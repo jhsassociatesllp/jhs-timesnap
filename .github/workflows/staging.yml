@@ -31,12 +31,16 @@ jobs:
       - name: Copy code to server (staging)
         run: |
           echo "📦 Copying code to /www/wwwroot/JHS_Timesnap/timesnap_staging ..."
+          tar -czf package.tar.gz .
+          scp -P 2232 -o StrictHostKeyChecking=no package.tar.gz \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/
           ssh -p 2232 -o StrictHostKeyChecking=no \
-              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-              "mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging"
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+              mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging &&
+              tar -xzf /www/wwwroot/JHS_Timesnap/package.tar.gz -C /www/wwwroot/JHS_Timesnap/timesnap_staging &&
+              rm -f /www/wwwroot/JHS_Timesnap/package.tar.gz
+              "
 
-          rsync -avz --delete -e "ssh -p 2232 -o StrictHostKeyChecking=no" \
-              ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/timesnap_staging/
 
       # -------------------------------
       # 4. Build & run Docker container
