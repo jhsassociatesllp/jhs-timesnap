@@ -1,4 +1,4 @@
-name: 🚀 Deploy to Staging (aapanel)
+name: 🚀 Deploy to Staging (aaPanel)
 
 on:
   push:
@@ -7,26 +7,54 @@ on:
 
 jobs:
   deploy:
+    name: Deploy to aaPanel Staging
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------------
+      # 1. Checkout the latest code
+      # -------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # -------------------------------
+      # 2. Setup SSH access
+      # -------------------------------
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SERVER_KEY }}
 
+      # -------------------------------
+      # 3. Copy code to the server via rsync
+      # -------------------------------
       - name: Copy code to server (staging)
         run: |
-          ssh -p 2232 -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging"
-          rsync -avz --delete -e "ssh -p 2232 -o StrictHostKeyChecking=no" ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/timesnap_staging/
+          echo "📦 Copying code to /www/wwwroot/JHS_Timesnap/timesnap_staging ..."
+          ssh -p 2232 -o StrictHostKeyChecking=no \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+              "mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging"
 
+          rsync -avz --delete -e "ssh -p 2232 -o StrictHostKeyChecking=no" \
+              ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/timesnap_staging/
+
+      # -------------------------------
+      # 4. Build & run Docker container
+      # -------------------------------
       - name: Deploy Docker container (staging)
         run: |
-          ssh -p 2232 -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-          cd /www/wwwroot/JHS_Timesnap/timesnap_staging &&
-          docker-compose down &&
-          APP_ENV=staging APP_PORT=9000 docker-compose up -d --build
-          "
+          echo "🐳 Deploying Docker container on port 9000 ..."
+          ssh -p 2232 -o StrictHostKeyChecking=no \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+              cd /www/wwwroot/JHS_Timesnap/timesnap_staging &&
+              docker-compose down &&
+              APP_ENV=staging APP_PORT=9000 docker-compose up -d --build &&
+              echo '✅ Container restarted successfully' &&
+              docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+              "
+
+      # -------------------------------
+      # 5. Confirmation message
+      # -------------------------------
+      - name: Deployment Completed
+        run: echo "🎉 Staging deployment completed successfully!"
