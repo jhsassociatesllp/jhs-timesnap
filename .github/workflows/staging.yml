@@ -26,20 +26,26 @@ jobs:
           ssh-private-key: ${{ secrets.SERVER_KEY }}
 
       # -------------------------------
-      # 3. Copy code to the server via rsync
-      # -------------------------------
+      # 3. Copy code to server (staging)
       - name: Copy code to server (staging)
         run: |
-          echo "📦 Copying code to /www/wwwroot/JHS_Timesnap/timesnap_staging ..."
-          tar -czf package.tar.gz .
+          echo "📦 Compressing and copying code to /www/wwwroot/JHS_Timesnap/timesnap_staging ..."
+          
+          # Create tarball but ignore 'file changed' warning
+          tar -czf package.tar.gz . --warning=no-file-changed || true
+
+          # Copy tarball to server
           scp -P 2232 -o StrictHostKeyChecking=no package.tar.gz \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/
+
+          # Extract files on server
           ssh -p 2232 -o StrictHostKeyChecking=no \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
               mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging &&
               tar -xzf /www/wwwroot/JHS_Timesnap/package.tar.gz -C /www/wwwroot/JHS_Timesnap/timesnap_staging &&
               rm -f /www/wwwroot/JHS_Timesnap/package.tar.gz
               "
+
 
 
       # -------------------------------
