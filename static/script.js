@@ -932,37 +932,37 @@ function pasteRow(button) {
     showPopup('Pasted!');
 }
 
-function pasteAboveCell(sectionId) {
-    const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
-    if (!tbody || tbody.rows.length === 0) return addRow(sectionId);
+// function pasteAboveCell(sectionId) {
+//     const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
+//     if (!tbody || tbody.rows.length === 0) return addRow(sectionId);
 
-    const lastRow = tbody.rows[tbody.rows.length - 1];
-    const newRow = lastRow.cloneNode(true);
-    tbody.insertBefore(newRow, lastRow.nextSibling);
+//     const lastRow = tbody.rows[tbody.rows.length - 1];
+//     const newRow = lastRow.cloneNode(true);
+//     tbody.insertBefore(newRow, lastRow.nextSibling);
 
-    const newInputs = newRow.querySelectorAll('input, select');
-    const lastInputs = lastRow.querySelectorAll('input, select');
+//     const newInputs = newRow.querySelectorAll('input, select');
+//     const lastInputs = lastRow.querySelectorAll('input, select');
 
-    newInputs.forEach((input, i) => {
-        if (input.type === 'button' || input.classList.contains('copy-btn') || input.classList.contains('paste-btn') || input.classList.contains('delete-btn')) return;
-        input.value = lastInputs[i]?.value || '';
-        if (input.classList.contains('date-field')) {
-            const date = new Date(input.value);
-            if (date < new Date(weekOptions[0].end)) {
-                date.setDate(date.getDate() + 1);
-                input.value = date.toISOString().split('T')[0];
-            }
-            validateDate(input);
-        }
-        if (input.classList.contains('project-start') || input.classList.contains('project-end')) {
-            calculateProjectHours(newRow);
-        }
-    });
+//     newInputs.forEach((input, i) => {
+//         if (input.type === 'button' || input.classList.contains('copy-btn') || input.classList.contains('paste-btn') || input.classList.contains('delete-btn')) return;
+//         input.value = lastInputs[i]?.value || '';
+//         if (input.classList.contains('date-field')) {
+//             const date = new Date(input.value);
+//             if (date < new Date(weekOptions[0].end)) {
+//                 date.setDate(date.getDate() + 1);
+//                 input.value = date.toISOString().split('T')[0];
+//             }
+//             validateDate(input);
+//         }
+//         if (input.classList.contains('project-start') || input.classList.contains('project-end')) {
+//             calculateProjectHours(newRow);
+//         }
+//     });
 
-    updateRowNumbers(tbody.id);
-    updateSummary();
-    showPopup('Duplicated above!');
-}
+//     updateRowNumbers(tbody.id);
+//     updateSummary();
+//     showPopup('Duplicated above!');
+// }
 
 function addWeekSection() {
     sectionCount++;
@@ -1040,11 +1040,11 @@ function addWeekSection() {
     addRowBtn.onclick = () => addRow(sectionId);
     buttonContainer.appendChild(addRowBtn);
 
-    const pasteAboveBtn = document.createElement('button');
-    pasteAboveBtn.className = 'paste-above-btn';
-    pasteAboveBtn.textContent = 'Paste Above Cell';
-    pasteAboveBtn.onclick = () => pasteAboveCell(sectionId);
-    buttonContainer.appendChild(pasteAboveBtn);
+    // const pasteAboveBtn = document.createElement('button');
+    // pasteAboveBtn.className = 'paste-above-btn';
+    // pasteAboveBtn.textContent = 'Paste Above Cell';
+    // pasteAboveBtn.onclick = () => pasteAboveCell(sectionId);
+    // buttonContainer.appendChild(pasteAboveBtn);
 
     section.appendChild(buttonContainer);
     sectionsDiv.appendChild(section);
