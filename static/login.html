@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Professional Time Sheet</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --dark-bg: #2c3e50;
+            --light-bg: #f8f9fa;
+            --text-dark: #2c3e50;
+            --border-color: #e1e8ed;
+            --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-medium: 0 10px 25px rgba(0, 0, 0, 0.15);
+            --shadow-heavy: 0 20px 40px rgba(0, 0, 0, 0.2);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-gradient);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            padding: 1rem;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="white" opacity="0.05"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.1;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .login-container {
+            background: white;
+            padding: 2.5rem 3rem;
+            border-radius: 20px;
+            box-shadow: var(--shadow-heavy);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            animation: fadeInUp 0.8s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-container h2 {
+            margin: 0 0 2rem 0;
+            color: var(--text-dark);
+            font-size: 2.2rem;
+            font-weight: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+        }
+
+        .login-container h2 i {
+            color: #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+            text-align: left;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 1.2rem 3.5rem 1.2rem 3.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            font-size: 1.1rem;
+            transition: var(--transition);
+            background: white;
+            position: relative;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .form-group i {
+            position: absolute;
+            top: 2.8rem;
+            color: #bdc3c7;
+            z-index: 1;
+            transition: var(--transition);
+        }
+
+        .form-group i.fa-lock, .form-group i.fa-user {
+            left: 1.2rem;
+        }
+
+        .form-group i.fa-eye, .form-group i.fa-eye-slash {
+            right: 1.2rem;
+            cursor: pointer;
+        }
+
+        .form-group:focus-within i {
+            color: #667eea;
+        }
+
+        .login-btn {
+            background: var(--success-gradient);
+            color: white;
+            border: none;
+            padding: 1.2rem 2.5rem;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: 600;
+            width: 100%;
+            transition: var(--transition);
+            box-shadow: var(--shadow-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 1rem;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-medium);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .register-link {
+            margin-top: 1.5rem;
+            font-size: 1rem;
+            color: #7f8c8d;
+        }
+
+        .register-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+            color: #764ba2;
+        }
+
+        .message {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            border-left: 4px solid;
+            display: none;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            background: #fdf2f2;
+            border-left-color: #e74c3c;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        .success-message {
+            color: #11998e;
+            background: #e8f9f0;
+            border-left-color: #11998e;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 1rem;
+                padding: 2rem;
+                border-radius: 15px;
+            }
+
+            .login-container h2 {
+                font-size: 1.8rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .form-group {
+                margin-bottom: 1.5rem;
+            }
+
+            .form-group input {
+                padding: 1rem 3rem 1rem 3rem;
+                font-size: 1rem;
+            }
+
+            .form-group i.fa-lock, .form-group i.fa-user {
+                left: 1rem;
+            }
+
+            .form-group i.fa-eye, .form-group i.fa-eye-slash {
+                right: 1rem;
+            }
+
+            .login-btn {
+                padding: 1rem 2rem;
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 320px) {
+            .login-container {
+                padding: 1.5rem;
+            }
+
+            .form-group input {
+                padding: 0.9rem 2.5rem 0.9rem 2.5rem;
+            }
+
+            .form-group i.fa-lock, .form-group i.fa-user {
+                left: 0.8rem;
+            }
+
+            .form-group i.fa-eye, .form-group i.fa-eye-slash {
+                right: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2><i class="fas fa-sign-in-alt"></i> Login</h2>
+        <div id="message" class="message"></div>
+        <div class="form-group">
+            <label>Employee Code</label>
+            <i class="fas fa-user"></i>
+            <input type="text" id="empid" placeholder="Enter your employee code">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" placeholder="Enter your password">
+            <i class="fas fa-eye toggle-password" onclick="togglePassword('password')"></i>
+        </div>
+        <button class="login-btn" onclick="login()"><i class="fas fa-arrow-right"></i> Login</button>
+        <div class="register-link">
+            Don't have an account? <a href="/static/register.html">Register</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        async function login() {
+            const empid = document.getElementById('empid').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!empid || !password) {
+                showMessage('Please enter both Employee Code and Password', 'error');
+                return;
+            }
+
+            const btn = document.querySelector('.login-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        username: empid,
+                        password: password
+                    })
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    localStorage.setItem('access_token', result.access_token);
+                    localStorage.setItem('loggedInEmployeeId', empid);
+                    window.location.href = '/dashboard';
+                } else {
+                    showMessage(result.detail || 'Invalid Employee Code or Password', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage('Failed to login: ' + error.message, 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function nlogin() {
+            const empid = document.getElementById('empid').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!empid || !password) {
+                showMessage('Please enter both Employee Code and Password', 'error');
+                return;
+            }
+
+            const btn = document.querySelector('.login-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ empid, password })
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    localStorage.setItem('access_token', result.access_token);
+                    localStorage.setItem('loggedInEmployeeId', empid);
+                    window.location.href = '/dashboard';
+                } else {
+                    showMessage(result.detail || 'Invalid Employee Code or Password', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage('Failed to login: ' + error.message, 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv) {
+                messageDiv.className = 'message ' + (type === 'success' ? 'success-message' : 'error-message');
+                messageDiv.textContent = message;
+                messageDiv.style.display = 'block';
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+name: 🚀 Deploy to Staging (aapanel)
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_KEY }}
+
+      - name: Copy code to server (staging)
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging"
+          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/timesnap_staging/
+
+      - name: Deploy Docker container (staging)
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd /www/wwwroot/JHS_Timesnap/timesnap_staging &&
+          docker-compose down &&
+          APP_ENV=staging APP_PORT=9000 docker-compose up -d --build
+          "

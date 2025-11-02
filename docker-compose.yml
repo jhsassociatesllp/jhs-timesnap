@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  jhs_timesnap:
+    build: .
+    container_name: jhs_timesnap_${APP_ENV}
+    ports:
+      - "${APP_PORT}:8000"
+    restart: always
+    environment:
+      - APP_ENV=${APP_ENV}
+    volumes:
+      - .:/app
