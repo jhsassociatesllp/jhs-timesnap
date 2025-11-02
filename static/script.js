@@ -6,7 +6,7 @@ let currentRow = null;
 let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem('loggedInEmployeeId');
 let copiedData = null;
-const API_URL = 'http://localhost:8000';
+const API_URL = '';
 let isEditingHistory = false;
 let currentEntryId = null;
 
