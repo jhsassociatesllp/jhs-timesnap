@@ -179,7 +179,7 @@ function hideLoading() {
 function fetchEmployeeData(empId) {
     const cleanEmpId = empId.trim();
     const employee = employeeData.find(e => e['EmpID']?.toString().trim() === cleanEmpId);
-    print(`Fetching data for Employee ID: ${cleanEmpId}`, employee ? '✅ Found' : '❌ Not Found');
+    // print(`Fetching data for Employee ID: ${cleanEmpId}`, employee ? '✅ Found' : '❌ Not Found');
     if (!employee) {
         showError(`No employee found for ID: ${empId}`);
         return null;
