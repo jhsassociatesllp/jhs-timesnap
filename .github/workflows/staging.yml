@@ -11,34 +11,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------
-      # 1. Checkout the latest code
-      # -------------------------------
+      # 1️⃣ Checkout latest code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------
-      # 2. Setup SSH access
-      # -------------------------------
+      # 2️⃣ Setup SSH
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SERVER_KEY }}
 
-      # -------------------------------
-      # 3. Copy code to server (staging)
+      # 3️⃣ Copy project files to server (without rsync)
       - name: Copy code to server (staging)
         run: |
           echo "📦 Compressing and copying code to /www/wwwroot/JHS_Timesnap/timesnap_staging ..."
           
-          # Create tarball but ignore 'file changed' warning
-          tar -czf package.tar.gz . --warning=no-file-changed || true
-
-          # Copy tarball to server
+          # Create compressed tarball (ignore warnings)
+          tar -czf package.tar.gz . --exclude='.git' --exclude='venv' --warning=no-file-changed || true
+          
+          # Upload to server
           scp -P 2232 -o StrictHostKeyChecking=no package.tar.gz \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/www/wwwroot/JHS_Timesnap/
 
-          # Extract files on server
+          # Extract and clean up
           ssh -p 2232 -o StrictHostKeyChecking=no \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
               mkdir -p /www/wwwroot/JHS_Timesnap/timesnap_staging &&
@@ -46,25 +41,28 @@ jobs:
               rm -f /www/wwwroot/JHS_Timesnap/package.tar.gz
               "
 
-
-
-      # -------------------------------
-      # 4. Build & run Docker container
-      # -------------------------------
+      # 4️⃣ Deploy Docker container on port 8010
       - name: Deploy Docker container (staging)
         run: |
-          echo "🐳 Deploying Docker container on port 9000 ..."
+          echo "🐳 Deploying Docker container on port 8010 ..."
           ssh -p 2232 -o StrictHostKeyChecking=no \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
               cd /www/wwwroot/JHS_Timesnap/timesnap_staging &&
-              docker-compose down &&
-              APP_ENV=staging APP_PORT=9000 docker-compose up -d --build &&
+              
+              # Stop any running container using the same name
+              docker stop jhs_timesnap_staging || true &&
+              docker rm jhs_timesnap_staging || true &&
+              
+              # Bring down any existing docker-compose services
+              docker-compose down || true &&
+              
+              # Rebuild and run on port 8010
+              APP_ENV=staging APP_PORT=8010 docker-compose up -d --build &&
+              
               echo '✅ Container restarted successfully' &&
               docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
               "
 
-      # -------------------------------
-      # 5. Confirmation message
-      # -------------------------------
+      # 5️⃣ Final confirmation
       - name: Deployment Completed
-        run: echo "🎉 Staging deployment completed successfully!"
+        run: echo "🎉 Staging deployment completed successfully on port 8010!"
