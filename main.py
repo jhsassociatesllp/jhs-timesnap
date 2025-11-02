@@ -253,6 +253,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
 @app.get("/employees")
 async def get_employees(current_user: str = Depends(get_current_user)):
     employees = list(employee_details_collection.find({}, {"_id": 0}))
+    print(f"Employees fetched: {employees}")
     return employees
 
 @app.get("/clients")
