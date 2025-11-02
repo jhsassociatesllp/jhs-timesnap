@@ -45,6 +45,7 @@ MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
 if not MONGO_CONNECTION_STRING:
     raise ValueError("MONGO_CONNECTION_STRING environment variable is required")
 
+print("MongoDB Connection String:", MONGO_CONNECTION_STRING)
 client = MongoClient(MONGO_CONNECTION_STRING)
 # client = MongoClient("mongodb://mongodb:'Jh$20212'@jhstimesnap_mongo:27017/?authSource=admin")
 db = client["Timesheets"]
