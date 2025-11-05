@@ -258,6 +258,37 @@ function updateExistingRowDates(sectionId) {
     }
 }
 
+// function validateDate(dateInput) {
+//     if (!dateInput) return;
+//     const section = dateInput.closest('.timesheet-section');
+//     const weekSelect = section.querySelector('.week-period select');
+//     const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
+//     if (!selectedWeek) return;
+
+//     const inputDateStr = dateInput.value;
+//     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
+//     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
+
+//     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
+//         dateInput.classList.add('validation-error');
+//         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
+//     } else {
+//         dateInput.classList.remove('validation-error');
+//         clearValidationMessage(dateInput);
+//     }
+
+//     const today = new Date();
+//     const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
+//     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+//     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
+//     const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+//     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
+//         dateInput.classList.add('validation-error');
+//         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+//     }
+// }
+
 function validateDate(dateInput) {
     if (!dateInput) return;
     const section = dateInput.closest('.timesheet-section');
@@ -269,25 +300,76 @@ function validateDate(dateInput) {
     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
 
+    const today = new Date();
+    const inputDate = new Date(inputDateStr + "T00:00:00");
+
+    const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
+    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+    const currentHour = today.getHours();
+
+    // ✅ Reset existing error state
+    dateInput.classList.remove('validation-error');
+    clearValidationMessage(dateInput);
+
+    // 1️⃣ Check if within week
     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
         dateInput.classList.add('validation-error');
         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
-    } else {
-        dateInput.classList.remove('validation-error');
-        clearValidationMessage(dateInput);
+        return;
     }
 
-    const today = new Date();
-    const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-    const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
+    // 2️⃣ Check allowed date range (last 60 days to yesterday/today after 7PM)
+    if (inputDate < sixtyDaysAgo) {
         dateInput.classList.add('validation-error');
-        showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+        showValidationMessage(dateInput, 'You can only fill timesheet entries from the last 60 days.');
+        return;
     }
+
+    // ✅ 3️⃣ Allow current day entry only if time >= 7PM
+    const inputDateStrIso = inputDate.toISOString().split('T')[0];
+    const todayStrIso = today.toISOString().split('T')[0];
+
+    if (inputDateStrIso === todayStrIso && currentHour < 19) {
+        dateInput.classList.add('validation-error');
+        showValidationMessage(dateInput, 'You can fill today’s timesheet only after 7 PM.');
+        return;
+    }
+
+    // ✅ 4️⃣ If all good, clear any previous error
+    clearValidationMessage(dateInput);
 }
+
+
+// function validateModalDate(dateInput) {
+//     if (!dateInput || !currentRow) return;
+//     const section = currentRow.closest('.timesheet-section');
+//     const weekSelect = section.querySelector('.week-period select');
+//     const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
+//     if (!selectedWeek) return;
+
+//     const inputDateStr = dateInput.value;
+//     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
+//     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
+
+//     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
+//         dateInput.classList.add('validation-error');
+//         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
+//     } else {
+//         dateInput.classList.remove('validation-error');
+//         clearValidationMessage(dateInput);
+//     }
+
+//     const today = new Date();
+//     const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
+//     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+//     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
+//     const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+//     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
+//         dateInput.classList.add('validation-error');
+//         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+//     }
+// }
 
 function validateModalDate(dateInput) {
     if (!dateInput || !currentRow) return;
@@ -297,28 +379,35 @@ function validateModalDate(dateInput) {
     if (!selectedWeek) return;
 
     const inputDateStr = dateInput.value;
+    const today = new Date();
+    const inputDate = new Date(inputDateStr + "T00:00:00");
+    const currentHour = today.getHours();
+
     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
+
+    dateInput.classList.remove('validation-error');
+    clearValidationMessage(dateInput);
 
     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
         dateInput.classList.add('validation-error');
         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
-    } else {
-        dateInput.classList.remove('validation-error');
-        clearValidationMessage(dateInput);
+        return;
     }
 
-    const today = new Date();
-    const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-    const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    // ✅ Allow current date only after 7 PM
+    const inputDateStrIso = inputDate.toISOString().split('T')[0];
+    const todayStrIso = today.toISOString().split('T')[0];
 
-    if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
+    if (inputDateStrIso === todayStrIso && currentHour < 19) {
         dateInput.classList.add('validation-error');
-        showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+        showValidationMessage(dateInput, 'You can fill today’s timesheet only after 7 PM.');
+        return;
     }
+
+    clearValidationMessage(dateInput);
 }
+
 
 function showValidationMessage(element, message) {
     if (!element) return;
