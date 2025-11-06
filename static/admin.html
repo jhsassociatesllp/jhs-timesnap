@@ -74,8 +74,8 @@
         }
 
         .form-group input:focus {
-            border-color: #38ef7d;
-            box-shadow: 0 0 0 4px rgba(56, 239, 125, 0.2);
+            border-color: #171817;
+            box-shadow: 0 0 0 4px rgba(99, 100, 99, 0.2);
             outline: none;
         }
 
@@ -135,39 +135,42 @@
         <div id="message" class="message"></div>
     </div>
 
-    <script>
+    <!-- <script>
         const API_URL = "http://127.0.0.1:8000"; // adjust if needed
 
         async function submitAdminLogin() {
-            const userid = document.getElementById("adminUserId").value.trim();
-            const password = document.getElementById("adminPassword").value.trim();
-            const message = document.getElementById("message");
+    const userid = document.getElementById("adminUserId").value.trim();
+    const password = document.getElementById("adminPassword").value.trim();
 
-            if (!userid || !password) {
-                showMessage("Please fill all fields", "error");
-                return;
-            }
+    if (!userid || !password) {
+        showMessage("Please fill all fields", "error");
+        return;
+    }
 
-            try {
-                const response = await fetch(`${API_URL}/admin-login`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userid, password })
-                });
-                const result = await response.json();
+    try {
+        console.log("Admin login")
+        const response = await fetch(`${API_URL}/admin-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid, password }),
+            // credentials: "include" // ✅ IMPORTANT: allow cookies
+        });
 
-                if (response.ok && result.success) {
-                    showMessage("Login successful!", "success");
-                    setTimeout(() => {
-                        window.location.href = "/admin-dashboard";
-                    }, 1500);
-                } else {
-                    showMessage(result.detail || "Invalid credentials", "error");
-                }
-            } catch (err) {
-                showMessage("Error: " + err.message, "error");
-            }
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showMessage("Login successful!", "success");
+            setTimeout(() => {
+                window.location.href = result.redirect; // ✅ use backend redirect path
+            }, 1200);
+        } else {
+            showMessage(result.detail || "Invalid credentials", "error");
         }
+    } catch (err) {
+        showMessage("Error: " + err.message, "error");
+    }
+}
+
 
         function showMessage(text, type) {
             const message = document.getElementById("message");
@@ -176,6 +179,57 @@
             message.style.display = "block";
             setTimeout(() => message.style.display = "none", 4000);
         }
-    </script>
+    </script> -->
+    <script>
+const API_URL = "http://127.0.0.1:8000";
+
+
+
+async function submitAdminLogin() {
+    const userid = document.getElementById("adminUserId").value.trim();
+    const password = document.getElementById("adminPassword").value.trim();
+
+    if (!userid || !password) {
+        showMessage("Please fill all fields", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/admin-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid, password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // ✅ Store token & userid in localStorage
+            localStorage.setItem("access_token", result.access_token);
+            localStorage.setItem("admin_userid", result.userid);
+
+            showMessage("Login successful!", "success");
+
+            // ✅ Redirect to dashboard
+            setTimeout(() => {
+                window.location.href = "/admin-dashboard";
+            }, 1200);
+        } else {
+            showMessage(result.detail || "Invalid credentials", "error");
+        }
+    } catch (err) {
+        showMessage("Error: " + err.message, "error");
+    }
+}
+
+function showMessage(text, type) {
+    const message = document.getElementById("message");
+    message.className = `message ${type}`;
+    message.textContent = text;
+    message.style.display = "block";
+    setTimeout(() => (message.style.display = "none"), 4000);
+}
+</script>
+
 </body>
 </html>

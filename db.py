@@ -26,4 +26,8 @@ employee_details_collection = db["Employee_details"]
 client_details_collection = db["Client_details"]
 users_collection = db["users"]
 admin_details_collection = db["Admin_details"]
+reporting_managers_collection = db["Reporting_managers"]
+pending_collection = db["Pending"]
+approved_collection = db["Approved"]
+rejected_collection = db["Rejected"]
 

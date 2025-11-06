@@ -1358,3 +1358,6 @@ body {
     justify-content: center;
     gap: 8px;
 }
+.manager-only {
+  display: none;
+}

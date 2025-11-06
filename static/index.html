@@ -1,184 +1,457 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Time Sheet - Professional Time Tracking</title>
-    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg">
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
+    <!-- Font Awesome & Google Fonts -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+
+  <body>
+    <!-- NAVBAR -->
     <div class="navbar">
-        <div class="hamburger" onclick="toggleNavMenu()"><i class="fas fa-bars"></i></div>
-        <div class="nav-menu" id="navMenu">
-            <a href="#" onclick="showSection('timesheet')"><i class="fas fa-clock"></i> Timesheet</a>
-            <a href="#" onclick="showSection('history')"><i class="fas fa-history"></i> History</a>
-            <button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-        </div>
+      <div class="hamburger" onclick="toggleNavMenu()">
+        <i class="fas fa-bars"></i>
+      </div>
+      <div class="nav-menu" id="navMenu">
+        <a
+          href="#"
+          onclick="showSection('timesheet')"
+          id="timesheetLink"
+          class="active"
+          ><i class="fas fa-clock"></i> Timesheet</a
+        >
+        <a href="#" onclick="showSection('history')" id="historyLink"
+          ><i class="fas fa-history"></i> History</a
+        >
+
+        <!-- Manager Only Buttons (Hidden by default) -->
+        <a
+          href="#"
+          id="pendingBtn"
+          class="manager-only"
+          onclick="showSection('pending')"
+          ><i class="fas fa-hourglass-half"></i> Pending</a
+        >
+        <a
+          href="#"
+          id="approveBtn"
+          class="manager-only"
+          onclick="showSection('approve')"
+          ><i class="fas fa-check-circle"></i> Approved</a
+        >
+        <a
+          href="#"
+          id="rejectedBtn"
+          class="manager-only"
+          onclick="showSection('rejected')"
+          ><i class="fas fa-times-circle"></i> Rejected</a
+        >
+
+        <button onclick="showExitConfirmation()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
     </div>
 
     <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-stopwatch"></i> JHS TIMESHEET</h1>
-        </div>
-        
-        <div class="form-section active" id="timesheetSection">
-            <div id="errorMessage" class="error-message"></div>
-            <div class="employee-info">
-                <div class="form-group">
-                    <label>Employee ID</label>
-                    <input type="text" id="employeeId" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Employee Name</label>
-                    <input type="text" id="employeeName" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Designation</label>
-                    <input type="text" id="designation" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Gender</label>
-                    <input type="text" id="gender" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Partner</label>
-                    <input type="text" id="partner" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Reporting Manager</label>
-                    <input type="text" id="reportingManager">
-                </div>
-            </div>
+      <div class="header">
+        <h1><i class="fas fa-stopwatch"></i> JHS TIMESHEET</h1>
+      </div>
 
-            <div id="timesheetSections"></div>
-
-            <button class="add-week-btn" onclick="addWeekSection()"><i class="fas fa-plus"></i> Add Week Period</button>
-            
-            <div class="feedback-section">
-                <div class="feedback-item">
-                    <label>3 HITS</label>
-                    <textarea id="hits" rows="3"></textarea>
-                </div>
-                <div class="feedback-item">
-                    <label>3 MISSES</label>
-                    <textarea id="misses" rows="3"></textarea>
-                </div>
-                <div class="feedback-item">
-                    <label>FEEDBACK FOR HR</label>
-                    <textarea id="feedback_hr" rows="3"></textarea>
-                </div>
-                <div class="feedback-item">
-                    <label>FEEDBACK FOR IT</label>
-                    <textarea id="feedback_it" rows="3"></textarea>
-                </div>
-                <div class="feedback-item">
-                    <label>FEEDBACK FOR CRM</label>
-                    <textarea id="feedback_crm" rows="3"></textarea>
-                </div>
-                <div class="feedback-item">
-                    <label>FEEDBACK FOR OTHERS</label>
-                    <textarea id="feedback_others" rows="3"></textarea>
-                </div>
-            </div>
-
-            <div class="summary-section">
-                <div class="summary-item total-hours">
-                    <h3><i class="fas fa-clock"></i> Total Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-                <div class="summary-item billable-hours">
-                    <h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-                <div class="summary-item non-billable-hours">
-                    <h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-            </div>
-
-            <div class="export-section">
-                <h3><i class="fas fa-download"></i> Export Timesheet</h3>
-                <button class="export-btn" onclick="exportTimesheetToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
-                <button class="export-btn" onclick="saveDataToMongo()"><i class="fas fa-save"></i> Submit</button>
-                <button class="clear-btn" onclick="clearTimesheet()"><i class="fas fa-eraser"></i> Clear</button>
-                <button class="export-btn" onclick="document.getElementById('uploadExcelInput').click()">
-                    <i class="fas fa-file-upload"></i> Upload Excel
-                </button>
-                <input type="file" id="uploadExcelInput" accept=".xlsx,.xls" style="display:none">
-
-            </div>
+      <!-- TIMESHEET SECTION -->
+      <div class="form-section active" id="timesheetSection">
+        <div id="errorMessage" class="error-message"></div>
+        <div class="employee-info">
+          <div class="form-group">
+            <label>Employee ID</label
+            ><input type="text" id="employeeId" readonly />
+          </div>
+          <div class="form-group">
+            <label>Employee Name</label
+            ><input type="text" id="employeeName" readonly />
+          </div>
+          <div class="form-group">
+            <label>Designation</label
+            ><input type="text" id="designation" readonly />
+          </div>
+          <div class="form-group">
+            <label>Gender</label><input type="text" id="gender" readonly />
+          </div>
+          <div class="form-group">
+            <label>Partner</label><input type="text" id="partner" readonly />
+          </div>
+          <div class="form-group">
+            <label>Reporting Manager</label
+            ><input type="text" id="reportingManager" />
+          </div>
         </div>
 
-        <div class="history-section" id="historySection">
-            <h2><i class="fas fa-history"></i> Past Timesheet Entries</h2>
-            <div class="summary-section history-summary">
-                <div class="summary-item total-hours">
-                    <h3><i class="fas fa-clock"></i> Total Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-                <div class="summary-item billable-hours">
-                    <h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-                <div class="summary-item non-billable-hours">
-                    <h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3>
-                    <div class="value">0.00</div>
-                </div>
-            </div>
-            <div id="historyContent"></div>
-            <div class="history-export-section">
-                <h3><i class="fas fa-download"></i> Export History</h3>
-                <button class="export-btn" onclick="exportHistoryToExcel()"><i class="fas fa-file-excel"></i> Export History to Excel</button>
-            </div>
+        <div id="timesheetSections"></div>
+
+        <button class="add-week-btn" onclick="addWeekSection()">
+          <i class="fas fa-plus"></i> Add Week Period
+        </button>
+
+        <div class="feedback-section">
+          <div class="feedback-item">
+            <label>3 HITS</label><textarea id="hits" rows="3"></textarea>
+          </div>
+          <div class="feedback-item">
+            <label>3 MISSES</label><textarea id="misses" rows="3"></textarea>
+          </div>
+          <div class="feedback-item">
+            <label>FEEDBACK FOR HR</label
+            ><textarea id="feedback_hr" rows="3"></textarea>
+          </div>
+          <div class="feedback-item">
+            <label>FEEDBACK FOR IT</label
+            ><textarea id="feedback_it" rows="3"></textarea>
+          </div>
+          <div class="feedback-item">
+            <label>FEEDBACK FOR CRM</label
+            ><textarea id="feedback_crm" rows="3"></textarea>
+          </div>
+          <div class="feedback-item">
+            <label>FEEDBACK FOR OTHERS</label
+            ><textarea id="feedback_others" rows="3"></textarea>
+          </div>
         </div>
+
+        <div class="summary-section">
+          <div class="summary-item total-hours">
+            <h3><i class="fas fa-clock"></i> Total Hours</h3>
+            <div class="value">0.00</div>
+          </div>
+          <div class="summary-item billable-hours">
+            <h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3>
+            <div class="value">0.00</div>
+          </div>
+          <div class="summary-item non-billable-hours">
+            <h3>
+              <i class="fas fa-exclamation-triangle"></i> Non-Billable Hours
+            </h3>
+            <div class="value">0.00</div>
+          </div>
+        </div>
+
+        <div class="export-section">
+          <h3><i class="fas fa-download"></i> Export Timesheet</h3>
+          <button class="export-btn" onclick="exportTimesheetToExcel()">
+            <i class="fas fa-file-excel"></i> Export to Excel
+          </button>
+          <button class="export-btn" onclick="saveDataToMongo()">
+            <i class="fas fa-save"></i> Submit
+          </button>
+          <button class="clear-btn" onclick="clearTimesheet()">
+            <i class="fas fa-eraser"></i> Clear
+          </button>
+          <!-- ✅ New Upload Excel Button -->
+          <button
+            class="export-btn"
+            onclick="document.getElementById('excelUploadInput').click()"
+          >
+            <i class="fas fa-upload"></i> Upload Excel
+          </button>
+
+          <!-- Hidden file input -->
+          <input
+            type="file"
+            id="excelUploadInput"
+            accept=".xlsx, .xls"
+            style="display: none"
+            onchange="handleExcelUpload(event)"
+          />
+        </div>
+      </div>
+
+      <!-- HISTORY SECTION -->
+      <div class="history-section" id="historySection" style="display: none">
+        <h2><i class="fas fa-history"></i> Past Timesheet Entries</h2>
+        <div class="summary-section history-summary">
+          <div class="summary-item total-hours">
+            <h3><i class="fas fa-clock"></i> Total Hours</h3>
+            <div class="value">0.00</div>
+          </div>
+          <div class="summary-item billable-hours">
+            <h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3>
+            <div class="value">0.00</div>
+          </div>
+          <div class="summary-item non-billable-hours">
+            <h3>
+              <i class="fas fa-exclamation-triangle"></i> Non-Billable Hours
+            </h3>
+            <div class="value">0.00</div>
+          </div>
+        </div>
+        <div id="historyContent"></div>
+        <div class="history-export-section">
+          <h3><i class="fas fa-download"></i> Export History</h3>
+          <button class="export-btn" onclick="exportHistoryToExcel()">
+            <i class="fas fa-file-excel"></i> Export History to Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- PENDING APPROVAL SECTION -->
+      <div class="pending-section" id="pendingSection" style="display: none">
+        <h2><i class="fas fa-hourglass-half"></i> Pending Approval</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pendingTableBody">
+              <tr>
+                <td colspan="3">Loading pending approvals...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- APPROVED SECTION -->
+      <div class="approve-section" id="approveSection" style="display: none">
+        <h2><i class="fas fa-check-circle"></i> Approved Employees</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="approveTableBody">
+              <tr>
+                <td colspan="3">Loading approved list...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REJECTED SECTION -->
+      <div class="rejected-section" id="rejectedSection" style="display: none">
+        <h2><i class="fas fa-times-circle"></i> Rejected Employees</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rejectedTableBody">
+              <tr>
+                <td colspan="3">Loading rejected list...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal-overlay" id="modalOverlay">
+    <!-- POPUPS & LOADING -->
+    <div class="popup" id="successPopup">
+      <p id="popupMessage"><i class="fas fa-check-circle"></i> Message</p>
+      <!-- <button class="popup-close" onclick="closePopup()">&times;</button> -->
+    </div>
+    <!-- <div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Saving...</div> -->
+
+
+    <!-- MODAL OVERLAY -->
+    <!-- <div class="modal-overlay" id="modalOverlay">
         <div class="modal-content">
-            <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()"></div>
-            <div><label id="modalLabel2">Location</label><select id="modalInput2" class="form-input">
-                <option value="Office">Office</option>
-                <option value="Client Site">Client Site</option>
-                <option value="Work From Home">Work From Home</option>
-                <option value="Field Work">Field Work</option>
-            </select></div>
-            <div><label id="modalLabel3">Project Start Time</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-            <div><label id="modalLabel4">Project End Time</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-            <div><label id="modalLabel5">Client</label><input id="modalInput5" class="form-input" placeholder="Enter Client" onchange="updateModalHours()"></div>
-            <div><label id="modalLabel6">Project</label><input type="text" id="modalInput6" class="form-input" placeholder="Enter Project" onchange="updateModalHours()"></div>
-            <div><label id="modalLabel7">Project Code</label><input type="text" id="modalInput7" class="form-input" placeholder="Enter Project Code" onchange="updateModalHours()"></div>
-            <div><label id="modalLabel8">Reporting Manager</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()"></div>
-            <div><label id="modalLabel9">Activity</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()"></div>
+            <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalProjectHours()"></div>
+            <div><label id="modalLabel2">Location</label>
+                <select id="modalInput2" class="form-input">
+                    <option value="Office">Office</option>
+                    <option value="Client Site">Client Site</option>
+                    <option value="Work From Home">Work From Home</option>
+                    <option value="Field Work">Field Work</option>
+                </select>
+            </div>
+            <div><label id="modalLabel3">Project Start Time</label><input type="time" id="modalInput3" class="form-input" onchange="updateModalProjectHours()"></div>
+            <div><label id="modalLabel4">Project End Time</label><input type="time" id="modalInput4" class="form-input" onchange="updateModalProjectHours()"></div>
+            <div><label id="modalLabel5">Client</label><input id="modalInput5" class="form-input" placeholder="Enter Client"></.div>
+            <div><label id="modalLabel6">Project</label><input type="text" id="modalInput6" class="form-input" placeholder="Enter Project"></div>
+            <div><label id="modalLabel7">Project Code</label><input type="text" id="modalInput7" class="form-input" placeholder="Enter Project Code"></div>
+            <div><label id="modalLabel8">Reporting Manager</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Reporting Manager"></div>
+            <div><label id="modalLabel9">Activity</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Activity"></div>
             <div><label id="modalLabel10">Project Hours</label><input type="number" id="modalInput10" class="form-input" readonly></div>
-            <div><label id="modalLabel11">Billable</label><select id="modalInput11" class="form-input" onchange="updateModalHours()">
-                <option value="Yes">Billable</option>
-                <option value="No">Non-Billable</option>
-            </select></div>
-            <div><label id="modalLabel12">Remarks</label><input type="text" id="modalInput12" class="form-input" placeholder="Additional notes" onchange="updateModalHours()"></div>
+            <div><label id="modalLabel11">Billable</label>
+                <select id="modalInput11" class="form-input">
+                    <option value="Yes">Billable</option>
+                    <option value="No">Non-Billable</option>
+                </select>
+            </div>
+            <div><label id="modalLabel12">Remarks</label><input type="text" id="modalInput12" class="form-input" placeholder="Additional notes"></div>
+
             <button id="modalCancelBtn" class="modal-cancel-btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
             <button id="modalAddBtn" class="modal-add-btn" onclick="saveModalEntry()"><i class="fas fa-check"></i> Add</button>
         </div>
-    </div>
+    </div> -->
 
-    <div class="popup" id="successPopup">
-        <button class="popup-close" onclick="closePopup()">&times;</button>
-        <p id="popupMessage"><i class="fas fa-check-circle"></i></p>
-    </div>
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal-content">
+        <div>
+          <label id="modalLabel1">Date</label>
+          <input
+            type="date"
+            id="modalInput1"
+            class="form-input"
+            onchange="validateModalDate(this); updateModalProjectHours()"
+          />
+        </div>
 
-    <div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Saving...</div>
+        <div>
+          <label id="modalLabel2">Location</label>
+          <select id="modalInput2" class="form-input">
+            <option value="Office">Office</option>
+            <option value="Client Site">Client Site</option>
+            <option value="Work From Home">Work From Home</option>
+            <option value="Field Work">Field Work</option>
+          </select>
+        </div>
+
+        <div>
+          <label id="modalLabel3">Project Start Time</label>
+          <input
+            type="time"
+            id="modalInput3"
+            class="form-input"
+            onchange="updateModalProjectHours()"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel4">Project End Time</label>
+          <input
+            type="time"
+            id="modalInput4"
+            class="form-input"
+            onchange="updateModalProjectHours()"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel5">Client</label>
+          <input
+            id="modalInput5"
+            class="form-input"
+            placeholder="Enter Client"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel6">Project</label>
+          <input
+            type="text"
+            id="modalInput6"
+            class="form-input"
+            placeholder="Enter Project"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel7">Project Code</label>
+          <input
+            type="text"
+            id="modalInput7"
+            class="form-input"
+            placeholder="Enter Project Code"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel8">Reporting Manager</label>
+          <input
+            type="text"
+            id="modalInput8"
+            class="form-input"
+            placeholder="Enter Reporting Manager"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel9">Activity</label>
+          <input
+            type="text"
+            id="modalInput9"
+            class="form-input"
+            placeholder="Enter Activity"
+          />
+        </div>
+
+        <div>
+          <label id="modalLabel10">Project Hours</label>
+          <input type="number" id="modalInput10" class="form-input" readonly />
+        </div>
+
+        <div>
+          <label id="modalLabel11">Billable</label>
+          <select id="modalInput11" class="form-input">
+            <option value="Yes">Billable</option>
+            <option value="No">Non-Billable</option>
+          </select>
+        </div>
+
+        <div>
+          <label id="modalLabel12">Remarks</label>
+          <input
+            type="text"
+            id="modalInput12"
+            class="form-input"
+            placeholder="Additional notes"
+          />
+        </div>
+
+        <!-- ✅ Buttons wrapper (newly added) -->
+        <div class="modal-buttons">
+          <button
+            id="modalCancelBtn"
+            class="modal-cancel-btn"
+            onclick="closeModal()"
+          >
+            <i class="fas fa-times"></i> Cancel
+          </button>
+          <button
+            id="modalAddBtn"
+            class="modal-add-btn"
+            onclick="saveModalEntry()">
+            <i class="fas fa-check"></i> Add
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div class="exit-confirmation" id="exitConfirmation">
-        <p>Do you want to exit?</p>
-        <button class="cancel-btn" onclick="cancelExit()">No</button>
-        <button class="confirm-btn" onclick="confirmExit()">Yes</button>
+      <p>Do you want to exit?</p>
+      <button class="cancel-btn" onclick="cancelExit()">No</button>
+      <button class="confirm-btn" onclick="confirmExit()">Yes</button>
     </div>
 
+    <!-- SCRIPTS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="/static/script.js"></script>
-</body>
+    <!-- <script src="/static/js/script.js"></script> -->
+
+  </body>
 </html>
