@@ -113,37 +113,6 @@
 #     return response
 
 
-# @admin_router.post("/create-admin")
-# async def create_admin(request: AdminRegisterRequest):
-#     userid = request.userid.strip().upper()
-#     password = request.password
-
-#     # Validation
-#     if len(password) < 8:
-#         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-#     if not re.search(r"[A-Z]", password):
-#         raise HTTPException(status_code=400, detail="Must include uppercase letter")
-#     if not re.search(r"[a-z]", password):
-#         raise HTTPException(status_code=400, detail="Must include lowercase letter")
-#     if not re.search(r"\d", password):
-#         raise HTTPException(status_code=400, detail="Must include number")
-#     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-#         raise HTTPException(status_code=400, detail="Must include special character")
-
-#     # Check if admin exists
-#     existing_admin = admin_details_collection.find_one({"userid": userid})
-#     if existing_admin:
-#         raise HTTPException(status_code=400, detail="Admin already exists")
-
-#     hashed_password = pwd_context.hash(password)
-#     admin_details_collection.insert_one({
-#         "userid": userid,
-#         "password": hashed_password,
-#         "par_status": "disable"
-#     })
-
-#     return {"success": True, "message": f"Admin {userid} created successfully!"}
-
 
 # @admin_router.get("/admin-dashboard", response_class=FileResponse)
 # async def admin_dashboard(request: Request):
@@ -273,6 +242,38 @@ async def admin_login(request: AdminLoginRequest):
         "access_token": access_token,
         "userid": userid
     }
+
+@admin_router.post("/create-admin")
+async def create_admin(request: AdminRegisterRequest):
+    userid = request.userid.strip().upper()
+    password = request.password
+
+    # Validation
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=400, detail="Must include uppercase letter")
+    if not re.search(r"[a-z]", password):
+        raise HTTPException(status_code=400, detail="Must include lowercase letter")
+    if not re.search(r"\d", password):
+        raise HTTPException(status_code=400, detail="Must include number")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Must include special character")
+
+    # Check if admin exists
+    existing_admin = admin_details_collection.find_one({"userid": userid})
+    if existing_admin:
+        raise HTTPException(status_code=400, detail="Admin already exists")
+
+    hashed_password = pwd_context.hash(password)
+    admin_details_collection.insert_one({
+        "userid": userid,
+        "password": hashed_password,
+        "par_status": "disable"
+    })
+
+    return {"success": True, "message": f"Admin {userid} created successfully!"}
+
 
 @admin_router.get("/admin-logout")
 async def logout():
