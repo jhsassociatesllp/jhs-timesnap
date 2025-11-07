@@ -42,27 +42,27 @@ app.add_middleware(
 app.include_router(admin_router)
 
 # Generate a secure JWT secret key (use environment variable in production)
-# SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-# ALGORITHM = "HS256"
-# ACCESS_TOKEN_EXPIRE_MINUTES = 1440
+SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
-# # MongoDB connection
-# MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
-# if not MONGO_CONNECTION_STRING:
-#     raise ValueError("MONGO_CONNECTION_STRING environment variable is required")
+# MongoDB connection
+MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
+if not MONGO_CONNECTION_STRING:
+    raise ValueError("MONGO_CONNECTION_STRING environment variable is required")
 
-# print(MONGO_CONNECTION_STRING)
-# client = MongoClient(MONGO_CONNECTION_STRING)
-# db = client["Timesheets"]
-# timesheets_collection = db["Timesheet_data"]
-# sessions_collection = db["sessions"]
-# employee_details_collection = db["Employee_details"]
-# client_details_collection = db["Client_details"]
-# users_collection = db["users"]
-# reporting_managers_collection = db["Reporting_managers"]
-# pending_collection = db["Pending"]
-# approved_collection = db["Approved"]
-# rejected_collection = db["Rejected"]
+print(MONGO_CONNECTION_STRING)
+client = MongoClient(MONGO_CONNECTION_STRING)
+db = client["Timesheets"]
+timesheets_collection = db["Timesheet_data"]
+sessions_collection = db["sessions"]
+employee_details_collection = db["Employee_details"]
+client_details_collection = db["Client_details"]
+users_collection = db["users"]
+reporting_managers_collection = db["Reporting_managers"]
+pending_collection = db["Pending"]
+approved_collection = db["Approved"]
+rejected_collection = db["Rejected"]
 
 # OAuth2 scheme for token-based authentication
 oauth2_scheme = HTTPBearer()
