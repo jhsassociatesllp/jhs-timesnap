@@ -25,20 +25,43 @@ window.addEventListener("load", () => {
 });
 
 // Helpers
-const getHeaders = () => {
+// const getHeaders = () => {
+//   const token =
+//     localStorage.getItem("access_token") ||
+//     localStorage.getItem("token") ||
+//     sessionStorage.getItem("token");
+//   return {
+//     Authorization: `Bearer ${token}`,
+//     "Content-Type": "application/json",
+//   };
+// };
+
+const getHeaders = (requireAuth = true) => {
   const token =
     localStorage.getItem("access_token") ||
     localStorage.getItem("token") ||
     sessionStorage.getItem("token");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+
+  // If auth required and no token -> force login (fail fast)
+  if (requireAuth && !token) {
+    console.warn("⚠️ No auth token found — redirecting to login.");
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = "/static/login.html";
+    return { "Content-Type": "application/json" }; // won't be used because of redirect
+  }
+
+  const base = { "Content-Type": "application/json" };
+  return token ? { ...base, Authorization: `Bearer ${token}` } : base;
 };
+
 
 async function checkPARStatus() {
   try {
-    const res = await fetch(`${API_URL}/get-par-current-status`);
+    // const res = await fetch(`${API_URL}/get-par-current-status`);
+    const res = await fetch(`${API_URL}/get-par-current-status`, {
+  headers: getHeaders(),
+});
     if (!res.ok) {
       console.warn("PAR status fetch failed", res.status);
       return false;
@@ -85,9 +108,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // verify session
   try {
-    const res = await fetch("/verify_session", {
+    // const res = await fetch("/verify_session", {
+    const res = await fetch(`${API_URL}/verify_session`,{ 
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      // headers: { Authorization: `Bearer ${token}` },
+      headers: getHeaders(),
     });
     if (!res.ok) {
       localStorage.removeItem("access_token");
@@ -119,12 +144,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-async function safeFetchJson(endpoint) {
+// async function safeFetchJson(endpoint) {
+//   try {
+//     const res = await fetch(`${API_URL}${endpoint}`, { headers: getHeaders() });
+//     if (!res.ok) {
+//       console.warn(`Fetch ${endpoint} returned ${res.status}`);
+//       return [];
+//     }
+//     return await res.json();
+//   } catch (err) {
+//     console.error(`Error fetching ${endpoint}:`, err);
+//     return [];
+//   }
+// }
+
+async function safeFetchJson(endpoint, opts = {}) {
   try {
-    const res = await fetch(`${API_URL}${endpoint}`, { headers: getHeaders() });
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      headers: getHeaders(opts.requireAuth !== false),
+      ...(opts || {})
+    });
+
+    if (res.status === 401) {
+      console.warn(`Unauthorized while fetching ${endpoint} — forcing logout.`);
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "/static/login.html";
+      return [];
+    }
+
     if (!res.ok) {
       console.warn(`Fetch ${endpoint} returned ${res.status}`);
-      return [];
+      throw new Error(`Fetch ${endpoint} failed: ${res.status}`);
     }
     return await res.json();
   } catch (err) {
@@ -132,6 +183,7 @@ async function safeFetchJson(endpoint) {
     return [];
   }
 }
+
 
 /* Payroll 21→20 window utilities */
 function getPayrollWindow() {
@@ -420,43 +472,64 @@ function addWeekSection() {
   const select = document.createElement("select");
   select.id = `weekPeriod_${sectionCount}`;
   select.className = "form-control";
-  select.style.fontWeight = "bold"; // bold dropdown text
+  // select.style.fontWeight = "600"; 
+  select.style.fontWeight = "500";          
+  select.style.fontSize = "18px";          
+  select.style.padding = "8px 12px";  
+  select.style.color = "#2c3e50" ; 
+  select.style.padding = "15px"   
+
+
+
   select.onchange = () => {
     if (typeof updateSummary === "function") updateSummary();
     if (typeof updateExistingRowDates === "function")
       updateExistingRowDates(sectionId);
   };
 
-  // ✅ Step 1: Collect all week headings before removing them
+  // ✅ Step 1: Cache headings (only once)
   if (!window.cachedWeekHeadings) {
     const weekHeadings = document.querySelectorAll(".week-period:not(.form-group)");
     window.cachedWeekHeadings = [];
 
     weekHeadings.forEach((div) => {
-      let text = div.textContent.trim();
+      let text = div.textContent.trim(); // Example: "Week 1: 21-May-2025 → 27-May-2025"
+
+      // 🧹 Remove unwanted characters (→, :, year)
       text = text.replace(/-\d{4}/g, ""); // remove year
+      text = text.replace("→", "-").replace(":", "").trim();
+
+      // 🔄 Convert to (Week 1 (21 May - 27 May)) format
+      const match = text.match(/(Week\s*\d+)\s*(\d{2}-\w{3})\s*-\s*(\d{2}-\w{3})/);
+      if (match) {
+        const weekNum = match[1];
+        const startDate = match[2].replace("-", " ");
+        const endDate = match[3].replace("-", " ");
+        text = `${weekNum} (${startDate} - ${endDate})`;
+      }
+
       if (text) window.cachedWeekHeadings.push(text);
     });
 
-    // ✅ Now safely remove the top week headings
+    // ✅ Remove old heading divs (UI cleanup)
     weekHeadings.forEach(div => div.remove());
   }
 
-  // ✅ Step 2: Populate dropdown using cached headings
+  // ✅ Step 2: Populate dropdown
   select.innerHTML = "";
   if (window.cachedWeekHeadings && window.cachedWeekHeadings.length > 0) {
     window.cachedWeekHeadings.forEach((text) => {
       const o = document.createElement("option");
       o.value = text;
       o.textContent = text;
-      o.style.fontWeight = "bold";
+      o.style.fontWeight = "500";
       select.appendChild(o);
     });
   } else {
     const o = document.createElement("option");
     o.value = "";
     o.textContent = "No week headings found";
-    o.style.fontWeight = "bold";
+    o.style.fontWeight = "500";
     select.appendChild(o);
   }
 
@@ -509,6 +582,7 @@ function addWeekSection() {
 
   console.log(`✅ Week section ${sectionId} added`);
 }
+
 
 
 
@@ -2739,7 +2813,8 @@ async function handleExcelUpload(event) {
 
 async function fetchCurrentPayroll() {
   try {
-    const res = await fetch("/get-current-payroll");
+    // const res = await fetch("/get-current-payroll");
+    const res = await fetch(`${API_URL}/get-current-payroll`, { headers: getHeaders(false) });
     const data = await res.json();
 
     if (data.start_date && data.end_date) {
