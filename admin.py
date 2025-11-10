@@ -355,19 +355,21 @@ async def get_par_status(request: Request):
     return {"par_status": par_status}
 
 
-# @admin_router.get("/get-par-current-status")
-# async def get_par_current_status(request: Request):
-#     """
-#     Returns the global PAR status (used by Reporting Manager's timesheet app).
-#     """
-#     try:
-#         admin = admin_details_collection.find_one({}, {"par_status": 1})
-#         if not admin:
-#             return {"par_status": "disable"}
-#         return {"par_status": admin.get("par_status", "disable")}
-#     except Exception as e:
-#         print("Error fetching PAR status:", e)
-#         return {"par_status": "disable"}
+@admin_router.get("/get-par-current-status")
+async def get_par_current_status(request: Request):
+    """
+    Returns the global PAR status (used by Reporting Manager's timesheet app).
+    """
+    try:
+        admin = admin_details_collection.find_one({}, {"par_status": 1})
+        if not admin:
+            return {"par_status": "disable"}
+        return {"par_status": admin.get("par_status", "disable")}
+    except Exception as e:
+        print("Error fetching PAR status:", e)
+        return {"par_status": "disable"}
+
+
 
 @admin_router.post("/update-payroll-status")
 async def update_payroll_status(request: Request):

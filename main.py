@@ -1255,3 +1255,60 @@ async def get_par_current_status(current_user: str = Depends(get_current_user)):
     except Exception as e:
         print("Error fetching PAR status:", e)
         return {"par_status": "disable"}
+
+
+# --- admin set payroll endpoint ---
+from fastapi import Body
+from calendar import monthrange
+
+@app.post("/admin/set-payroll")
+async def admin_set_payroll(month: int = Body(...), year: int = Body(...), par_status: str = Body("enable"), current_user: str = Depends(get_current_user)):
+    """
+    Admin saves payroll month/year.
+    month: 1..12, year: full year
+    Saves payroll_start and payroll_end as ISO strings.
+    """
+    try:
+        # compute start (21st of given month) and end (20th of next month)
+        start = datetime(year, month, 21)
+        next_month = month + 1
+        next_year = year
+        if next_month == 13:
+            next_month = 1
+            next_year = year + 1
+        end = datetime(next_year, next_month, 20)
+
+        payload = {
+            "par_status": par_status,
+            "payroll_start": start.isoformat(),
+            "payroll_end": end.isoformat(),
+            "updated_by": current_user,
+            "updated_time": datetime.utcnow().isoformat()
+        }
+
+        admin_details_collection.update_one({}, {"$set": payload}, upsert=True)
+
+        return {"success": True, "message": "Payroll window updated", "start": payload["payroll_start"], "end": payload["payroll_end"]}
+    except Exception as e:
+        print("admin_set_payroll error:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- replace your existing get-par-current-status body with this ---
+@app.get("/get-par-current-status")
+async def get_par_current_status(current_user: str = Depends(get_current_user)):
+    """
+    Returns par_status and payroll window start/end (ISO strings).
+    """
+    try:
+        admin = admin_details_collection.find_one({}, {"par_status": 1, "payroll_start": 1, "payroll_end": 1})
+        if not admin:
+            return {"par_status": "disable"}
+        return {
+            "par_status": admin.get("par_status", "disable"),
+            "start": admin.get("payroll_start"),
+            "end": admin.get("payroll_end")
+        }
+    except Exception as e:
+        print("Error fetching PAR status:", e)
+        return {"par_status": "disable"}

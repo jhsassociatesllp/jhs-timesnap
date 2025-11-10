@@ -187,6 +187,58 @@ async function safeFetchJson(endpoint, opts = {}) {
 
 
 /* Payroll 21→20 window utilities */
+// function getPayrollWindow() {
+//   const today = new Date();
+//   let start, end;
+
+//   if (today.getDate() >= 21) {
+//     start = new Date(today.getFullYear(), today.getMonth(), 21);
+//     end = new Date(today.getFullYear(), today.getMonth() + 1, 20);
+//   } else {
+//     start = new Date(today.getFullYear(), today.getMonth() - 1, 21);
+//     end = new Date(today.getFullYear(), today.getMonth(), 20);
+//   }
+
+//   return { start, end };
+// }
+
+// function generateWeekOptions(start, end) {
+//     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+//     let weeks = [];
+//     let current = new Date(start);
+//     let weekNum = 1;
+//     while (current <= end) {
+//         let weekStart = new Date(current);
+//         let daysToSunday = (7 - weekStart.getDay()) % 7;
+//         let weekEnd = new Date(weekStart);
+//         weekEnd.setDate(weekEnd.getDate() + daysToSunday);
+//         if (weekEnd > end) weekEnd = new Date(end);
+
+//         let wsDay = weekStart.getDate().toString().padStart(2, '0');
+//         let wsMonth = months[weekStart.getMonth()];
+//         let weDay = weekEnd.getDate().toString().padStart(2, '0');
+//         let weMonth = months[weekEnd.getMonth()];
+//         let value = `${wsDay}/${weekStart.getMonth() + 1}/${weekStart.getFullYear()} to ${weDay}/${weekEnd.getMonth() + 1}/${weekEnd.getFullYear()}`;
+//         let text = `Week ${weekNum} (${wsDay} ${wsMonth} - ${weDay} ${weMonth})`;
+//         weeks.push({ value, text, start: weekStart, end: weekEnd });
+
+//         current = new Date(weekEnd);
+//         current.setDate(current.getDate() + 1);
+//         weekNum++;
+//     }
+//     return weeks;
+// }
+
+
+// /* initialize weekOptions automatically from payroll window */
+// (function initWeekOptions() {
+//   const { start, end } = getPayrollWindow();
+//   window.weekOptions = generateWeekOptions(start, end);
+//   console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+//   console.log(`📅 Total Weeks: ${window.weekOptions.length}`);
+// })();
+
+
 function getPayrollWindow() {
   const today = new Date();
   let start, end;
@@ -202,40 +254,286 @@ function getPayrollWindow() {
   return { start, end };
 }
 
+// function generateWeekOptions(start, end) {
+//   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+//   const weeks = [];
+//   let weekNum = 1;
+
+//   // 1️⃣ Move current to start of payroll window
+//   let current = new Date(start);
+
+//   // 2️⃣ Adjust first week to end on Sunday
+//   const firstWeekEnd = new Date(current);
+//   firstWeekEnd.setDate(firstWeekEnd.getDate() + (7 - firstWeekEnd.getDay() - 1 + 7) % 7); // till Sunday
+//   if (firstWeekEnd > end) firstWeekEnd.setTime(end.getTime());
+
+//   // Add first (possibly partial) week
+//   weeks.push(makeWeekObject(current, firstWeekEnd, weekNum++, months));
+
+//   // 3️⃣ Move to next Monday
+//   current = new Date(firstWeekEnd);
+//   current.setDate(current.getDate() + 1);
+
+//   // 4️⃣ Generate full 7-day weeks till payroll end
+//   while (current <= end) {
+//     const weekStart = new Date(current);
+//     const weekEnd = new Date(weekStart);
+//     weekEnd.setDate(weekStart.getDate() + 6); // Mon–Sun
+
+//     if (weekEnd > end) weekEnd.setTime(end.getTime()); // last partial week if needed
+
+//     weeks.push(makeWeekObject(weekStart, weekEnd, weekNum++, months));
+
+//     current = new Date(weekEnd);
+//     current.setDate(current.getDate() + 1);
+//   }
+
+//   return weeks;
+// }
+
 function generateWeekOptions(start, end) {
-  const months = [
-    "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
-  ];
-  const output = [];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const weeks = [];
   let weekNum = 1;
-  let ws = new Date(start);
 
-  while (ws <= end) {
-    const we = new Date(ws);
-    we.setDate(ws.getDate() + (6 - ((ws.getDay() + 6) % 7))); // up to Sunday
-    if (we > end) we.setTime(end.getTime());
+  // Clone start date
+  let current = new Date(start);
 
-    const wsDay = String(ws.getDate()).padStart(2, "0");
-    const weDay = String(we.getDate()).padStart(2, "0");
-    const value = `${wsDay}/${ws.getMonth()+1}/${ws.getFullYear()} to ${weDay}/${we.getMonth()+1}/${we.getFullYear()}`;
-    const text = `Week ${weekNum} (${wsDay} ${months[ws.getMonth()]} - ${weDay} ${months[we.getMonth()]})`;
+  // 🟢 1️⃣ First week: from payroll start → upcoming Sunday
+  const firstWeekEnd = new Date(current);
+  const daysToSunday = 7 - firstWeekEnd.getDay(); // e.g. if Wed → 4 days to Sunday
+  firstWeekEnd.setDate(firstWeekEnd.getDate() + (daysToSunday === 7 ? 0 : daysToSunday));
 
-    output.push({ value, text, start: new Date(ws), end: new Date(we) });
+  weeks.push(makeWeekObject(current, firstWeekEnd, weekNum++, months));
 
-    ws = new Date(we);
-    ws.setDate(ws.getDate() + 1); // next Monday
-    weekNum++;
+  // 🟢 2️⃣ Move to next Monday
+  current = new Date(firstWeekEnd);
+  current.setDate(current.getDate() + 1);
+
+  // 🟢 3️⃣ Add full Mon–Sun weeks
+  while (current < end) {
+    const weekStart = new Date(current);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    if (weekEnd > end) weekEnd.setTime(end.getTime()); // last week truncated
+    weeks.push(makeWeekObject(weekStart, weekEnd, weekNum++, months));
+
+    current = new Date(weekEnd);
+    current.setDate(current.getDate() + 1);
   }
-  return output;
+
+  return weeks;
 }
 
-/* initialize weekOptions automatically from payroll window */
-(function initWeekOptions() {
-  const { start, end } = getPayrollWindow();
-  window.weekOptions = generateWeekOptions(start, end);
-  console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
-  console.log(`📅 Total Weeks: ${window.weekOptions.length}`);
+
+// 🔹 Helper to build each week object
+function makeWeekObject(start, end, weekNum, months) {
+  const wsDay = start.getDate().toString().padStart(2, '0');
+  const wsMonth = months[start.getMonth()];
+  const weDay = end.getDate().toString().padStart(2, '0');
+  const weMonth = months[end.getMonth()];
+  const value = `${wsDay}/${start.getMonth() + 1}/${start.getFullYear()} to ${weDay}/${end.getMonth() + 1}/${end.getFullYear()}`;
+  const text = `Week ${weekNum} (${wsDay} ${wsMonth} - ${weDay} ${weMonth})`;
+
+  return { value, text, start, end };
+}
+
+/* 🔹 Auto-initialize on load */
+// (function initWeekOptions() {
+//   const { start, end } = getPayrollWindow();
+//   window.weekOptions = generateWeekOptions(start, end);
+//   console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+//   console.log(`📅 Total Weeks: ${window.weekOptions.length}`);
+//   console.table(window.weekOptions.map(w => ({
+//     Week: w.text,
+//     From: w.start.toDateString(),
+//     To: w.end.toDateString()
+//   })));
+// })();
+
+// 🔄 Fetch payroll window dynamically (if admin changed it)
+// async function initWeekOptions() {
+//   try {
+//     const res = await fetch("/get-par-current-status"); // backend API hit
+//     const data = await res.json();
+
+//     let start, end;
+
+//     if (data.start && data.end) {
+//       // backend ne start aur end diya ho to use karo
+//       start = new Date(data.start);
+//       end = new Date(data.end);
+//     } else {
+//       // warna fallback local payroll window (21 → 20)
+//       ({ start, end } = getPayrollWindow());
+//     }
+
+//     window.weekOptions = generateWeekOptions(start, end);
+
+//     console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+//     console.log(`📅 Total Weeks: ${window.weekOptions.length}`);
+//     console.table(window.weekOptions.map(w => ({
+//       Week: w.text,
+//       From: w.start.toDateString(),
+//       To: w.end.toDateString()
+//     })));
+//   } catch (err) {
+//     console.error("❌ Error fetching payroll window:", err);
+//     const { start, end } = getPayrollWindow();
+//     window.weekOptions = generateWeekOptions(start, end);
+//   }
+// }
+
+// // Page load hone ke baad run karo
+// (async () => {
+//   await initWeekOptions();
+// })();
+
+// // 🧩 Manually refresh payroll weeks after admin update
+// async function refreshPayrollWeeks() {
+//   try {
+//     const res = await fetch("/get-par-current-status");
+//     const data = await res.json();
+
+//     if (data.start && data.end) {
+//       const start = new Date(data.start);
+//       const end = new Date(data.end);
+//       window.weekOptions = generateWeekOptions(start, end);
+//     } else {
+//       const { start, end } = getPayrollWindow();
+//       window.weekOptions = generateWeekOptions(start, end);
+//     }
+
+//     // Update all dropdowns already visible on page
+//     document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+//       select.innerHTML = "";
+//       window.weekOptions.forEach(week => {
+//         const o = document.createElement("option");
+//         o.value = week.value;
+//         o.textContent = week.text;
+//         select.appendChild(o);
+//       });
+//     });
+
+//     console.log("🔄 Payroll weeks refreshed successfully:", window.weekOptions);
+//   } catch (err) {
+//     console.error("❌ Error refreshing payroll weeks:", err);
+//   }
+// }
+
+
+// top-level cache for current payroll window
+window._currentPayrollWindow = null; // { start: ISO, end: ISO }
+
+// Improved init — fetch from server and build weekOptions
+async function initWeekOptions() {
+  try {
+    // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
+    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    const data = await res.json();
+
+    let start, end;
+    if (data && data.start && data.end) {
+      start = new Date(data.start);
+      end = new Date(data.end);
+      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+    } else {
+      const fallback = getPayrollWindow();
+      start = fallback.start;
+      end = fallback.end;
+      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+    }
+
+    window.weekOptions = generateWeekOptions(start, end);
+
+    // update all existing selects
+    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+      select.innerHTML = "";
+      window.weekOptions.forEach(week => {
+        const o = document.createElement("option");
+        o.value = week.value;
+        o.textContent = week.text;
+        select.appendChild(o);
+      });
+    });
+
+    console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+
+  } catch (err) {
+    console.error("❌ Error fetching payroll window:", err);
+    const { start, end } = getPayrollWindow();
+    window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+    window.weekOptions = generateWeekOptions(start, end);
+  }
+}
+
+// Refresh function — update weekOptions only if admin changed payroll window
+async function refreshPayrollWeeks() {
+  try {
+    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    if (!res.ok) {
+      console.warn("refreshPayrollWeeks: server returned", res.status);
+      return;
+    }
+    const data = await res.json();
+
+    let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
+    let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
+
+    if (!startISO || !endISO) {
+      const local = getPayrollWindow();
+      startISO = local.start.toISOString();
+      endISO = local.end.toISOString();
+    }
+
+    const newWindowHash = startISO + "|" + endISO;
+    const oldWindow = window._currentPayrollWindow ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) : null;
+
+    if (oldWindow !== newWindowHash) {
+      console.log("🔄 Payroll window changed — updating week dropdowns");
+      window._currentPayrollWindow = { start: startISO, end: endISO };
+      const start = new Date(startISO);
+      const end = new Date(endISO);
+      window.weekOptions = generateWeekOptions(start, end);
+
+      document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+        const prevVal = select.value;
+        select.innerHTML = "";
+        window.weekOptions.forEach(week => {
+          const o = document.createElement("option");
+          o.value = week.value;
+          o.textContent = week.text;
+          select.appendChild(o);
+        });
+
+        // try to keep selection if same value exists
+        if (prevVal) {
+          const found = Array.from(select.options).find(opt => opt.value === prevVal);
+          if (found) select.value = prevVal;
+        }
+      });
+
+      showPopup("Payroll weeks updated by admin — week period dropdown refreshed.");
+    }
+  } catch (err) {
+    console.error("❌ Error refreshing payroll weeks:", err);
+  }
+}
+
+// Auto-polling every 20 seconds (only when tab visible)
+setInterval(() => {
+  if (document.visibilityState === "visible") {
+    refreshPayrollWeeks();
+  }
+}, 30000);
+
+// Ensure initial run
+(async () => {
+  await initWeekOptions();
 })();
+
+
 
 /* add week section (UI) */
 // function addWeekSection() {
@@ -473,7 +771,6 @@ function addWeekSection() {
   const select = document.createElement("select");
   select.id = `weekPeriod_${sectionCount}`;
   select.className = "form-control";
-  // select.style.fontWeight = "600"; 
   select.style.fontWeight = "500";          
   select.style.fontSize = "18px";          
   select.style.padding = "8px 12px";  
@@ -489,50 +786,53 @@ function addWeekSection() {
   };
 
   // ✅ Step 1: Cache headings (only once)
-  if (!window.cachedWeekHeadings) {
-    const weekHeadings = document.querySelectorAll(".week-period:not(.form-group)");
-    window.cachedWeekHeadings = [];
+  // if (!window.cachedWeekHeadings) {
+  //   const weekHeadings = document.querySelectorAll(".week-period:not(.form-group)");
+  //   window.cachedWeekHeadings = [];
 
-    weekHeadings.forEach((div) => {
-      let text = div.textContent.trim(); // Example: "Week 1: 21-May-2025 → 27-May-2025"
+  //   weekHeadings.forEach((div) => {
+  //     let text = div.textContent.trim(); // Example: "Week 1: 21-May-2025 → 27-May-2025"
 
-      // 🧹 Remove unwanted characters (→, :, year)
-      text = text.replace(/-\d{4}/g, ""); // remove year
-      text = text.replace("→", "-").replace(":", "").trim();
+  //     // 🧹 Remove unwanted characters (→, :, year)
+  //     text = text.replace(/-\d{4}/g, ""); // remove year
+  //     text = text.replace("→", "-").replace(":", "").trim();
 
-      // 🔄 Convert to (Week 1 (21 May - 27 May)) format
-      const match = text.match(/(Week\s*\d+)\s*(\d{2}-\w{3})\s*-\s*(\d{2}-\w{3})/);
-      if (match) {
-        const weekNum = match[1];
-        const startDate = match[2].replace("-", " ");
-        const endDate = match[3].replace("-", " ");
-        text = `${weekNum} (${startDate} - ${endDate})`;
-      }
+  //     // 🔄 Convert to (Week 1 (21 May - 27 May)) format
+  //     const match = text.match(/(Week\s*\d+)\s*(\d{2}-\w{3})\s*-\s*(\d{2}-\w{3})/);
+  //     if (match) {
+  //       const weekNum = match[1];
+  //       const startDate = match[2].replace("-", " ");
+  //       const endDate = match[3].replace("-", " ");
+  //       text = `${weekNum} (${startDate} - ${endDate})`;
+  //     }
 
-      if (text) window.cachedWeekHeadings.push(text);
-    });
+  //     if (text) window.cachedWeekHeadings.push(text);
+  //   });
 
-    // ✅ Remove old heading divs (UI cleanup)
-    weekHeadings.forEach(div => div.remove());
-  }
+  //   // ✅ Remove old heading divs (UI cleanup)
+  //   weekHeadings.forEach(div => div.remove());
+  // }
 
   // ✅ Step 2: Populate dropdown
-  select.innerHTML = "";
-  if (window.cachedWeekHeadings && window.cachedWeekHeadings.length > 0) {
-    window.cachedWeekHeadings.forEach((text) => {
-      const o = document.createElement("option");
-      o.value = text;
-      o.textContent = text;
-      o.style.fontWeight = "500";
-      select.appendChild(o);
-    });
-  } else {
+  // ✅ Step 2: Populate dropdown directly from window.weekOptions
+select.innerHTML = "";
+
+if (window.weekOptions && window.weekOptions.length > 0) {
+  window.weekOptions.forEach((week) => {
     const o = document.createElement("option");
-    o.value = "";
-    o.textContent = "No week headings found";
+    o.value = week.value; // "21/10/2025 to 26/10/2025"
+    o.textContent = week.text; // "Week 1 (21 Oct - 26 Oct)"
     o.style.fontWeight = "500";
     select.appendChild(o);
-  }
+  });
+} else {
+  const o = document.createElement("option");
+  o.value = "";
+  o.textContent = "No week periods found";
+  o.style.fontWeight = "500";
+  select.appendChild(o);
+}
+
 
   weekDiv.appendChild(select);
 
@@ -2812,60 +3112,84 @@ async function handleExcelUpload(event) {
 
 // ✅ Payroll se week periods auto generate karne ka code
 
-async function fetchCurrentPayroll() {
-  try {
-    // const res = await fetch("/get-current-payroll");
-    const res = await fetch(`${API_URL}/get-current-payroll`, { headers: getHeaders(false) });
-    const data = await res.json();
+// async function fetchCurrentPayroll() {
+//   try {
+//     // const res = await fetch("/get-current-payroll");
+//     const res = await fetch(`${API_URL}/get-current-payroll`, { headers: getHeaders(false) });
+//     const data = await res.json();
 
-    if (data.start_date && data.end_date) {
-      generateWeekPeriods(data.start_date, data.end_date);
-    } else {
-      console.warn("⚠️ Payroll data not found in DB");
-    }
-  } catch (err) {
-    console.error("Error fetching payroll:", err);
-  }
-}
+//     if (data.start_date && data.end_date) {
+//       generateWeekPeriods(data.start_date, data.end_date);
+//     } else {
+//       console.warn("⚠️ Payroll data not found in DB");
+//     }
+//   } catch (err) {
+//     console.error("Error fetching payroll:", err);
+//   }
+// }
 
-function generateWeekPeriods(startDateStr, endDateStr) {
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
+// function generateWeekPeriods(startDateStr, endDateStr) {
+//   const start = new Date(startDateStr);
+//   const end = new Date(endDateStr);
 
-  const weekContainer = document.getElementById("timesheetSections");
-  if (!weekContainer) return;
-  weekContainer.innerHTML = ""; // clear old weeks
+//   const weekContainer = document.getElementById("timesheetSections");
+//   if (!weekContainer) return;
+//   weekContainer.innerHTML = ""; // clear old weeks
 
-  let weekCount = 1;
-  let current = new Date(start);
+//   let weekCount = 1;
+//   let current = new Date(start);
 
-  while (current <= end) {
-    const weekStart = new Date(current);
-    const weekEnd = new Date(current);
-    weekEnd.setDate(weekEnd.getDate() + 6); // 7 days per week
+//   while (current <= end) {
+//     const weekStart = new Date(current);
+//     const weekEnd = new Date(current);
+//     weekEnd.setDate(weekEnd.getDate() + 6); // 7 days per week
 
-    if (weekEnd > end) weekEnd.setTime(end.getTime());
+//     if (weekEnd > end) weekEnd.setTime(end.getTime());
 
-    const weekHTML = `
-      <div class="week-period">
-        <h4>Week ${weekCount}: ${formatDate(weekStart)} → ${formatDate(weekEnd)}</h4>
-      </div>
-    `;
-    weekContainer.insertAdjacentHTML("beforeend", weekHTML);
+//     const weekHTML = `
+//       <div class="week-period">
+//         <h4>Week ${weekCount}: ${formatDate(weekStart)} → ${formatDate(weekEnd)}</h4>
+//       </div>
+//     `;
+//     weekContainer.insertAdjacentHTML("beforeend", weekHTML);
 
-    current.setDate(current.getDate() + 7);
-    weekCount++;
-  }
-}
+//     current.setDate(current.getDate() + 7);
+//     weekCount++;
+//   }
+// }
 
-function formatDate(dateObj) {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const d = String(dateObj.getDate()).padStart(2, "0");
-  return `${d}-${months[dateObj.getMonth()]}-${dateObj.getFullYear()}`;
-}
+// function formatDate(dateObj) {
+//   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+//   const d = String(dateObj.getDate()).padStart(2, "0");
+//   return `${d}-${months[dateObj.getMonth()]}-${dateObj.getFullYear()}`;
+// }
 
 // ✅ Load weeks automatically when timesheet opens
-window.addEventListener("load", fetchCurrentPayroll);
+// window.addEventListener("load", fetchCurrentPayroll);
+
+
+// Admin side: call when admin clicks Save
+async function savePayrollWindow(month, year, par_status = "enable") {
+  try {
+    const token = localStorage.getItem("access_token"); // ya jo token use karte ho
+    const res = await fetch("/admin/set-payroll", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : ""
+      },
+      body: JSON.stringify({ month: Number(month), year: Number(year), par_status })
+    });
+    const js = await res.json();
+    if (!res.ok) throw new Error(js.detail || js.message || "Failed to save payroll");
+    showPopup("Payroll saved"); // tumhara popup function
+    return js;
+  } catch (err) {
+    console.error("savePayrollWindow error", err);
+    showPopup("Failed to save payroll: " + err.message, true);
+  }
+}
+
 
 
 /* End of file */
