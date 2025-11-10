@@ -52,18 +52,18 @@
 #     token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 #     return token
 
-# def verify_token(token: str):
-#     """Verify JWT token"""
-#     try:
-#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         userid = payload.get("sub")
-#         if userid is None:
-#             raise HTTPException(status_code=401, detail="Invalid token")
-#         return userid
-#     except jwt.ExpiredSignatureError:
-#         raise HTTPException(status_code=401, detail="Session expired. Please login again.")
-#     except jwt.InvalidTokenError:
-#         raise HTTPException(status_code=401, detail="Invalid token")
+def verify_token(token: str):
+    """Verify JWT token"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        userid = payload.get("sub")
+        if userid is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return userid
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please login again.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # def get_current_admin(request: Request):
 #     """Check JWT from cookies"""
@@ -166,6 +166,7 @@ import os, re, jwt
 from dotenv import load_dotenv
 from db import *
 from fastapi import APIRouter
+from datetime import datetime, timedelta, timezone
 
 load_dotenv()
 
@@ -190,24 +191,36 @@ class AdminRegisterRequest(BaseModel):
     password: str
 
 
-# ---------------- JWT FUNCTIONS ----------------
+#---------------- JWT FUNCTIONS ----------------
 def create_access_token(data: dict, expires_delta: timedelta = None):
-    """Generate JWT token"""
+    """JWT create kare, 1 ghante ke liye valid."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    expire_dt = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    # timestamp integer me convert
+    to_encode.update({"exp": int(expire_dt.timestamp())})
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    print(f"🕒 Token created for {data.get('sub')} | Expires at: {expire_dt.isoformat()}")
+    return token
+
+
 
 def verify_token(token: str):
-    """Verify JWT token"""
+    """JWT verify kare aur userid return kare."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    token = token.strip()
+    if token.startswith('"') and token.endswith('"'):
+        token = token[1:-1]
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        userid = payload.get("sub")
-        if userid is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        userid = payload.get("sub") or payload.get("userid")
+        if not userid:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
         return userid
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired. Please login again.")
+        raise HTTPException(status_code=401, detail="Session expired. Please login again.")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -233,15 +246,26 @@ async def admin_login(request: AdminLoginRequest):
     if not pwd_context.verify(password, admin["password"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Admin ID or Password")
 
-    # ✅ Create JWT access token
-    access_token = create_access_token(data={"sub": userid})
+    # 1 ghante ke liye valid token
+    access_token = create_access_token(data={"sub": userid}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
 
-    return {
-        "success": True,
-        "message": "Login successful",
-        "access_token": access_token,
-        "userid": userid
-    }
+    # Response + HTTP-only cookie
+    resp = JSONResponse(
+        content={
+            "success": True,
+            "message": "Login successful",
+            "access_token": access_token,
+            "userid": userid
+        }
+    )
+    resp.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="Lax"
+    )
+    return resp
 
 @admin_router.post("/create-admin")
 async def create_admin(request: AdminRegisterRequest):
