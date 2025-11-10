@@ -355,20 +355,117 @@ async def get_par_status(request: Request):
     return {"par_status": par_status}
 
 
+# @admin_router.get("/get-par-current-status")
+# async def get_par_current_status(request: Request):
+#     """
+#     Returns the global PAR status (used by Reporting Manager's timesheet app).
+#     """
+#     try:
+#         admin = admin_details_collection.find_one({}, {"par_status": 1})
+#         if not admin:
+#             return {"par_status": "disable"}
+#         return {"par_status": admin.get("par_status", "disable")}
+#     except Exception as e:
+#         print("Error fetching PAR status:", e)
+#         return {"par_status": "disable"}
+
+
+# @admin_router.get("/get-par-current-status")
+# async def get_par_current_status():
+#     """
+#     Returns the current payroll period (start_date → end_date) 
+#     for all users – used by employee timesheet to auto-generate week dropdowns.
+#     """
+#     try:
+#         admin = admin_details_collection.find_one({}, {"_id": 0, "payroll_status": 1})
+#         if not admin or "payroll_status" not in admin:
+#             # fallback: default payroll (21st → 20th)
+#             today = datetime.now()
+#             if today.day >= 21:
+#                 start = datetime(today.year, today.month, 21)
+#                 if today.month == 12:
+#                     end = datetime(today.year + 1, 1, 20)
+#                 else:
+#                     end = datetime(today.year, today.month + 1, 20)
+#             else:
+#                 if today.month == 1:
+#                     start = datetime(today.year - 1, 12, 21)
+#                 else:
+#                     start = datetime(today.year, today.month - 1, 21)
+#                 end = datetime(today.year, today.month, 20)
+
+#             return {
+#                 "start": start.strftime("%Y-%m-%d"),
+#                 "end": end.strftime("%Y-%m-%d"),
+#                 "source": "default"
+#             }
+
+#         payroll = admin["payroll_status"]
+#         return {
+#             "start": payroll.get("start_date"),
+#             "end": payroll.get("end_date"),
+#             "source": "db"
+#         }
+
+#     except Exception as e:
+#         print("❌ Error fetching current payroll period:", e)
+#         return {"start": None, "end": None, "source": "error"}
+
 @admin_router.get("/get-par-current-status")
-async def get_par_current_status(request: Request):
+async def get_par_current_status():
     """
-    Returns the global PAR status (used by Reporting Manager's timesheet app).
+    Returns both:
+    1️⃣ Global PAR status (enable/disable)
+    2️⃣ Current Payroll period (start_date → end_date)
+    Used by Timesheet (for Reporting Manager & week dropdowns)
     """
     try:
-        admin = admin_details_collection.find_one({}, {"par_status": 1})
-        if not admin:
-            return {"par_status": "disable"}
-        return {"par_status": admin.get("par_status", "disable")}
-    except Exception as e:
-        print("Error fetching PAR status:", e)
-        return {"par_status": "disable"}
+        admin = admin_details_collection.find_one({}, {"_id": 0, "par_status": 1, "payroll_status": 1})
 
+        # -------------- PAR STATUS --------------
+        par_status = admin.get("par_status", "disable") if admin else "disable"
+
+        # -------------- PAYROLL PERIOD --------------
+        if not admin or "payroll_status" not in admin:
+            # fallback: default payroll 21st → 20th
+            today = datetime.now()
+            if today.day >= 21:
+                start = datetime(today.year, today.month, 21)
+                if today.month == 12:
+                    end = datetime(today.year + 1, 1, 20)
+                else:
+                    end = datetime(today.year, today.month + 1, 20)
+            else:
+                if today.month == 1:
+                    start = datetime(today.year - 1, 12, 21)
+                else:
+                    start = datetime(today.year, today.month - 1, 21)
+                end = datetime(today.year, today.month, 20)
+
+            start_date = start.strftime("%Y-%m-%d")
+            end_date = end.strftime("%Y-%m-%d")
+            source = "default"
+        else:
+            payroll = admin.get("payroll_status", {})
+            start_date = payroll.get("start_date")
+            end_date = payroll.get("end_date")
+            source = "db"
+
+        return {
+            "par_status": par_status,
+            "start": start_date,
+            "end": end_date,
+            "source": source
+        }
+
+    except Exception as e:
+        print("❌ Error fetching PAR & Payroll data:", e)
+        return {
+            "par_status": "disable",
+            "start": None,
+            "end": None,
+            "source": "error"
+        }
 
 
 @admin_router.post("/update-payroll-status")

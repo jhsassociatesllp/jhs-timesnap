@@ -206,7 +206,7 @@ async function submitAdminLogin() {
 
         if (response.ok && result.success) {
             // ✅ Store token & userid in localStorage
-            localStorage.setItem("access_token", result.access_token);
+            localStorage.setItem("admin_token", result.access_token);
             localStorage.setItem("admin_userid", result.userid);
 
             showMessage("Login successful!", "success");
