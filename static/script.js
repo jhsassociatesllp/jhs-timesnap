@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    const uploadInput = document.getElementById("uploadExcelInput");
+    const uploadInput = document.getElementById("excelUploadInput");
     if (uploadInput) {
         uploadInput.addEventListener("change", handleExcelUpload);
         console.log("Excel upload handler attached successfully");
@@ -607,6 +607,61 @@ function exportTimesheetToExcel() {
     const ws = XLSX.utils.json_to_sheet(allData);
     XLSX.utils.book_append_sheet(wb, ws, 'Timesheet');
     XLSX.writeFile(wb, `Timesheet_${document.getElementById('employeeId').value || 'User'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+function exportHistoryToExcel() {
+    // Get the table
+    const table = document.querySelector('.export-btn tbody');
+    if (!table || table.rows.length === 0) {
+        alert("No data to export!");
+        return;
+    }
+
+    // Prepare data
+    const data = [];
+    const headers = [];
+
+    // Get headers
+    document.querySelectorAll('#historyTable thead th').forEach(th => {
+        headers.push(th.innerText.trim());
+    });
+    data.push(headers);
+
+    // Get rows
+    table.querySelectorAll('tr').forEach(row => {
+        const rowData = [];
+        row.querySelectorAll('td').forEach(td => {
+            rowData.push(td.innerText.trim());
+        });
+        data.push(rowData);
+    });
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Auto-size columns
+    const colWidths = headers.map((_, i) => {
+        let max = headers[i].length;
+        data.slice(1).forEach(row => {
+            const val = row[i] || '';
+            if (val.length > max) max = val.length;
+        });
+        return { wch: max + 2 };
+    });
+    ws['!cols'] = colWidths;
+
+    // Add sheet
+    XLSX.utils.book_append_sheet(wb, ws, "Timesheet History");
+
+    // Generate filename
+    const empId = document.querySelector('#employeeId')?.value || 'Employee';
+    const week = document.querySelector('#weekPeriod')?.value || 'Week';
+    const filename = `${empId}_${week.replace(/\s/g, '')}_Timesheet.xlsx`;
+
+    // Download
+    XLSX.writeFile(wb, filename);
+    console.log("Excel exported:", filename);
 }
 
 function getEmployeeInfoForExport() {
@@ -1249,3 +1304,43 @@ async function handleExcelUpload(event) {
 }
 
 window.handleExcelUpload = handleExcelUpload;
+
+// Add these functions in your <script> tag or script.js
+
+function validateTimes() {
+    const punchIn = document.querySelector('#modalPunchIn')?.value || '';
+    const punchOut = document.querySelector('#modalPunchOut')?.value || '';
+    const projectStart = document.querySelector('#modalProjectStartTime')?.value || '';
+    const projectEnd = document.querySelector('#modalProjectEndTime')?.value || '';
+
+    let workingHours = '';
+    let projectHours = '';
+
+    // Calculate Working Hours (Punch In → Punch Out)
+    if (punchIn && punchOut) {
+        const [h1, m1] = punchIn.split(':').map(Number);
+        const [h2, m2] = punchOut.split(':').map(Number);
+        const diff = (h2 - h1) + (m2 - m1) / 60;
+        workingHours = diff > 0 ? diff.toFixed(2) : '0.00';
+    }
+
+    // Calculate Project Hours (Project Start → Project End)
+    if (projectStart && projectEnd) {
+        const [h1, m1] = projectStart.split(':').map(Number);
+        const [h2, m2] = projectEnd.split(':').map(Number);
+        const diff = (h2 - h1) + (m2 - m1) / 60;
+        projectHours = diff > 0 ? diff.toFixed(2) : '0.00';
+    }
+
+    // Update fields
+    const workingHoursInput = document.querySelector('#modalWorkingHours');
+    const projectHoursInput = document.querySelector('#modalProjectHours');
+
+    if (workingHoursInput) workingHoursInput.value = workingHours;
+    if (projectHoursInput) projectHoursInput.value = projectHours;
+}
+
+function updateModalHours() {
+    validateTimes(); // Same logic
+}
+
