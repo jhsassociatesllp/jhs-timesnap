@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     const uploadInput = document.getElementById("uploadExcelInput");
     if (uploadInput) {
         uploadInput.addEventListener("change", handleExcelUpload);
-        console.log("✅ Excel upload handler attached successfully");
+        console.log("Excel upload handler attached successfully");
     } else {
-        console.error("❌ Upload Excel input not found");
+        console.error("Upload Excel input not found");
     }
 
     try {
@@ -109,8 +109,8 @@ async function fetchData(endpoint) {
 }
 
 function getPayrollPeriod() {
-    let start = new Date(2025, 9, 21); // Oct 21, 2025
-    let end = new Date(2025, 10, 20);  // Nov 20, 2025
+    let start = new Date(2025, 9, 21);
+    let end = new Date(2025, 10, 20);
     return { start, end };
 }
 
@@ -179,7 +179,6 @@ function hideLoading() {
 function fetchEmployeeData(empId) {
     const cleanEmpId = empId.trim();
     const employee = employeeData.find(e => e['EmpID']?.toString().trim() === cleanEmpId);
-    // print(`Fetching data for Employee ID: ${cleanEmpId}`, employee ? '✅ Found' : '❌ Not Found');
     if (!employee) {
         showError(`No employee found for ID: ${empId}`);
         return null;
@@ -205,13 +204,6 @@ async function populateEmployeeInfo() {
     }
 }
 
-function getReportingManagers() {
-    return [...new Set(employeeData
-        .map(e => e['ReportingEmpName'])
-        .filter(m => m && typeof m === 'string' && m.trim()))];
-}
-
-// REMOVED: calculateHours() — only project hours now
 function calculateProjectHours(row) {
     const projectStart = row.querySelector('.project-start')?.value;
     const projectEnd = row.querySelector('.project-end')?.value;
@@ -229,6 +221,26 @@ function calculateProjectHours(row) {
 
     const projectHoursField = row.querySelector('.project-hours-field');
     if (projectHoursField) projectHoursField.value = projectHours > 0 ? projectHours : '';
+    updateSummary();
+}
+
+function calculateWorkingHours(row) {
+    const punchIn = row.querySelector('.punch-in')?.value;
+    const punchOut = row.querySelector('.punch-out')?.value;
+
+    let workingHours = 0;
+    if (punchIn && punchOut) {
+        const [inH, inM] = punchIn.split(':').map(Number);
+        const [outH, outM] = punchOut.split(':').map(Number);
+        const inMinutes = inH * 60 + inM;
+        const outMinutes = outH * 60 + outM;
+        let diff = outMinutes - inMinutes;
+        if (diff < 0) diff += 24 * 60;
+        workingHours = (diff / 60).toFixed(2);
+    }
+
+    const workingHoursField = row.querySelector('.working-hours-field');
+    if (workingHoursField) workingHoursField.value = workingHours > 0 ? workingHours : '';
     updateSummary();
 }
 
@@ -258,37 +270,6 @@ function updateExistingRowDates(sectionId) {
     }
 }
 
-// function validateDate(dateInput) {
-//     if (!dateInput) return;
-//     const section = dateInput.closest('.timesheet-section');
-//     const weekSelect = section.querySelector('.week-period select');
-//     const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-//     if (!selectedWeek) return;
-
-//     const inputDateStr = dateInput.value;
-//     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
-//     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
-
-//     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
-//         dateInput.classList.add('validation-error');
-//         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
-//     } else {
-//         dateInput.classList.remove('validation-error');
-//         clearValidationMessage(dateInput);
-//     }
-
-//     const today = new Date();
-//     const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-//     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-//     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-//     const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-//     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
-//         dateInput.classList.add('validation-error');
-//         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
-//     }
-// }
-
 function validateDate(dateInput) {
     if (!dateInput) return;
     const section = dateInput.closest('.timesheet-section');
@@ -302,30 +283,23 @@ function validateDate(dateInput) {
 
     const today = new Date();
     const inputDate = new Date(inputDateStr + "T00:00:00");
-
-    const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
     const currentHour = today.getHours();
 
-    // ✅ Reset existing error state
     dateInput.classList.remove('validation-error');
     clearValidationMessage(dateInput);
 
-    // 1️⃣ Check if within week
     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
         dateInput.classList.add('validation-error');
         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
         return;
     }
 
-    // 2️⃣ Check allowed date range (last 60 days to yesterday/today after 7PM)
-    if (inputDate < sixtyDaysAgo) {
+    if (inputDate < new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000))) {
         dateInput.classList.add('validation-error');
         showValidationMessage(dateInput, 'You can only fill timesheet entries from the last 60 days.');
         return;
     }
 
-    // ✅ 3️⃣ Allow current day entry only if time >= 7PM
     const inputDateStrIso = inputDate.toISOString().split('T')[0];
     const todayStrIso = today.toISOString().split('T')[0];
 
@@ -335,41 +309,8 @@ function validateDate(dateInput) {
         return;
     }
 
-    // ✅ 4️⃣ If all good, clear any previous error
     clearValidationMessage(dateInput);
 }
-
-
-// function validateModalDate(dateInput) {
-//     if (!dateInput || !currentRow) return;
-//     const section = currentRow.closest('.timesheet-section');
-//     const weekSelect = section.querySelector('.week-period select');
-//     const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-//     if (!selectedWeek) return;
-
-//     const inputDateStr = dateInput.value;
-//     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
-//     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
-
-//     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
-//         dateInput.classList.add('validation-error');
-//         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
-//     } else {
-//         dateInput.classList.remove('validation-error');
-//         clearValidationMessage(dateInput);
-//     }
-
-//     const today = new Date();
-//     const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-//     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-//     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-//     const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-//     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
-//         dateInput.classList.add('validation-error');
-//         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
-//     }
-// }
 
 function validateModalDate(dateInput) {
     if (!dateInput || !currentRow) return;
@@ -395,7 +336,6 @@ function validateModalDate(dateInput) {
         return;
     }
 
-    // ✅ Allow current date only after 7 PM
     const inputDateStrIso = inputDate.toISOString().split('T')[0];
     const todayStrIso = today.toISOString().split('T')[0];
 
@@ -407,7 +347,6 @@ function validateModalDate(dateInput) {
 
     clearValidationMessage(dateInput);
 }
-
 
 function showValidationMessage(element, message) {
     if (!element) return;
@@ -452,15 +391,17 @@ function deleteWeekSection(sectionId) {
     }
 }
 
+// MODAL: OPEN (Perfect Order)
 function openModal(button) {
     isEditingHistory = false;
     currentRow = button.closest('tr');
     const inputs = currentRow.querySelectorAll('input, select');
 
     const labels = [
-        'Date', 'Location of Work', 'Project Start Time', 'Project End Time',
+        'Date', 'Location of Work', 'Punch In', 'Punch Out',
+        'Project Start Time', 'Project End Time',
         'Client', 'Project', 'Project Code', 'Reporting Manager', 'Activity',
-        'Project Hours', 'Billable', 'Remarks'
+        'Working Hours', 'Project Hours', 'Billable', 'Remarks'
     ];
 
     for (let i = 0; i < inputs.length; i++) {
@@ -469,18 +410,21 @@ function openModal(button) {
         if (label && input) {
             label.textContent = labels[i];
             input.value = inputs[i].value || '';
-            if (input.tagName === 'SELECT' && i === 10) {
+            if (input.tagName === 'SELECT' && i === 13) {
                 input.value = inputs[i].value || 'Yes';
             }
         }
     }
+
     document.getElementById('modalOverlay').style.display = 'flex';
-    // ✅ Auto update hours when time fields change
-    document.getElementById('modalInput3').onchange = updateModalProjectHours;
-    document.getElementById('modalInput4').onchange = updateModalProjectHours;
+
+    document.getElementById('modalInput4').onchange = updateModalCalculations;
+    document.getElementById('modalInput5').onchange = updateModalCalculations;
+    document.getElementById('modalInput6').onchange = updateModalCalculations;
 
     validateModalDate(document.getElementById('modalInput1'));
-    updateModalProjectHours();
+    updateModalCalculations();
+
     const addBtn = document.getElementById('modalAddBtn');
     addBtn.innerHTML = 'Add';
     addBtn.setAttribute('onclick', 'saveModalEntry()');
@@ -493,44 +437,7 @@ function closeModal() {
     currentEntryId = null;
 }
 
-// function updateModalProjectHours() {
-//     if (!currentRow) return;
-//     const projectStart = document.getElementById('modalInput3').value;
-//     const projectEnd = document.getElementById('modalInput4').value;
-
-//     let projectHours = 0;
-//     if (projectStart && projectEnd) {
-//         const [startH, startM] = projectStart.split(':').map(Number);
-//         const [endH, endM] = projectEnd.split(':').map(Number);
-//         const startMinutes = startH * 60 + startM;
-//         const endMinutes = endH * 60 + endM;
-//         projectHours = (endMinutes - startMinutes) / 60;
-//         if (projectHours < 0) projectHours += 24;
-//         projectHours = projectHours.toFixed(2);
-//     }
-
-//     document.getElementById('modalInput10').value = projectHours;
-// }
-
-function updateModalProjectHours() {
-    const start = document.getElementById('modalInput3').value;
-    const end = document.getElementById('modalInput4').value;
-
-    if (!start || !end) {
-        document.getElementById('modalInput10').value = '';
-        return;
-    }
-
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
-    let diff = (endH * 60 + endM) - (startH * 60 + startM);
-    if (diff < 0) diff += 24 * 60;
-
-    const hours = (diff / 60).toFixed(2);
-    document.getElementById('modalInput10').value = hours;
-}
-
-
+// MODAL: SAVE (Perfect Mapping)
 function saveModalEntry() {
     if (!currentRow) return;
 
@@ -542,18 +449,30 @@ function saveModalEntry() {
     const modalInputs = document.querySelectorAll('#modalOverlay input, #modalOverlay select');
     const rowInputs = currentRow.querySelectorAll('input, select');
 
-    for (let i = 0; i < modalInputs.length; i++) {
-        if (rowInputs[i]) {
-            rowInputs[i].value = modalInputs[i].value;
-        }
-    }
+    rowInputs[0].value = modalInputs[0].value;  // Date
+    rowInputs[1].value = modalInputs[1].value;  // Location
+    rowInputs[2].value = modalInputs[2].value;  // Punch In
+    rowInputs[3].value = modalInputs[3].value;  // Punch Out
+    rowInputs[4].value = modalInputs[4].value;  // Project Start
+    rowInputs[5].value = modalInputs[5].value;  // Project End
+    rowInputs[6].value = modalInputs[6].value;  // Client
+    rowInputs[7].value = modalInputs[7].value;  // Project
+    rowInputs[8].value = modalInputs[8].value;  // Project Code
+    rowInputs[9].value = modalInputs[9].value;  // Reporting Manager
+    rowInputs[10].value = modalInputs[10].value; // Activity
+    rowInputs[11].value = modalInputs[11].value; // Working Hours
+    rowInputs[12].value = modalInputs[12].value; // Project Hours
+    rowInputs[13].value = modalInputs[13].value; // Billable
+    rowInputs[14].value = modalInputs[14].value; // Remarks
 
     calculateProjectHours(currentRow);
+    calculateWorkingHours(currentRow);
     validateDate(currentRow.querySelector('.date-field'));
     closeModal();
     updateSummary();
 }
 
+// MODAL: UPDATE HISTORY (Perfect Mapping)
 function updateHistoryEntry() {
     if (!currentRow || !currentEntryId) return;
     const modalInputs = document.querySelectorAll('#modalOverlay input, #modalOverlay select');
@@ -561,16 +480,19 @@ function updateHistoryEntry() {
     const updateData = {
         date: modalInputs[0].value,
         location: modalInputs[1].value,
-        projectStartTime: modalInputs[2].value,
-        projectEndTime: modalInputs[3].value,
-        client: modalInputs[4].value,
-        project: modalInputs[5].value,
-        projectCode: modalInputs[6].value,
-        reportingManagerEntry: modalInputs[7].value,
-        activity: modalInputs[8].value,
-        projectHours: modalInputs[9].value,
-        billable: modalInputs[10].value,
-        remarks: modalInputs[11].value
+        punchIn: modalInputs[2].value,
+        punchOut: modalInputs[3].value,
+        projectStartTime: modalInputs[4].value,
+        projectEndTime: modalInputs[5].value,
+        client: modalInputs[6].value,
+        project: modalInputs[7].value,
+        projectCode: modalInputs[8].value,
+        reportingManagerEntry: modalInputs[9].value,
+        activity: modalInputs[10].value,
+        workingHours: modalInputs[11].value,
+        projectHours: modalInputs[12].value,
+        billable: modalInputs[13].value,
+        remarks: modalInputs[14].value
     };
 
     fetch(`${API_URL}/update_timesheet/${loggedInEmployeeId}/${currentEntryId}`, {
@@ -588,6 +510,31 @@ function updateHistoryEntry() {
         console.error('Error updating entry:', error);
         showPopup('Failed to update entry.', true);
     });
+}
+
+function updateModalCalculations() {
+    updateModalProjectHours();
+    if (currentRow) {
+        calculateWorkingHours(currentRow);
+    }
+}
+
+function updateModalProjectHours() {
+    const start = document.getElementById('modalInput5').value;
+    const end = document.getElementById('modalInput6').value;
+
+    if (!start || !end) {
+        document.getElementById('modalInput13').value = '';
+        return;
+    }
+
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    let diff = (endH * 60 + endM) - (startH * 60 + startM);
+    if (diff < 0) diff += 24 * 60;
+
+    const hours = (diff / 60).toFixed(2);
+    document.getElementById('modalInput13').value = hours;
 }
 
 function updateSummary() {
@@ -633,16 +580,19 @@ function exportTimesheetToExcel() {
                 'S.No': row.cells[0].textContent,
                 'Date': inputs[0]?.value || '',
                 'Location of Work': inputs[1]?.value || '',
-                'Project Start Time': inputs[2]?.value || '',
-                'Project End Time': inputs[3]?.value || '',
-                'Client': inputs[4]?.value || '',
-                'Project': inputs[5]?.value || '',
-                'Project Code': inputs[6]?.value || '',
-                'Reporting Manager Entry': inputs[7]?.value || '',
-                'Activity': inputs[8]?.value || '',
-                'Project Hours': inputs[9]?.value || '',
-                'Billable': inputs[10]?.value || '',
-                'Remarks': inputs[11]?.value || '',
+                'Punch In': inputs[2]?.value || '',
+                'Punch Out': inputs[3]?.value || '',
+                'Project Start Time': inputs[4]?.value || '',
+                'Project End Time': inputs[5]?.value || '',
+                'Client': inputs[6]?.value || '',
+                'Project': inputs[7]?.value || '',
+                'Project Code': inputs[8]?.value || '',
+                'Reporting Manager Entry': inputs[9]?.value || '',
+                'Activity': inputs[10]?.value || '',
+                'Working Hours': inputs[11]?.value || '',
+                'Project Hours': inputs[12]?.value || '',
+                'Billable': inputs[13]?.value || '',
+                'Remarks': inputs[14]?.value || '',
                 '3 HITS': document.getElementById('hits').value || '',
                 '3 MISSES': document.getElementById('misses').value || '',
                 'FEEDBACK FOR HR': document.getElementById('feedback_hr').value || '',
@@ -671,6 +621,8 @@ function getEmployeeInfoForExport() {
         'S.No': '',
         'Date': '',
         'Location of Work': '',
+        'Punch In': '',
+        'Punch Out': '',
         'Project Start Time': '',
         'Project End Time': '',
         'Client': '',
@@ -678,6 +630,7 @@ function getEmployeeInfoForExport() {
         'Project Code': '',
         'Reporting Manager Entry': '',
         'Activity': '',
+        'Working Hours': '',
         'Project Hours': '',
         'Billable': '',
         'Remarks': '',
@@ -710,17 +663,17 @@ async function saveDataToMongo() {
         const rows = section.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const inputs = row.querySelectorAll('input, select');
-            if (inputs.length < 12) return;
+            if (inputs.length < 15) return;
 
             const dateInput = inputs[0];
             const mandatoryFields = {
-                'Project Start Time': inputs[2].value,
-                'Project End Time': inputs[3].value,
-                'Client': inputs[4].value,
-                'Project': inputs[5].value,
-                'Project Code': inputs[6].value,
-                'Reporting Manager': inputs[7].value,
-                'Activity': inputs[8].value
+                'Project Start Time': inputs[4].value,
+                'Project End Time': inputs[5].value,
+                'Client': inputs[6].value,
+                'Project': inputs[7].value,
+                'Project Code': inputs[8].value,
+                'Reporting Manager': inputs[9].value,
+                'Activity': inputs[10].value
             };
 
             for (let [fieldName, value] of Object.entries(mandatoryFields)) {
@@ -750,16 +703,19 @@ async function saveDataToMongo() {
                 weekPeriod,
                 date: inputs[0].value,
                 location: inputs[1].value,
-                projectStartTime: inputs[2].value,
-                projectEndTime: inputs[3].value,
-                client: inputs[4].value,
-                project: inputs[5].value,
-                projectCode: inputs[6].value,
-                reportingManagerEntry: inputs[7].value || '',
-                activity: inputs[8].value,
-                projectHours: inputs[9].value,
-                billable: inputs[10].value,
-                remarks: inputs[11].value,
+                punchIn: inputs[2].value,
+                punchOut: inputs[3].value,
+                projectStartTime: inputs[4].value,
+                projectEndTime: inputs[5].value,
+                client: inputs[6].value,
+                project: inputs[7].value,
+                projectCode: inputs[8].value,
+                reportingManagerEntry: inputs[9].value || '',
+                activity: inputs[10].value,
+                workingHours: inputs[11].value,
+                projectHours: inputs[12].value,
+                billable: inputs[13].value,
+                remarks: inputs[14].value,
                 hits: document.getElementById('hits').value || '',
                 misses: document.getElementById('misses').value || '',
                 feedback_hr: document.getElementById('feedback_hr').value || '',
@@ -794,21 +750,15 @@ async function saveDataToMongo() {
         });
 
         if (!response.ok) throw new Error('Failed to submit');
-        // hideLoading();
-        // showPopup('Timesheet Submitted successfully!');
-        // setTimeout(() => window.location.reload(), 2000);
         hideLoading();
         showPopup('Timesheet Submitted successfully!');
 
-        // Temporarily disable beforeunload warning
         isExiting = true;
         window.removeEventListener('beforeunload', beforeUnloadHandler);
 
-        // Reload after popup delay
         setTimeout(() => {
             window.location.reload();
         }, 2000);
-
 
     } catch (error) {
         hideLoading();
@@ -884,6 +834,8 @@ async function showSection(section) {
                             <th>Action</th>
                             <th>Date</th>
                             <th>Location</th>
+                            <th>Punch In</th>
+                            <th>Punch Out</th>
                             <th>Project Start</th>
                             <th>Project End</th>
                             <th>Client</th>
@@ -891,6 +843,7 @@ async function showSection(section) {
                             <th>Project Code</th>
                             <th>Reporting Manager</th>
                             <th>Activity</th>
+                            <th>Working Hours</th>
                             <th>Project Hours</th>
                             <th>Billable</th>
                             <th>Remarks</th>
@@ -909,6 +862,8 @@ async function showSection(section) {
                         </td>
                         <td>${entry.date || ''}</td>
                         <td>${entry.location || ''}</td>
+                        <td>${entry.punchIn || ''}</td>
+                        <td>${entry.punchOut || ''}</td>
                         <td>${entry.projectStartTime || ''}</td>
                         <td>${entry.projectEndTime || ''}</td>
                         <td>${entry.client || ''}</td>
@@ -916,6 +871,7 @@ async function showSection(section) {
                         <td>${entry.projectCode || ''}</td>
                         <td>${entry.reportingManagerEntry || ''}</td>
                         <td>${entry.activity || ''}</td>
+                        <td>${entry.workingHours || ''}</td>
                         <td>${entry.projectHours || ''}</td>
                         <td>${entry.billable || ''}</td>
                         <td>${entry.remarks || ''}</td>
@@ -923,7 +879,6 @@ async function showSection(section) {
                     tbody.appendChild(row);
                 });
 
-                // weekDiv.appendChild(document.createElement('div').appendChild(table).parentNode);
                 const tableWrapper = document.createElement('div');
                 tableWrapper.className = 'table-responsive';
                 tableWrapper.appendChild(table);
@@ -952,30 +907,34 @@ async function showSection(section) {
     }
 }
 
+// MODAL: EDIT HISTORY (Perfect Mapping)
 function editHistoryRow(button, entryId) {
     const row = button.closest('tr');
     currentRow = row;
     const cells = row.querySelectorAll('td');
     const modalInputs = document.querySelectorAll('#modalOverlay input, #modalOverlay select');
 
-    modalInputs[0].value = cells[2].textContent;
-    modalInputs[1].value = cells[3].textContent;
-    modalInputs[2].value = cells[4].textContent;
-    modalInputs[3].value = cells[5].textContent;
-    modalInputs[4].value = cells[6].textContent;
-    modalInputs[5].value = cells[7].textContent;
-    modalInputs[6].value = cells[8].textContent;
-    modalInputs[7].value = cells[9].textContent;
-    modalInputs[8].value = cells[10].textContent;
-    modalInputs[9].value = cells[11].textContent;
-    modalInputs[10].value = cells[12].textContent;
-    modalInputs[11].value = cells[13].textContent;
+    modalInputs[0].value = cells[2].textContent;  // Date
+    modalInputs[1].value = cells[3].textContent;  // Location
+    modalInputs[2].value = cells[4].textContent;  // Punch In
+    modalInputs[3].value = cells[5].textContent;  // Punch Out
+    modalInputs[4].value = cells[6].textContent;  // Project Start
+    modalInputs[5].value = cells[7].textContent;  // Project End
+    modalInputs[6].value = cells[8].textContent;  // Client
+    modalInputs[7].value = cells[9].textContent;  // Project
+    modalInputs[8].value = cells[10].textContent; // Project Code
+    modalInputs[9].value = cells[11].textContent; // Reporting Manager
+    modalInputs[10].value = cells[12].textContent;// Activity
+    modalInputs[11].value = cells[13].textContent;// Working Hours
+    modalInputs[12].value = cells[14].textContent;// Project Hours
+    modalInputs[13].value = cells[15].textContent;// Billable
+    modalInputs[14].value = cells[16].textContent;// Remarks
 
     isEditingHistory = true;
     currentEntryId = entryId;
     document.getElementById('modalOverlay').style.display = 'flex';
     validateModalDate(modalInputs[0]);
-    updateModalProjectHours();
+    updateModalCalculations();
     document.getElementById('modalAddBtn').innerHTML = 'Update';
     document.getElementById('modalAddBtn').onclick = updateHistoryEntry;
 }
@@ -1015,43 +974,14 @@ function pasteRow(button) {
             if (input.classList.contains('project-start') || input.classList.contains('project-end')) {
                 calculateProjectHours(row);
             }
+            if (input.classList.contains('punch-in') || input.classList.contains('punch-out')) {
+                calculateWorkingHours(row);
+            }
         }
     });
     updateSummary();
     showPopup('Pasted!');
 }
-
-// function pasteAboveCell(sectionId) {
-//     const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
-//     if (!tbody || tbody.rows.length === 0) return addRow(sectionId);
-
-//     const lastRow = tbody.rows[tbody.rows.length - 1];
-//     const newRow = lastRow.cloneNode(true);
-//     tbody.insertBefore(newRow, lastRow.nextSibling);
-
-//     const newInputs = newRow.querySelectorAll('input, select');
-//     const lastInputs = lastRow.querySelectorAll('input, select');
-
-//     newInputs.forEach((input, i) => {
-//         if (input.type === 'button' || input.classList.contains('copy-btn') || input.classList.contains('paste-btn') || input.classList.contains('delete-btn')) return;
-//         input.value = lastInputs[i]?.value || '';
-//         if (input.classList.contains('date-field')) {
-//             const date = new Date(input.value);
-//             if (date < new Date(weekOptions[0].end)) {
-//                 date.setDate(date.getDate() + 1);
-//                 input.value = date.toISOString().split('T')[0];
-//             }
-//             validateDate(input);
-//         }
-//         if (input.classList.contains('project-start') || input.classList.contains('project-end')) {
-//             calculateProjectHours(newRow);
-//         }
-//     });
-
-//     updateRowNumbers(tbody.id);
-//     updateSummary();
-//     showPopup('Duplicated above!');
-// }
 
 function addWeekSection() {
     sectionCount++;
@@ -1102,14 +1032,17 @@ function addWeekSection() {
                 <th class="col-narrow col-add">Add</th>
                 <th class="col-narrow col-action">Action</th>
                 <th class="col-medium col-date">Date</th>
-                <th class="col-wide col-location">Location of Work</th>
-                <th class="col-medium col-project-start">Project Start Time</th>
-                <th class="col-medium col-project-end">Project End Time</th>
+                <th class="col-wide col-location">Location</th>
+                <th class="col-narrow col-punch-in">Punch In</th>
+                <th class="col-narrow col-punch-out">Punch Out</th>
+                <th class="col-medium col-project-start">Project Start</th>
+                <th class="col-medium col-project-end">Project End</th>
                 <th class="col-wide col-client">Client</th>
                 <th class="col-wide col-project">Project</th>
                 <th class="col-project col-project-code">Project Code</th>
                 <th class="col-wide col-reporting-manager">Reporting Manager</th>
                 <th class="col-wide col-activity">Activity</th>
+                <th class="col-narrow col-working-hours">Working Hours</th>
                 <th class="col-narrow col-project-hours">Project Hours</th>
                 <th class="col-medium col-billable">Billable</th>
                 <th class="col-wide col-remarks">Remarks</th>
@@ -1128,12 +1061,6 @@ function addWeekSection() {
     addRowBtn.textContent = '+ Add New Entry';
     addRowBtn.onclick = () => addRow(sectionId);
     buttonContainer.appendChild(addRowBtn);
-
-    // const pasteAboveBtn = document.createElement('button');
-    // pasteAboveBtn.className = 'paste-above-btn';
-    // pasteAboveBtn.textContent = 'Paste Above Cell';
-    // pasteAboveBtn.onclick = () => pasteAboveCell(sectionId);
-    // buttonContainer.appendChild(pasteAboveBtn);
 
     section.appendChild(buttonContainer);
     sectionsDiv.appendChild(section);
@@ -1155,7 +1082,7 @@ function addRow(sectionId) {
     const row = document.createElement('tr');
     row.innerHTML = `
         <td class="col-sno">${rowCount}</td>
-        <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></button></td>
+        <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
         <td class="col-action">
             <button class="copy-btn" onclick="copyRow(this)">Copy</button>
             <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
@@ -1167,6 +1094,8 @@ function addRow(sectionId) {
             <option>Work From Home</option>
             <option>Field Work</option>
         </select></td>
+        <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="calculateWorkingHours(this.closest('tr'))"></td>
+        <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="calculateWorkingHours(this.closest('tr'))"></td>
         <td class="col-project-start"><input type="time" class="project-start form-input" onchange="calculateProjectHours(this.closest('tr'))"></td>
         <td class="col-project-end"><input type="time" class="project-end form-input" onchange="calculateProjectHours(this.closest('tr'))"></td>
         <td class="col-client"><input type="text" class="client-field form-input" placeholder="Enter Client" oninput="updateSummary()"></td>
@@ -1174,6 +1103,7 @@ function addRow(sectionId) {
         <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code" oninput="updateSummary()"></td>
         <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager" onchange="updateSummary()"></td>
         <td class="col-activity"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
+        <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
         <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
         <td class="col-billable"><select class="billable-select form-input" onchange="updateSummary()">
             <option>Yes</option>
@@ -1192,14 +1122,6 @@ function updateDateValidations(sectionId) {
 }
 
 let isExiting = false;
-// window.addEventListener('beforeunload', e => {
-//     if (!isExiting) {
-//         e.preventDefault();
-//         e.returnValue = '';
-//         showExitConfirmation();
-//     }
-// });
-
 function beforeUnloadHandler(e) {
     if (!isExiting) {
         e.preventDefault();
@@ -1209,13 +1131,13 @@ function beforeUnloadHandler(e) {
 }
 window.addEventListener('beforeunload', beforeUnloadHandler);
 
-
 document.addEventListener('keydown', e => {
     if (e.key === 'Backspace' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
         e.preventDefault();
         showExitConfirmation();
     }
 });
+
 function showExitConfirmation() {
     document.getElementById('exitConfirmation').style.display = 'block';
 }
@@ -1246,12 +1168,12 @@ async function handleExcelUpload(event) {
                 return;
             }
 
-            // ✅ Required columns to validate
             const requiredColumns = [
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
                 'Reporting Manager', 'Week Period', 'Date', 'Location of Work',
-                'Project Start Time', 'Project End Time', 'Client', 'Project', 'Project Code',
-                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Billable', 'Remarks'
+                'Punch In', 'Punch Out', 'Project Start Time', 'Project End Time',
+                'Client', 'Project', 'Project Code', 'Reporting Manager Entry',
+                'Activity', 'Working Hours', 'Project Hours', 'Billable', 'Remarks'
             ];
 
             const fileColumns = Object.keys(jsonData[0]);
@@ -1264,7 +1186,6 @@ async function handleExcelUpload(event) {
 
             showLoading("Uploading Excel data");
 
-            // ✅ Convert Excel data into API format
             const timesheetData = jsonData.map(row => ({
                 employeeId: row['Employee ID'] || '',
                 employeeName: row['Employee Name'] || '',
@@ -1275,17 +1196,17 @@ async function handleExcelUpload(event) {
                 weekPeriod: row['Week Period'] || '',
                 date: row['Date'] || '',
                 location: row['Location of Work'] || '',
-                projectStartTime: row['Project Start Time'] || '',
-                projectEndTime: row['Project End Time'] || '',
                 punchIn: row['Punch In'] || '',
                 punchOut: row['Punch Out'] || '',
+                projectStartTime: row['Project Start Time'] || '',
+                projectEndTime: row['Project End Time'] || '',
                 client: row['Client'] || '',
                 project: row['Project'] || '',
                 projectCode: row['Project Code'] || '',
                 reportingManagerEntry: row['Reporting Manager Entry'] || '',
                 activity: row['Activity'] || '',
-                projectHours: row['Project Hours'] || '',
                 workingHours: row['Working Hours'] || '',
+                projectHours: row['Project Hours'] || '',
                 billable: row['Billable'] || '',
                 remarks: row['Remarks'] || '',
                 hits: row['3 HITS'] || '',
@@ -1328,5 +1249,3 @@ async function handleExcelUpload(event) {
 }
 
 window.handleExcelUpload = handleExcelUpload;
-
-
