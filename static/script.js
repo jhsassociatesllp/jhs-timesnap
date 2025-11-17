@@ -461,24 +461,35 @@ function openModal(button) {
     const inputs = currentRow.querySelectorAll('input, select');
     
     const labels = [
-        'Date', 'Location of Work', 'Punch In', 'Punch Out', 'Project Start Time', 'Project End Time',
-        'Client', 'Project', 'Project Code', 'Reporting Manager', 'Activity', 'Project Hours', 'Working Hours', 'Billable', 'Remarks'
-    ];
+    'Date',
+    'Location of Work',         
+    'Punch In',                 
+    'Punch Out',                
+    'Project Start Time',       
+    'Project End Time',         
+    'Client',                   
+    'Project',                  
+    'Project Code',             
+    'Reporting Manager',        
+    'Activity',                 
+    'Project Hours',            
+    'Working Hours',            
+    'Billable',                 
+    'Remarks'                   
+];
     
-    for (let i = 0; i < inputs.length; i++) {
-        const label = document.getElementById(`modalLabel${i + 1}`);
-        const input = document.getElementById(`modalInput${i + 1}`);
-        if (label && input) {
-            label.textContent = labels[i];
-            input.value = inputs[i].value || '';
-            
-            if (input.tagName === 'SELECT') {
-                if (i === 13) {
-                    input.value = inputs[i].value || 'Yes';
-                }
-            }
-        }
-    }
+    // const inputs = currentRow.querySelectorAll('input, select');
+
+for (let i = 0; i < 15; i++) {
+    const label = document.getElementById(`modalLabel${i + 1}`);
+    const input = document.getElementById(`modalInput${i + 1}`);
+
+    if (!label || !input) continue;
+
+    label.textContent = labels[i];
+    input.value = inputs[i] ? inputs[i].value : '';
+}
+
     document.getElementById('modalOverlay').style.display = 'flex';
     validateModalDate(document.getElementById('modalInput1'));
     updateModalHours();
@@ -499,38 +510,75 @@ function closeModal() {
     addBtn.onclick = saveModalEntry;
 }
 
+// function updateModalHours() {
+//     if (!currentRow) return;
+//     const projectStart = document.getElementById('modalInput5').value;
+//     const projectEnd = document.getElementById('modalInput6').value;
+//     const punchIn = document.getElementById('modalInput3').value;
+//     const punchOut = document.getElementById('modalInput4').value;
+
+//     let projectHours = 0;
+//     if (projectStart && projectEnd) {
+//         const [startH, startM] = projectStart.split(':').map(Number);
+//         const [endH, endM] = projectEnd.split(':').map(Number);
+//         const startMinutes = startH * 60 + startM;
+//         const endMinutes = endH * 60 + endM;
+//         projectHours = (endMinutes - startMinutes) / 60;
+//         if (projectHours < 0) projectHours += 24;
+//         projectHours = projectHours.toFixed(2); 
+//     }
+
+//     let workingHours = 0;
+//     if (punchIn && punchOut) {
+//         const [inH, inM] = punchIn.split(':').map(Number);
+//         const [outH, outM] = punchOut.split(':').map(Number);
+//         const inMinutes = inH * 60 + inM;
+//         const outMinutes = outH * 60 + outM;
+//         workingHours = (outMinutes - inMinutes) / 60;
+//         if (workingHours < 0) workingHours += 24;
+//         workingHours = workingHours.toFixed(2);
+//     }
+
+//     document.getElementById('modalInput12').value = projectHours;
+//     document.getElementById('modalInput13').value = workingHours;
+// }
+
 function updateModalHours() {
-    if (!currentRow) return;
-    const projectStart = document.getElementById('modalInput5').value;
-    const projectEnd = document.getElementById('modalInput6').value;
     const punchIn = document.getElementById('modalInput3').value;
     const punchOut = document.getElementById('modalInput4').value;
+    const projectStart = document.getElementById('modalInput5').value;
+    const projectEnd = document.getElementById('modalInput6').value;
 
-    let projectHours = 0;
+    // Project Hours
+    let projectHours = "";
     if (projectStart && projectEnd) {
-        const [startH, startM] = projectStart.split(':').map(Number);
-        const [endH, endM] = projectEnd.split(':').map(Number);
-        const startMinutes = startH * 60 + startM;
-        const endMinutes = endH * 60 + endM;
-        projectHours = (endMinutes - startMinutes) / 60;
-        if (projectHours < 0) projectHours += 24;
-        projectHours = projectHours.toFixed(2);
+        const [sH, sM] = projectStart.split(":").map(Number);
+        const [eH, eM] = projectEnd.split(":").map(Number);
+
+        let s = sH * 60 + sM;
+        let e = eH * 60 + eM;
+        if (e < s) e += 24 * 60;
+
+        projectHours = ((e - s) / 60).toFixed(2);
     }
 
-    let workingHours = 0;
+    // Working Hours
+    let workingHours = "";
     if (punchIn && punchOut) {
-        const [inH, inM] = punchIn.split(':').map(Number);
-        const [outH, outM] = punchOut.split(':').map(Number);
-        const inMinutes = inH * 60 + inM;
-        const outMinutes = outH * 60 + outM;
-        workingHours = (outMinutes - inMinutes) / 60;
-        if (workingHours < 0) workingHours += 24;
-        workingHours = workingHours.toFixed(2);
+        const [inH, inM] = punchIn.split(":").map(Number);
+        const [outH, outM] = punchOut.split(":").map(Number);
+
+        let s = inH * 60 + inM;
+        let e = outH * 60 + outM;
+        if (e < s) e += 24 * 60;
+
+        workingHours = ((e - s) / 60).toFixed(2);
     }
 
     document.getElementById('modalInput12').value = projectHours;
     document.getElementById('modalInput13').value = workingHours;
 }
+
 
 function saveModalEntry() {
     console.log("Saving modal entry. isEditingHistory:", isEditingHistory);
@@ -543,13 +591,20 @@ function saveModalEntry() {
     const modalInputs = document.querySelectorAll('#modalOverlay input, #modalOverlay select');
     const rowInputs = currentRow.querySelectorAll('input, select');
     
-    for (let i = 0; i < modalInputs.length; i++) {
-        if (rowInputs[i].tagName === 'INPUT' && rowInputs[i].type !== 'button') {
-            rowInputs[i].value = modalInputs[i].value;
-        } else if (rowInputs[i].tagName === 'SELECT') {
-            rowInputs[i].value = modalInputs[i].value;
-        }
+    for (let i = 0; i < 15; i++) {   // only your 15 actual fields
+    if (!rowInputs[i]) continue;
+
+    // input fields
+    if (rowInputs[i].tagName === 'INPUT') {
+        rowInputs[i].value = modalInputs[i].value;
     }
+
+    // select fields
+    if (rowInputs[i].tagName === 'SELECT') {
+        rowInputs[i].value = modalInputs[i].value;
+    }
+}
+
     calculateHours(currentRow);
     validateDate(currentRow.querySelector('.date-field'));
     closeModal();
