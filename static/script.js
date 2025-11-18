@@ -9,6 +9,8 @@ let copiedData = null; // Store copied row data
 const API_URL = '';
 let isEditingHistory = false;
 let currentEntryId = null;
+let historyEntries = [];
+
 
 const getHeaders = () => ({
     'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -774,70 +776,201 @@ function getEmployeeInfoForExport() {
     };
 }
 
-async function exportHistoryToExcel() {
-    try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, {
-            headers: getHeaders()
-        });
-        if (!response.ok) {
-            throw new Error('Failed to fetch history for export');
-        }
-        const data = await response.json();
-        const entries = Array.isArray(data.Data) ? data.Data : data.Data ? [data.Data] : [];
+// async function exportHistoryToExcel() {
+//     try {
+//         const token = localStorage.getItem('access_token');
+//         const response = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, {
+//             headers: getHeaders()
+//         });
+//         if (!response.ok) {
+//             throw new Error('Failed to fetch history for export');
+//         }
+//         const data = await response.json();
+//         const entries = Array.isArray(data.Data) ? data.Data : data.Data ? [data.Data] : [];
 
-        const wb = XLSX.utils.book_new();
-        const employeeInfo = getEmployeeInfoForExport();
-        let allData = [];
+//         const wb = XLSX.utils.book_new();
+//         const employeeInfo = getEmployeeInfoForExport();
+//         let allData = [];
 
-        allData.push(employeeInfo);
+//         allData.push(employeeInfo);
 
-        entries.forEach(entry => {
-            const rowData = {
-                'Employee ID': employeeInfo['Employee ID'],
-                'Employee Name': employeeInfo['Employee Name'],
-                'Designation': employeeInfo['Designation'],
-                'Gender': employeeInfo['Gender'],
-                'Partner': employeeInfo['Partner'],
-                'Reporting Manager': employeeInfo['Reporting Manager'],
-                'Week Period': entry.weekPeriod || '',
-                'S.No': '',
-                'Date': entry.date || '',
-                'Location of Work': entry.location || '',
-                'Project Start Time': entry.projectStartTime || '',
-                'Project End Time': entry.projectEndTime || '',
-                'Punch In': entry.punchIn || '',
-                'Punch Out': entry.punchOut || '',
-                'Client': entry.client || '',
-                'Project': entry.project || '',
-                'Project Code': entry.projectCode || '',
-                'Reporting Manager Entry': entry.reportingManagerEntry || '',
-                'Activity': entry.activity || '',
-                'Project Hours': entry.projectHours || '',
-                'Working Hours': entry.workingHours || '',
-                'Billable': entry.billable || '',
-                'Remarks': entry.remarks || '',
-                '3 HITS': entry.hits || '',
-                '3 MISSES': entry.misses || '',
-                'FEEDBACK FOR HR': entry.feedback_hr || '',
-                'FEEDBACK FOR IT': entry.feedback_it || '',
-                'FEEDBACK FOR CRM': entry.feedback_crm || '',
-                'FEEDBACK FOR OTHERS': entry.feedback_others || '',
-                'Total Hours': data.totalHours || '0.00',
-                'Total Billable Hours': data.totalBillableHours || '0.00',
-                'Total Non-Billable Hours': data.totalNonBillableHours || '0.00'
-            };
-            allData.push(rowData);
-        });
+//         entries.forEach(entry => {
+//             const rowData = {
+//                 'Employee ID': employeeInfo['Employee ID'],
+//                 'Employee Name': employeeInfo['Employee Name'],
+//                 'Designation': employeeInfo['Designation'],
+//                 'Gender': employeeInfo['Gender'],
+//                 'Partner': employeeInfo['Partner'],
+//                 'Reporting Manager': employeeInfo['Reporting Manager'],
+//                 'Week Period': entry.weekPeriod || '',
+//                 'S.No': '',
+//                 'Date': entry.date || '',
+//                 'Location of Work': entry.location || '',
+//                 'Project Start Time': entry.projectStartTime || '',
+//                 'Project End Time': entry.projectEndTime || '',
+//                 'Punch In': entry.punchIn || '',
+//                 'Punch Out': entry.punchOut || '',
+//                 'Client': entry.client || '',
+//                 'Project': entry.project || '',
+//                 'Project Code': entry.projectCode || '',
+//                 'Reporting Manager Entry': entry.reportingManagerEntry || '',
+//                 'Activity': entry.activity || '',
+//                 'Project Hours': entry.projectHours || '',
+//                 'Working Hours': entry.workingHours || '',
+//                 'Billable': entry.billable || '',
+//                 'Remarks': entry.remarks || '',
+//                 '3 HITS': entry.hits || '',
+//                 '3 MISSES': entry.misses || '',
+//                 'FEEDBACK FOR HR': entry.feedback_hr || '',
+//                 'FEEDBACK FOR IT': entry.feedback_it || '',
+//                 'FEEDBACK FOR CRM': entry.feedback_crm || '',
+//                 'FEEDBACK FOR OTHERS': entry.feedback_others || '',
+//                 'Total Hours': data.totalHours || '0.00',
+//                 'Total Billable Hours': data.totalBillableHours || '0.00',
+//                 'Total Non-Billable Hours': data.totalNonBillableHours || '0.00'
+//             };
+//             allData.push(rowData);
+//         });
 
-        const ws = XLSX.utils.json_to_sheet(allData);
-        XLSX.utils.book_append_sheet(wb, ws, 'History');
-        XLSX.writeFile(wb, `History_${document.getElementById('employeeId').value || 'User'}_${new Date().toISOString().split('T')[0]}.xlsx`);
-    } catch (error) {
-        console.error('Error exporting history:', error);
-        showPopup('Failed to export history: ' + error.message, true);
+//         const ws = XLSX.utils.json_to_sheet(allData);
+//         XLSX.utils.book_append_sheet(wb, ws, 'History');
+//         XLSX.writeFile(wb, `History_${document.getElementById('employeeId').value || 'User'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+//     } catch (error) {
+//         console.error('Error exporting history:', error);
+//         showPopup('Failed to export history: ' + error.message, true);
+//     }
+// }
+
+function exportHistoryToExcel() {
+    if (!historyEntries || historyEntries.length === 0) {
+        showPopup("No history available!");
+        return;
     }
+
+    // Columns WITHOUT S.No
+    const columns = [
+        "employeeId",
+        "employeeName",
+        "designation",
+        "gender",
+        "partner",
+        "reportingManager",
+        "weekPeriod",
+        "date",
+        "location",
+        "punchIn",
+        "punchOut",
+        "projectStartTime",
+        "projectEndTime",
+        "client",
+        "project",
+        "projectCode",
+        "reportingManagerEntry",
+        "activity",
+        "projectHours",
+        "workingHours",
+        "billable",
+        "remarks",
+        "hits",
+        "misses",
+        "feedback_hr",
+        "feedback_it",
+        "feedback_crm",
+        "feedback_others",
+        "totalHours",
+        "totalBillableHours",
+        "totalNonBillableHours"
+    ];
+
+    // Header labels WITHOUT S.No
+    const headersPretty = [
+        "Employee ID",
+        "Employee Name",
+        "Designation",
+        "Gender",
+        "Partner",
+        "Reporting Manager",
+        "Week Period",
+        "Date",
+        "Location of Work",
+        "Punch In",
+        "Punch Out",
+        "Project Start Time",
+        "Project End Time",
+        "Client",
+        "Project",
+        "Project Code",
+        "Reporting Manager Entry",
+        "Activity",
+        "Project Hours",
+        "Working Hours",
+        "Billable",
+        "Remarks",
+        "3 HITS",
+        "3 MISSES",
+        "Feedback for HR",
+        "Feedback for IT",
+        "Feedback for CRM",
+        "Feedback for Others",
+        "Total Hours",
+        "Total Billable Hours",
+        "Total Non Billable Hours"
+    ];
+
+    // Prepare cleaned rows WITHOUT S.No
+    const cleanedRows = historyEntries.map((row) => ({
+        employeeId: row.employeeId || "",
+        employeeName: row.employeeName || "",
+        designation: row.designation || "",
+        gender: row.gender || "",
+        partner: row.partner || "",
+        reportingManager: row.reportingManager || "",
+        weekPeriod: row.weekPeriod || "",
+        date: row.date || "",
+        location: row.location || "",
+        punchIn: row.punchIn || "",
+        punchOut: row.punchOut || "",
+        projectStartTime: row.projectStartTime || "",
+        projectEndTime: row.projectEndTime || "",
+        client: row.client || "",
+        project: row.project || "",
+        projectCode: row.projectCode || "",
+        reportingManagerEntry: row.reportingManagerEntry || "",
+        activity: row.activity || "",
+        projectHours: row.projectHours || "",
+        workingHours: row.workingHours || "",
+        billable: row.billable || "",
+        remarks: row.remarks || "",
+        hits: row.hits || "",
+        misses: row.misses || "",
+        feedback_hr: row.feedback_hr || "",
+        feedback_it: row.feedback_it || "",
+        feedback_crm: row.feedback_crm || "",
+        feedback_others: row.feedback_others || "",
+        totalHours: row.totalHours || "",
+        totalBillableHours: row.totalBillableHours || "",
+        totalNonBillableHours: row.totalNonBillableHours || ""
+    }));
+
+    // Convert rows → sheet
+    const worksheet = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
+
+    // Insert Pretty Headers
+    XLSX.utils.sheet_add_aoa(worksheet, [headersPretty], { origin: "A1" });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "History");
+
+    const fileName = `History_${loggedInEmployeeId}_${new Date()
+        .toISOString()
+        .split("T")[0]}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
+
+    showPopup("History exported successfully!");
 }
+
+
 
 
 async function saveDataToMongo() {
@@ -1070,6 +1203,7 @@ async function showSection(section) {
             }
 
             const data = await response.json();
+            historyEntries = Array.isArray(data.Data) ? data.Data : [];
             console.log('API Response:', data); // Debug log to check structure
             const historyContent = document.getElementById('historyContent');
             historyContent.innerHTML = '';
@@ -1769,3 +1903,105 @@ function updateDateValidations(sectionId) {
     const dateInputs = section.querySelectorAll('.date-field');
     dateInputs.forEach(input => validateDate(input));
 }
+
+async function handleExcelUpload(event) {
+    console.log("Excel upload initiated");
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            if (!jsonData || jsonData.length === 0) {
+                showPopup('Excel file is empty.', true);
+                return;
+            }
+
+            // ✅ Required columns to validate
+            const requiredColumns = [
+                'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
+                'Reporting Manager', 'Week Period', 'Date', 'Location of Work',
+                'Project Start Time', 'Project End Time', 'Client', 'Project', 'Project Code',
+                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Billable', 'Remarks'
+            ];
+
+            const fileColumns = Object.keys(jsonData[0]);
+            const missingColumns = requiredColumns.filter(col => !fileColumns.includes(col));
+
+            if (missingColumns.length > 0) {
+                showPopup(`Invalid Excel format. Missing columns: ${missingColumns.join(', ')}`, true);
+                return;
+            }
+
+            showLoading("Uploading Excel data");
+
+            // ✅ Convert Excel data into API format
+            const timesheetData = jsonData.map(row => ({
+                employeeId: row['Employee ID'] || '',
+                employeeName: row['Employee Name'] || '',
+                designation: row['Designation'] || '',
+                gender: row['Gender'] || '',
+                partner: row['Partner'] || '',
+                reportingManager: row['Reporting Manager'] || '',
+                weekPeriod: row['Week Period'] || '',
+                date: row['Date'] || '',
+                location: row['Location of Work'] || '',
+                projectStartTime: row['Project Start Time'] || '',
+                projectEndTime: row['Project End Time'] || '',
+                punchIn: row['Punch In'] || '',
+                punchOut: row['Punch Out'] || '',
+                client: row['Client'] || '',
+                project: row['Project'] || '',
+                projectCode: row['Project Code'] || '',
+                reportingManagerEntry: row['Reporting Manager Entry'] || '',
+                activity: row['Activity'] || '',
+                projectHours: row['Project Hours'] || '',
+                workingHours: row['Working Hours'] || '',
+                billable: row['Billable'] || '',
+                remarks: row['Remarks'] || '',
+                hits: row['3 HITS'] || '',
+                misses: row['3 MISSES'] || '',
+                feedback_hr: row['FEEDBACK FOR HR'] || '',
+                feedback_it: row['FEEDBACK FOR IT'] || '',
+                feedback_crm: row['FEEDBACK FOR CRM'] || '',
+                feedback_others: row['FEEDBACK FOR OTHERS'] || '',
+                totalHours: row['Total Hours'] || '0.00',
+                totalBillableHours: row['Total Billable Hours'] || '0.00',
+                totalNonBillableHours: row['Total Non-Billable Hours'] || '0.00'
+            }));
+
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_URL}/save_timesheets`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(timesheetData)
+            });
+
+            hideLoading();
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to upload Excel data.');
+            }
+
+            const result = await response.json();
+            showPopup('Excel uploaded and saved successfully!');
+            setTimeout(() => window.location.reload(), 2000);
+
+        } catch (error) {
+            console.error('Error reading Excel:', error);
+            hideLoading();
+            showPopup(`Failed to upload Excel: ${error.message}`, true);
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+window.handleExcelUpload = handleExcelUpload;
