@@ -689,58 +689,205 @@ function updateSummary() {
     if (nonBillableHoursElement) nonBillableHoursElement.textContent = nonBillableHours.toFixed(2);
 }
 
+// function exportTimesheetToExcel() {
+//     const wb = XLSX.utils.book_new();
+//     const employeeInfo = getEmployeeInfoForExport();
+//     let allData = [];
+
+//     allData.push(employeeInfo);
+
+//     const sections = document.querySelectorAll('.timesheet-section');
+//     sections.forEach((section) => {
+//         const weekPeriod = section.querySelector('.week-period select').value || '';
+//         const rows = section.querySelectorAll('tbody tr');
+//         rows.forEach(row => {
+//             const inputs = row.querySelectorAll('input, select');
+//             const rowData = {
+//                 'Employee ID': employeeInfo['Employee ID'],
+//                 'Employee Name': employeeInfo['Employee Name'],
+//                 'Designation': employeeInfo['Designation'],
+//                 'Gender': employeeInfo['Gender'],
+//                 'Partner': employeeInfo['Partner'],
+//                 'Reporting Manager': employeeInfo['Reporting Manager'],
+//                 'Week Period': weekPeriod,
+//                 'S.No': row.cells[0].textContent,
+//                 'Date': inputs[0] ? inputs[0].value : '',
+//                 'Location of Work': inputs[1] ? (inputs[1].value || inputs[1].querySelector('option:checked')?.value) : '',
+//                 'Project Start Time': inputs[2] ? inputs[2].value : '',
+//                 'Project End Time': inputs[3] ? inputs[3].value : '',
+//                 'Punch In': inputs[4] ? inputs[4].value : '',
+//                 'Punch Out': inputs[5] ? inputs[5].value : '',
+//                 'Client': inputs[6] ? (inputs[6].value || inputs[6].querySelector('option:checked')?.value) : '',
+//                 'Project': inputs[7] ? inputs[7].value : '',
+//                 'Project Code': inputs[8] ? inputs[8].value : '',
+//                 'Reporting Manager Entry': inputs[9] ? inputs[9].value || '' : '',
+//                 'Activity': inputs[10] ? inputs[10].value : '',
+//                 'Project Hours': inputs[11] ? inputs[11].value : '',
+//                 'Working Hours': inputs[12] ? inputs[12].value : '',
+//                 'Billable': inputs[13] ? inputs[13].value : '',
+//                 'Remarks': inputs[14] ? inputs[14].value : '',
+//                 '3 HITS': document.getElementById('hits').value || '',
+//                 '3 MISSES': document.getElementById('misses').value || '',
+//                 'FEEDBACK FOR HR': document.getElementById('feedback_hr').value || '',
+//                 'FEEDBACK FOR IT': document.getElementById('feedback_it').value || '',
+//                 'FEEDBACK FOR CRM': document.getElementById('feedback_crm').value || '',
+//                 'FEEDBACK FOR OTHERS': document.getElementById('feedback_others').value || ''
+//             };
+//             allData.push(rowData);
+//         });
+//     });
+
+//     const ws = XLSX.utils.json_to_sheet(allData);
+//     XLSX.utils.book_append_sheet(wb, ws, 'Timesheet');
+//     XLSX.writeFile(wb, `Timesheet_${document.getElementById('employeeId').value || 'User'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+// }
+
 function exportTimesheetToExcel() {
-    const wb = XLSX.utils.book_new();
     const employeeInfo = getEmployeeInfoForExport();
-    let allData = [];
+    const wb = XLSX.utils.book_new();
 
-    allData.push(employeeInfo);
+    // Columns (same order as history)
+    const columns = [
+        "employeeId",
+        "employeeName",
+        "designation",
+        "gender",
+        "partner",
+        "reportingManager",
+        "weekPeriod",
+        "date",
+        "location",
+        "punchIn",
+        "punchOut",
+        "projectStartTime",
+        "projectEndTime",
+        "client",
+        "project",
+        "projectCode",
+        "reportingManagerEntry",
+        "activity",
+        "projectHours",
+        "workingHours",
+        "billable",
+        "remarks",
+        "hits",
+        "misses",
+        "feedback_hr",
+        "feedback_it",
+        "feedback_crm",
+        "feedback_others"
+    ];
 
-    const sections = document.querySelectorAll('.timesheet-section');
+    // Pretty Headers (same as history)
+    const headersPretty = [
+        "Employee ID",
+        "Employee Name",
+        "Designation",
+        "Gender",
+        "Partner",
+        "Reporting Manager",
+        "Week Period",
+        "Date",
+        "Location of Work",
+        "Punch In",
+        "Punch Out",
+        "Project Start Time",
+        "Project End Time",
+        "Client",
+        "Project",
+        "Project Code",
+        "Reporting Manager Entry",
+        "Activity",
+        "Project Hours",
+        "Working Hours",
+        "Billable",
+        "Remarks",
+        "3 HITS",
+        "3 MISSES",
+        "Feedback for HR",
+        "Feedback for IT",
+        "Feedback for CRM",
+        "Feedback for Others"
+    ];
+
+    let cleanedRows = [];
+
+    const sections = document.querySelectorAll(".timesheet-section");
+
     sections.forEach((section) => {
-        const weekPeriod = section.querySelector('.week-period select').value || '';
-        const rows = section.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const inputs = row.querySelectorAll('input, select');
-            const rowData = {
-                'Employee ID': employeeInfo['Employee ID'],
-                'Employee Name': employeeInfo['Employee Name'],
-                'Designation': employeeInfo['Designation'],
-                'Gender': employeeInfo['Gender'],
-                'Partner': employeeInfo['Partner'],
-                'Reporting Manager': employeeInfo['Reporting Manager'],
-                'Week Period': weekPeriod,
-                'S.No': row.cells[0].textContent,
-                'Date': inputs[0] ? inputs[0].value : '',
-                'Location of Work': inputs[1] ? (inputs[1].value || inputs[1].querySelector('option:checked')?.value) : '',
-                'Project Start Time': inputs[2] ? inputs[2].value : '',
-                'Project End Time': inputs[3] ? inputs[3].value : '',
-                'Punch In': inputs[4] ? inputs[4].value : '',
-                'Punch Out': inputs[5] ? inputs[5].value : '',
-                'Client': inputs[6] ? (inputs[6].value || inputs[6].querySelector('option:checked')?.value) : '',
-                'Project': inputs[7] ? inputs[7].value : '',
-                'Project Code': inputs[8] ? inputs[8].value : '',
-                'Reporting Manager Entry': inputs[9] ? inputs[9].value || '' : '',
-                'Activity': inputs[10] ? inputs[10].value : '',
-                'Project Hours': inputs[11] ? inputs[11].value : '',
-                'Working Hours': inputs[12] ? inputs[12].value : '',
-                'Billable': inputs[13] ? inputs[13].value : '',
-                'Remarks': inputs[14] ? inputs[14].value : '',
-                '3 HITS': document.getElementById('hits').value || '',
-                '3 MISSES': document.getElementById('misses').value || '',
-                'FEEDBACK FOR HR': document.getElementById('feedback_hr').value || '',
-                'FEEDBACK FOR IT': document.getElementById('feedback_it').value || '',
-                'FEEDBACK FOR CRM': document.getElementById('feedback_crm').value || '',
-                'FEEDBACK FOR OTHERS': document.getElementById('feedback_others').value || ''
-            };
-            allData.push(rowData);
+        const weekPeriod =
+            section.querySelector(".week-period select")?.value || "";
+
+        const rows = section.querySelectorAll("tbody tr");
+
+        rows.forEach((row) => {
+            const inputs = row.querySelectorAll("input, select");
+
+            // Detect empty row (same logic as history)
+            const date = inputs[0]?.value?.trim() || "";
+            const project = inputs[7]?.value?.trim() || "";
+            const client =
+                inputs[6]?.value ||
+                inputs[6]?.querySelector("option:checked")?.value ||
+                "";
+
+            if (!date && !project && !client) return;
+
+            cleanedRows.push({
+                employeeId: employeeInfo["Employee ID"],
+                employeeName: employeeInfo["Employee Name"],
+                designation: employeeInfo["Designation"],
+                gender: employeeInfo["Gender"],
+                partner: employeeInfo["Partner"],
+                reportingManager: employeeInfo["Reporting Manager"],
+                weekPeriod: weekPeriod,
+                date,
+                location:
+                    inputs[1]?.value ||
+                    inputs[1]?.querySelector("option:checked")?.value ||
+                    "",
+                punchIn: inputs[4]?.value || "",
+                punchOut: inputs[5]?.value || "",
+                projectStartTime: inputs[2]?.value || "",
+                projectEndTime: inputs[3]?.value || "",
+                client: client,
+                project: project,
+                projectCode: inputs[8]?.value || "",
+                reportingManagerEntry: inputs[9]?.value || "",
+                activity: inputs[10]?.value || "",
+                projectHours: inputs[11]?.value || "",
+                workingHours: inputs[12]?.value || "",
+                billable: inputs[13]?.value || "",
+                remarks: inputs[14]?.value || "",
+                hits: document.getElementById("hits").value || "",
+                misses: document.getElementById("misses").value || "",
+                feedback_hr: document.getElementById("feedback_hr").value || "",
+                feedback_it: document.getElementById("feedback_it").value || "",
+                feedback_crm: document.getElementById("feedback_crm").value || "",
+                feedback_others:
+                    document.getElementById("feedback_others").value || ""
+            });
         });
     });
 
-    const ws = XLSX.utils.json_to_sheet(allData);
-    XLSX.utils.book_append_sheet(wb, ws, 'Timesheet');
-    XLSX.writeFile(wb, `Timesheet_${document.getElementById('employeeId').value || 'User'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    if (cleanedRows.length === 0) {
+        showPopup("No valid data to export!", true);
+        return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
+    XLSX.utils.sheet_add_aoa(ws, [headersPretty], { origin: "A1" });
+
+    const fileName = `Timesheet_${employeeInfo["Employee ID"]}_${new Date()
+        .toISOString()
+        .split("T")[0]}.xlsx`;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Timesheet");
+    XLSX.writeFile(wb, fileName);
+
+    showPopup("Timesheet exported successfully!");
 }
+
 
 function getEmployeeInfoForExport() {
     return {
