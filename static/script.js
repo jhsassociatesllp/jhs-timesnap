@@ -1677,44 +1677,37 @@ function confirmExit() {
 }
 
 // New function to copy row data
+
 function copyRow(button) {
-    const row = button.closest('tr');
-    copiedData = {};
-    const inputs = row.querySelectorAll('input, select');
-    inputs.forEach((input, index) => {
-        if (input.type === 'button' || input.classList.contains('copy-btn') || input.classList.contains('paste-btn')) return;
-        copiedData[`field${index}`] = input.type === 'select' ? input.value : input.value;
-    });
-    showPopup('Row data copied!');
+  const row = button.closest("tr");
+  if (!row) return;
+  const inputs = Array.from(row.querySelectorAll("input, select"));
+  copiedData = {};
+  inputs.forEach((inp) => {
+    const cls = inp.classList && inp.classList[0] ? inp.classList[0] : null;
+    if (cls) copiedData[cls] = inp.value;
+  });
+  showPopup("Row copied!");
 }
 
-// New function to paste row data
 function pasteRow(button) {
-    if (!copiedData) {
-        showPopup('No data copied to paste!', true);
-        return;
+  if (!copiedData) {
+    showPopup("No copied row found", true);
+    return;
+  }
+  const row = button.closest("tr");
+  if (!row) return;
+  const inputs = Array.from(row.querySelectorAll("input, select"));
+  inputs.forEach((inp) => {
+    const cls = inp.classList && inp.classList[0] ? inp.classList[0] : null;
+    if (cls && copiedData[cls] !== undefined) {
+      inp.value = copiedData[cls];
     }
-    const row = button.closest('tr');
-    const inputs = row.querySelectorAll('input, select');
-    inputs.forEach((input, index) => {
-        if (input.type === 'button' || input.classList.contains('copy-btn') || input.classList.contains('paste-btn')) return;
-        const fieldKey = `field${index}`;
-        if (copiedData[fieldKey] !== undefined) {
-            input.value = copiedData[fieldKey];
-            if (input.classList.contains('date-field')) validateDate(input);
-            if (input.classList.contains('project-start') || input.classList.contains('project-end') ||
-                input.classList.contains('punch-in') || input.classList.contains('punch-out')) {
-                validateTimes(row);
-                calculateHours(row);
-            }
-            if (input.classList.contains('reporting-manager-field')) handleReportingManagerChange(input);
-        }
-    });
-    updateSummary();
-    showPopup('Row data pasted!');
+  });
+  calculateHours(row);
+  updateSummary();
+  showPopup("Row pasted!");
 }
-
-
 function pasteAboveCell(sectionId) {
     const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
     if (!tbody) {
