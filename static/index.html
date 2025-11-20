@@ -126,6 +126,15 @@
             ><textarea id="feedback_others" rows="3"></textarea>
           </div>
         </div>
+            <div class="export-section">
+                <h3><i class="fas fa-download"></i> Export Timesheet</h3>
+                <button class="export-btn" onclick="exportTimesheetToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
+                <button class="export-btn" onclick="saveDataToMongo()"><i class="fas fa-save"></i> Submit & Save</button>
+                <button class="clear-btn" onclick="clearTimesheet()"><i class="fas fa-eraser"></i> Clear</button>
+                <button class="export-btn" onclick="document.getElementById('uploadExcelInput').click()">
+                    <i class="fas fa-file-upload"></i> Upload Excel
+                </button>
+                <input type="file" id="uploadExcelInput" accept=".xlsx,.xls" style="display:none">
 
         <div class="summary-section">
           <div class="summary-item total-hours">
