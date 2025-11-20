@@ -683,6 +683,15 @@ body {
     animation: fadeIn 0.3s ease-out;
 }
 
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;       /* spacing between the 2 buttons */
+    margin-top: 25px;
+}
+
+
 .modal-content {
     background: white;
     padding: 2rem;
@@ -692,11 +701,18 @@ body {
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: var(--shadow-heavy);
+
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
+
     position: relative;
     animation: slideIn 0.3s ease-out;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes slideIn {
@@ -747,9 +763,11 @@ body {
     font-weight: 600;
     margin-top: 1rem;
     transition: var(--transition);
-    grid-column: 1 / -1;
-    justify-self: center;
+    /* grid-column: 1 / -1; */
+    /* justify-self: center; */
     box-shadow: var(--shadow-light);
+    grid-column: unset !important;
+    justify-self: unset !important;
 }
 
 .modal-cancel-btn {
@@ -765,6 +783,19 @@ body {
 .modal-cancel-btn:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-medium);
+}
+
+.modal-buttons {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 20px;
+    margin-top: 20px;
+}
+.modal-content > div {
+    width: 100%;
 }
 
 .popup {

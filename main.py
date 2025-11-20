@@ -571,3 +571,70 @@ async def delete_timesheet(employee_id: str, entry_id: str, current_user: str = 
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.post("/upload_timesheet")
+async def upload_timesheet(
+    file: UploadFile = File(...),
+    current_user: str = Depends(get_current_user)
+):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file format")
+
+    content = await file.read()
+    df = pd.read_excel(BytesIO(content))
+
+    # Clean column names
+    df.columns = [str(c).strip() for c in df.columns]
+
+    required = [
+        "Employee ID", "Date", "Location of Work", "Punch In", "Punch Out",
+        "Project Start Time", "Project End Time", "Client",
+        "Project", "Project Code", "Reporting Manager Entry",
+        "Activity", "Project Hours", "Working Hours",
+        "Billable", "Remarks", "Week Period"
+    ]
+
+    for r in required:
+        if r not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Missing column: {r}")
+
+    entries = []
+
+    for _, row in df.iterrows():
+        entry = {
+            "employeeId": str(row["Employee ID"]),
+            "employeeName": row.get("Employee Name", ""),
+            "designation": row.get("Designation", ""),
+            "gender": row.get("Gender", ""),
+            "partner": row.get("Partner", ""),
+            "reportingManager": row.get("Reporting Manager", ""),
+            "weekPeriod": row.get("Week Period", ""),
+            "date": str(row["Date"]),
+            "location": row.get("Location of Work", ""),
+            "punchIn": row.get("Punch In", ""),
+            "punchOut": row.get("Punch Out", ""),
+            "projectStartTime": row.get("Project Start Time", ""),
+            "projectEndTime": row.get("Project End Time", ""),
+            "client": row.get("Client", ""),
+            "project": row.get("Project", ""),
+            "projectCode": row.get("Project Code", ""),
+            "reportingManagerEntry": row.get("Reporting Manager Entry", ""),
+            "activity": row.get("Activity", ""),
+            "projectHours": str(row.get("Project Hours", "")),
+            "workingHours": str(row.get("Working Hours", "")),
+            "billable": row.get("Billable", ""),
+            "remarks": row.get("Remarks", ""),
+            "hits": row.get("3 HITS", ""),
+            "misses": row.get("3 MISSES", ""),
+            "feedback_hr": row.get("FEEDBACK FOR HR", ""),
+            "feedback_it": row.get("FEEDBACK FOR IT", ""),
+            "feedback_crm": row.get("FEEDBACK FOR CRM", ""),
+            "feedback_others": row.get("FEEDBACK FOR OTHERS", "")
+        }
+        entries.append(entry)
+
+    # Insert using your existing logic
+    await save_timesheets(entries, current_user)
+
+    return {"success": True, "message": "Uploaded and saved to database"}
