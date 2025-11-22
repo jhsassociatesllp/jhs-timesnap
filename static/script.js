@@ -846,10 +846,10 @@ function exportTimesheetToExcel() {
                     inputs[1]?.value ||
                     inputs[1]?.querySelector("option:checked")?.value ||
                     "",
-                punchIn: inputs[4]?.value || "",
-                punchOut: inputs[5]?.value || "",
-                projectStartTime: inputs[2]?.value || "",
-                projectEndTime: inputs[3]?.value || "",
+                punchIn: inputs[2]?.value || "",
+                punchOut: inputs[3]?.value || "",
+                projectStartTime: inputs[4]?.value || "",
+                projectEndTime: inputs[5]?.value || "",
                 client: client,
                 project: project,
                 projectCode: inputs[8]?.value || "",
@@ -1708,6 +1708,7 @@ function pasteRow(button) {
   updateSummary();
   showPopup("Row pasted!");
 }
+
 function pasteAboveCell(sectionId) {
     const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
     if (!tbody) {
@@ -1773,102 +1774,7 @@ function pasteAboveCell(sectionId) {
     showPopup('Row duplicated above last row!');
 }
 
-// function addWeekSection() {
-//     sectionCount++;
-//     const sectionsDiv = document.getElementById('timesheetSections');
-//     const sectionId = `section_${sectionCount}`;
-    
-//     const section = document.createElement('div');
-//     section.className = 'timesheet-section';
-//     section.id = sectionId;
-    
-//     const deleteBtn = document.createElement('button');
-//     deleteBtn.className = 'delete-week-btn';
-//     deleteBtn.textContent = 'Delete Week';
-//     deleteBtn.onclick = () => deleteWeekSection(sectionId);
-//     section.appendChild(deleteBtn);
-    
-//     const weekPeriod = document.createElement('div');
-//     weekPeriod.className = 'week-period form-group';
-//     weekPeriod.innerHTML = `
-//         <label>Week Period ${sectionCount}</label>
-//     `;
-//     const select = document.createElement('select');
-//     select.id = `weekPeriod_${sectionCount}`;
-//     select.onchange = () => {
-//         updateSummary();
-//         updateDateValidations(sectionId);
-//         updateExistingRowDates(sectionId);
-//     };
-//     weekOptions.forEach(opt => {
-//         const option = document.createElement('option');
-//         option.value = opt.value;
-//         option.textContent = opt.text;
-//         select.appendChild(option);
-//     });
-//     if (weekOptions.length > 0) {
-//         select.value = weekOptions[0].value;
-//         setTimeout(() => {
-//             select.onchange();
-//         }, 100);
-//     }
-//     weekPeriod.appendChild(select);
-//     section.appendChild(weekPeriod);
-    
-//     const tableWrapper = document.createElement('div');
-//     tableWrapper.className = 'table-responsive';
-//     const table = document.createElement('table');
-//     table.className = 'timesheet-table';
-//     table.innerHTML = `
-//         <thead>
-//             <tr>
-//                 <th class="col-narrow col-sno">S.No</th>
-//                 <th class="col-narrow col-add">Add</th>
-//                 <th class="col-narrow col-action">Action</th>
-//                 <th class="col-medium col-date">Date</th>
-//                 <th class="col-wide col-location">Location of Work</th>
-//                 <th class="col-medium col-punch-in">Punch In</th>
-//                 <th class="col-medium col-punch-out">Punch Out</th>
-//                 <th class="col-medium col-project-start">Project Start Time</th>
-//                 <th class="col-medium col-project-end">Project End Time</th>
-//                 <th class="col-wide col-client">Client</th>
-//                 <th class="col-wide col-project">Project</th>
-//                 <th class="col-project col-project-code">Project Code</th>
-//                 <th class="col-wide col-reporting-manager">Reporting Manager</th>
-//                 <th class="col-wide col-activity">Activity</th>
-//                 <th class="col-narrow col-project-hours">Project Hours</th>
-//                 <th class="col-narrow col-working-hours">Working Hours</th>
-//                 <th class="col-medium col-billable">Billable</th>
-//                 <th class="col-wide col-remarks">Remarks</th>
-//                 <th class="col-narrow col-delete">Action</th>
-//             </tr>
-//         </thead>
-//         <tbody id="timesheetBody_${sectionCount}"></tbody>
-//     `;
-//     tableWrapper.appendChild(table);
-//     section.appendChild(tableWrapper);
-    
-//     const buttonContainer = document.createElement('div');
-//     buttonContainer.className = 'button-container';
-    
-//     const addRowBtn = document.createElement('button');
-//     addRowBtn.className = 'add-row-btn';
-//     addRowBtn.textContent = '+ Add New Entry';
-//     addRowBtn.onclick = () => addRow(sectionId);
-//     buttonContainer.appendChild(addRowBtn);
-    
-//     const pasteAboveBtn = document.createElement('button');
-//     pasteAboveBtn.className = 'paste-above-btn';
-//     pasteAboveBtn.textContent = 'Paste Above Cell';
-//     pasteAboveBtn.onclick = () => pasteAboveCell(sectionId);
-//     buttonContainer.appendChild(pasteAboveBtn);
-    
-//     section.appendChild(buttonContainer);
-    
-//     sectionsDiv.appendChild(section);
-//     addRow(sectionId);
-//     updateDateValidations(sectionId);
-// }
+
 
 function addWeekSection() {
     sectionCount++;
