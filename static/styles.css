@@ -1407,3 +1407,7 @@ body {
     font-size: 0.9rem;
     cursor: pointer;
 }
+.action-btn{
+    display: flex;
+    gap: 10px;
+}
