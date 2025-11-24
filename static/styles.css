@@ -1371,3 +1371,24 @@ body {
 .manager-only {
   display: none;
 }
+
+.employee-link{
+    color: #2c7cc2;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.approve-btn{
+    background: var(--secondary-gradient);
+    color: whitesmoke;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 5px;
+}
+
+.reject-btn{
+    background: var(--danger-gradient);
+    color: whitesmoke;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 5px;
+}
