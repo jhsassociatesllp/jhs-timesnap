@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - JHS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        :root {
+            --primary: #5d5fef;
+            --primary-light: #e8e8ff;
+            --success: #10b981;
+            --danger: #ef4444;
+            --gray-100: #f8fafc;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-600: #475569;
+            --gray-800: #1e293b;
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-md: 0 10px 30px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.15);
+            --radius: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+            color: var(--gray-800);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Clean & Modern */
+        .sidebar {
+            width: 280px;
+            background: white;
+            box-shadow: var(--shadow-md);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 3rem;
+            z-index: 10;
+        }
+
+        .logo h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #5d5fef, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .nav-menu {
+            flex: 1;
+        }
+
+        .nav-item {
+            padding: 1rem 1.2rem;
+            margin: 0.4rem 0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+            color: var(--gray-600);
+        }
+
+        .nav-item i {
+            width: 24px;
+            font-size: 1.2rem;
+            color: var(--gray-600);
+        }
+
+        .nav-item:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .nav-item:hover i {
+            color: var(--primary);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .nav-item.active i {
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 3rem;
+            background: transparent;
+        }
+
+        .header h1 {
+            font-size: 2.6rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #5d5fef, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--gray-600);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-top: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .status-display {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 1.5rem 0;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            background: var(--primary-light);
+            color: var(--primary);
+            display: inline-block;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            min-width: 150px;
+            justify-content: center;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        input[type="month"] {
+            padding: 1rem;
+            border: 2px solid var(--gray-300);
+            border-radius: 12px;
+            font-size: 1rem;
+            width: 100%;
+            max-width: 320px;
+            background: white;
+        }
+
+        input[type="month"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(93, 95, 239, 0.15);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: var(--gray-800);
+            color: white;
+            padding: 1rem 1.8rem;
+            border-radius: 12px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 0.4s ease;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Popup */
+        .popup {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .popup-content {
+            background: white;
+            border-radius: var(--radius);
+            padding: 2.5rem;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .popup-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--gray-800);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <h2>JHS Timesnap Admin</h2>
+        </div>
+        <div class="nav-menu">
+            <div class="nav-item active" data-section="par">
+                <i class="fas fa-clock"></i> PAR Control
+            </div>
+            <div class="nav-item" data-section="payroll">
+                <i class="fas fa-money-bill-wave"></i> Payroll Period
+            </div>
+            <div class="nav-item" data-section="analysis">
+                <i class="fas fa-chart-line"></i> Analysis
+            </div>
+            <div class="nav-item" data-section="upload">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Data
+            </div>
+            <div class="nav-item" id="logoutBtn" style="margin-top: auto; color: #ef4444;">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h1 id="pageTitle">PAR Control Panel</h1>
+            <p>Welcome back, Admin! Manage everything with ease</p>
+        </div>
+
+        <!-- PAR Section -->
+        <div id="parSection" class="section">
+            <div class="card">
+                <h2><i class="fas fa-power-off"></i> PAR System Status</h2>
+                <div class="status-display" id="statusText">Loading...</div>
+                <div class="btn-group">
+                    <button class="btn btn-success" id="enableBtn">
+                        <i class="fas fa-play-circle"></i> Enable PAR
+                    </button>
+                    <button class="btn btn-danger" id="disableBtn">
+                        <i class="fas fa-stop-circle"></i> Disable PAR
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payroll Section -->
+        <div id="payrollSection" class="section" style="display:none;">
+            <div class="card">
+                <h2><i class="fas fa-calendar-check"></i> Current Payroll Period</h2>
+                <div class="status-display" id="payrollStatus" style="background:#ecfdf5; color:#10b981;">
+                    Loading...
+                </div>
+                
+                <div style="margin-top: 1.5rem;">
+                    <label style="font-weight:600; color:var(--gray-800);">Select Payroll Month</label>
+                    <input type="month" id="payrollMonth" />
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <button class="btn btn-primary" id="savePayrollBtn">
+                        <i class="fas fa-save"></i> Save Payroll Period
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Popup & Toast -->
+<div class="popup" id="confirmationPopup">
+    <div class="popup-content">
+        <h3 id="popupMessage">Are you sure?</h3>
+        <div class="btn-group">
+            <button class="btn btn-success" id="confirmBtn">Yes, Confirm</button>
+            <button class="btn btn-danger" id="cancelBtn">No, Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// Same exact logic as before – sirf UI badla hai
+const toast = document.getElementById("toast");
+const popup = document.getElementById("confirmationPopup");
+const popupMessage = document.getElementById("popupMessage");
+let pendingStatus = null;
+
+function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3000);
+}
+
+// Navigation
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', function() {
+        if (this.id === 'logoutBtn') {
+            localStorage.clear();
+            window.location.href = "/admin-logout";
+            return;
+        }
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+        const sec = this.getAttribute('data-section') + 'Section';
+        document.getElementById(sec).style.display = 'block';
+        document.getElementById('pageTitle').textContent = this.textContent.trim() + " Panel";
+        if (sec === 'payrollSection') fetchPayrollStatus();
+    });
+});
+
+// PAR & Payroll functions – 100% same as before (only minor UI tweaks)
+async function fetchParStatus() {
+    const token = localStorage.getItem("admin_token");
+    if (!token) return showToast("Session expired!");
+
+    try {
+        const res = await fetch(`/get-par-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token}) });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById("statusText").innerHTML = data.par_status === "enable" 
+                ? "Enabled <span style='color:#10b981'>Active</span>" 
+                : "Disabled <span style='color:#ef4444'>Inactive</span>";
+        }
+    } catch(err) { showToast("Failed to load status"); }
+}
+
+async function updateParStatus(status) {
+    const token = localStorage.getItem("admin_token");
+    try {
+        const res = await fetch(`/update-par-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token, new_status: status}) });
+        if (res.ok) {
+            showToast(`PAR ${status}d successfully!`);
+            fetchParStatus();
+        } else showToast("Update failed");
+    } catch(err) { showToast("Server error"); }
+}
+
+document.getElementById("enableBtn").onclick = () => { pendingStatus = "enable"; popupMessage.textContent = "Enable PAR for all users?"; popup.style.display = "flex"; };
+document.getElementById("disableBtn").onclick = () => { pendingStatus = "disable"; popupMessage.textContent = "Disable PAR for all users?"; popup.style.display = "flex"; };
+document.getElementById("confirmBtn").onclick = () => { if(pendingStatus) updateParStatus(pendingStatus); popup.style.display = "none"; };
+document.getElementById("cancelBtn").onclick = () => { popup.style.display = "none"; };
+
+// Payroll logic (same as before)
+function getMonthRange(s, e) {
+    if (!s || !e) return "Not Set";
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${months[new Date(s).getMonth()]} ${new Date(s).getFullYear()} - ${months[new Date(e).getMonth()]} ${new Date(e).getFullYear()}`;
+}
+
+async function fetchPayrollStatus() {
+    const token = localStorage.getItem("admin_token");
+    try {
+        const res = await fetch(`/get-payroll-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token}) });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById("payrollStatus").textContent = getMonthRange(data.start_date, data.end_date);
+            if (data.start_date) {
+                const d = new Date(data.start_date);
+                document.getElementById("payrollMonth").value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+            }
+        }
+    } catch(err) { console.error(err); }
+}
+
+document.getElementById("savePayrollBtn").onclick = async () => {
+    const val = document.getElementById("payrollMonth").value;
+    if (!val) return showToast("Please select a month!");
+
+    const [y, m] = val.split("-");
+    const selMonth = parseInt(m);
+    const startMonth = selMonth === 1 ? 12 : selMonth - 1;
+    const startYear = selMonth === 1 ? parseInt(y) - 1 : parseInt(y);
+    const start = `${startYear}-${String(startMonth).padStart(2,"0")}-21`;
+    const end = `${y}-${m}-20`;
+
+    const token = localStorage.getItem("admin_token");
+    try {
+        const res = await fetch(`/update-payroll-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token, start_date: start, end_date: end}) });
+        if (res.ok) {
+            showToast("Payroll updated successfully!");
+            document.getElementById("payrollStatus").textContent = getMonthRange(start, end);
+        } else showToast("Failed to update");
+    } catch(err) { showToast("Server error"); }
+};
+
+// Load on start
+window.onload = () => {
+    fetchParStatus();
+    fetchPayrollStatus();
+};
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -134,52 +134,6 @@
         <button class="submit-btn" onclick="submitAdminLogin()">Submit</button>
         <div id="message" class="message"></div>
     </div>
-
-    <!-- <script>
-        const API_URL = "http://127.0.0.1:8000"; // adjust if needed
-
-        async function submitAdminLogin() {
-    const userid = document.getElementById("adminUserId").value.trim();
-    const password = document.getElementById("adminPassword").value.trim();
-
-    if (!userid || !password) {
-        showMessage("Please fill all fields", "error");
-        return;
-    }
-
-    try {
-        console.log("Admin login")
-        const response = await fetch(`${API_URL}/admin-login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userid, password }),
-            // credentials: "include" // ✅ IMPORTANT: allow cookies
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            showMessage("Login successful!", "success");
-            setTimeout(() => {
-                window.location.href = result.redirect; // ✅ use backend redirect path
-            }, 1200);
-        } else {
-            showMessage(result.detail || "Invalid credentials", "error");
-        }
-    } catch (err) {
-        showMessage("Error: " + err.message, "error");
-    }
-}
-
-
-        function showMessage(text, type) {
-            const message = document.getElementById("message");
-            message.className = `message ${type}`;
-            message.textContent = text;
-            message.style.display = "block";
-            setTimeout(() => message.style.display = "none", 4000);
-        }
-    </script> -->
     <script>
 // const API_URL = "http://127.0.0.1:8000";
 const API_URL = "";
@@ -229,6 +183,303 @@ function showMessage(text, type) {
     message.textContent = text;
     message.style.display = "block";
     setTimeout(() => (message.style.display = "none"), 4000);
+}
+</script>
+
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login - JHS Time Sheet</title>
+<link rel="icon" type="image/png" href="/static/jhs_logo.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<style>
+    :root {
+        --primary: #5d5fef;
+        --primary-light: #e8e8ff;
+        --success: #10b981;
+        --danger: #ef4444;
+        --gray-100: #f8fafc;
+        --gray-200: #e2e8f0;
+        --gray-300: #cbd5e1;
+        --gray-600: #475569;
+        --gray-800: #1e293b;
+        --shadow-sm: 0 4px 12px rgba(0,0,0,0.08);
+        --shadow-md: 0 10px 30px rgba(0,0,0,0.1);
+        --shadow-lg: 0 20px 50px rgba(0,0,0,0.15);
+        --radius: 16px;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Subtle background accent */
+    body::before {
+        content: '';
+        position: absolute;
+        width: 600px;
+        height: 600px;
+        background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+        border-radius: 50%;
+        top: -20%;
+        left: -15%;
+        opacity: 0.3;
+        filter: blur(100px);
+        z-index: 0;
+    }
+
+    body::after {
+        content: '';
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+        border-radius: 50%;
+        bottom: -20%;
+        right: -10%;
+        opacity: 0.3;
+        filter: blur(100px);
+        z-index: 0;
+    }
+
+    .login-card {
+        background: white;
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius);
+        padding: 3rem 2.5rem;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: var(--shadow-lg);
+        position: relative;
+        z-index: 1;
+        animation: slideUp 0.7s ease-out;
+        border: 1px solid var(--gray-200);
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+        width: 90px;
+        height: 90px;
+        background: linear-gradient(135deg, #5d5fef, #8b5cf6);
+        border-radius: 50%;
+        margin: 0 auto 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: var(--shadow-md);
+    }
+
+    .logo i {
+        font-size: 2.8rem;
+        color: white;
+    }
+
+    h2 {
+        font-size: 2.4rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #5d5fef, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+        text-align: center;
+        color: var(--gray-600);
+        font-size: 1.1rem;
+        margin-bottom: 2.5rem;
+    }
+
+    .form-group {
+        position: relative;
+        margin-bottom: 1.8rem;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 1.3rem 1.2rem 1.3rem 3.5rem;
+        border: 2px solid var(--gray-300);
+        border-radius: 12px;
+        font-size: 1.1rem;
+        transition: var(--transition);
+        background: var(--gray-100);
+    }
+
+    .form-group input::placeholder {
+        color: var(--gray-600);
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(93, 95, 239, 0.15);
+    }
+
+    .form-group i {
+        position: absolute;
+        left: 1.1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-600);
+        font-size: 1.2rem;
+        pointer-events: none;
+    }
+
+    .submit-btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 1.3rem;
+        border-radius: 12px;
+        font-size: 1.15rem;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+        transition: var(--transition);
+        margin-top: 1rem;
+        box-shadow: var(--shadow-md);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        background: #4c4cc7;
+    }
+
+    .submit-btn:active {
+        transform: translateY(-1px);
+    }
+
+    .message {
+        margin-top: 1.5rem;
+        padding: 1rem 1.2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        text-align: center;
+        display: none;
+        animation: fadeIn 0.5s ease;
+    }
+
+    .success {
+        background: #ecfdf5;
+        color: #10b981;
+        border: 1px solid #86efac;
+    }
+
+    .error {
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fca5a5;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+        .login-card {
+            padding: 2rem 1.5rem;
+        }
+        h2 { font-size: 2rem; }
+    }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="logo">
+        <i class="fas fa-shield-alt"></i>
+    </div>
+    <h2>Admin Login</h2>
+    <p class="subtitle">Welcome back! Please sign in to continue</p>
+
+    <div class="form-group">
+        <i class="fas fa-user"></i>
+        <input type="text" id="adminUserId" placeholder="Enter Admin ID" autocomplete="username">
+    </div>
+
+    <div class="form-group">
+        <i class="fas fa-lock"></i>
+        <input type="password" id="adminPassword" placeholder="Enter Password" autocomplete="current-password">
+    </div>
+
+    <button class="submit-btn" onclick="submitAdminLogin()">
+        Login Securely
+    </button>
+
+    <div id="message" class="message"></div>
+</div>
+
+<script>
+const API_URL = "";
+
+async function submitAdminLogin() {
+    const userid = document.getElementById("adminUserId").value.trim();
+    const password = document.getElementById("adminPassword").value.trim();
+
+    if (!userid || !password) {
+        showMessage("Please fill all fields", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/admin-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid, password })
+        });
+
+        const result = await response.json();
+        console.log(`Result: ${result}`)
+        if (response.ok && result.success) {
+            localStorage.setItem("admin_token", result.access_token);
+            localStorage.setItem("admin_userid", result.userid);
+            showMessage("Login successful! Redirecting...", "success");
+            setTimeout(() => {
+                window.location.href = "/admin-dashboard";
+            }, 1200);
+        } else {
+            showMessage(result.detail || "Invalid credentials", "error");
+        }
+    } catch (err) {
+        showMessage("Error: " + err.message, "error");
+    }
+}
+
+function showMessage(text, type) {
+    const message = document.getElementById("message");
+    message.className = `message ${type}`;
+    message.textContent = text;
+    message.style.display = "block";
+    setTimeout(() => message.style.display = "none", 4000);
 }
 </script>
 

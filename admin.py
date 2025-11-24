@@ -258,13 +258,14 @@ async def admin_login(request: AdminLoginRequest):
             "userid": userid
         }
     )
-    resp.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="Lax"
-    )
+    print(f"Returning response: {resp}")
+    # resp.set_cookie(
+    #     key="admin_token",
+    #     value=access_token,
+    #     httponly=True,
+    #     max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    #     samesite="Lax"
+    # )
     return resp
 
 @admin_router.post("/create-admin")
@@ -559,3 +560,328 @@ async def get_current_payroll():
     if not admin or "payroll_status" not in admin:
         return {"start_date": None, "end_date": None}
     return admin["payroll_status"]
+
+
+# @admin_router.get("/admin/stats")
+# async def admin_stats():
+#     """
+#     Admin Dashboard Stats:
+#     1. Total Employees
+#     2. Total Filled Employees
+#     3. Total Not Filled Employees
+#     4. Reporting Manager Wise Filled & Not Filled
+#     """
+
+#     # 1️⃣ Get all employees
+#     all_employees = list(employee_details_collection.find({}, {"EmpID": 1, "ReportingEmpCode": 1, "ReportingEmpName": 1, "_id": 0}))
+#     total_employees = len(all_employees)
+
+#     # 2️⃣ Get employees who filled timesheets
+#     filled_docs = list(timesheets_collection.find({}, {"employeeId": 1, "_id": 0}))
+#     filled_emp_ids = {doc["employeeId"] for doc in filled_docs}
+#     total_filled = len(filled_emp_ids)
+
+#     # 3️⃣ Not filled employees
+#     all_emp_ids = {e["EmpID"] for e in all_employees}
+#     not_filled_emp_ids = all_emp_ids - filled_emp_ids
+#     total_not_filled = len(not_filled_emp_ids)
+
+#     # 4️⃣ Reporting Manager Wise Breakdown
+#     manager_map = {}
+
+#     for emp in all_employees:
+#         emp_id = emp["EmpID"]
+#         mgr_code = emp.get("ReportingEmpCode", "").strip().upper()
+#         mgr_name = emp.get("ReportingEmpName", "Unknown")
+
+#         if not mgr_code:
+#             continue  # skip employees without manager
+
+#         if mgr_code not in manager_map:
+#             manager_map[mgr_code] = {
+#                 "managerName": mgr_name,
+#                 "filled": [],
+#                 "not_filled": []
+#             }
+
+#         if emp_id in filled_emp_ids:
+#             manager_map[mgr_code]["filled"].append(emp_id)
+#         else:
+#             manager_map[mgr_code]["not_filled"].append(emp_id)
+
+#     return {
+#         "success": True,
+#         "summary": {
+#             "totalEmployees": total_employees,
+#             "totalFilled": total_filled,
+#             "totalNotFilled": total_not_filled
+#         },
+#         "managerWise": manager_map
+#     }
+
+
+@admin_router.post("/admin/analysis-stats")
+async def admin_analysis_stats(request: Request):
+    """
+    Admin Analytics:
+    - Total Employees
+    - Total Filled Employees
+    - Total Not Filled Employees
+    - Reporting Manager-wise filled / not-filled with employee details
+    """
+    data = await request.json()
+    token = data.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    # ✅ Validate admin token
+    userid = verify_token(token)
+
+    # 1️⃣ Load all employees (code, name, manager mapping)
+    employees = list(employee_details_collection.find({}, {"_id": 0}))
+    emp_map = {}
+
+    for emp in employees:
+        emp_code = (emp.get("EmpID") or emp.get("empid") or emp.get("EmployeeCode") or "").strip().upper()
+        if not emp_code:
+            continue
+
+        emp_name = (
+            emp.get("Emp Name")
+            or emp.get("EmployeeName")
+            or emp.get("Name")
+            or emp.get("EmployeeFullName")
+            or ""
+        )
+
+        mgr_code = (emp.get("ReportingEmpCode") or emp.get("ManagerCode") or "").strip().upper()
+        mgr_name = (
+            emp.get("ReportingEmpName")
+            or emp.get("ManagerName")
+            or ""
+        )
+
+        emp_map[emp_code] = {
+            "name": emp_name,
+            "managerCode": mgr_code,
+            "managerName": mgr_name
+        }
+
+    all_emp_ids = set(emp_map.keys())
+    total_employees = len(all_emp_ids)
+
+    # 2️⃣ Fetch employees who have timesheet entries (filled)
+    filled_docs = timesheets_collection.find(
+        {"employeeId": {"$in": list(all_emp_ids)}},
+        {"_id": 0, "employeeId": 1}
+    )
+    filled_emp_ids = {
+        doc["employeeId"].strip().upper()
+        for doc in filled_docs
+        if doc.get("employeeId")
+    }
+
+    total_filled = len(filled_emp_ids)
+    not_filled_emp_ids = all_emp_ids - filled_emp_ids
+    total_not_filled = len(not_filled_emp_ids)
+
+    # 3️⃣ Manager-wise breakdown
+    manager_stats = {}
+
+    for emp_code, info in emp_map.items():
+        mgr_code = info["managerCode"]
+        mgr_name = info["managerName"] or "Unknown"
+
+        if not mgr_code:
+            # If you want unassigned manager bucket, handle here
+            continue
+
+        if mgr_code not in manager_stats:
+            manager_stats[mgr_code] = {
+                "reportingManagerCode": mgr_code,
+                "reportingManagerName": mgr_name,
+                "filledEmployees": [],
+                "notFilledEmployees": []
+            }
+
+        bucket = (
+            manager_stats[mgr_code]["filledEmployees"]
+            if emp_code in filled_emp_ids
+            else manager_stats[mgr_code]["notFilledEmployees"]
+        )
+
+        bucket.append({
+            "empCode": emp_code,
+            "empName": info["name"]
+        })
+
+    # 4️⃣ Convert to list + totals
+    manager_list = []
+    for mgr_code, data_obj in manager_stats.items():
+        filled_list = data_obj["filledEmployees"]
+        not_filled_list = data_obj["notFilledEmployees"]
+
+        manager_list.append({
+            "reportingManagerCode": data_obj["reportingManagerCode"],
+            "reportingManagerName": data_obj["reportingManagerName"],
+            "totalEmployees": len(filled_list) + len(not_filled_list),
+            "totalFilled": len(filled_list),
+            "totalNotFilled": len(not_filled_list),
+            "filledEmployees": filled_list,
+            "notFilledEmployees": not_filled_list
+        })
+
+    result = {
+        "success": True,
+        "summary": {
+            "totalEmployees": total_employees,
+            "totalFilledEmployees": total_filled,
+            "totalNotFilledEmployees": total_not_filled
+        },
+        "managerWise": manager_list
+    }
+    print("Response")
+    print(result)
+    return result
+
+
+@admin_router.post("/admin/par-stats")
+async def admin_par_stats(request: Request):
+    """
+    PAR Control Stats (Admin):
+
+    - For each ReportingEmpCode:
+        * pending / approved / rejected employees (code + name)
+        * counts + total unique employees under that manager
+    - Uses Pending, Approved, Rejected collections ONLY (Option A).
+    """
+    data = await request.json()
+    token = data.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    # ✅ Validate admin token (we don't care which admin, just that it's valid)
+    verify_token(token)
+
+    # 1️⃣ Build EmpCode → EmpName map
+    employees = list(employee_details_collection.find({}, {"_id": 0}))
+    emp_name_map = {}
+
+    for emp in employees:
+        emp_code = (
+            emp.get("EmpID")
+            or emp.get("empid")
+            or emp.get("EmployeeCode")
+            or ""
+        )
+        emp_code = emp_code.strip().upper()
+        if not emp_code:
+            continue
+
+        emp_name = (
+            emp.get("Emp Name")
+            or emp.get("EmployeeName")
+            or emp.get("Name")
+            or emp.get("EmployeeFullName")
+            or ""
+        )
+
+        emp_name_map[emp_code] = emp_name
+
+    def enrich_employee_codes(codes):
+        """Convert list of emp codes → [{empCode, empName}]"""
+        result = []
+        for raw in codes or []:
+            code = (raw or "").strip().upper()
+            if not code:
+                continue
+            result.append({
+                "empCode": code,
+                "empName": emp_name_map.get(code, "")
+            })
+        return result
+
+    manager_stats = {}
+
+    def add_from_collection(collection, bucket_key: str):
+        """
+        bucket_key ∈ {"pendingEmployees", "approvedEmployees", "rejectedEmployees"}
+        """
+        docs = collection.find({}, {"_id": 0, "ReportingEmpCode": 1, "ReportingEmpName": 1, "EmployeesCodes": 1})
+        for doc in docs:
+            mgr_code = (doc.get("ReportingEmpCode") or "").strip().upper()
+            if not mgr_code:
+                continue
+
+            mgr_name = doc.get("ReportingEmpName") or ""
+
+            if mgr_code not in manager_stats:
+                manager_stats[mgr_code] = {
+                    "reportingEmpCode": mgr_code,
+                    "reportingEmpName": mgr_name,
+                    "pendingEmployees": [],
+                    "approvedEmployees": [],
+                    "rejectedEmployees": []
+                }
+            else:
+                # If name is empty in cache but present here, update it
+                if mgr_name and not manager_stats[mgr_code]["reportingEmpName"]:
+                    manager_stats[mgr_code]["reportingEmpName"] = mgr_name
+
+            employees_list = enrich_employee_codes(doc.get("EmployeesCodes", []))
+            manager_stats[mgr_code][bucket_key].extend(employees_list)
+
+    # 2️⃣ Load from Pending / Approved / Rejected
+    add_from_collection(pending_collection, "pendingEmployees")
+    add_from_collection(approved_collection, "approvedEmployees")
+    add_from_collection(rejected_collection, "rejectedEmployees")
+
+    # 3️⃣ Build summary + final list
+    total_pending = 0
+    total_approved = 0
+    total_rejected = 0
+    all_unique_emp_codes = set()
+    manager_list = []
+
+    for mgr_code, info in manager_stats.items():
+        pending_codes = {e["empCode"] for e in info["pendingEmployees"]}
+        approved_codes = {e["empCode"] for e in info["approvedEmployees"]}
+        rejected_codes = {e["empCode"] for e in info["rejectedEmployees"]}
+
+        total_pending_mgr = len(pending_codes)
+        total_approved_mgr = len(approved_codes)
+        total_rejected_mgr = len(rejected_codes)
+
+        all_codes_mgr = pending_codes | approved_codes | rejected_codes
+        total_emps_mgr = len(all_codes_mgr)
+
+        total_pending += total_pending_mgr
+        total_approved += total_approved_mgr
+        total_rejected += total_rejected_mgr
+        all_unique_emp_codes |= all_codes_mgr
+
+        manager_list.append({
+            "reportingEmpCode": info["reportingEmpCode"],
+            "reportingEmpName": info["reportingEmpName"],
+            "totalPending": total_pending_mgr,
+            "totalApproved": total_approved_mgr,
+            "totalRejected": total_rejected_mgr,
+            "totalEmployees": total_emps_mgr,
+            "pendingEmployees": info["pendingEmployees"],
+            "approvedEmployees": info["approvedEmployees"],
+            "rejectedEmployees": info["rejectedEmployees"],
+        })
+
+    return {
+        "success": True,
+        "summary": {
+            "totalManagers": len(manager_list),
+            "totalPendingEmployees": total_pending,
+            "totalApprovedEmployees": total_approved,
+            "totalRejectedEmployees": total_rejected,
+            "totalUniqueEmployees": len(all_unique_emp_codes)
+        },
+        "managerWise": manager_list
+    }
