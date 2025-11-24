@@ -1070,7 +1070,15 @@ async def get_employee_timesheet(employee_id: str):
         doc = timesheets_collection.find_one({"employeeId": employee_id}, {"_id": 0})
         if not doc:
             raise HTTPException(status_code=404, detail=f"No timesheet found for employee {employee_id}")
-
+        # data = {
+        #     "employee_id": doc.get("employeeId"),
+        #     "employee_name": doc.get("employeeName"),
+        #     "designation": doc.get("designation"),
+        #     "gender": doc.get("gender"),
+        #     "partner": doc.get("partner"),
+        #     "reporting_manager": doc.get("reportingManager")
+        # }
+        # print(data)
         # Nested data flatten karo
         flattened_entries = []
         for week_item in doc.get("Data", []):
@@ -1093,6 +1101,12 @@ async def get_employee_timesheet(employee_id: str):
 
         # Ye response frontend ko milega
         return {
+            "employee_id": doc.get("employeeId"),
+            "employee_name": doc.get("employeeName"),
+            "designation": doc.get("designation"),
+            "gender": doc.get("gender"),
+            "partner": doc.get("partner"),
+            "reporting_manager": doc.get("reportingManager"),
             "entries": flattened_entries,
             "hits": doc.get("hits", ""),
             "misses": doc.get("misses", ""),

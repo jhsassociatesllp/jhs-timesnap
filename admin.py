@@ -746,15 +746,153 @@ async def admin_analysis_stats(request: Request):
     return result
 
 
+# @admin_router.post("/admin/par-stats")
+# async def admin_par_stats(request: Request):
+#     """
+#     PAR Control Stats (Admin):
+
+#     - For each ReportingEmpCode:
+#         * pending / approved / rejected employees (code + name)
+#         * counts + total unique employees under that manager
+#     - Uses Pending, Approved, Rejected collections ONLY (Option A).
+#     """
+#     data = await request.json()
+#     token = data.get("token")
+
+#     if not token:
+#         raise HTTPException(status_code=401, detail="Token required")
+
+#     # ✅ Validate admin token (we don't care which admin, just that it's valid)
+#     verify_token(token)
+
+#     # 1️⃣ Build EmpCode → EmpName map
+#     employees = list(employee_details_collection.find({}, {"_id": 0}))
+#     emp_name_map = {}
+
+#     for emp in employees:
+#         emp_code = (
+#             emp.get("EmpID")
+#             or emp.get("empid")
+#             or emp.get("EmployeeCode")
+#             or ""
+#         )
+#         emp_code = emp_code.strip().upper()
+#         if not emp_code:
+#             continue
+
+#         emp_name = (
+#             emp.get("Emp Name")
+#             or emp.get("EmployeeName")
+#             or emp.get("Name")
+#             or emp.get("EmployeeFullName")
+#             or ""
+#         )
+
+#         emp_name_map[emp_code] = emp_name
+
+#     def enrich_employee_codes(codes):
+#         """Convert list of emp codes → [{empCode, empName}]"""
+#         result = []
+#         for raw in codes or []:
+#             code = (raw or "").strip().upper()
+#             if not code:
+#                 continue
+#             result.append({
+#                 "empCode": code,
+#                 "empName": emp_name_map.get(code, "")
+#             })
+#         return result
+
+#     manager_stats = {}
+
+#     def add_from_collection(collection, bucket_key: str):
+#         """
+#         bucket_key ∈ {"pendingEmployees", "approvedEmployees", "rejectedEmployees"}
+#         """
+#         docs = collection.find({}, {"_id": 0, "ReportingEmpCode": 1, "ReportingEmpName": 1, "EmployeesCodes": 1})
+#         for doc in docs:
+#             mgr_code = (doc.get("ReportingEmpCode") or "").strip().upper()
+#             if not mgr_code:
+#                 continue
+
+#             mgr_name = doc.get("ReportingEmpName") or ""
+
+#             if mgr_code not in manager_stats:
+#                 manager_stats[mgr_code] = {
+#                     "reportingEmpCode": mgr_code,
+#                     "reportingEmpName": mgr_name,
+#                     "pendingEmployees": [],
+#                     "approvedEmployees": [],
+#                     "rejectedEmployees": []
+#                 }
+#             else:
+#                 # If name is empty in cache but present here, update it
+#                 if mgr_name and not manager_stats[mgr_code]["reportingEmpName"]:
+#                     manager_stats[mgr_code]["reportingEmpName"] = mgr_name
+
+#             employees_list = enrich_employee_codes(doc.get("EmployeesCodes", []))
+#             manager_stats[mgr_code][bucket_key].extend(employees_list)
+
+#     # 2️⃣ Load from Pending / Approved / Rejected
+#     add_from_collection(pending_collection, "pendingEmployees")
+#     add_from_collection(approved_collection, "approvedEmployees")
+#     add_from_collection(rejected_collection, "rejectedEmployees")
+
+#     # 3️⃣ Build summary + final list
+#     total_pending = 0
+#     total_approved = 0
+#     total_rejected = 0
+#     all_unique_emp_codes = set()
+#     manager_list = []
+
+#     for mgr_code, info in manager_stats.items():
+#         pending_codes = {e["empCode"] for e in info["pendingEmployees"]}
+#         approved_codes = {e["empCode"] for e in info["approvedEmployees"]}
+#         rejected_codes = {e["empCode"] for e in info["rejectedEmployees"]}
+
+#         total_pending_mgr = len(pending_codes)
+#         total_approved_mgr = len(approved_codes)
+#         total_rejected_mgr = len(rejected_codes)
+
+#         all_codes_mgr = pending_codes | approved_codes | rejected_codes
+#         total_emps_mgr = len(all_codes_mgr)
+
+#         total_pending += total_pending_mgr
+#         total_approved += total_approved_mgr
+#         total_rejected += total_rejected_mgr
+#         all_unique_emp_codes |= all_codes_mgr
+
+#         manager_list.append({
+#             "reportingEmpCode": info["reportingEmpCode"],
+#             "reportingEmpName": info["reportingEmpName"],
+#             "totalPending": total_pending_mgr,
+#             "totalApproved": total_approved_mgr,
+#             "totalRejected": total_rejected_mgr,
+#             "totalEmployees": total_emps_mgr,
+#             "pendingEmployees": info["pendingEmployees"],
+#             "approvedEmployees": info["approvedEmployees"],
+#             "rejectedEmployees": info["rejectedEmployees"],
+#         })
+
+#     return {
+#         "success": True,
+#         "summary": {
+#             "totalManagers": len(manager_list),
+#             "totalPendingEmployees": total_pending,
+#             "totalApprovedEmployees": total_approved,
+#             "totalRejectedEmployees": total_rejected,
+#             "totalUniqueEmployees": len(all_unique_emp_codes)
+#         },
+#         "managerWise": manager_list
+#     }
+
+
 @admin_router.post("/admin/par-stats")
 async def admin_par_stats(request: Request):
     """
-    PAR Control Stats (Admin):
-
-    - For each ReportingEmpCode:
-        * pending / approved / rejected employees (code + name)
-        * counts + total unique employees under that manager
-    - Uses Pending, Approved, Rejected collections ONLY (Option A).
+    Correct PAR Stats:
+    - totalEmployees = employees under the Reporting Manager from employee_details
+    - pending/approved/rejected computed out of actual team members
     """
     data = await request.json()
     token = data.get("token")
@@ -762,25 +900,19 @@ async def admin_par_stats(request: Request):
     if not token:
         raise HTTPException(status_code=401, detail="Token required")
 
-    # ✅ Validate admin token (we don't care which admin, just that it's valid)
     verify_token(token)
 
-    # 1️⃣ Build EmpCode → EmpName map
+    # ---------- 1️⃣ Build Manager → Employees Map ----------
     employees = list(employee_details_collection.find({}, {"_id": 0}))
-    emp_name_map = {}
+    manager_emp_map = {}        # mgr_code -> list of empCodes
+    emp_name_map = {}           # empCode -> empName
 
     for emp in employees:
-        emp_code = (
-            emp.get("EmpID")
-            or emp.get("empid")
-            or emp.get("EmployeeCode")
-            or ""
-        )
-        emp_code = emp_code.strip().upper()
-        if not emp_code:
+        code = (emp.get("EmpID") or "").strip().upper()
+        if not code:
             continue
 
-        emp_name = (
+        emp_name_map[code] = (
             emp.get("Emp Name")
             or emp.get("EmployeeName")
             or emp.get("Name")
@@ -788,100 +920,80 @@ async def admin_par_stats(request: Request):
             or ""
         )
 
-        emp_name_map[emp_code] = emp_name
+        mgr_code = (emp.get("ReportingEmpCode") or "").strip().upper()
+        mgr_name = (
+            emp.get("ReportingEmpName") 
+            or emp.get("ManagerName")
+            or ""
+        )
 
-    def enrich_employee_codes(codes):
-        """Convert list of emp codes → [{empCode, empName}]"""
-        result = []
-        for raw in codes or []:
-            code = (raw or "").strip().upper()
-            if not code:
-                continue
-            result.append({
-                "empCode": code,
-                "empName": emp_name_map.get(code, "")
-            })
-        return result
-
-    manager_stats = {}
-
-    def add_from_collection(collection, bucket_key: str):
-        """
-        bucket_key ∈ {"pendingEmployees", "approvedEmployees", "rejectedEmployees"}
-        """
-        docs = collection.find({}, {"_id": 0, "ReportingEmpCode": 1, "ReportingEmpName": 1, "EmployeesCodes": 1})
-        for doc in docs:
-            mgr_code = (doc.get("ReportingEmpCode") or "").strip().upper()
-            if not mgr_code:
-                continue
-
-            mgr_name = doc.get("ReportingEmpName") or ""
-
-            if mgr_code not in manager_stats:
-                manager_stats[mgr_code] = {
-                    "reportingEmpCode": mgr_code,
-                    "reportingEmpName": mgr_name,
-                    "pendingEmployees": [],
-                    "approvedEmployees": [],
-                    "rejectedEmployees": []
+        if mgr_code:
+            if mgr_code not in manager_emp_map:
+                manager_emp_map[mgr_code] = {
+                    "managerName": mgr_name,
+                    "employees": []
                 }
-            else:
-                # If name is empty in cache but present here, update it
-                if mgr_name and not manager_stats[mgr_code]["reportingEmpName"]:
-                    manager_stats[mgr_code]["reportingEmpName"] = mgr_name
+            manager_emp_map[mgr_code]["employees"].append(code)
 
-            employees_list = enrich_employee_codes(doc.get("EmployeesCodes", []))
-            manager_stats[mgr_code][bucket_key].extend(employees_list)
+    # ---------- 2️⃣ Collect PAR status sets ----------
+    def fetch_codes(col):
+        docs = col.find({}, {"_id": 0, "EmployeesCodes": 1})
+        codes = set()
+        for d in docs:
+            for c in d.get("EmployeesCodes", []):
+                codes.add(c.strip().upper())
+        return codes
 
-    # 2️⃣ Load from Pending / Approved / Rejected
-    add_from_collection(pending_collection, "pendingEmployees")
-    add_from_collection(approved_collection, "approvedEmployees")
-    add_from_collection(rejected_collection, "rejectedEmployees")
+    pending_set = fetch_codes(pending_collection)
+    approved_set = fetch_codes(approved_collection)
+    rejected_set = fetch_codes(rejected_collection)
 
-    # 3️⃣ Build summary + final list
-    total_pending = 0
-    total_approved = 0
-    total_rejected = 0
-    all_unique_emp_codes = set()
-    manager_list = []
+    # ---------- 3️⃣ Build manager-wise stats ----------
+    result_list = []
+    total_pending_all = total_approved_all = total_rejected_all = 0
+    global_employees = set()
 
-    for mgr_code, info in manager_stats.items():
-        pending_codes = {e["empCode"] for e in info["pendingEmployees"]}
-        approved_codes = {e["empCode"] for e in info["approvedEmployees"]}
-        rejected_codes = {e["empCode"] for e in info["rejectedEmployees"]}
+    for mgr_code, info in manager_emp_map.items():
+        mgr_emp_list = set(info["employees"])  # Full team
+        global_employees |= mgr_emp_list
 
-        total_pending_mgr = len(pending_codes)
-        total_approved_mgr = len(approved_codes)
-        total_rejected_mgr = len(rejected_codes)
+        # Now compute PAR subsets (correct logic)
+        mgr_pending = sorted(mgr_emp_list & pending_set)
+        mgr_approved = sorted(mgr_emp_list & approved_set)
+        mgr_rejected = sorted(mgr_emp_list & rejected_set)
 
-        all_codes_mgr = pending_codes | approved_codes | rejected_codes
-        total_emps_mgr = len(all_codes_mgr)
+        total_pending_mgr = len(mgr_pending)
+        total_approved_mgr = len(mgr_approved)
+        total_rejected_mgr = len(mgr_rejected)
 
-        total_pending += total_pending_mgr
-        total_approved += total_approved_mgr
-        total_rejected += total_rejected_mgr
-        all_unique_emp_codes |= all_codes_mgr
+        total_pending_all += total_pending_mgr
+        total_approved_all += total_approved_mgr
+        total_rejected_all += total_rejected_mgr
 
-        manager_list.append({
-            "reportingEmpCode": info["reportingEmpCode"],
-            "reportingEmpName": info["reportingEmpName"],
+        # convert to [{empCode, empName}]
+        def to_obj(codes):
+            return [{"empCode": c, "empName": emp_name_map.get(c, "")} for c in codes]
+
+        result_list.append({
+            "reportingEmpCode": mgr_code,
+            "reportingEmpName": info["managerName"],
+            "totalEmployees": len(mgr_emp_list),     # <-- Correct!
             "totalPending": total_pending_mgr,
             "totalApproved": total_approved_mgr,
             "totalRejected": total_rejected_mgr,
-            "totalEmployees": total_emps_mgr,
-            "pendingEmployees": info["pendingEmployees"],
-            "approvedEmployees": info["approvedEmployees"],
-            "rejectedEmployees": info["rejectedEmployees"],
+            "pendingEmployees": to_obj(mgr_pending),
+            "approvedEmployees": to_obj(mgr_approved),
+            "rejectedEmployees": to_obj(mgr_rejected)
         })
 
     return {
         "success": True,
         "summary": {
-            "totalManagers": len(manager_list),
-            "totalPendingEmployees": total_pending,
-            "totalApprovedEmployees": total_approved,
-            "totalRejectedEmployees": total_rejected,
-            "totalUniqueEmployees": len(all_unique_emp_codes)
+            "totalManagers": len(result_list),
+            "totalPendingEmployees": total_pending_all,
+            "totalApprovedEmployees": total_approved_all,
+            "totalRejectedEmployees": total_rejected_all,
+            "totalUniqueEmployees": len(global_employees)
         },
-        "managerWise": manager_list
+        "managerWise": result_list
     }
