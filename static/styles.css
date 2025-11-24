@@ -1384,6 +1384,8 @@ body {
     border: none;
     border-radius: 5px;
     font-size: 0.9rem;
+    cursor: pointer;
+    transform: scale(1.05);
 }
 
 .reject-btn{
@@ -1393,4 +1395,15 @@ body {
     border: none;
     border-radius: 5px;
     font-size: 0.9rem;
+    cursor: pointer;
+    transform: scale(1.05);
+}
+.approve-all-btn{
+    background: rgb(13, 161, 13);
+    color: whitesmoke;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    cursor: pointer;
 }

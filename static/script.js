@@ -2612,6 +2612,7 @@ async function loadPendingList() {
   } catch (err) {
     console.error("loadPendingList error:", err);
   }
+  updateApproveAllButtons();
 }
 
 async function loadRejectedList() {
@@ -2658,6 +2659,7 @@ async function loadRejectedList() {
   } catch (err) {
     console.error("loadRejectedList error", err);
   }
+  updateApproveAllButtons();
 }
 
 /* Approve / Reject employee flows */
@@ -3263,6 +3265,69 @@ function formatDate(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return "";
   return date.toISOString().split("T")[0]; // YYYY-MM-DD
 }
+
+// --------------------------------------------------------------
+// Approve All (Pending or Rejected)
+// --------------------------------------------------------------
+async function approveAll(source) {        // source = "Pending" | "Rejected"
+    if (!confirm(`Approve ALL ${source.toUpperCase()} timesheets?`)) return;
+
+    showLoading(`Approving all ${source.toLowerCase()} timesheets...`);
+
+    try {
+        const payload = {
+            reporting_emp_code: loggedInEmployeeId,
+            source: source               // "Pending" or "Rejected"
+        };
+
+        const res = await fetch(`${API_URL}/approve_all_timesheets`, {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+
+        hideLoading();
+
+        if (!res.ok || !result.success) {
+            showPopup(result.message || "Approve All failed", true);
+            return;
+        }
+
+        showPopup(result.message);
+
+        // Refresh the three lists
+        await loadPendingList();
+        await loadApprovedList();
+        await loadRejectedList();
+
+        // Hide the button again if the list became empty
+        updateApproveAllButtons();
+
+    } catch (err) {
+        hideLoading();
+        console.error("approveAll error:", err);
+        showPopup("Approve All failed", true);
+    }
+}
+
+// --------------------------------------------------------------
+// Show “Approve All” button only when there is at least one row
+// --------------------------------------------------------------
+function updateApproveAllButtons() {
+    const pendingRows   = document.querySelectorAll("#pendingTableBody tr").length;
+    const rejectedRows  = document.querySelectorAll("#rejectedTableBody tr").length;
+
+    document.getElementById("approveAllPendingContainer").style.display =
+        pendingRows > 0 ? "block" : "none";
+
+    document.getElementById("approveAllRejectedContainer").style.display =
+        rejectedRows > 0 ? "block" : "none";
+}
+
+// Call this after every load of the tables
+// (add it at the end of loadPendingList() and loadRejectedList())
 
 
 /* End of file */

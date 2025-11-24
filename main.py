@@ -1465,3 +1465,55 @@ async def get_par_current_status(current_user: str = Depends(get_current_user)):
     except Exception as e:
         print("Error fetching PAR status:", e)
         return {"par_status": "disable"}
+
+# --------------------------------------------------------------
+# APPROVE ALL (Pending → Approved  OR  Rejected → Approved)
+# --------------------------------------------------------------
+@app.post("/approve_all_timesheets")
+async def approve_all_timesheets(
+    reporting_emp_code: str = Body(...),           # manager code
+    source: str = Body(...),                       # "Pending" or "Rejected"
+    current_user: str = Depends(get_current_user)
+):
+    manager_code = reporting_emp_code.strip().upper()
+    source = source.strip().title()                # make sure it is "Pending" or "Rejected"
+
+    if source not in ["Pending", "Rejected"]:
+        raise HTTPException(status_code=400, detail="source must be Pending or Rejected")
+
+    # Choose the source collection
+    source_coll = pending_collection if source == "Pending" else rejected_collection
+
+    # 1. Get the manager document (contains the EmployeesCodes array)
+    manager_doc = source_coll.find_one({"ReportingEmpCode": manager_code})
+
+    if not manager_doc or not manager_doc.get("EmployeesCodes"):
+        return {"success": True, "approved": 0, "message": "No employees to approve"}
+
+    employees_to_approve = manager_doc["EmployeesCodes"]
+
+    # 2. Remove them from BOTH pending AND rejected (just in case)
+    pending_collection.update_one(
+        {"ReportingEmpCode": manager_code},
+        {"$pull": {"EmployeesCodes": {"$in": employees_to_approve}}}
+    )
+    rejected_collection.update_one(
+        {"ReportingEmpCode": manager_code},
+        {"$pull": {"EmployeesCodes": {"$in": employees_to_approve}}}
+    )
+
+    # 3. Add them to Approved collection
+    manager_detail = employee_details_collection.find_one(
+        {"ReportingEmpCode": manager_code}
+    )
+    manager_name = manager_detail.get("ReportingEmpName") if manager_detail else "Unknown"
+
+    # Use the same helper you already have for single approve
+    for emp_code in employees_to_approve:
+        add_or_create(approved_collection, manager_code, manager_name, emp_code)
+
+    return {
+        "success": True,
+        "approved": len(employees_to_approve),
+        "message": f"{len(employees_to_approve)} employee(s) approved successfully."
+    }
