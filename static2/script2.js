@@ -1263,7 +1263,7 @@ function validateTimes(row, isModal = false) {
     } else {
         const projectStart = row.querySelector('.project-start')?.value;
         const projectEnd = row.querySelector('.project-end')?.value;
-        const In = row.querySelector('.punch-in')?.value;
+        const punchIn = row.querySelector('.punch-in')?.value;
         const punchOut = row.querySelector('.punch-out')?.value;
 
         if (projectStart && projectEnd) {
@@ -1669,8 +1669,8 @@ function addRow(sectionId) {
     
     const row = document.createElement('tr');
     row.innerHTML = `
-        <td class="col-sno" style="min-width: 60px;">${rowCount}</td><i class="fas fa-eye"></i>
-        <td class="col-add" style="min-width: 60px;"><button class="eye-btn" onclick="openModal(this)"></button></td>
+        <td class="col-sno" style="min-width: 60px;">${rowCount}</td>
+        <td class="col-add" style="min-width: 60px;"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
         <td class="col-action" style="min-width: 120px;">
             <button class="copy-btn" onclick="copyRow(this)"><i class="fas fa-copy"></i> Copy</button>
             <button class="paste-btn" onclick="pasteRow(this)"><i class="fas fa-paste"></i> Paste</button>

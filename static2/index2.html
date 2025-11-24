@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Time Sheet - Professional Time Tracking</title>
     <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
-    <link rel="icon" type="image/png" href="/static/favicon.png">
-
 
     <!-- Font Awesome & Google Fonts -->
     <link
@@ -39,7 +37,7 @@
         >
 
         <!-- Manager Only Buttons (Hidden by default) -->
-        <a
+        <!-- <a
           href="#"
           id="pendingBtn"
           class="manager-only"
@@ -59,11 +57,9 @@
           class="manager-only"
           onclick="showSection('rejected')"
           ><i class="fas fa-times-circle"></i> Rejected</a
-        >
+        > -->
 
-        <button onclick="showExitConfirmation()">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </button>
+        <button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
     </div>
 
@@ -146,15 +142,15 @@
             </h3>
             <div class="value">0.00</div>
           </div>
-        </div>      
+        </div>
 
         <div class="export-section">
           <h3><i class="fas fa-download"></i> Export Timesheet</h3>
-          <button  class="export-btn" onclick="exportTimesheetToExcel()">
+          <button class="export-btn" onclick="exportTimesheetToExcel()">
             <i class="fas fa-file-excel"></i> Export to Excel
           </button>
-          <button id="submitBtn" class="export-btn" onclick="saveDataToMongo()">
-            <i class="fas fa-save"></i> Submit & Save
+          <button class="export-btn" onclick="saveDataToMongo()">
+            <i class="fas fa-save"></i> Submit
           </button>
           <button class="clear-btn" onclick="clearTimesheet()">
             <i class="fas fa-eraser"></i> Clear
@@ -273,7 +269,7 @@
     <!-- POPUPS & LOADING -->
     <div class="popup" id="successPopup">
       <p id="popupMessage"><i class="fas fa-check-circle"></i> Message</p>
-      <button class="popup-close" onclick="closePopup()">&times;</button>
+      <!-- <button class="popup-close" onclick="closePopup()">&times;</button> -->
     </div>
     <div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Saving...</div>
 
@@ -312,41 +308,139 @@
     </div> -->
 
     <div class="modal-overlay" id="modalOverlay">
-    <div class="modal-content">
-        <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()"></div>
-        <div><label id="modalLabel2">Location</label><select id="modalInput2" class="form-input">
-            <option value="Office">Office</option>
-            <option value="Client Site">Client Site</option>
-            <option value="Work From Home">Work From Home</option>
-            <option value="Field Work">Field Work</option>
-        </select></div>
-        <div><label id="modalLabel3">Punch In</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-        <div><label id="modalLabel4">Punch Out</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-        <div><label id="modalLabel5">Project Start</label><input type="time" id="modalInput5" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-        <div><label id="modalLabel6">Project End</label><input type="time" id="modalInput6" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
-        <div><label id="modalLabel7">Client</label><input id="modalInput7" class="form-input" placeholder="Enter Client" onchange="updateModalHours()"></div>
-        <div><label id="modalLabel8">Project</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Project" onchange="updateModalHours()"></div>
-        <div><label id="modalLabel9">Project Code</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Project Code" onchange="updateModalHours()"></div>
-        <div><label id="modalLabel10">Reporting Manager</label><input type="text" id="modalInput10" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()"></div>
-        <div><label id="modalLabel11">Activity</label><input type="text" id="modalInput11" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()"></div>
-        <div><label id="modalLabel12">Project Hours</label><input type="number" id="modalInput12" class="form-input" readonly></div>
-        <div><label id="modalLabel13">Working Hours</label><input type="number" id="modalInput13" class="form-input" readonly></div>
-        <div><label id="modalLabel14">Billable</label><select id="modalInput14" class="form-input" onchange="updateModalHours()">
-            <option value="Yes">Billable</option>
-            <option value="No">Non-Billable</option>
-        </select></div>
-        <div><label id="modalLabel15">Remarks</label><input type="text" id="modalInput15" class="form-input" placeholder="Additional notes" onchange="updateModalHours()"></div>
-        <button id="modalCancelBtn" class="modal-cancel-btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
-        <button id="modalAddBtn" class="modal-add-btn" onclick="saveModalEntry()"><i class="fas fa-check"></i> Add</button>
+  <div class="modal-content">
+
+    <!-- 1 Date -->
+    <div>
+      <label id="modalLabel1">Date</label>
+      <input type="date" id="modalInput1" class="form-input"
+        onchange="validateModalDate(this); updateModalHours()">
     </div>
+
+    <!-- 2 Location -->
+    <div>
+      <label id="modalLabel2">Location of Work</label>
+      <select id="modalInput2" class="form-input">
+        <option value="Office">Office</option>
+        <option value="Client Site">Client Site</option>
+        <option value="Work From Home">Work From Home</option>
+        <option value="Field Work">Field Work</option>
+      </select>
+    </div>
+
+    <!-- 3 Punch In -->
+    <div>
+      <label id="modalLabel3">Punch In</label>
+      <input type="time" id="modalInput3" class="form-input"
+        onchange="updateModalHours()">
+    </div>
+
+    <!-- 4 Punch Out -->
+    <div>
+      <label id="modalLabel4">Punch Out</label>
+      <input type="time" id="modalInput4" class="form-input"
+        onchange="updateModalHours()">
+    </div>
+
+    <!-- 5 Project Start -->
+    <div>
+      <label id="modalLabel5">Project Start Time</label>
+      <input type="time" id="modalInput5" class="form-input"
+        onchange="updateModalHours()">
+    </div>
+
+    <!-- 6 Project End -->
+    <div>
+      <label id="modalLabel6">Project End Time</label>
+      <input type="time" id="modalInput6" class="form-input"
+        onchange="updateModalHours()">
+    </div>
+
+    <!-- 7 Client -->
+    <div>
+      <label id="modalLabel7">Client</label>
+      <input type="text" id="modalInput7" class="form-input"
+        placeholder="Enter Client">
+    </div>
+
+    <!-- 8 Project -->
+    <div>
+      <label id="modalLabel8">Project</label>
+      <input type="text" id="modalInput8" class="form-input"
+        placeholder="Enter Project">
+    </div>
+
+    <!-- 9 Project Code -->
+    <div>
+      <label id="modalLabel9">Project Code</label>
+      <input type="text" id="modalInput9" class="form-input"
+        placeholder="Enter Project Code">
+    </div>
+
+    <!-- 10 Reporting Manager -->
+    <div>
+      <label id="modalLabel10">Reporting Manager</label>
+      <input type="text" id="modalInput10" class="form-input"
+        placeholder="Enter Reporting Manager">
+    </div>
+
+    <!-- 11 Activity -->
+    <div>
+      <label id="modalLabel11">Activity</label>
+      <input type="text" id="modalInput11" class="form-input"
+        placeholder="Enter Activity">
+    </div>
+
+    <!-- 12 Project Hours -->
+    <div>
+      <label id="modalLabel12">Project Hours</label>
+      <input type="number" id="modalInput12" class="form-input" readonly>
+    </div>
+
+    <!-- 13 Working Hours -->
+    <div>
+      <label id="modalLabel13">Working Hours</label>
+      <input type="number" id="modalInput13" class="form-input" readonly>
+    </div>
+
+    <!-- 14 Billable -->
+    <div>
+      <label id="modalLabel14">Billable</label>
+      <select id="modalInput14" class="form-input">
+        <option value="Yes">Billable</option>
+        <option value="No">Non-Billable</option>
+      </select>
+    </div>
+
+    <!-- 15 Remarks -->
+    <div>
+      <label id="modalLabel15">Remarks</label>
+      <input type="text" id="modalInput15" class="form-input"
+        placeholder="Additional notes">
+    </div>
+
+    <div class="modal-buttons">
+      <button id="modalCancelBtn" class="modal-cancel-btn" onclick="closeModal()">
+        <i class="fas fa-times"></i> Cancel
+      </button>
+      <button id="modalAddBtn" class="modal-add-btn" onclick="saveModalEntry()">
+        <i class="fas fa-check"></i> Add
+      </button>
+    </div>
+
+  </div>
 </div>
 
-
-    <div class="exit-confirmation" id="exitConfirmation">
-      <p>Do you want to exit?</p>
-      <button class="cancel-btn" onclick="cancelExit()">No</button>
-      <button class="confirm-btn" onclick="confirmExit()">Yes</button>
+  <!-- LOGOUT CONFIRMATION POPUP -->
+<div id="logoutPopup" class="popup-overlay" style="display: none;">
+  <div class="popup-box">
+    <p>Are you sure you want to logout?</p>
+    <div class="popup-btns">
+      <button onclick="confirmLogout()" class="yes-btn">Yes</button>
+      <button onclick="cancelLogout()" class="no-btn">No</button>
     </div>
+  </div>
+</div>
 
     <!-- SCRIPTS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

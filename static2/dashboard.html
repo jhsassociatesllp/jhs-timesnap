@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #68428f 100%);
+            --secondary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            --dark-bg: #2c3e50;
+            --text-dark: #2c3e50;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            background: var(--dark-bg);
+            min-height: 100vh;
+            color: var(--text-dark);
+        }
+
+        .sidebar {
+            width: 23%;
+            /* background: var(--primary-gradient); */
+            /* background: linear-gradient(135deg,#2e2d2d, #eb2e0c ); */
+            background: darkcyan;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 30px;
+        }
+
+        .sidebar h2 {
+            color: rgb(252, 253, 252);
+            margin-bottom: 30px;
+            font-size: 22px;
+            letter-spacing: 1px;
+        }
+
+        .sidebar button {
+            background: none;
+            border: none;
+            color: white;
+            padding: 12px 18px;
+            width: 80%;
+            text-align: left;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: var(--transition);
+        }
+
+        .sidebar button:hover,
+        .sidebar button.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .main-content {
+            flex: 1;
+            background-color: ghostwhite;
+            /* background-color: #ffffff; */
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .status-container {
+            margin-bottom: 25px;
+        }
+
+        .status {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .button-container button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 15px;
+            transition: var(--transition);
+        }
+
+        .button-container button:hover {
+            transform: translateY(-2px);
+        }
+
+        .popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .popup-content {
+            background: white;
+            padding: 25px 35px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+            min-width: 300px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .popup-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .popup-buttons button {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .confirm-btn {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .cancel-btn {
+            background-color: #ccc;
+            color: #333;
+        }
+
+        .toast {
+            position: fixed;
+            top: 40%;
+            left: 40%;
+           /* background: linear-gradient(135deg, #ff3c1a, #000000); */
+            background: #667eea;
+            color: rgb(255, 255, 255);
+            padding: 12px 18px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            box-shadow: 1px 1px 5px black;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        #payrollMonth {
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        /*.payroll-container {
+            width: 100%;
+            background-color: lightblue;
+            padding: 30px;
+            border-radius: 8px;
+        }*/
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <h2>Admin</h2>
+        <button id="parBtn" class="active">PAR</button>
+        <button id="payrollBtn">Payroll</button>
+        <button id="analysisBtn">Analysis</button>
+        <button id="uploadBtn">Upload Data</button>
+        <button id="logoutBtn">Logout</button>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <!-- PAR SECTION -->
+        <div class="PAR-container">
+            <div id="parSection">
+                <div class="status-container">
+                    <h3>Current state: <span id="statusText" class="status">Loading...</span></h3>
+                </div>
+                <div class="button-container">
+                    <button id="enableBtn">Enable</button>
+                    <button id="disableBtn">Disable</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- PAYROLL SECTION -->
+        <div class="payroll-container">
+            <div id="payrollSection" style="display:none;">
+                <h3>Current Payroll Period:
+                    <span id="payrollStatus" style="color: #ee5a52;" class="status">Loading...</span>
+                </h3>
+
+                <div style="margin-top: 25px;">
+                    <label><b>Select Payroll Month:</b></label>
+                    <input type="month" id="payrollMonth" />
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button id="savePayrollBtn"
+                        style="background-color:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;">
+                        Save Payroll Month
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="popup" id="confirmationPopup">
+            <div class="popup-content">
+                <h3 id="popupMessage">Are you sure?</h3>
+                <div class="popup-buttons">
+                    <button id="confirmBtn" class="confirm-btn">Yes</button>
+                    <button id="cancelBtn" class="cancel-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast" class="toast"></div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js"></script>
+
+
+        <script>
+            // PAR Section
+            
+    
+    const popup = document.getElementById("confirmationPopup");
+    const popupMessage = document.getElementById("popupMessage");
+    const confirmBtn = document.getElementById("confirmBtn");
+    const cancelBtn = document.getElementById("cancelBtn");
+    let pendingStatus = null;
+
+    // Toast Function
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2500);
+    }
+
+ async function fetchParStatus() {
+  const token = localStorage.getItem("access_token");
+
+  if (!token) {
+    showToast("Session expired. Please login again.");
+    setTimeout(() => (window.location.href = "/admin"), 1000);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/get-par-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      const statusText = document.getElementById("statusText");
+      if (data.par_status === "enable") {
+        statusText.textContent = "Enable 🟢";
+        statusText.style.color = "green";
+      } else {
+        statusText.textContent = "Disable ⛔";
+        statusText.style.color = "red";
+      }
+    } else {
+      showToast(data.detail || "Failed to fetch status ⚠️");
+    }
+  } catch (err) {
+    showToast("Error fetching status ⚠️");
+    console.error(err);
+  }
+}
+
+async function updateParStatus(newStatus) {
+  const token = localStorage.getItem("access_token");
+  const userid = localStorage.getItem("admin_userid");
+
+  if (!token || !userid) {
+    showToast("Session expired. Please login again.");
+    setTimeout(() => (window.location.href = "/admin"), 1000);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/update-par-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: token,
+        new_status: newStatus
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(`PAR ${newStatus}d successfully ✅`);
+      document.getElementById("statusText").textContent =
+        newStatus === "enable" ? "Enable 🟢" : "Disable ⛔";
+      document.getElementById("statusText").style.color =
+        newStatus === "enable" ? "green" : "red";
+    } else {
+      showToast(data.detail || "Update failed ⚠️");
+    }
+  } catch (err) {
+    showToast("Server error ⚠️");
+    console.error(err);
+  }
+}
+
+    // Show confirmation popup
+    function showConfirmation(action) {
+      pendingStatus = action;
+      popupMessage.textContent = `Are you sure you want to ${action} PAR?`;
+      popup.style.display = "flex";
+    }
+
+    // Confirm / Cancel actions
+    confirmBtn.addEventListener("click", () => {
+      if (pendingStatus) {
+        updateParStatus(pendingStatus);
+        pendingStatus = null;
+      }
+      popup.style.display = "none";
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      popup.style.display = "none";
+      pendingStatus = null;
+    });
+
+    // Buttons
+    document.getElementById("enableBtn").addEventListener("click", () => showConfirmation("enable"));
+    document.getElementById("disableBtn").addEventListener("click", () => showConfirmation("disable"));
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("access_token");
+      window.location.href = "/admin-logout";
+    });
+
+    // Load on start
+    fetchParStatus();
+    // ✅ Fetch status when the page loads
+// window.onload = fetchParStatus;
+
+            const toast = document.getElementById("toast");
+            const userid = localStorage.getItem("admin_userid") || "ADMIN";
+
+            function showToast(message) {
+                toast.textContent = message;
+                toast.classList.add("show");
+                setTimeout(() => toast.classList.remove("show"), 2500);
+            }
+
+            // ✅ Month-Year Display → e.g. Dec 2025 - Jan 2026
+            function getMonthRange(start, end) {
+                if (!start || !end) return "Not Set";
+                const s = new Date(start);
+                const e = new Date(end);
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return `${months[s.getMonth()]} ${s.getFullYear()} - ${months[e.getMonth()]} ${e.getFullYear()}`;
+            }
+
+            // ---------------- PAYROLL SECTION (FIXED 21 TO 20) ----------------
+            const payrollStatus = document.getElementById("payrollStatus");
+            const monthInput = document.getElementById("payrollMonth");
+
+            // ✅ Fetch Payroll Status
+            async function fetchPayrollStatus() {
+                const token = localStorage.getItem("access_token");
+                if (!token) return;
+
+                try {
+                    const res = await fetch(`/get-payroll-status`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ token }),
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        payrollStatus.textContent = getMonthRange(data.start_date, data.end_date);
+
+                        // Autofill month picker with existing payroll start date
+                        if (data.start_date) {
+                            const s = new Date(data.start_date);
+                            monthInput.value = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}`;
+                        }
+                    } else {
+                        showToast(data.detail || "Failed to fetch payroll ⚠️");
+                    }
+                } catch (err) {
+                    console.error("Error fetching payroll:", err);
+                }
+            }
+
+            // ✅ Save Payroll Month (handles December edge case)
+            document.getElementById("savePayrollBtn").addEventListener("click", async () => {
+                const token = localStorage.getItem("access_token");
+                const monthValue = monthInput.value;
+
+                if (!monthValue) {
+                    showToast("Please select payroll month ⚠️");
+                    return;
+                }
+
+                const [year, month] = monthValue.split("-");
+                const selectedMonth = parseInt(month);
+
+                // 🟢 If December → previous month November (start), else previous month
+                let startMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+                let startYear = selectedMonth === 1 ? parseInt(year) - 1 : parseInt(year);
+
+                // 21st of previous month to 20th of selected month
+                const start_date = `${startYear}-${String(startMonth).padStart(2, "0")}-21`;
+                const end_date = `${year}-${String(selectedMonth).padStart(2, "0")}-20`;
+
+                try {
+                    const res = await fetch(`/update-payroll-status`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ token, start_date, end_date }),
+                    });
+
+                    const data = await res.json();
+                    if (res.ok) {
+                        showToast("Payroll month saved ✅");
+                        payrollStatus.textContent = getMonthRange(start_date, end_date);
+                    } else {
+                        showToast(data.detail || "Failed to update payroll ⚠️");
+                    }
+                } catch (err) {
+                    showToast("Server error ⚠️");
+                }
+            });
+
+            // ---------------- SIDEBAR NAVIGATION ----------------
+            const parSection = document.getElementById("parSection");
+            const payrollSection = document.getElementById("payrollSection");
+
+            document.getElementById("parBtn").addEventListener("click", () => {
+                parSection.style.display = "block";
+                payrollSection.style.display = "none";
+            });
+
+            document.getElementById("payrollBtn").addEventListener("click", () => {
+                parSection.style.display = "none";
+                payrollSection.style.display = "block";
+                fetchPayrollStatus();
+            });
+
+            // window.onload = fetchPayrollStatus;
+            window.addEventListener("load", () => {
+  fetchParStatus();      // PAR status load karega
+  fetchPayrollStatus();  // Payroll period load karega
+});
+
+        </script>
+</body>
+
+</html>
