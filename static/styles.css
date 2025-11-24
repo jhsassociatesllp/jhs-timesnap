@@ -1383,6 +1383,7 @@ body {
     padding: 0.6rem 1rem;
     border: none;
     border-radius: 5px;
+    font-size: 0.9rem;
 }
 
 .reject-btn{
@@ -1391,4 +1392,5 @@ body {
     padding: 0.6rem 1rem;
     border: none;
     border-radius: 5px;
+    font-size: 0.9rem;
 }
