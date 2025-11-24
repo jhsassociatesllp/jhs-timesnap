@@ -441,6 +441,10 @@ tr:hover td {
                     <button class="btn btn-danger" id="disableBtn">
                         <i class="fas fa-stop-circle"></i> Disable PAR
                     </button>
+                    <button class="btn btn-primary" id="initParBtn" style="margin-top:1rem; width:100%;">
+                        <i class="fas fa-sync-alt"></i> Initialize PAR Stats
+                    </button>
+
                 </div>
             </div>
             <div class="card table-card" style="margin-top:2rem;">
@@ -620,6 +624,32 @@ document.querySelectorAll('.nav-item').forEach(item => {
     });
 });
 
+async function initializeParCycle() {
+    const token = localStorage.getItem("admin_token");
+    if (!token) return showToast("Session expired!");
+
+    try {
+        const res = await fetch("/admin/init-par-cycle", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ token })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            showToast("PAR Initialized Successfully!");
+            fetchParStats(); // refresh table
+        } else {
+            showToast(data.detail || "Initialization failed");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Server error while initializing PAR");
+    }
+}
+
+
 
 
 // PAR & Payroll functions – 100% same as before (only minor UI tweaks)
@@ -651,7 +681,25 @@ async function updateParStatus(status) {
 
 document.getElementById("enableBtn").onclick = () => { pendingStatus = "enable"; popupMessage.textContent = "Enable PAR for all users?"; popup.style.display = "flex"; };
 document.getElementById("disableBtn").onclick = () => { pendingStatus = "disable"; popupMessage.textContent = "Disable PAR for all users?"; popup.style.display = "flex"; };
-document.getElementById("confirmBtn").onclick = () => { if(pendingStatus) updateParStatus(pendingStatus); popup.style.display = "none"; };
+document.getElementById("initParBtn").onclick = () => {
+    pendingStatus = "init_par";  
+    popupMessage.textContent = "Do you really want to Initialize PAR stats?";
+    popup.style.display = "flex";
+};
+
+// document.getElementById("confirmBtn").onclick = () => { if(pendingStatus) updateParStatus(pendingStatus); popup.style.display = "none"; };
+document.getElementById("confirmBtn").onclick = () => {
+    if (pendingStatus === "enable" || pendingStatus === "disable") {
+        updateParStatus(pendingStatus);
+    }
+
+    if (pendingStatus === "init_par") {
+        initializeParCycle();
+    }
+
+    popup.style.display = "none";
+};
+
 document.getElementById("cancelBtn").onclick = () => { popup.style.display = "none"; };
 
 // Payroll logic (same as before)
