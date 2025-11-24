@@ -1488,7 +1488,7 @@ async function showSection(section) {
             hideLoading();
             showPopup('Failed to load history: ' + error.message, true);
         }
-    }
+    }   
 }
 
 
