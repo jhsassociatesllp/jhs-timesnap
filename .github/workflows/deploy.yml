@@ -29,6 +29,7 @@ jobs:
 
           # Choose correct port for staging/production
           if [ "$ENV" = "main" ]; then
+          
             PORT=8011
             MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
