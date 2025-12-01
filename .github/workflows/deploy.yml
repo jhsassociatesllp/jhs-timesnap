@@ -1,0 +1,47 @@
+name: 🚀 Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_KEY }}
+
+      - name: Deploy on Server
+        run: |
+          ENV=${GITHUB_REF_NAME}
+          IMAGE=ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$ENV
+          APP_NAME=jhs_timesnap_$ENV
+
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+
+          echo '⏬ Logging into GHCR...'
+          echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          echo '📥 Pulling latest image...'
+          docker pull $IMAGE
+
+          echo '🛑 Stopping old container...'
+          docker stop $APP_NAME || true
+          docker rm $APP_NAME || true
+
+          echo '▶️ Starting new container...'
+          docker run -d \
+            --name $APP_NAME \
+            -p 8000:8000 \
+            -e APP_ENV=$ENV \
+            $IMAGE
+
+          echo '🧹 Cleaning up old images...'
+          docker system prune -af --volumes
+
+          "
