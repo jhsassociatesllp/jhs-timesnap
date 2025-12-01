@@ -18,30 +18,48 @@ jobs:
 
       - name: Deploy on Server
         run: |
+          # Determine environment
           ENV=${GITHUB_REF_NAME}
-          IMAGE=ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$ENV
-          APP_NAME=jhs_timesnap_$ENV
 
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          # Docker image path
+          IMAGE="ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$ENV"
 
-          echo '⏬ Logging into GHCR...'
-          echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Container name
+          APP_NAME="jhs_timesnap_$ENV"
 
-          echo '📥 Pulling latest image...'
-          docker pull $IMAGE
+          # Determine correct port
+          if [ "$ENV" = "main" ]; then
+            PORT=8011
+          else
+            PORT=8010
+          fi
 
-          echo '🛑 Stopping old container...'
-          docker stop $APP_NAME || true
-          docker rm $APP_NAME || true
+          echo "Deploying environment: $ENV"
+          echo "Using container: $APP_NAME"
+          echo "Using port: $PORT"
 
-          echo '▶️ Starting new container...'
-          docker run -d \
-            --name $APP_NAME \
-            -p 8000:8000 \
-            -e APP_ENV=$ENV \
-            $IMAGE
+          ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+              
+              echo '⏬ Logging into GHCR...'
+              echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
-          echo '🧹 Cleaning up old images...'
-          docker system prune -af --volumes
+              echo '📥 Pulling latest image: $IMAGE'
+              docker pull $IMAGE
 
+              echo '🛑 Stopping old container if exists...'
+              docker stop $APP_NAME || true
+              docker rm $APP_NAME || true
+
+              echo '▶️ Starting new container on port $PORT...'
+              docker run -d \
+                --name $APP_NAME \
+                -p $PORT:8000 \
+                -e APP_ENV=$ENV \
+                $IMAGE
+
+              echo '🧹 Cleaning unused Docker data...'
+              docker system prune -af --volumes
+
+              echo '✅ Deployment for $ENV completed successfully!'
           "
