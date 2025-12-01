@@ -30,14 +30,14 @@ jobs:
           # Choose correct port for staging/production
           if [ "$ENV" = "main" ]; then
             PORT=8011
-            MONGO="${{ secrets.MONGO_CONNECTION_STRING_PRODUCTION }}"
+            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
-            JWT="${{ secrets.JWT_SECRET_PRODUCTION }}"
+            JWT="${{ secrets.JWT_SECRET_KEY }}"
           else
             PORT=8010
-            MONGO="${{ secrets.MONGO_CONNECTION_STRING_STAGING }}"
+            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
-            JWT="${{ secrets.JWT_SECRET_STAGING }}"
+            JWT="${{ secrets.JWT_SECRET_KEY }}"
           fi
 
           echo "🌍 Environment: $ENV"

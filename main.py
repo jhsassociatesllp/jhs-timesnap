@@ -1151,20 +1151,6 @@ def add_or_create(collection, reporting_emp_code, reporting_emp_name, employee_c
         collection.insert_one(new_doc)
         print(f"Created new {collection.name} document for {reporting_emp_code} with employee {employee_code}.")
 
-from threading import Thread
-import time
-
-def cleanup_expired_otps():
-    """Deletes expired OTPs every 60 seconds."""
-    while True:
-        now = datetime.utcnow()
-        result = otp_collection.delete_many({"expires_at": {"$lt": now}})
-        if result.deleted_count > 0:
-            print(f"🧹 Cleaned up {result.deleted_count} expired OTP(s) at {now.isoformat()}")
-        time.sleep(60)  # check every 1 minute
-
-# Start cleanup thread in background
-Thread(target=cleanup_expired_otps, daemon=True).start()
 
 
 @app.post("/approve_timesheet")
