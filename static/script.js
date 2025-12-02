@@ -8,6 +8,7 @@ let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem("loggedInEmployeeId") || "";
 // const API_URL = "http://localhost:8000";
 const API_URL = "";
+
 let copiedData = null; // for copy/paste row
 let currentRow = null; // used by modal if present
 let isEditingHistory = false;
@@ -154,6 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Step 1: Verify session
   try {
+    console.log(`API URL: ${API_URL}`)
     const res = await fetch(`${API_URL}/verify_session`, {
       method: "POST",
       headers: getHeaders(),
