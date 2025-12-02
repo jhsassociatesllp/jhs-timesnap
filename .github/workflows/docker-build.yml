@@ -19,13 +19,26 @@ jobs:
       - name: Build Image
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/jhs-timesnap
-          TAG=${GITHUB_REF_NAME}
 
+          # Convert branch → correct tag name
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            TAG="production"
+          else
+            TAG="staging"
+          fi
+
+          echo "📦 Building image: $IMAGE_NAME:$TAG"
           docker build -t $IMAGE_NAME:$TAG .
 
       - name: Push Image
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/jhs-timesnap
-          TAG=${GITHUB_REF_NAME}
 
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            TAG="production"
+          else
+            TAG="staging"
+          fi
+
+          echo "📤 Pushing image: $IMAGE_NAME:$TAG"
           docker push $IMAGE_NAME:$TAG

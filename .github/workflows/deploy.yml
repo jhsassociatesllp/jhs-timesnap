@@ -18,7 +18,6 @@ jobs:
 
       - name: Deploy to Server
         run: |
-          # Determine environment name from branch
           BRANCH=${GITHUB_REF_NAME}
 
           if [ "$BRANCH" = "main" ]; then
@@ -37,23 +36,23 @@ jobs:
 
           echo "🌍 Environment: $TAG"
           echo "🐳 Image: $IMAGE"
-          echo "🔌 Using port: $PORT"
+          echo "🔌 Port: $PORT"
           echo "📦 Container: $APP_NAME"
 
           ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-              
-              echo '⏬ Logging into GHCR...'
+
+              echo '🔐 Logging into GHCR...'
               echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
-              echo '📥 Pulling latest image...'
-              docker pull $IMAGE
+              echo '📥 Pulling new image...'
+              docker pull $IMAGE || { echo '❌ Pull failed. Keeping old container.'; exit 1; }
 
-              echo '🛑 Stopping old container if exists...'
+              echo '🛑 Stopping old container...'
               docker stop $APP_NAME || true
               docker rm $APP_NAME || true
 
-              echo '▶️ Starting new container on port $PORT...'
+              echo '▶️ Starting new container...'
               docker run -d \
                 --name $APP_NAME \
                 -p $PORT:8000 \
@@ -63,8 +62,9 @@ jobs:
                 -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
                 $IMAGE
 
-              echo '🧹 Cleaning Docker garbage...'
-              docker system prune -af --volumes
+              echo '🧹 Removing old images only...'
+              docker image prune -f
 
-              echo '✅ Deployment completed for $TAG!'
+              echo '✅ Deployment successfully completed for $TAG!'
           "
+  
