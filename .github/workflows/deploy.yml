@@ -20,6 +20,7 @@ jobs:
         run: |
           BRANCH=${GITHUB_REF_NAME}
 
+          # Map branch → tag + container + port
           if [ "$BRANCH" = "main" ]; then
             TAG="production"
             APP_NAME="jhs_timesnap_production"
@@ -32,7 +33,7 @@ jobs:
             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
           fi
 
-          IMAGE="ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$TAG"
+          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$TAG"
 
           echo "🌍 Environment: $TAG"
           echo "🐳 Image: $IMAGE"
@@ -41,12 +42,15 @@ jobs:
 
           ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-
+              
               echo '🔐 Logging into GHCR...'
               echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
-              echo '📥 Pulling new image...'
-              docker pull $IMAGE || { echo '❌ Pull failed. Keeping old container.'; exit 1; }
+              echo '📥 Pulling latest image...'
+              docker pull $IMAGE || {
+                echo '❌ Pull failed — keeping old container alive.';
+                exit 1;
+              }
 
               echo '🛑 Stopping old container...'
               docker stop $APP_NAME || true
@@ -62,9 +66,8 @@ jobs:
                 -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
                 $IMAGE
 
-              echo '🧹 Removing old images only...'
+              echo '🧹 Cleaning unused images...'
               docker image prune -f
 
-              echo '✅ Deployment successfully completed for $TAG!'
+              echo '✅ Deployment successful for $TAG!'
           "
-  
