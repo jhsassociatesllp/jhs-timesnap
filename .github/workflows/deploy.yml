@@ -19,29 +19,23 @@ jobs:
       - name: Deploy to Server
         run: |
           # Determine environment name from branch
-          ENV=${GITHUB_REF_NAME}
+          BRANCH=${GITHUB_REF_NAME}
 
-          # Docker image path
-          IMAGE="ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$ENV"
-
-          # Docker container name
-          APP_NAME="jhs_timesnap_$ENV"
-
-          # Choose correct port for staging/production
-          if [ "$ENV" = "main" ]; then
-          
+          if [ "$BRANCH" = "main" ]; then
+            TAG="production"
+            APP_NAME="jhs_timesnap_production"
             PORT=8011
-            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
-            JWT="${{ secrets.JWT_SECRET_KEY }}"
           else
+            TAG="staging"
+            APP_NAME="jhs_timesnap_staging"
             PORT=8010
-            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
-            JWT="${{ secrets.JWT_SECRET_KEY }}"
           fi
 
-          echo "🌍 Environment: $ENV"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$TAG"
+
+          echo "🌍 Environment: $TAG"
           echo "🐳 Image: $IMAGE"
           echo "🔌 Using port: $PORT"
           echo "📦 Container: $APP_NAME"
@@ -63,14 +57,14 @@ jobs:
               docker run -d \
                 --name $APP_NAME \
                 -p $PORT:8000 \
-                -e APP_ENV=$ENV \
-                -e MONGO_CONNECTION_STRING=\"$MONGO\" \
+                -e APP_ENV=$TAG \
+                -e MONGO_CONNECTION_STRING=\"${{ secrets.MONGO_CONNECTION_STRING }}\" \
                 -e SMTP_KEY=\"$SMTP\" \
-                -e JWT_SECRET=\"$JWT\" \
+                -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
                 $IMAGE
 
               echo '🧹 Cleaning Docker garbage...'
               docker system prune -af --volumes
 
-              echo '✅ Deployment completed for $ENV!'
+              echo '✅ Deployment completed for $TAG!'
           "
