@@ -1,0 +1,76 @@
+name: 🚀 Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_KEY }}
+
+      - name: Deploy to Server
+        run: |
+          # Determine environment name from branch
+          ENV=${GITHUB_REF_NAME}
+
+          # Docker image path
+          IMAGE="ghcr.io/${{ github.repository_owner }}/jhs-timesnap:$ENV"
+
+          # Docker container name
+          APP_NAME="jhs_timesnap_$ENV"
+
+          # Choose correct port for staging/production
+          if [ "$ENV" = "main" ]; then
+          
+            PORT=8011
+            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
+            SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
+            JWT="${{ secrets.JWT_SECRET_KEY }}"
+          else
+            PORT=8010
+            MONGO="${{ secrets.MONGO_CONNECTION_STRING }}"
+            SMTP="${{ secrets.SMTP_KEY_STAGING }}"
+            JWT="${{ secrets.JWT_SECRET_KEY }}"
+          fi
+
+          echo "🌍 Environment: $ENV"
+          echo "🐳 Image: $IMAGE"
+          echo "🔌 Using port: $PORT"
+          echo "📦 Container: $APP_NAME"
+
+          ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+              
+              echo '⏬ Logging into GHCR...'
+              echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+              echo '📥 Pulling latest image...'
+              docker pull $IMAGE
+
+              echo '🛑 Stopping old container if exists...'
+              docker stop $APP_NAME || true
+              docker rm $APP_NAME || true
+
+              echo '▶️ Starting new container on port $PORT...'
+              docker run -d \
+                --name $APP_NAME \
+                -p $PORT:8000 \
+                -e APP_ENV=$ENV \
+                -e MONGO_CONNECTION_STRING=\"$MONGO\" \
+                -e SMTP_KEY=\"$SMTP\" \
+                -e JWT_SECRET=\"$JWT\" \
+                $IMAGE
+
+              echo '🧹 Cleaning Docker garbage...'
+              docker system prune -af --volumes
+
+              echo '✅ Deployment completed for $ENV!'
+          "

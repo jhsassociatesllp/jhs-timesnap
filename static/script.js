@@ -8,6 +8,7 @@ let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem("loggedInEmployeeId") || "";
 // const API_URL = "http://localhost:8000";
 const API_URL = "";
+
 let copiedData = null; // for copy/paste row
 let currentRow = null; // used by modal if present
 let isEditingHistory = false;
@@ -154,6 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Step 1: Verify session
   try {
+    console.log(`API URL: ${API_URL}`)
     const res = await fetch(`${API_URL}/verify_session`, {
       method: "POST",
       headers: getHeaders(),
@@ -537,110 +539,47 @@ function populateEmployeeInfo() {
 }
 
 /* update dates in existing rows to match selected week */
-// function updateExistingRowDates(sectionId) {
-//   const tbody = document.getElementById(
-//     `timesheetBody_${sectionId.split("_")[1]}`
-//   );
-//   if (!tbody) return;
 
-//   const weekSelect = document.getElementById(
-//     `weekPeriod_${sectionId.split("_")[1]}`
-//   );
-//   const selectedWeekValue = weekSelect.value;
-//   const selectedWeek = weekOptions.find(
-//     (opt) => opt.value === selectedWeekValue
-//   );
-
-//   if (selectedWeek && selectedWeek.start) {
-//     const weekStart = new Date(selectedWeek.start);
-//     const defaultDate = `${weekStart.getFullYear()}-${String(
-//       weekStart.getMonth() + 1
-//     ).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
-
-//     const dateInputs = tbody.querySelectorAll(".date-field");
-//     dateInputs.forEach((dateInput) => {
-//       const currentDate = new Date(dateInput.value + "T00:00:00");
-//       const weekStartDate = new Date(weekStart);
-//       const weekEndDate = new Date(selectedWeek.end);
-
-//       if (
-//         !dateInput.value ||
-//         currentDate < weekStartDate ||
-//         currentDate > weekEndDate
-//       ) {
-//         dateInput.value = defaultDate;
-//         validateDate(dateInput);
-//       }
-//     });
-//   }
-// }
-
-// function updateExistingRowDates(sectionId) {
-//     // YE LINE ADD KAR DO — SAB FIX HO JAYEGA
-//     if (!weekOptionsReady || !window.weekOptions || window.weekOptions.length === 0) {
-//         return; // Wait karo, abhi validate mat karo
-//     }
-
-//     const secNum = sectionId.split("_")[1];
-//     const tbody = document.getElementById(`timesheetBody_${secNum}`);
-//     const weekSelect = document.getElementById(`weekPeriod_${secNum}`);
-
-//     if (!tbody || !weekSelect || !weekSelect.value) return;
-
-//     const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-//     if (!selectedWeek || !selectedWeek.start || !selectedWeek.end) return;
-
-//     const start = new Date(selectedWeek.start).toISOString().split("T")[0];
-//     const end = new Date(selectedWeek.end).toISOString().split("T")[0];
-
-//     tbody.querySelectorAll("input[type='date'], .date-field").forEach(input => {
-//         input.min = start;
-//         input.max = end;
-//         if (!input.value || input.value < start || input.value > end) {
-//             input.value = start;
-//         }
-//         validateDate(input);
-//     });
-// }
 function updateExistingRowDates(sectionId) {
     const secNum = sectionId.split("_")[1];
     const tbody = document.getElementById(`timesheetBody_${secNum}`);
     if (!tbody) return;
 
     const weekSel = document.getElementById(`weekPeriod_${secNum}`);
-    if (!weekSel) return;
+    if (!weekSel || !weekSel.value) return;
 
-    const week = weekOptions.find(w => w.value === weekSel.value);
-    if (!week) return;
+    const selectedWeek = window.weekOptions.find(w => w.value === weekSel.value);
+    if (!selectedWeek) return;
 
-    const start = formatDate(new Date(week.start));
-    const end = formatDate(new Date(week.end));
+    const weekStartISO = new Date(selectedWeek.start).toISOString().split("T")[0];
+    const weekEndISO = new Date(selectedWeek.end).toISOString().split("T")[0];
 
+    // Sabhi date inputs ko update karo
     tbody.querySelectorAll(".date-field").forEach(input => {
-        input.setAttribute("min", start);
-        input.setAttribute("max", end);
+        // min/max set karo
+        input.min = weekStartISO;
+        input.max = weekEndISO;
 
-        if (!input.value || input.value < start || input.value > end) {
-            input.value = start;
+        // Agar khali hai ya invalid date hai → week ki starting date daal do
+        if (!input.value || input.value < weekStartISO || input.value > weekEndISO) {
+            input.value = weekStartISO;
         }
+
+        // Validation trigger karo
+        validateDate(input);
     });
 
-    // also sync modal (if open)
+    // Agar modal open hai to uska date bhi sync karo
     const modalDate = document.getElementById("modalInput1");
-    if (modalDate) {
-        modalDate.setAttribute("min", start);
-        modalDate.setAttribute("max", end);
-
-        if (!modalDate.value || modalDate.value < start || modalDate.value > end) {
-            modalDate.value = start;
+    if (modalDate && document.getElementById("modalOverlay")?.style.display === "flex") {
+        modalDate.min = weekStartISO;
+        modalDate.max = weekEndISO;
+        if (!modalDate.value || modalDate.value < weekStartISO || modalDate.value > weekEndISO) {
+            modalDate.value = weekStartISO;
         }
+        validateDate(modalDate);
     }
 }
-
-
-
-
-
 
 /* add a new entry row */
 function addRow(sectionId, specificDate = null) {
@@ -715,8 +654,12 @@ if (specificDate) {
 
   tbody.appendChild(tr);
 
+  // const dateInput = tr.querySelector(".date-field");
+  // if (dateInput) validateDate(dateInput);
   const dateInput = tr.querySelector(".date-field");
-  if (dateInput) validateDate(dateInput);
+if (dateInput && window.weekOptions && window.weekOptions.length > 0) {
+    setTimeout(() => validateDate(dateInput), 500); // Thoda delay to ensure weekOptions ready
+}
   updateRowNumbers(tbody.id);
   updateSummary();
 }
@@ -956,47 +899,96 @@ function validateTimes(rowOrModal, isModal = false) {
 }
 
 
-function validateDate(input) {
-    if (!input || !input.value) return;
+// function validateDate(input) {
+//     // Agar input khali hai toh kuch mat kar
+//     if (!input || !input.value) {
+//         input?.classList.remove("validation-error");
+//         return;
+//     }
 
-    const section = input.closest(".timesheet-section");
+//     const dateValue = input.value; // YYYY-MM-DD
+
+//     // Section dhundho
+//     const section = input.closest('.timesheet-section');
+//     if (!section) return;
+
+//     // Week dropdown dhundho
+//     const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
+//     if (!weekSelect || !weekSelect.value) {
+//         showPopup("First select Week Period!", true);
+//         input.classList.add("validation-error");
+//         return;
+//     }
+
+//     // weekOptions check karo
+//     if (!window.weekOptions || window.weekOptions.length === 0) {
+//         showPopup("Week data not loaded. Refresh page.", true);
+//         return;
+//     }
+
+//     // Selected week dhundho
+//     const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
+//     if (!selectedWeek) return;
+
+//     // Week ki start aur end date
+//     const weekStart = selectedWeek.start.toISOString().split('T')[0];
+//     const weekEnd = selectedWeek.end.toISOString().split('T')[0];
+
+//     // Agar date week ke bahar hai → ERROR!
+//     if (dateValue < weekStart || dateValue > weekEnd) {
+//         input.classList.add("validation-error");
+//         showPopup(`Invalid Date! Only dates from <strong>${weekStart.split('-').reverse().join('/')} to ${weekEnd.split('-').reverse().join('/')}</strong> are allowed for this week.`, true);
+//     } else {
+//         input.classList.remove("validation-error");
+//     }
+// }
+
+function validateDate(input) {
+    if (!input || !input.value) {
+        input?.classList.remove("validation-error");
+        return;
+    }
+
+    const inputDateStr = input.value;
+
+    // Agar weekOptions abhi load nahi hua → validation skip kar do
+    if (!window.weekOptions || window.weekOptions.length === 0) {
+        input.classList.remove("validation-error");
+        return; // Ab koi popup nahi aayega
+    }
+
+    const section = input.closest('.timesheet-section');
     if (!section) return;
 
     const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-    if (!weekSelect || !weekSelect.value) return;
-
-    // YE LINE SABSE ZAROORI HAI
-    if (!weekOptionsReady || !window.weekOptions || window.weekOptions.length === 0) {
-        return; // Ab koi error nahi aayega
+    if (!weekSelect || !weekSelect.value) {
+        input.classList.remove("validation-error");
+        return;
     }
 
     const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-    if (!selectedWeek || !selectedWeek.start || !selectedWeek.end) return;
-
-    const start = new Date(selectedWeek.start).toISOString().split("T")[0];
-    const end = new Date(selectedWeek.end).toISOString().split("T")[0];
-
-    input.min = start;
-    input.max = end;
-
-    if (input.value < start || input.value > end) {
-        const prettyStart = new Date(start).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-        const prettyEnd = new Date(end).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-        showPopup(`Invalid Date! Must be ${prettyStart} - ${prettyEnd}`, true);
-        input.value = start;
-        input.style.border = "2px solid #e74c3c";
-        setTimeout(() => input.style.border = "", 2000);
+    if (!selectedWeek || !selectedWeek.start || !selectedWeek.end) {
+        input.classList.remove("validation-error");
+        return;
     }
 
-    updateSummary();
+    const inputDate = new Date(inputDateStr);
+    const weekStart = new Date(selectedWeek.start);
+    const weekEnd = new Date(selectedWeek.end);
+
+    inputDate.setHours(0, 0, 0, 0);
+    weekStart.setHours(0, 0, 0, 0);
+    weekEnd.setHours(0, 0, 0, 0);
+
+    if (inputDate < weekStart || inputDate > weekEnd) {
+        input.classList.add("validation-error");
+        const startStr = weekStart.toLocaleDateString('en-GB');
+        const endStr = weekEnd.toLocaleDateString('en-GB');
+        showPopup(`Invalid Date! Only dates from <strong>${startStr}</strong> to <strong>${endStr}</strong> are allowed.`, true);
+    } else {
+        input.classList.remove("validation-error");
+    }
 }
-
-// Backend se week options aane ke baad
-// window.weekOptions = response.weekOptions || [];
-
-
-
-
 
 /* Summary update */
 function updateSummary() {
@@ -3127,35 +3119,6 @@ async function savePayrollWindow(month, year, par_status = "enable") {
 //         input.classList.remove("validation-error");
 //     }
 // }
-
-function validateDate(input) {
-    if (!input) return;
-
-    const section = input.closest(".timesheet-section") || document.getElementById("modalOverlay");
-    if (!section) return;
-
-    const weekSelect = section.querySelector(".week-period select");
-    if (!weekSelect) return;
-
-    const week = weekOptions.find(w => w.value === weekSelect.value);
-    if (!week) return;
-
-    const start = formatDate(new Date(week.start));
-    const end = formatDate(new Date(week.end));
-
-    input.setAttribute("min", start);
-    input.setAttribute("max", end);
-
-    if (input.value < start || input.value > end) {
-        showPopup(`Please select a date within ${start} - ${end}`, true);
-        input.classList.add("validation-error");
-        input.value = start;
-    } else {
-        input.classList.remove("validation-error");
-    }
-}
-
-
 
 
 async function handleExcelUpload(event) {

@@ -944,40 +944,89 @@ function validateTimes(rowOrModal, isModal = false) {
   }
 }
 
-function validateDate(dateInput) {
-  if (!dateInput) return;
-  const section = dateInput.closest(".timesheet-section");
-  const weekSelect = section?.querySelector(".week-period select");
-  const selectedWeek = weekOptions.find(
-    (opt) => opt.value === (weekSelect ? weekSelect.value : "")
-  );
-  if (!selectedWeek) return;
+// function validateDate(dateInput) {
+//   if (!dateInput) return;
+//   const section = dateInput.closest(".timesheet-section");
+//   const weekSelect = section?.querySelector(".week-period select");
+//   const selectedWeek = weekOptions.find(
+//     (opt) => opt.value === (weekSelect ? weekSelect.value : "")
+//   );
+//   if (!selectedWeek) return;
 
-  const inputDateStr = dateInput.value;
-  const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(
-    selectedWeek.start.getMonth() + 1
-  ).padStart(2, "0")}-${String(selectedWeek.start.getDate()).padStart(2, "0")}`;
-  const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(
-    selectedWeek.end.getMonth() + 1
-  ).padStart(2, "0")}-${String(selectedWeek.end.getDate()).padStart(2, "0")}`;
+//   const inputDateStr = dateInput.value;
+//   const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(
+//     selectedWeek.start.getMonth() + 1
+//   ).padStart(2, "0")}-${String(selectedWeek.start.getDate()).padStart(2, "0")}`;
+//   const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(
+//     selectedWeek.end.getMonth() + 1
+//   ).padStart(2, "0")}-${String(selectedWeek.end.getDate()).padStart(2, "0")}`;
 
-  if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
-    dateInput.classList.add("validation-error");
-    showPopup("Please select a date within the selected week", true);
-  } else {
-    dateInput.classList.remove("validation-error");
-  }
+//   if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
+//     dateInput.classList.add("validation-error");
+//     showPopup("Please select a date within the selected week", true);
+//   } else {
+//     dateInput.classList.remove("validation-error");
+//   }
 
-  // Also ensure date is within last 60 days up to yesterday
-  const today = new Date();
-  const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  const minStr = sixtyDaysAgo.toISOString().split("T")[0];
-  const maxStr = yesterday.toISOString().split("T")[0];
-  if (inputDateStr < minStr || inputDateStr > maxStr) {
-    dateInput.classList.add("validation-error");
-    showPopup("Date must be within last 60 days up to yesterday", true);
-  }
+//   // Also ensure date is within last 60 days up to yesterday
+//   const today = new Date();
+//   const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
+//   const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+//   const minStr = sixtyDaysAgo.toISOString().split("T")[0];
+//   const maxStr = yesterday.toISOString().split("T")[0];
+//   if (inputDateStr < minStr || inputDateStr > maxStr) {
+//     dateInput.classList.add("validation-error");
+//     showPopup("Date must be within last 60 days up to yesterday", true);
+//   }
+// }
+
+function validateDate(input) {
+    // Agar input khali hai toh kuch mat kar
+    if (!input || !input.value) {
+        input?.classList.remove("validation-error");
+        return;
+    }
+
+    const dateValue = input.value; // YYYY-MM-DD
+
+    // Section dhundho
+    const section = input.closest('.timesheet-section');
+    if (!section) return;
+
+    // Week dropdown dhundho
+    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
+    if (!weekSelect || !weekSelect.value) {
+        showPopup("First select Week Period!", true);
+        input.classList.add("validation-error");
+        return;
+    }
+
+    // weekOptions check karo
+    if (!window.weekOptions || window.weekOptions.length === 0) {
+        showPopup("Week data not loaded. Refresh page.", true);
+        return;
+    }
+
+    // Selected week dhundho
+    const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
+    if (!selectedWeek) return;
+
+    // Week ki start aur end date
+    const weekStart = selectedWeek.start.toISOString().split('T')[0];
+    const weekEnd = selectedWeek.end.toISOString().split('T')[0];
+
+    // Agar date week ke bahar hai → ERROR!
+    if (dateValue < weekStart || dateValue > weekEnd) {
+        input.classList.add("validation-error");
+        showPopup(`Invalid Date! Only dates from <strong>${weekStart.split('-').reverse().join('/')} to ${weekEnd.split('-').reverse().join('/')}</strong> are allowed for this week.`, true);
+    } else {
+        input.classList.remove("validation-error");
+    }
+}
+
+// Helper function for pretty date
+function formatDate(date) {
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, ' ');
 }
 
 /* Summary update */
@@ -2796,38 +2845,81 @@ async function handleExcelUpload(event) {
   }
 }
 
+// function validateModalDate(dateInput) {
+//     if (!dateInput || !currentRow) return;
+//     const section = currentRow.closest('.timesheet-section');
+//     const weekSelect = section.querySelector('.week-period select');
+//     const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
+//     if (!selectedWeek) return;
+
+//     const inputDateStr = dateInput.value;
+//     console.log("Selected week:", selectedWeek);
+//     const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
+//     const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
+
+//     console.log('Validation check:', inputDateStr, weekStartStr, weekEndStr);
+
+//     if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
+//         dateInput.classList.add('validation-error');
+//         console.log('Validation error on modal date:', inputDateStr, weekStartStr, weekEndStr);
+//         showValidationMessage(dateInput, 'Please select a date within the specified week only.');
+//     } else {
+//         dateInput.classList.remove('validation-error');
+//         clearValidationMessage(dateInput);
+//     }
+
+//     const today = new Date();
+//     const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
+//     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+//     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
+//     const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+//     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
+//         dateInput.classList.add('validation-error');
+//         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+//     }
+// }
+
 function validateModalDate(dateInput) {
     if (!dateInput || !currentRow) return;
-    const section = currentRow.closest('.timesheet-section');
-    const weekSelect = section.querySelector('.week-period select');
-    const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-    if (!selectedWeek) return;
 
-    const inputDateStr = dateInput.value;
-    console.log("Selected week:", selectedWeek);
-    const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
-    const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
-
-    console.log('Validation check:', inputDateStr, weekStartStr, weekEndStr);
-
-    if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
-        dateInput.classList.add('validation-error');
-        console.log('Validation error on modal date:', inputDateStr, weekStartStr, weekEndStr);
-        showValidationMessage(dateInput, 'Please select a date within the specified week only.');
-    } else {
-        dateInput.classList.remove('validation-error');
-        clearValidationMessage(dateInput);
+    const section = currentRow.closest(".timesheet-section");
+    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
+    if (!weekSelect || !weekSelect.value) {
+        showPopup("Please select a week period first!", true);
+        dateInput.classList.add("validation-error");
+        return;
     }
 
+    const selectedWeek = weekOptions.find(w => w.value === weekSelect.value);
+    if (!selectedWeek) return;
+
+    const selectedDate = dateInput.value;
+    const weekStart = new Date(selectedWeek.start);
+    const weekEnd = new Date(selectedWeek.end);
+
+    const weekStartStr = weekStart.toISOString().split("T")[0];
+    const weekEndStr = weekEnd.toISOString().split("T")[0];
+
     const today = new Date();
-    const sixtyDaysAgo = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
-    const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
-    if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
-        dateInput.classList.add('validation-error');
-        showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
+    const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const minDate = sixtyDaysAgo.toISOString().split("T")[0];
+    const maxDate = yesterday.toISOString().split("T")[0];
+
+    let error = null;
+
+    if (selectedDate < weekStartStr || selectedDate > weekEndStr) {
+        error = `Date must be between ${formatDate(weekStart)} and ${formatDate(weekEnd)} only!`;
+    } else if (selectedDate < minDate || selectedDate > maxDate) {
+        error = "Date must be within last 60 days up to yesterday!";
+    }
+
+    if (error) {
+        dateInput.classList.add("validation-error");
+        showPopup(error, true);
+    } else {
+        dateInput.classList.remove("validation-error");
     }
 }
 

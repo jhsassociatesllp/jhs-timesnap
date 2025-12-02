@@ -19,6 +19,11 @@ from passlib.context import CryptContext
 import hashlib
 import json
 from admin import *
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+import requests
+
 
 
 
@@ -33,7 +38,7 @@ app = FastAPI(title="Professional Time Sheet API", version="1.0.0")
 # CORS middleware - Update allow_origins for production security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["jhstimesnap.in"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -238,6 +243,7 @@ async def register(request: RegisterRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must contain at least one special character")
 
     employee = employee_details_collection.find_one({"EmpID": empid})
+    print(employee)
     if not employee:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Employee does not exist")
 
@@ -1123,121 +1129,6 @@ async def get_employee_timesheet(employee_id: str):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-# ============================
-# 🔐 FORGOT PASSWORD FLOW
-# ============================
-from email.mime.text import MIMEText
-import smtplib
-import random
-
-# Temporary OTP store (Mongo collection)
-otp_collection = db["otp_storage"]
-
-# Gmail credentials (use app password)
-EMAIL_USER = "yourcompanyemail@gmail.com"
-EMAIL_PASS = "your_app_password"
-
-def send_email(to_email, subject, body):
-    """Send email via Gmail SMTP"""
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_USER
-    msg["To"] = to_email
-
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, to_email, msg.as_string())
-    except Exception as e:
-        print("❌ Email sending failed:", e)
-        raise HTTPException(status_code=500, detail="Failed to send OTP email")
-
-
-# ✅ 1️⃣ Send OTP
-@app.post("/send-otp")
-async def send_otp(data: dict):
-    empid = data.get("empid", "").strip().upper()
-    if not empid:
-        raise HTTPException(status_code=400, detail="Employee ID is required")
-
-    emp = employee_details_collection.find_one({"EmpID": empid})
-    if not emp:
-        raise HTTPException(status_code=404, detail="Employee not found")
-
-    email = emp.get("Email") or emp.get("email") or emp.get("MailID") or emp.get("OfficialEmail")
-    if not email:
-        raise HTTPException(status_code=400, detail="No email found for this employee")
-
-    otp = str(random.randint(100000, 999999))
-    expiry_time = datetime.utcnow() + timedelta(minutes=1)
-
-    otp_collection.update_one(
-        {"empid": empid},
-        {"$set": {"otp": otp, "expires_at": expiry_time}},
-        upsert=True
-    )
-
-    body = f"Your OTP for password reset is {otp}. It is valid for 1 minute."
-    send_email(email, "Password Reset OTP - Professional Timesheet", body)
-
-    return {"success": True, "message": "OTP sent successfully to your registered email."}
-
-
-# ✅ 2️⃣ Verify OTP
-@app.post("/verify-otp")
-async def verify_otp(data: dict):
-    empid = data.get("empid", "").strip().upper()
-    otp = data.get("otp", "").strip()
-
-    if not empid or not otp:
-        raise HTTPException(status_code=400, detail="Employee ID and OTP are required")
-
-    record = otp_collection.find_one({"empid": empid})
-    if not record:
-        raise HTTPException(status_code=400, detail="OTP not found")
-
-    if record["otp"] != otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-
-    if datetime.utcnow() > record["expires_at"]:
-        raise HTTPException(status_code=400, detail="OTP expired")
-
-    return {"success": True, "message": "OTP verified successfully"}
-
-
-# ✅ 3️⃣ Reset Password
-@app.post("/reset-password")
-async def reset_password(data: dict):
-    empid = data.get("empid", "").strip().upper()
-    new_password = data.get("new_password", "")
-
-    if not empid or not new_password:
-        raise HTTPException(status_code=400, detail="Employee ID and new password are required")
-
-    user = users_collection.find_one({"empid": empid})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not registered")
-
-    # Password validation
-    if len(new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    if not re.search(r'[A-Z]', new_password):
-        raise HTTPException(status_code=400, detail="Must contain uppercase letter")
-    if not re.search(r'[a-z]', new_password):
-        raise HTTPException(status_code=400, detail="Must contain lowercase letter")
-    if not re.search(r'\d', new_password):
-        raise HTTPException(status_code=400, detail="Must contain number")
-    if not re.search(r'[!@#$%^&*(),.?\":{}|<>]', new_password):
-        raise HTTPException(status_code=400, detail="Must contain special character")
-
-    hashed_password = pwd_context.hash(new_password)
-    users_collection.update_one({"empid": empid}, {"$set": {"password": hashed_password}})
-
-    otp_collection.delete_one({"empid": empid})  # cleanup OTP
-
-    return {"success": True, "message": "Password reset successful"}
-
-
 
 
 # Health check endpoint
@@ -1266,20 +1157,6 @@ def add_or_create(collection, reporting_emp_code, reporting_emp_name, employee_c
         collection.insert_one(new_doc)
         print(f"Created new {collection.name} document for {reporting_emp_code} with employee {employee_code}.")
 
-from threading import Thread
-import time
-
-def cleanup_expired_otps():
-    """Deletes expired OTPs every 60 seconds."""
-    while True:
-        now = datetime.utcnow()
-        result = otp_collection.delete_many({"expires_at": {"$lt": now}})
-        if result.deleted_count > 0:
-            print(f"🧹 Cleaned up {result.deleted_count} expired OTP(s) at {now.isoformat()}")
-        time.sleep(60)  # check every 1 minute
-
-# Start cleanup thread in background
-Thread(target=cleanup_expired_otps, daemon=True).start()
 
 
 @app.post("/approve_timesheet")
@@ -1517,3 +1394,112 @@ async def approve_all_timesheets(
         "approved": len(employees_to_approve),
         "message": f"{len(employees_to_approve)} employee(s) approved successfully."
     }
+
+def generate_otp():
+    return str(secrets.randbelow(900000) + 100000)  # 6 digit OTP
+
+def hash_otp(otp: str):
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+def send_otp_email(to_email, otp):
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    payload = {
+        "sender": {"name": "JHSTimesnap", "email": "vasugadde0203@gmail.com"},
+        "to": [{"email": to_email}],
+        "subject": "Your Password Reset OTP",
+        "htmlContent": f"""
+            <h2>Timesnap Password Reset</h2>
+            <p>Your OTP for resetting your password is:</p>
+            <h1 style="font-size: 32px; letter-spacing: 4px;">{otp}</h1>
+            <p>This OTP is valid for 5 minutes.</p>
+        """
+    }
+
+    headers = {
+        "accept": "application/json",
+        "api-key": os.getenv("BREVO_API_KEY"),
+        "content-type": "application/json"
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    return response
+
+@app.post("/forgot-password")
+async def forgot_password(empid: str = Body(...)):
+    empid = empid.strip().upper()
+
+    # get employee email
+    emp = employee_details_collection.find_one({"EmpID": empid})
+    if not emp:
+        raise HTTPException(status_code=400, detail="Employee not found")
+
+    email = emp.get("Email") or emp.get("Personal Email")
+    print(f"Email from databae: {email}")
+    if not email:
+        raise HTTPException(status_code=400, detail="No email associated with this employee")
+
+    # generate OTP
+    otp = generate_otp()
+    hashed = hash_otp(otp)
+    expires = datetime.utcnow() + timedelta(minutes=5)
+
+    # save OTP in DB
+    forgot_password_otps_collection.update_one(
+        {"empid": empid},
+        {
+            "$set": {
+                "empid": empid,
+                "otp_hash": hashed,
+                "expires_at": expires,
+                "created_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+
+    # send email
+    response = send_otp_email(email, otp)
+    if response.status_code != 201:
+        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+
+    return {"success": True, "message": "OTP sent to registered email"}
+
+@app.post("/verify-otp")
+async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
+    empid = empid.strip().upper()
+    record = forgot_password_otps_collection.find_one({"empid": empid})
+
+    if not record:
+        raise HTTPException(status_code=400, detail="OTP not requested")
+
+    if datetime.utcnow() > record["expires_at"]:
+        raise HTTPException(status_code=400, detail="OTP expired")
+
+    if hash_otp(otp) != record["otp_hash"]:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    return {"success": True, "message": "OTP verified"}
+
+@app.post("/reset-password")
+async def reset_password(empid: str = Body(...), password: str = Body(...)):
+    empid = empid.strip().upper()
+
+    # validate password strength
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    hashed_password = pwd_context.hash(password)
+
+    result = users_collection.update_one(
+        {"empid": empid},
+        {"$set": {"password": hashed_password}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=400, detail="Employee not registered")
+
+    # delete OTP after use
+    forgot_password_otps_collection.delete_one({"empid": empid})
+
+    return {"success": True, "message": "Password updated successfully"}
