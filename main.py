@@ -19,6 +19,11 @@ from passlib.context import CryptContext
 import hashlib
 import json
 from admin import *
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+import requests
+
 
 
 
@@ -1388,3 +1393,112 @@ async def approve_all_timesheets(
         "approved": len(employees_to_approve),
         "message": f"{len(employees_to_approve)} employee(s) approved successfully."
     }
+
+def generate_otp():
+    return str(secrets.randbelow(900000) + 100000)  # 6 digit OTP
+
+def hash_otp(otp: str):
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+def send_otp_email(to_email, otp):
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    payload = {
+        "sender": {"name": "JHSTimesnap", "email": "vasugadde0203@gmail.com"},
+        "to": [{"email": to_email}],
+        "subject": "Your Password Reset OTP",
+        "htmlContent": f"""
+            <h2>Timesnap Password Reset</h2>
+            <p>Your OTP for resetting your password is:</p>
+            <h1 style="font-size: 32px; letter-spacing: 4px;">{otp}</h1>
+            <p>This OTP is valid for 5 minutes.</p>
+        """
+    }
+
+    headers = {
+        "accept": "application/json",
+        "api-key": os.getenv("BREVO_API_KEY"),
+        "content-type": "application/json"
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    return response
+
+@app.post("/forgot-password")
+async def forgot_password(empid: str = Body(...)):
+    empid = empid.strip().upper()
+
+    # get employee email
+    emp = employee_details_collection.find_one({"EmpID": empid})
+    if not emp:
+        raise HTTPException(status_code=400, detail="Employee not found")
+
+    email = emp.get("Email") or emp.get("Personal Email")
+    print(f"Email from databae: {email}")
+    if not email:
+        raise HTTPException(status_code=400, detail="No email associated with this employee")
+
+    # generate OTP
+    otp = generate_otp()
+    hashed = hash_otp(otp)
+    expires = datetime.utcnow() + timedelta(minutes=5)
+
+    # save OTP in DB
+    forgot_password_otps_collection.update_one(
+        {"empid": empid},
+        {
+            "$set": {
+                "empid": empid,
+                "otp_hash": hashed,
+                "expires_at": expires,
+                "created_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+
+    # send email
+    response = send_otp_email(email, otp)
+    if response.status_code != 201:
+        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+
+    return {"success": True, "message": "OTP sent to registered email"}
+
+@app.post("/verify-otp")
+async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
+    empid = empid.strip().upper()
+    record = forgot_password_otps_collection.find_one({"empid": empid})
+
+    if not record:
+        raise HTTPException(status_code=400, detail="OTP not requested")
+
+    if datetime.utcnow() > record["expires_at"]:
+        raise HTTPException(status_code=400, detail="OTP expired")
+
+    if hash_otp(otp) != record["otp_hash"]:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    return {"success": True, "message": "OTP verified"}
+
+@app.post("/reset-password")
+async def reset_password(empid: str = Body(...), password: str = Body(...)):
+    empid = empid.strip().upper()
+
+    # validate password strength
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    hashed_password = pwd_context.hash(password)
+
+    result = users_collection.update_one(
+        {"empid": empid},
+        {"$set": {"password": hashed_password}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=400, detail="Employee not registered")
+
+    # delete OTP after use
+    forgot_password_otps_collection.delete_one({"empid": empid})
+
+    return {"success": True, "message": "Password updated successfully"}

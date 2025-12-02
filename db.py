@@ -19,7 +19,7 @@ if not MONGO_CONNECTION_STRING:
 print("MongoDB Connection String:", MONGO_CONNECTION_STRING)
 client = MongoClient(MONGO_CONNECTION_STRING)
 # client = MongoClient("mongodb://mongodb:'Jh$20212'@jhstimesnap_mongo:27017/?authSource=admin")
-db = client["staging_Timesheet"]
+db = client["Timesheets"]
 timesheets_collection = db["Timesheet_data"]
 sessions_collection = db["sessions"]
 employee_details_collection = db["Employee_details"]
@@ -30,4 +30,5 @@ reporting_managers_collection = db["Reporting_managers"]
 pending_collection = db["Pending"]
 approved_collection = db["Approved"]
 rejected_collection = db["Rejected"]
+forgot_password_otps_collection = db["forgot_password_otps"]
 
