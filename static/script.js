@@ -707,7 +707,7 @@ function addRow(sectionId, specificDate = null) {
   if (!tbody) {
     console.error("Table body not found for", sectionId);
     return;
-  }
+  }    
 
   const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
   if (!weekSelect || !weekSelect.value) {
