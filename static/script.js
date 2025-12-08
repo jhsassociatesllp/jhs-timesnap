@@ -582,6 +582,125 @@ function updateExistingRowDates(sectionId) {
 }
 
 /* add a new entry row */
+// function addRow(sectionId, specificDate = null) {
+//   const sectionNum = sectionId.split("_")[1];
+//   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
+//   if (!tbody) {
+//     console.error("Table body not found for", sectionId);
+//     return;
+//   }
+
+//   const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
+//   const selectedWeek = weekOptions.find(
+//     (opt) => opt.value === (weekSelect ? weekSelect.value : "")
+//   );
+//   // const weekDates =
+//   //   selectedWeek && selectedWeek.start ? getWeekDates(selectedWeek.start) : [];
+//   // const defaultDate =
+//   //   specificDate ||
+//   //   (weekDates.length ? weekDates[0] : new Date().toISOString().split("T")[0]);
+  
+// // let defaultDate;
+// // if (specificDate) {
+// //     defaultDate = specificDate;
+// // } else if (selectedWeek && selectedWeek.start) {
+// //     const ws = new Date(selectedWeek.start);
+// //     defaultDate = `${ws.getFullYear()}-${String(ws.getMonth()+1).padStart(2,"0")}-${String(ws.getDate()).padStart(2,"0")}`;
+// // } else {
+// //     defaultDate = new Date().toISOString().split("T")[0];
+// // }
+
+// let defaultDate;
+// if (specificDate) {
+//     defaultDate = specificDate;
+// } else if (selectedWeek && selectedWeek.start && selectedWeek.end) {
+//     // Get the tbody for this section
+//     const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
+//     const existingDateInputs = tbody.querySelectorAll(".date-field");
+
+//     let lastDateStr = null;
+//     if (existingDateInputs.length > 0) {
+//         // Get the last row's date
+//         lastDateStr = existingDateInputs[existingDateInputs.length - 1].value;
+//     }
+
+//     if (lastDateStr) {
+//         // Parse last date and add 1 day
+//         const lastDate = new Date(lastDateStr);
+//         const nextDate = new Date(lastDate);
+//         nextDate.setDate(lastDate.getDate() + 1);
+
+//         // Get week end date
+//         const weekEndDate = new Date(selectedWeek.end);
+
+//         // If nextDate > weekEnd, set to weekEnd
+//         if (nextDate > weekEndDate) {
+//             defaultDate = weekEndDate.toISOString().split("T")[0];
+//         } else {
+//             defaultDate = nextDate.toISOString().split("T")[0];
+//         }
+//     } else {
+//         // No existing rows: use week start
+//         defaultDate = new Date(selectedWeek.start).toISOString().split("T")[0];
+//     }
+// } else {
+//     defaultDate = new Date().toISOString().split("T")[0];
+// }
+
+
+//   const rowIndex = tbody.querySelectorAll("tr").length + 1;
+//   const tr = document.createElement("tr");
+//   tr.innerHTML = `
+//   <td class="col-sno">${rowIndex}</td>
+//   <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
+//   <td class="col-action">
+//     <button class="copy-btn" onclick="copyRow(this)"><i class="fas fa-copy"></i> Copy</button>
+//     <button class="paste-btn" onclick="pasteRow(this)"><i class="fas fa-paste"></i> Paste</button>
+//   </td>
+//   <td class="col-date form-input"><input type="date" class="date-field form-input" value="${defaultDate}" onchange="validateDate(this); updateSummary()"></td>
+//   <td class="col-location">
+//     <select class="location-select form-input" onchange="updateSummary()">
+//       <option value="Office">Office</option>
+//       <option value="Client Site">Client Site</option>
+//       <option value="Work From Home">Work From Home</option>
+//       <option value="Field Work">Field Work</option>
+//     </select>
+//   </td>
+
+//   <!-- NEW: Punch In / Punch Out / Working Hours -->
+//   <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
+//   <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
+//   <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+//   <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+//   <td class="col-client form-input "><input type="text" class="client-field form-input" placeholder="Enter Client"></td>
+//   <td class="col-project"><input type="text" class="project-field form-input" placeholder="Enter Project"></td>
+//   <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code"></td>
+//   <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
+//   <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
+//   <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
+//    <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
+//   <td class="col-billable">
+//     <select class="billable-select form-input" onchange="updateSummary()">
+//       <option value="Yes">Billable</option>
+//       <option value="No">Non-Billable</option>
+//     </select>
+//   </td>
+//   <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
+//   <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
+// `;
+
+//   tbody.appendChild(tr);
+
+//   // const dateInput = tr.querySelector(".date-field");
+//   // if (dateInput) validateDate(dateInput);
+//   const dateInput = tr.querySelector(".date-field");
+// if (dateInput && window.weekOptions && window.weekOptions.length > 0) {
+//     setTimeout(() => validateDate(dateInput), 500); // Thoda delay to ensure weekOptions ready
+// }
+//   updateRowNumbers(tbody.id);
+//   updateSummary();
+// }
+
 function addRow(sectionId, specificDate = null) {
   const sectionNum = sectionId.split("_")[1];
   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
@@ -591,147 +710,92 @@ function addRow(sectionId, specificDate = null) {
   }
 
   const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
-  const selectedWeek = weekOptions.find(
-    (opt) => opt.value === (weekSelect ? weekSelect.value : "")
-  );
-  // const weekDates =
-  //   selectedWeek && selectedWeek.start ? getWeekDates(selectedWeek.start) : [];
-  // const defaultDate =
-  //   specificDate ||
-  //   (weekDates.length ? weekDates[0] : new Date().toISOString().split("T")[0]);
-  let defaultDate;
+  if (!weekSelect || !weekSelect.value) {
+    showPopup("Please select a week period first!", true);
+    return;
+  }
 
-if (specificDate) {
-    defaultDate = specificDate;
-} else if (selectedWeek && selectedWeek.start) {
-    const ws = new Date(selectedWeek.start);
-    defaultDate = `${ws.getFullYear()}-${String(ws.getMonth()+1).padStart(2,"0")}-${String(ws.getDate()).padStart(2,"0")}`;
-} else {
-    defaultDate = new Date().toISOString().split("T")[0];
-}
+  const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
+  if (!selectedWeek) {
+    showPopup("Invalid week selected", true);
+    return;
+  }
 
+  const weekStart = new Date(selectedWeek.start);
+  const weekEnd = new Date(selectedWeek.end);
+
+  // Step 1: Find the last used date in THIS section only
+  const dateInputs = tbody.querySelectorAll(".date-field");
+  let nextDate;
+
+  if (dateInputs.length === 0) {
+    // First row → use week start
+    nextDate = new Date(weekStart);
+  } else {
+    // Get last row's date
+    const lastInput = dateInputs[dateInputs.length - 1];
+    const lastDate = new Date(lastInput.value || weekStart);
+    nextDate = new Date(lastDate);
+    nextDate.setDate(lastDate.getDate() + 1); // +1 day
+  }
+
+  // Step 2: If nextDate is beyond week end → set to week end
+  if (nextDate > weekEnd) {
+    nextDate = new Date(weekEnd);
+  }
+
+  // Step 3: Format as YYYY-MM-DD
+  const defaultDate = nextDate.toISOString().split("T")[0];
 
   const rowIndex = tbody.querySelectorAll("tr").length + 1;
   const tr = document.createElement("tr");
   tr.innerHTML = `
-  <td class="col-sno">${rowIndex}</td>
-  <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
-  <td class="col-action">
-    <button class="copy-btn" onclick="copyRow(this)"><i class="fas fa-copy"></i> Copy</button>
-    <button class="paste-btn" onclick="pasteRow(this)"><i class="fas fa-paste"></i> Paste</button>
-  </td>
-  <td class="col-date form-input"><input type="date" class="date-field form-input" value="${defaultDate}" onchange="validateDate(this); updateSummary()"></td>
-  <td class="col-location">
-    <select class="location-select form-input" onchange="updateSummary()">
-      <option value="Office">Office</option>
-      <option value="Client Site">Client Site</option>
-      <option value="Work From Home">Work From Home</option>
-      <option value="Field Work">Field Work</option>
-    </select>
-  </td>
-
-  <!-- NEW: Punch In / Punch Out / Working Hours -->
-  <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
-  <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
-  <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-  <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-  <td class="col-client form-input "><input type="text" class="client-field form-input" placeholder="Enter Client"></td>
-  <td class="col-project"><input type="text" class="project-field form-input" placeholder="Enter Project"></td>
-  <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code"></td>
-  <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
-  <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
-  <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
-   <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
-  <td class="col-billable">
-    <select class="billable-select form-input" onchange="updateSummary()">
-      <option value="Yes">Billable</option>
-      <option value="No">Non-Billable</option>
-    </select>
-  </td>
-  <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
-  <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
-`;
+    <td class="col-sno">${rowIndex}</td>
+    <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
+    <td class="col-action">
+      <button class="copy-btn" onclick="copyRow(this)">Copy</button>
+      <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
+    </td>
+    <td class="col-date form-input">
+      <input type="date" class="date-field form-input" value="${defaultDate}" onchange="validateDate(this); updateSummary()">
+    </td>
+    <td class="col-location">
+      <select class="location-select form-input" onchange="updateSummary()">
+        <option value="Office">Office</option>
+        <option value="Client Site">Client Site</option>
+        <option value="Work From Home">Work From Home</option>
+        <option value="Field Work">Field Work</option>
+      </select>
+    </td>
+    <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
+    <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
+    <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+    <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+    <td class="col-client form-input "><input type="text" class="client-field form-input" placeholder="Enter Client"></td>
+    <td class="col-project"><input type="text" class="project-field form-input" placeholder="Enter Project"></td>
+    <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code"></td>
+    <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
+    <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
+    <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
+    <td class="col-billable">
+      <select class="billable-select form-input" onchange="updateSummary()">
+        <option value="Yes">Billable</option>
+        <option value="No">Non-Billable</option>
+      </select>
+    </td>
+    <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
+    <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
+  `;
 
   tbody.appendChild(tr);
 
-  // const dateInput = tr.querySelector(".date-field");
-  // if (dateInput) validateDate(dateInput);
-  const dateInput = tr.querySelector(".date-field");
-if (dateInput && window.weekOptions && window.weekOptions.length > 0) {
-    setTimeout(() => validateDate(dateInput), 500); // Thoda delay to ensure weekOptions ready
-}
+  // Auto focus first input
+  setTimeout(() => tr.querySelector("input, select")?.focus(), 100);
+
   updateRowNumbers(tbody.id);
   updateSummary();
 }
-
-// function addRow(sectionId) {
-//     const tbody = document.getElementById(`timesheetBody_${sectionId.split('_')[1]}`);
-//     if (!tbody) return;
-
-//     const weekSelect = document.getElementById(`weekPeriod_${sectionId.split('_')[1]}`);
-//     if (!weekSelect) return;
-
-//     let defaultDate = new Date().toISOString().split('T')[0];
-//     let minDate = "";
-//     let maxDate = "";
-
-//     // Safe check – agar weekOptions load nahi hua ya empty hai to crash nahi hoga
-//     if (window.weekOptions && Array.isArray(window.weekOptions) && weekSelect.value) {
-//         const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-//         if (selectedWeek && selectedWeek.start && selectedWeek.end) {
-//             const start = new Date(selectedWeek.start);
-//             const end = new Date(selectedWeek.end);
-            
-//             defaultDate = start.toISOString().split('T')[0];
-//             minDate = defaultDate;
-//             maxDate = end.toISOString().split('T')[0];
-//         }
-//     }
-
-
-//     const rowCount = tbody.rows.length + 1;
-//     const row = document.createElement('tr');
-//     row.innerHTML = `
-//         <td class="col-sno" style="min-width: 60px;">${rowCount}</td>
-//         <td class="col-add" style="min-width: 60px;"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
-//         <td class="col-action" style="min-width: 120px;">
-//             <button class="copy-btn" onclick="copyRow(this)">Copy</button>
-//             <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
-//         </td>
-//         <td class="col-date" style="min-width: 120px;">
-//             <input type="date" value="${defaultDate}" class="date-field form-input"
-//                    min="${minDate}" max="${maxDate}"
-//                    onchange="validateDate(this); updateSummary()">
-//         </td>
-//         <td class="clo-location" style="min-width: 200px;"><select class="location-select form-input" onchange="updateSummary()">
-//             <option value="Office">Office</option>
-//             <option value="Client Site">Client Site</option>
-//             <option value="Work From Home">Work From Home</option>
-//             <option value="Field Work">Field Work</option>
-//         </select></td>
-//         <td class="col-punch-in" style="min-width: 120px;"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//         <td class="col-punch-out" style="min-width: 120px;"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//         <td class="col-project-start" style="min-width: 120px;"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//         <td class="col-project-end" style="min-width: 120px;"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//         <td class="col-client" style="min-width: 250px;"><input type="text" class="client-field form-input" placeholder="Enter Client" oninput="updateSummary()"></td>
-//         <td class="col-project" style="min-width: 200px;"><input type="text" class="project-field form-input" placeholder="Enter Project" oninput="updateSummary()"></td>
-//         <td class="col-project-code" style="min-width: 200px;"><input type="text" class="project-code form-input" placeholder="Enter Project Code" oninput="updateSummary()"></td>
-//         <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager" onchange="updateSummary()"></td>
-//         <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
-//         <td class="col-project-hours" style="min-width: 80px;"><input type="number" class="project-hours-field form-input" readonly></td>
-//         <td class="col-working-hours" style="min-width: 80px;"><input type="number" class="working-hours-field form-input" readonly></td>
-//         <td class="col-billable" style="min-width: 120px;"><select class="billable-select form-input" onchange="updateSummary()">
-//             <option value="Yes">Billable</option>
-//             <option value="No">Non-Billable</option>
-//         </select></td>
-//         <td class="col-remarks" style="min-width: 200px;"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
-//         <td class="col-delete" style="min-width: 80px;"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
-//     `;
-
-//     tbody.appendChild(row);
-//     updateSummary();
-// }
-
 
 /* utility to create 7 daily dates from a week start */
 function getWeekDates(startDate) {
@@ -799,7 +863,6 @@ function calculateHours(row) {
   calculateWorkingHours(row);
   updateSummary();
 }
-
 
 function calculateWorkingHours(row) {
   if (!row) return;
@@ -897,51 +960,6 @@ function validateTimes(rowOrModal, isModal = false) {
     return true;
   }
 }
-
-
-// function validateDate(input) {
-//     // Agar input khali hai toh kuch mat kar
-//     if (!input || !input.value) {
-//         input?.classList.remove("validation-error");
-//         return;
-//     }
-
-//     const dateValue = input.value; // YYYY-MM-DD
-
-//     // Section dhundho
-//     const section = input.closest('.timesheet-section');
-//     if (!section) return;
-
-//     // Week dropdown dhundho
-//     const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-//     if (!weekSelect || !weekSelect.value) {
-//         showPopup("First select Week Period!", true);
-//         input.classList.add("validation-error");
-//         return;
-//     }
-
-//     // weekOptions check karo
-//     if (!window.weekOptions || window.weekOptions.length === 0) {
-//         showPopup("Week data not loaded. Refresh page.", true);
-//         return;
-//     }
-
-//     // Selected week dhundho
-//     const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-//     if (!selectedWeek) return;
-
-//     // Week ki start aur end date
-//     const weekStart = selectedWeek.start.toISOString().split('T')[0];
-//     const weekEnd = selectedWeek.end.toISOString().split('T')[0];
-
-//     // Agar date week ke bahar hai → ERROR!
-//     if (dateValue < weekStart || dateValue > weekEnd) {
-//         input.classList.add("validation-error");
-//         showPopup(`Invalid Date! Only dates from <strong>${weekStart.split('-').reverse().join('/')} to ${weekEnd.split('-').reverse().join('/')}</strong> are allowed for this week.`, true);
-//     } else {
-//         input.classList.remove("validation-error");
-//     }
-// }
 
 function validateDate(input) {
     if (!input || !input.value) {
