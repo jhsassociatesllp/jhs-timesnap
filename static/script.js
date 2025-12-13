@@ -1147,6 +1147,38 @@ function openModal(button) {
   }
 }
 
+function updateModalHours() {
+    if (!currentRow) return;
+    const projectStart = document.getElementById('modalInput5').value;
+    const projectEnd = document.getElementById('modalInput6').value;
+    const punchIn = document.getElementById('modalInput3').value;
+    const punchOut = document.getElementById('modalInput4').value;
+
+    let projectHours = 0;
+    if (projectStart && projectEnd) {
+        const [startH, startM] = projectStart.split(':').map(Number);
+        const [endH, endM] = projectEnd.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        projectHours = (endMinutes - startMinutes) / 60;
+        if (projectHours < 0) projectHours += 24;
+        projectHours = projectHours.toFixed(2);
+    }
+
+    let workingHours = 0;
+    if (punchIn && punchOut) {
+        const [inH, inM] = punchIn.split(':').map(Number);
+        const [outH, outM] = punchOut.split(':').map(Number);
+        const inMinutes = inH * 60 + inM;
+        const outMinutes = outH * 60 + outM;
+        workingHours = (outMinutes - inMinutes) / 60;
+        if (workingHours < 0) workingHours += 24;
+        workingHours = workingHours.toFixed(2);
+    }
+
+    document.getElementById('modalInput12').value = projectHours;
+    document.getElementById('modalInput13').value = workingHours;
+}
 
 function closeModal() {
   const modal = document.getElementById("modalOverlay");
