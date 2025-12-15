@@ -509,11 +509,6 @@ if (window.weekOptions && window.weekOptions.length > 0) {
 }
 
 
-
-
-
-
-
 /* populate header employee fields */
 function populateEmployeeInfo() {
   if (!loggedInEmployeeId) return;
