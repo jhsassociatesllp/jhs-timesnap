@@ -16,7 +16,6 @@ let currentEntryId = null;
 let historyEntries = [];
 
 
-
 // Ye variable bana de top me
 let weekOptionsReady = false;
 window.weekOptions = [];
@@ -1089,6 +1088,8 @@ function openModal(button) {
   isEditingHistory = false;
   currentRow = button.closest("tr");
 
+   currentEntryId = currentRow.getAttribute("data-entry-id");
+
   const modalOverlay = document.getElementById("modalOverlay");
   if (!modalOverlay) {
     showPopup("Modal not available in layout. Please add modalOverlay div.", true);
@@ -1693,18 +1694,21 @@ function editHistoryRow(button, entryId) {
   const cells = row.querySelectorAll("td");
   const modalInputs = modal.querySelectorAll("input, select, textarea");
   try {
-    modalInputs[0].value = cells[2].textContent.trim(); // date
-    modalInputs[1].value = cells[3].textContent.trim(); // location
-    modalInputs[2].value = cells[4].textContent.trim(); // projectStartTime
-    modalInputs[3].value = cells[5].textContent.trim(); // projectEndTime
-    modalInputs[4].value = cells[6].textContent.trim(); // client
-    modalInputs[5].value = cells[7].textContent.trim(); // project
-    modalInputs[6].value = cells[8].textContent.trim(); // projectCode
-    modalInputs[7].value = cells[9].textContent.trim(); // reportingManagerEntry
-    modalInputs[8].value = cells[10].textContent.trim(); // activity
-    modalInputs[9].value = cells[11].textContent.trim(); // projectHours
-    modalInputs[10].value = cells[12].textContent.trim(); // billable
-    modalInputs[11].value = cells[13].textContent.trim(); // remarks
+    document.getElementById("modalInput1").value = cells[2].textContent.trim();  // Date
+    document.getElementById("modalInput2").value = cells[3].textContent.trim();  // Location
+    document.getElementById("modalInput3").value = cells[4].textContent.trim();  // Punch In
+    document.getElementById("modalInput4").value = cells[5].textContent.trim();  // Punch Out
+    document.getElementById("modalInput5").value = cells[6].textContent.trim();  // Project Start
+    document.getElementById("modalInput6").value = cells[7].textContent.trim();  // Project End
+    document.getElementById("modalInput7").value = cells[8].textContent.trim();  // Client
+    document.getElementById("modalInput8").value = cells[9].textContent.trim();  // Project
+    document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Project Code
+    document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Reporting Manager
+    document.getElementById("modalInput11").value = cells[12].textContent.trim(); // Activity
+    document.getElementById("modalInput13").value = cells[13].textContent.trim(); // Working Hours
+    document.getElementById("modalInput12").value = cells[14].textContent.trim(); // Project Hours
+    document.getElementById("modalInput14").value = cells[15].textContent.trim(); // Billable
+    document.getElementById("modalInput15").value = cells[16].textContent.trim(); // Remarks
   } catch (err) {
     console.warn("Mapping modal inputs failed", err);
   }
@@ -1733,18 +1737,21 @@ function updateHistoryEntry() {
   }
   const inputs = modal.querySelectorAll("input, select, textarea");
   const updatePayload = {
-    date: inputs[0].value,
-    location: inputs[1].value,
-    projectStartTime: inputs[2].value,
-    projectEndTime: inputs[3].value,
-    client: inputs[4].value,
-    project: inputs[5].value,
-    projectCode: inputs[6].value,
-    reportingManagerEntry: inputs[7].value,
-    activity: inputs[8].value,
-    projectHours: inputs[9].value,
-    billable: inputs[10].value,
-    remarks: inputs[11].value,
+    date: document.getElementById("modalInput1").value,
+    location: document.getElementById("modalInput2").value,
+    punchIn: document.getElementById("modalInput3").value,
+    punchOut: document.getElementById("modalInput4").value,
+    projectStartTime: document.getElementById("modalInput5").value,
+    projectEndTime: document.getElementById("modalInput6").value,
+    client: document.getElementById("modalInput7").value,
+    project: document.getElementById("modalInput8").value,
+    projectCode: document.getElementById("modalInput9").value,
+    reportingManagerEntry: document.getElementById("modalInput10").value,
+    activity: document.getElementById("modalInput11").value,
+    projectHours: document.getElementById("modalInput12").value,
+    workingHours: document.getElementById("modalInput13").value,
+    billable: document.getElementById("modalInput14").value,
+    remarks: document.getElementById("modalInput15").value,
   };
 
   showLoading("Updating entry...");

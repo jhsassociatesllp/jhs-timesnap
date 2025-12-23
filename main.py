@@ -119,10 +119,10 @@ class LoginRequest(BaseModel):
 class UpdateTimesheetRequest(BaseModel):
     date: str
     location: Optional[str] = None
-    projectStartTime: Optional[str] = None
-    projectEndTime: Optional[str] = None
     punchIn: Optional[str] = None
     punchOut: Optional[str] = None
+    projectStartTime: Optional[str] = None
+    projectEndTime: Optional[str] = None
     client: Optional[str] = None
     project: Optional[str] = None
     projectCode: Optional[str] = None
@@ -811,10 +811,10 @@ async def update_timesheet(employee_id: str, entry_id: str, update_data: UpdateT
                                 updated_entry = {
                                     "date": update_data.date or entry.get("date", ""),
                                     "location": update_data.location or entry.get("location", ""),
-                                    "projectStartTime": update_data.projectStartTime or entry.get("projectStartTime", ""),
-                                    "projectEndTime": update_data.projectEndTime or entry.get("projectEndTime", ""),
                                     "punchIn": update_data.punchIn or entry.get("punchIn", ""),
                                     "punchOut": update_data.punchOut or entry.get("punchOut", ""),
+                                    "projectStartTime": update_data.projectStartTime or entry.get("projectStartTime", ""),
+                                    "projectEndTime": update_data.projectEndTime or entry.get("projectEndTime", ""),
                                     "client": update_data.client or entry.get("client", ""),
                                     "project": update_data.project or entry.get("project", ""),
                                     "projectCode": update_data.projectCode or entry.get("projectCode", ""),
@@ -825,7 +825,7 @@ async def update_timesheet(employee_id: str, entry_id: str, update_data: UpdateT
                                     "billable": update_data.billable or entry.get("billable", ""),
                                     "remarks": update_data.remarks or entry.get("remarks", ""),
                                     "updated_time": now_iso,
-                                    "id": entry_id  # Keep the same ID
+                                    "id": entry_id
                                 }
                                 
                                 # Replace the entry in the array
@@ -941,7 +941,7 @@ async def delete_timesheet(employee_id: str, entry_id: str, current_user: str = 
                         new_entries = [entry for entry in week_entries if entry.get("id") != entry_id]
                         if len(new_entries) != len(week_entries):
                             entry_found = True
-                        if new_entries:  # Only add if not empty
+                        if new_entries:  
                             new_week_obj[week_period] = new_entries
                 if new_week_obj:
                     new_data.append(new_week_obj)
