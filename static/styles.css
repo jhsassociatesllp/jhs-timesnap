@@ -527,34 +527,14 @@ body {
 .summary-item:nth-child(2) { --index: 2; }
 .summary-item:nth-child(3) { --index: 3; }
 
-/* .feedback-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-    margin: 2rem 0;
-    padding: 2rem;
-    background: var(--light-bg);
-    border-radius: 15px;
-    border-left: 5px solid #2ecc71;
-    box-shadow: var(--shadow-light);
-}
 
-.feedback-item {
-    display: flex;
-    flex-direction: column;
-    padding: 1.5rem;
-    background: white;
-    border-radius: 10px;
-    box-shadow: var(--shadow-light);
-    transition: var(--transition);
-} */
 
 .feedback-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 2rem; /* Increased spacing between boxes */
-    margin: 3rem 0; /* More breathing room above and below */
-    padding: 2.5rem; /* Slightly larger padding inside */
+    gap: 2rem;
+    margin: 3rem 0;
+    padding: 2.5rem; 
     background: var(--light-bg);
     border-radius: 15px;
     border-left: 6px solid #2ecc71;
@@ -564,7 +544,7 @@ body {
 .feedback-item {
     display: flex;
     flex-direction: column;
-    padding: 2rem; /* more padding inside each card */
+    padding: 2rem; 
     background: white;
     border-radius: 12px;
     box-shadow: var(--shadow-light);
@@ -1410,3 +1390,73 @@ body {
 .action-btn{
    margin: 10px;
 }
+
+/* ========================================
+   ✅ DATE VALIDATION CSS - ADD TO END OF STYLES.CSS
+   Copy this entire section and paste at the END of your styles.css file
+   ======================================== */
+
+/* Enhanced date input validation error styling */
+.date-field.validation-error {
+    border: 2px solid #ff4444 !important;
+    background-color: #fff5f5 !important;
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Date input focus when valid */
+.date-field:not(.validation-error):focus {
+    border-color: #4CAF50;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Enhanced validation message styling */
+.validation-message {
+    color: #ff4444;
+    font-size: 11px;
+    margin-top: 4px;
+    display: block;
+    font-weight: 500;
+    text-align: left;
+    padding: 4px 8px;
+    background: #fff5f5;
+    border-radius: 4px;
+    border-left: 3px solid #ff4444;
+    animation: slideInLeft 0.3s ease-out;
+}
+
+/* Slide-in animation for validation messages */
+@keyframes slideInLeft {
+    from { 
+        opacity: 0; 
+        transform: translateX(-10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateX(0); 
+    }
+}
+
+/* Date input when valid */
+input[type="date"]:valid:not(.validation-error) {
+    border-color: #28a745;
+}
+
+/* Date input when invalid (HTML5 validation) */
+input[type="date"]:invalid {
+    border-color: #ff9800;
+}
+
+/* Date input hover state */
+input[type="date"]:hover {
+    border-color: #999;
+}
+
+/* Make validation messages more visible in table cells */
+.timesheet-table td {
+    position: relative;
+}
+
+/* ========================================
+   END OF DATE VALIDATION CSS
+   ======================================== */
