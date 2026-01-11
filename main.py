@@ -990,6 +990,79 @@ async def check_reporting_manager(emp_code: str, current_user: str = Depends(get
 #     reporting_emp_code = current_user
 #     return get_employees_by_status(reporting_emp_code.strip(), "Pending")
 
+def get_employees_by_status(reporting_emp_code: str, status: str):
+    """
+    Helper function to get employees by status (Pending/Approved/Rejected)
+    """
+    try:
+        reporting_emp_code = reporting_emp_code.strip().upper()
+        
+        # Select collection
+        if status == "Pending":
+            collection = pending_collection
+        elif status == "Approved":
+            collection = approved_collection
+        elif status == "Rejected":
+            collection = rejected_collection
+        else:
+            return {"employees": [], "message": f"Invalid status: {status}"}
+        
+        print(f"🔍 Fetching {status} employees for manager: {reporting_emp_code}")
+        
+        # Find manager's document
+        manager_doc = collection.find_one({"ReportingEmpCode": reporting_emp_code})
+        
+        if not manager_doc:
+            print(f"⚠️ No {status} document found for manager {reporting_emp_code}")
+            return {"employees": [], "message": f"No {status} employees found"}
+        
+        employee_codes = manager_doc.get("EmployeesCodes", [])
+        print(f"📋 Found {len(employee_codes)} employee codes: {employee_codes}")
+        
+        if not employee_codes:
+            return {"employees": [], "message": f"No {status} employees"}
+        
+        # Fetch timesheet data for each employee
+        employees_data = []
+        
+        for emp_code in employee_codes:
+            timesheet = timesheets_collection.find_one(
+                {"employeeId": emp_code},
+                {"_id": 0}
+            )
+            
+            if timesheet:
+                employees_data.append({
+                    "employeeId": emp_code,
+                    "timesheetData": {
+                        "employeeName": timesheet.get("employeeName", "N/A"),
+                        "designation": timesheet.get("designation", "N/A"),
+                        "totalHours": timesheet.get("totalHours", 0),
+                        "totalBillableHours": timesheet.get("totalBillableHours", 0),
+                        "totalNonBillableHours": timesheet.get("totalNonBillableHours", 0)
+                    }
+                })
+            else:
+                emp_details = employee_details_collection.find_one({"EmpID": emp_code})
+                employees_data.append({
+                    "employeeId": emp_code,
+                    "timesheetData": {
+                        "employeeName": emp_details.get("Emp Name", "N/A") if emp_details else "N/A",
+                        "designation": emp_details.get("Designation Name", "N/A") if emp_details else "N/A",
+                        "totalHours": 0,
+                        "totalBillableHours": 0,
+                        "totalNonBillableHours": 0
+                    }
+                })
+        
+        print(f"✅ Returning {len(employees_data)} employees for {status}")
+        return {"employees": employees_data, "count": len(employees_data)}
+        
+    except Exception as e:
+        print(f"❌ Error in get_employees_by_status: {e}")
+        return {"employees": [], "error": str(e)}
+
+
 @app.get("/get_pending_employees/{reporting_emp_code}")
 async def get_pending_employees(reporting_emp_code: str, current_user: str = Depends(get_current_user)):
     """
@@ -1040,15 +1113,7 @@ async def get_employee_timesheet(employee_id: str):
         doc = timesheets_collection.find_one({"employeeId": employee_id}, {"_id": 0})
         if not doc:
             raise HTTPException(status_code=404, detail=f"No timesheet found for employee {employee_id}")
-        # data = {
-        #     "employee_id": doc.get("employeeId"),
-        #     "employee_name": doc.get("employeeName"),
-        #     "designation": doc.get("designation"),
-        #     "gender": doc.get("gender"),
-        #     "partner": doc.get("partner"),
-        #     "reporting_manager": doc.get("reportingManager")
-        # }
-        # print(data)
+        
         # Nested data flatten karo
         flattened_entries = []
         for week_item in doc.get("Data", []):
@@ -1058,16 +1123,19 @@ async def get_employee_timesheet(employee_id: str):
                         flattened_entries.append({
                             "weekPeriod": week_period,
                             "date": entry.get("date", ""),
+                            "location": entry.get("location", ""),
+                            "projectStartTime": entry.get("projectStartTime", ""),
+                            "projectEndTime": entry.get("projectEndTime", ""),
                             "client": entry.get("client", ""),
                             "project": entry.get("project", ""),
+                            "projectCode": entry.get("projectCode", ""),
+                            "reportingManagerEntry": entry.get("reportingManagerEntry", ""),
                             "activity": entry.get("activity", ""),
-                            "location": entry.get("location", ""),
-                            "start_time": entry.get("projectStartTime", ""),
-                            "end_time": entry.get("projectEndTime", ""),
-                            "hours": entry.get("projectHours", ""),
+                            "projectHours": entry.get("projectHours", ""),
                             "billable": entry.get("billable", ""),
                             "remarks": entry.get("remarks", "")
                         })
+        
         # Ye response frontend ko milega
         return {
             "employee_id": doc.get("employeeId"),
@@ -1090,7 +1158,6 @@ async def get_employee_timesheet(employee_id: str):
     except Exception as e:
         print(f"Error in get_employee_timesheet for {employee_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
 
 
 

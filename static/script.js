@@ -6,7 +6,8 @@ let currentRow = null;
 let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem('loggedInEmployeeId');
 let copiedData = null; // Store copied row data
-const API_URL = '';
+// const API_URL = '';
+const API_URL = 'http://localhost:8000';
 // const API_URL = window.location.origin;
 let isEditingHistory = false;
 let currentEntryId = null;
@@ -74,6 +75,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
+// ===========================
+// PENDING SECTION - Has Approve & Reject buttons
+// ===========================
 async function loadPendingData() {
     try {
         showLoading("Loading Pending Employees...");
@@ -91,24 +95,34 @@ async function loadPendingData() {
             tbody.innerHTML = '<tr><td colspan="3">No pending approvals</td></tr>';
         } else {
             data.employees.forEach(emp => {
-                const row = `
-                    <tr>
-                        <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
-                        <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                            <button class="action-btn approve-btn" onclick="approveEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                            <button class="action-btn delete-btn" onclick="rejectEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
-                                <i class="fas fa-times"></i> Reject
-                            </button>
-                        </td>
-                    </tr>
+                const tr = document.createElement('tr');
+                tr.id = `pending-row-${emp.employeeId}`;
+                
+                tr.innerHTML = `
+                    <td>${emp.employeeId}</td>
+                    <td>
+                        <a href="javascript:void(0)" 
+                           onclick="viewEmployeeDetails('${emp.employeeId}')" 
+                           style="color: #3498db; text-decoration: none; font-weight: 500; cursor: pointer;"
+                           onmouseover="this.style.textDecoration='underline'" 
+                           onmouseout="this.style.textDecoration='none'">
+                            ${emp.timesheetData?.employeeName || 'N/A'}
+                        </a>
+                    </td>
+                    <td style="min-width: 200px;">
+                        <button class="action-btn approve-btn" 
+                                onclick="approveEmployee('${loggedInEmployeeId}', '${emp.employeeId}')"
+                                style="margin-right: 10px;">
+                            <i class="fas fa-check"></i> Approve
+                        </button>
+                        <button class="action-btn delete-btn" 
+                                onclick="rejectEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    </td>
                 `;
-                tbody.innerHTML += row;
+                
+                tbody.appendChild(tr);
             });
         }
         hideLoading();
@@ -119,6 +133,9 @@ async function loadPendingData() {
     }
 }
 
+// ===========================
+// APPROVED SECTION - Has Reject button only
+// ===========================
 async function loadApprovedData() {
     try {
         showLoading("Loading Approved Employees...");
@@ -137,12 +154,21 @@ async function loadApprovedData() {
         } else {
             data.employees.forEach(emp => {
                 const row = `
-                    <tr>
+                    <tr id="approved-row-${emp.employeeId}">
                         <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
                         <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
+                            <a href="javascript:void(0)" 
+                               onclick="viewEmployeeDetails('${emp.employeeId}')" 
+                               style="color:#27ae60;text-decoration:none;font-weight:500;cursor:pointer"
+                               onmouseover="this.style.textDecoration='underline'" 
+                               onmouseout="this.style.textDecoration='none'">
+                                ${emp.timesheetData?.employeeName || 'N/A'}
+                            </a>
+                        </td>
+                        <td style="min-width:120px">
+                            <button class="action-btn delete-btn" 
+                                    onclick="rejectEmployee('${loggedInEmployeeId}','${emp.employeeId}')">
+                                <i class="fas fa-times"></i> Reject
                             </button>
                         </td>
                     </tr>
@@ -158,73 +184,9 @@ async function loadApprovedData() {
     }
 }
 
-async function loadRejectedData() {
-    try {
-        showLoading("Loading Rejected Employees...");
-        const response = await fetch(`${API_URL}/get_rejected_employees/${loggedInEmployeeId}`, {
-            headers: getHeaders()
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch rejected employees');
-        
-        const data = await response.json();
-        const tbody = document.getElementById('rejectedTableBody');
-        tbody.innerHTML = '';
-        
-        if (!data.employees || data.employees.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3">No rejected employees</td></tr>';
-        } else {
-            data.employees.forEach(emp => {
-                const row = `
-                    <tr>
-                        <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
-                        <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        }
-        hideLoading();
-    } catch (error) {
-        console.error('Error loading rejected data:', error);
-        hideLoading();
-        showPopup('Failed to load rejected employees', true);
-    }
-}
-
-async function approveEmployee(managerCode, employeeCode) {
-    try {
-        showLoading("Approving...");
-        const response = await fetch(`${API_URL}/approve_timesheet`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
-                reporting_emp_code: managerCode,
-                employee_code: employeeCode
-            })
-        });
-        
-        const result = await response.json();
-        hideLoading();
-        
-        if (result.success) {
-            showPopup('Employee approved successfully!');
-            await loadPendingData(); // Refresh the list
-        } else {
-            showPopup('Failed to approve employee', true);
-        }
-    } catch (error) {
-        console.error('Error approving employee:', error);
-        hideLoading();
-        showPopup('Failed to approve employee', true);
-    }
-}
-
+// ===========================
+// REJECTED SECTION - Has Approve button only
+// ===========================
 async function rejectEmployee(managerCode, employeeCode) {
     if (!confirm('Are you sure you want to reject this employee?')) return;
     
@@ -243,8 +205,18 @@ async function rejectEmployee(managerCode, employeeCode) {
         hideLoading();
         
         if (result.success) {
-            showPopup('Employee rejected successfully!');
-            await loadPendingData(); // Refresh the list
+            showPopup('Employee rejected successfully! ❌');
+            
+            // ✅ Remove row immediately from approved table
+            const approvedRow = document.getElementById(`approved-row-${employeeCode}`);
+            if (approvedRow) {
+                approvedRow.remove();
+            }
+            
+            // Refresh all sections
+            await loadPendingData();
+            await loadApprovedData();
+            await loadRejectedData();
         } else {
             showPopup('Failed to reject employee', true);
         }
@@ -255,9 +227,271 @@ async function rejectEmployee(managerCode, employeeCode) {
     }
 }
 
+// ===========================
+// APPROVE EMPLOYEE - Move from Pending/Rejected to Approved
+// ===========================
+async function approveEmployee(managerCode, employeeCode) {
+    try {
+        showLoading("Approving...");
+        const response = await fetch(`${API_URL}/approve_timesheet`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                reporting_emp_code: managerCode,
+                employee_code: employeeCode
+            })
+        });
+        
+        const result = await response.json();
+        hideLoading();
+        
+        if (result.success) {
+            showPopup('Employee approved successfully! ✅');
+            
+            // ✅ Remove row immediately from pending/rejected table
+            const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
+            if (pendingRow) {
+                pendingRow.remove();
+            }
+            const rejectedRow = document.getElementById(`rejected-row-${employeeCode}`);
+            if (rejectedRow) {
+                rejectedRow.remove();
+            }
+            
+            // Refresh all sections
+            await loadPendingData();
+            await loadApprovedData();
+            await loadRejectedData();
+        } else {
+            showPopup('Failed to approve employee', true);
+        }
+    } catch (error) {
+        console.error('Error approving employee:', error);
+        hideLoading();
+        showPopup('Failed to approve employee', true);
+    }
+}
+
+// ===========================
+// REJECT EMPLOYEE - Move from Pending/Approved to Rejected
+// ===========================
+async function rejectEmployee(managerCode, employeeCode) {
+    if (!confirm('Are you sure you want to reject this employee?')) return;
+    
+    try {
+        showLoading("Rejecting...");
+        const response = await fetch(`${API_URL}/reject_timesheet`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                reporting_emp_code: managerCode,
+                employee_code: employeeCode
+            })
+        });
+        
+        const result = await response.json();
+        hideLoading();
+        
+        if (result.success) {
+            showPopup('Employee rejected successfully! ❌');
+            
+            // Refresh all sections
+            await loadPendingData();
+            await loadApprovedData();
+            await loadRejectedData();
+        } else {
+            showPopup('Failed to reject employee', true);
+        }
+    } catch (error) {
+        console.error('Error rejecting employee:', error);
+        hideLoading();
+        showPopup('Failed to reject employee', true);
+    }
+}
+
+// Add after the viewEmployeeTimesheet function (around line 270)
+
+async function viewEmployeeDetails(employeeId) {
+    try {
+        showLoading("Loading employee details...");
+        
+        const response = await fetch(`${API_URL}/get_timesheet/${employeeId}`, {
+            headers: getHeaders()
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch employee details');
+        
+        const data = await response.json();
+        hideLoading();
+        
+        displayEmployeeDetailsModal(data);
+        
+    } catch (error) {
+        console.error('Error fetching employee details:', error);
+        hideLoading();
+        showPopup('Failed to load employee details', true);
+    }
+}
+
+function displayEmployeeDetailsModal(data) {
+    const modal = document.getElementById('employeeDetailsModal');
+    const body = document.getElementById('employeeDetailsBody');
+    
+    // Group entries by week
+    const weekGroups = {};
+    data.entries.forEach(entry => {
+        const week = entry.weekPeriod || 'Uncategorized';
+        if (!weekGroups[week]) {
+            weekGroups[week] = [];
+        }
+        weekGroups[week].push(entry);
+    });
+    
+    let html = `
+        <!-- Employee Info Section -->
+        <div class="details-section">
+            <h3><i class="fas fa-id-card"></i> Employee Information</h3>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Employee ID</span>
+                    <span class="detail-value">${data.employee_id || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Employee Name</span>
+                    <span class="detail-value">${data.employee_name || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Designation</span>
+                    <span class="detail-value">${data.designation || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Gender</span>
+                    <span class="detail-value">${data.gender || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Partner</span>
+                    <span class="detail-value">${data.partner || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Reporting Manager</span>
+                    <span class="detail-value">${data.reporting_manager || 'N/A'}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Timesheet Data Section -->
+        <div class="details-section">
+            <h3><i class="fas fa-calendar-alt"></i> Timesheet Data</h3>
+    `;
+    
+    // Add each week's data
+    // In displayEmployeeDetailsModal function, replace the table section with:
+
+Object.keys(weekGroups).forEach(week => {
+    html += `
+        <div class="week-section">
+            <div class="week-header">${week}</div>
+            <div class="week-table-wrapper">
+                <table class="week-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th>Project Start</th>
+                            <th>Project End</th>
+                            <th>Client</th>
+                            <th>Project</th>
+                            <th>Project Code</th>
+                            <th>Reporting Manager</th>
+                            <th>Activity</th>
+                            <th>Hours</th>
+                            <th>Billable</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    weekGroups[week].forEach(entry => {
+        html += `
+            <tr>
+                <td>${entry.date || '-'}</td>
+                <td>${entry.location || '-'}</td>
+                <td>${entry.projectStartTime || '-'}</td>
+                <td>${entry.projectEndTime || '-'}</td>
+                <td>${entry.client || '-'}</td>
+                <td>${entry.project || '-'}</td>
+                <td>${entry.projectCode || '-'}</td>
+                <td>${entry.reportingManagerEntry || '-'}</td>
+                <td>${entry.activity || '-'}</td>
+                <td><strong>${entry.projectHours || '0'}</strong></td>
+                <td><span style="color: ${entry.billable === 'Yes' ? '#27ae60' : '#e74c3c'}; font-weight: 600;">${entry.billable || '-'}</span></td>
+                <td>${entry.remarks || '-'}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+});
+    // Feedback Section
+    html += `
+        <div class="details-section">
+            <h3><i class="fas fa-comments"></i> Feedback</h3>
+            <div class="feedback-grid">
+                <div class="feedback-item-display">
+                    <label>3 Hits</label>
+                    <p>${data.hits || 'No feedback provided'}</p>
+                </div>
+                <div class="feedback-item-display">
+                    <label>3 Misses</label>
+                    <p>${data.misses || 'No feedback provided'}</p>
+                </div>
+                <div class="feedback-item-display">
+                    <label>Feedback for HR</label>
+                    <p>${data.feedback_hr || 'No feedback provided'}</p>
+                </div>
+                <div class="feedback-item-display">
+                    <label>Feedback for IT</label>
+                    <p>${data.feedback_it || 'No feedback provided'}</p>
+                </div>
+                <div class="feedback-item-display">
+                    <label>Feedback for CRM</label>
+                    <p>${data.feedback_crm || 'No feedback provided'}</p>
+                </div>
+                <div class="feedback-item-display">
+                    <label>Feedback for Others</label>
+                    <p>${data.feedback_others || 'No feedback provided'}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    body.innerHTML = html;
+    modal.style.display = 'block';
+}
+
+function closeEmployeeDetailsModal() {
+    document.getElementById('employeeDetailsModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('employeeDetailsModal');
+    if (event.target === modal) {
+        closeEmployeeDetailsModal();
+    }
+}
+
+// ===========================
+// VIEW EMPLOYEE TIMESHEET - Opens in new tab
+// ===========================
 function viewEmployeeTimesheet(employeeId) {
-    // Open in new tab or modal
-    window.open(`/view_timesheet/${employeeId}`, '_blank');
+    window.open(`${API_URL}/view_timesheet/${employeeId}`, '_blank');
 }
 
 async function checkSession() {
@@ -2144,17 +2378,25 @@ async function loadPendingData() {
         } else {
             data.employees.forEach(emp => {
                 const row = `
-                    <tr>
+                    <tr id="pending-row-${emp.employeeId}">
                         <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
                         <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                            <button class="action-btn approve-btn" onclick="approveEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
+                            <a href="javascript:void(0)" 
+                               onclick="viewEmployeeDetails('${emp.employeeId}')" 
+                               style="color: #3498db; text-decoration: none; font-weight: 500; cursor: pointer;"
+                               onmouseover="this.style.textDecoration='underline'" 
+                               onmouseout="this.style.textDecoration='none'">
+                                ${emp.timesheetData?.employeeName || 'N/A'}
+                            </a>
+                        </td>
+                        <td style="min-width: 200px;">
+                            <button class="action-btn approve-btn" 
+                                    onclick="approveEmployee('${loggedInEmployeeId}', '${emp.employeeId}')"
+                                    style="margin-right: 10px;">
                                 <i class="fas fa-check"></i> Approve
                             </button>
-                            <button class="action-btn delete-btn" onclick="rejectEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
+                            <button class="action-btn delete-btn" 
+                                    onclick="rejectEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
                                 <i class="fas fa-times"></i> Reject
                             </button>
                         </td>
@@ -2188,18 +2430,29 @@ async function loadApprovedData() {
             tbody.innerHTML = '<tr><td colspan="3">No approved employees</td></tr>';
         } else {
             data.employees.forEach(emp => {
-                const row = `
-                    <tr>
-                        <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
-                        <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </td>
-                    </tr>
+                const tr = document.createElement('tr');
+                tr.id = `approved-row-${emp.employeeId}`;
+                
+                tr.innerHTML = `
+                    <td>${emp.employeeId}</td>
+                    <td>
+                        <a href="javascript:void(0)" 
+                           onclick="viewEmployeeDetails('${emp.employeeId}')" 
+                           style="color: #27ae60; text-decoration: none; font-weight: 500; cursor: pointer;"
+                           onmouseover="this.style.textDecoration='underline'" 
+                           onmouseout="this.style.textDecoration='none'">
+                            ${emp.timesheetData?.employeeName || 'N/A'}
+                        </a>
+                    </td>
+                    <td style="min-width: 120px;">
+                        <button class="action-btn delete-btn" 
+                                onclick="rejectEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    </td>
                 `;
-                tbody.innerHTML += row;
+                
+                tbody.appendChild(tr);
             });
         }
         hideLoading();
@@ -2228,12 +2481,21 @@ async function loadRejectedData() {
         } else {
             data.employees.forEach(emp => {
                 const row = `
-                    <tr>
+                    <tr id="rejected-row-${emp.employeeId}">
                         <td>${emp.employeeId}</td>
-                        <td>${emp.timesheetData?.employeeName || 'N/A'}</td>
                         <td>
-                            <button class="action-btn edit-btn" onclick="viewEmployeeTimesheet('${emp.employeeId}')">
-                                <i class="fas fa-eye"></i> View
+                            <a href="javascript:void(0)" 
+                               onclick="viewEmployeeDetails('${emp.employeeId}')" 
+                               style="color: #e74c3c; text-decoration: none; font-weight: 500; cursor: pointer;"
+                               onmouseover="this.style.textDecoration='underline'" 
+                               onmouseout="this.style.textDecoration='none'">
+                                ${emp.timesheetData?.employeeName || 'N/A'}
+                            </a>
+                        </td>
+                        <td style="min-width: 120px;">
+                            <button class="action-btn approve-btn" 
+                                    onclick="approveEmployee('${loggedInEmployeeId}', '${emp.employeeId}')">
+                                <i class="fas fa-check"></i> Approve
                             </button>
                         </td>
                     </tr>
@@ -2249,36 +2511,12 @@ async function loadRejectedData() {
     }
 }
 
-async function approveEmployee(managerCode, employeeCode) {
-    try {
-        showLoading("Approving...");
-        const response = await fetch(`${API_URL}/approve_timesheet`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
-                reporting_emp_code: managerCode,
-                employee_code: employeeCode
-            })
-        });
-        
-        const result = await response.json();
-        hideLoading();
-        
-        if (result.success) {
-            showPopup('Employee approved successfully!');
-            await loadPendingData();
-        } else {
-            showPopup('Failed to approve employee', true);
-        }
-    } catch (error) {
-        console.error('Error approving employee:', error);
-        hideLoading();
-        showPopup('Failed to approve employee', true);
-    }
-}
+
 
 async function rejectEmployee(managerCode, employeeCode) {
-    if (!confirm('Are you sure you want to reject this employee?')) return;
+    // ✅ Show custom popup instead of browser confirm
+    const confirmReject = await showConfirmPopup('Are you sure you want to reject this employee?');
+    if (!confirmReject) return;
     
     try {
         showLoading("Rejecting...");
@@ -2295,8 +2533,34 @@ async function rejectEmployee(managerCode, employeeCode) {
         hideLoading();
         
         if (result.success) {
-            showPopup('Employee rejected successfully!');
-            await loadPendingData(); 
+            showPopup('Employee rejected successfully! ❌');
+            
+            // ✅ Remove row immediately from approved table
+            const approvedRow = document.getElementById(`approved-row-${employeeCode}`);
+            if (approvedRow) {
+                approvedRow.remove();
+            }
+            
+            // ✅ Remove row immediately from pending table
+            const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
+            if (pendingRow) {
+                pendingRow.remove();
+            }
+            
+            // ✅ Check if approved table is now empty
+            const approveTableBody = document.getElementById('approveTableBody');
+            if (approveTableBody && approveTableBody.children.length === 0) {
+                approveTableBody.innerHTML = '<tr><td colspan="3">No approved employees</td></tr>';
+            }
+            
+            // ✅ Check if pending table is now empty
+            const pendingTableBody = document.getElementById('pendingTableBody');
+            if (pendingTableBody && pendingTableBody.children.length === 0) {
+                pendingTableBody.innerHTML = '<tr><td colspan="3">No pending approvals</td></tr>';
+            }
+            
+            // Refresh rejected section to show new entry
+            await loadRejectedData();
         } else {
             showPopup('Failed to reject employee', true);
         }
@@ -2312,6 +2576,43 @@ function viewEmployeeTimesheet(employeeId) {
     window.open(`${API_URL}/view_timesheet/${employeeId}`, '_blank');
 }
 
+// ✅ Custom confirmation popup
+function showConfirmPopup(message) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-popup">
+                <div class="confirm-icon">⚠️</div>
+                <p class="confirm-message">${message}</p>
+                <div class="confirm-buttons">
+                    <button class="confirm-btn-cancel" id="confirmCancel">Cancel</button>
+                    <button class="confirm-btn-ok" id="confirmOk">OK</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        document.getElementById('confirmCancel').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(false);
+        };
+        
+        document.getElementById('confirmOk').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(true);
+        };
+        
+        // Close on overlay click
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                resolve(false);
+            }
+        };
+    });
+}
 
 function editHistoryRow(button, entryId) {
     console.log("✏️ Editing entry ID:", entryId);
@@ -2901,6 +3202,110 @@ function updateDateValidations(sectionId) {
     dateInputs.forEach(input => validateDate(input));
 }
 
+// async function handleExcelUpload(event) {
+//     console.log("Excel upload initiated");
+//     const file = event.target.files[0];
+//     if (!file) return;
+
+//     const reader = new FileReader();
+//     reader.onload = async function (e) {
+//         try {
+//             const data = new Uint8Array(e.target.result);
+//             const workbook = XLSX.read(data, { type: 'array' });
+//             const sheetName = workbook.SheetNames[0];
+//             const sheet = workbook.Sheets[sheetName];
+//             const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+//             if (!jsonData || jsonData.length === 0) {
+//                 showPopup('Excel file is empty.', true);
+//                 return;
+//             }
+
+//             // UPDATED Required columns (removed Punch In, Punch Out, Working Hours)
+//             const requiredColumns = [
+//                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
+//                 'Reporting Manager', 'Week Period', 'Date', 'Location of Work',
+//                 'Project Start Time', 'Project End Time', 
+//                 // REMOVED: 'Punch In', 'Punch Out',
+//                 'Client', 'Project', 'Project Code',
+//                 'Reporting Manager Entry', 'Activity', 'Project Hours', 
+//                 // REMOVED: 'Working Hours',
+//                 'Billable', 'Remarks'
+//             ];
+
+//             const fileColumns = Object.keys(jsonData[0]);
+//             const missingColumns = requiredColumns.filter(col => !fileColumns.includes(col));
+
+//             if (missingColumns.length > 0) {
+//                 showPopup(`Invalid Excel format. Missing columns: ${missingColumns.join(', ')}`, true);
+//                 return;
+//             }
+
+//             showLoading("Uploading Excel data");
+
+//             // UPDATED Convert Excel data into API format (removed corresponding fields)
+//             const timesheetData = jsonData.map(row => ({
+//                 employeeId: row['Employee ID'] || '',
+//                 employeeName: row['Employee Name'] || '',
+//                 designation: row['Designation'] || '',
+//                 gender: row['Gender'] || '',
+//                 partner: row['Partner'] || '',
+//                 reportingManager: row['Reporting Manager'] || '',
+//                 weekPeriod: row['Week Period'] || '',
+//                 date: row['Date'] || '',
+//                 location: row['Location of Work'] || '',
+//                 projectStartTime: row['Project Start Time'] || '',
+//                 projectEndTime: row['Project End Time'] || '',
+//                 // REMOVED: punchIn: row['Punch In'] || '',
+//                 // REMOVED: punchOut: row['Punch Out'] || '',
+//                 client: row['Client'] || '',
+//                 project: row['Project'] || '',
+//                 projectCode: row['Project Code'] || '',
+//                 reportingManagerEntry: row['Reporting Manager Entry'] || '',
+//                 activity: row['Activity'] || '',
+//                 projectHours: row['Project Hours'] || '',
+//                 // REMOVED: workingHours: row['Working Hours'] || '',
+//                 billable: row['Billable'] || '',
+//                 remarks: row['Remarks'] || '',
+//                 hits: row['3 HITS'] || '',
+//                 misses: row['3 MISSES'] || '',
+//                 feedback_hr: row['FEEDBACK FOR HR'] || '',
+//                 feedback_it: row['FEEDBACK FOR IT'] || '',
+//                 feedback_crm: row['FEEDBACK FOR CRM'] || '',
+//                 feedback_others: row['FEEDBACK FOR OTHERS'] || '',
+//                 totalHours: row['Total Hours'] || '0.00',
+//                 totalBillableHours: row['Total Billable Hours'] || '0.00',
+//                 totalNonBillableHours: row['Total Non-Billable Hours'] || '0.00'
+//             }));
+
+//             const token = localStorage.getItem('access_token');
+//             const response = await fetch(`${API_URL}/save_timesheets`, {
+//                 method: 'POST',
+//                 headers: getHeaders(),
+//                 body: JSON.stringify(timesheetData)
+//             });
+
+//             hideLoading();
+
+//             if (!response.ok) {
+//                 const errorData = await response.json();
+//                 throw new Error(errorData.detail || 'Failed to upload Excel data.');
+//             }
+
+//             const result = await response.json();
+//             showPopup('Excel uploaded and saved successfully!');
+//             setTimeout(() => window.location.replace('/dashboard'), 2000);
+
+//         } catch (error) {
+//             console.error('Error reading Excel:', error);
+//             hideLoading();
+//             showPopup(`Failed to upload Excel: ${error.message}`, true);
+//         }
+//     };
+
+//     reader.readAsArrayBuffer(file);
+// }
+
 async function handleExcelUpload(event) {
     console.log("Excel upload initiated");
     const file = event.target.files[0];
@@ -2925,10 +3330,8 @@ async function handleExcelUpload(event) {
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
                 'Reporting Manager', 'Week Period', 'Date', 'Location of Work',
                 'Project Start Time', 'Project End Time', 
-                // REMOVED: 'Punch In', 'Punch Out',
                 'Client', 'Project', 'Project Code',
                 'Reporting Manager Entry', 'Activity', 'Project Hours', 
-                // REMOVED: 'Working Hours',
                 'Billable', 'Remarks'
             ];
 
@@ -2955,15 +3358,12 @@ async function handleExcelUpload(event) {
                 location: row['Location of Work'] || '',
                 projectStartTime: row['Project Start Time'] || '',
                 projectEndTime: row['Project End Time'] || '',
-                // REMOVED: punchIn: row['Punch In'] || '',
-                // REMOVED: punchOut: row['Punch Out'] || '',
                 client: row['Client'] || '',
                 project: row['Project'] || '',
                 projectCode: row['Project Code'] || '',
                 reportingManagerEntry: row['Reporting Manager Entry'] || '',
                 activity: row['Activity'] || '',
                 projectHours: row['Project Hours'] || '',
-                // REMOVED: workingHours: row['Working Hours'] || '',
                 billable: row['Billable'] || '',
                 remarks: row['Remarks'] || '',
                 hits: row['3 HITS'] || '',
@@ -2992,19 +3392,31 @@ async function handleExcelUpload(event) {
             }
 
             const result = await response.json();
-            showPopup('Excel uploaded and saved successfully!');
-            setTimeout(() => window.location.replace('/dashboard'), 2000);
+            
+            // ✅ Show success popup
+            showPopup('Excel uploaded and saved successfully! 🎉');
+            
+            // ✅ Clear the file input
+            event.target.value = '';
+            
+            // ✅ Redirect to dashboard after 1.5 seconds
+            setTimeout(() => {
+                isExiting = true;
+                formModified = false;
+                window.location.replace('/dashboard');
+            }, 1500);
 
         } catch (error) {
             console.error('Error reading Excel:', error);
             hideLoading();
             showPopup(`Failed to upload Excel: ${error.message}`, true);
+            // ✅ Clear the file input on error too
+            event.target.value = '';
         }
     };
 
     reader.readAsArrayBuffer(file);
 }
-
 window.handleExcelUpload = handleExcelUpload;
 
 
