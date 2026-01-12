@@ -290,18 +290,18 @@ async function rejectEmployee(managerCode, employeeCode) {
         });
         
         const result = await response.json();
-hideLoading();
+        hideLoading();
 
-if (result.success) {
-    showPopup('Employee rejected successfully! ❌'); // ✅ Add this line
-    
-    // Refresh all sections
-    await loadPendingData();
-    await loadApprovedData();
-    await loadRejectedData();
-} else {
-    showPopup('Failed to reject employee', true);
-}
+        if (result.success) {
+            showPopup('Employee rejected successfully! ❌'); // ✅ Add this line
+            
+            // Refresh all sections
+            await loadPendingData();
+            await loadApprovedData();
+            await loadRejectedData();
+        } else {
+            showPopup('Failed to reject employee', true);
+        }
     } catch (error) {
         console.error('Error rejecting employee:', error);
         hideLoading();
@@ -665,7 +665,7 @@ function showPopup(message, isError = false) {
             popup.style.visibility = 'hidden';
         }, 400);
     }, 3000);
-}
+}    
 
 function closePopup() {
     document.getElementById('successPopup').style.display = 'none';
