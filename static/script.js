@@ -6,8 +6,8 @@ let currentRow = null;
 let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem('loggedInEmployeeId');
 let copiedData = null; // Store copied row data
-// const API_URL = '';
-const API_URL = 'http://localhost:8000';
+const API_URL = '';
+// const API_URL = 'http://localhost:8000';
 // const API_URL = window.location.origin;
 let isEditingHistory = false;
 let currentEntryId = null;
@@ -243,28 +243,28 @@ async function approveEmployee(managerCode, employeeCode) {
         });
         
         const result = await response.json();
-hideLoading();
+        hideLoading();
 
-if (result.success) {
-    showPopup('Employee approved successfully! ✅'); // ✅ Add this line
-    
-    // ✅ Remove row immediately
-    const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
-    if (pendingRow) {
-        pendingRow.remove();
-    }
-    const rejectedRow = document.getElementById(`rejected-row-${employeeCode}`);
-    if (rejectedRow) {
-        rejectedRow.remove();
-    }
-    
-    // Refresh all sections
-    await loadPendingData();
-    await loadApprovedData();
-    await loadRejectedData();
-} else {
-    showPopup('Failed to approve employee', true);
-}
+        if (result.success) {
+            showPopup('Employee approved successfully! ✅'); // ✅ Add this line
+            
+            // ✅ Remove row immediately
+            const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
+            if (pendingRow) {
+                pendingRow.remove();
+            }
+            const rejectedRow = document.getElementById(`rejected-row-${employeeCode}`);
+            if (rejectedRow) {
+                rejectedRow.remove();
+            }
+            
+            // Refresh all sections
+            await loadPendingData();
+            await loadApprovedData();
+            await loadRejectedData();
+        } else {
+            showPopup('Failed to approve employee', true);
+        }
     } catch (error) {
         console.error('Error approving employee:', error);
         hideLoading();
