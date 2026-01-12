@@ -747,8 +747,8 @@ body {
     box-shadow: var(--shadow-medium);
 }
 
-.popup {
-    display: none; /* default hidden */
+/* .popup {
+    display: none;
     position: fixed;
     top: 50%;
     left: 50%;
@@ -762,6 +762,27 @@ body {
     text-align: center;
     animation: popIn 0.3s ease-out;
     min-width: 300px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+} */
+
+.popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    text-align: center;
+    min-width: 300px;
+    font-size: 16px;
+    font-weight: 500;
+    display: none; /* Default hidden */
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.4s ease, visibility 0.4s ease;
@@ -779,7 +800,7 @@ body {
 }
 
 .popup.error {
-    background: var(--danger-gradient);
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
 }
 
 .popup-close {
@@ -791,7 +812,7 @@ body {
     font-size: 1.5rem;
     color: white;
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.3s ease;
 }
 
 .popup-close:hover {
@@ -1794,6 +1815,33 @@ input[type="date"]:hover {
         transform: translateY(0);
         opacity: 1;
     }
+}
+
+/* Approve All Button */
+.approve-all-btn {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 20px;
+}
+
+.approve-all-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(17, 153, 142, 0.3);
+}
+
+.approve-all-btn i {
+    font-size: 16px;
 }
 
 /* ========================================

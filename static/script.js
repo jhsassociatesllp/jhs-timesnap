@@ -243,28 +243,28 @@ async function approveEmployee(managerCode, employeeCode) {
         });
         
         const result = await response.json();
-        hideLoading();
-        
-        if (result.success) {
-            showPopup('Employee approved successfully! ✅');
-            
-            // ✅ Remove row immediately from pending/rejected table
-            const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
-            if (pendingRow) {
-                pendingRow.remove();
-            }
-            const rejectedRow = document.getElementById(`rejected-row-${employeeCode}`);
-            if (rejectedRow) {
-                rejectedRow.remove();
-            }
-            
-            // Refresh all sections
-            await loadPendingData();
-            await loadApprovedData();
-            await loadRejectedData();
-        } else {
-            showPopup('Failed to approve employee', true);
-        }
+hideLoading();
+
+if (result.success) {
+    showPopup('Employee approved successfully! ✅'); // ✅ Add this line
+    
+    // ✅ Remove row immediately
+    const pendingRow = document.getElementById(`pending-row-${employeeCode}`);
+    if (pendingRow) {
+        pendingRow.remove();
+    }
+    const rejectedRow = document.getElementById(`rejected-row-${employeeCode}`);
+    if (rejectedRow) {
+        rejectedRow.remove();
+    }
+    
+    // Refresh all sections
+    await loadPendingData();
+    await loadApprovedData();
+    await loadRejectedData();
+} else {
+    showPopup('Failed to approve employee', true);
+}
     } catch (error) {
         console.error('Error approving employee:', error);
         hideLoading();
@@ -290,22 +290,66 @@ async function rejectEmployee(managerCode, employeeCode) {
         });
         
         const result = await response.json();
+hideLoading();
+
+if (result.success) {
+    showPopup('Employee rejected successfully! ❌'); // ✅ Add this line
+    
+    // Refresh all sections
+    await loadPendingData();
+    await loadApprovedData();
+    await loadRejectedData();
+} else {
+    showPopup('Failed to reject employee', true);
+}
+    } catch (error) {
+        console.error('Error rejecting employee:', error);
+        hideLoading();
+        showPopup('Failed to reject employee', true);
+    }
+}
+
+// ===========================
+// APPROVE ALL EMPLOYEES AT ONCE
+// ===========================
+async function approveAllEmployees(source = 'pending') {
+    const confirmApprove = await showConfirmPopup(`Are you sure you want to approve ALL ${source} employees?`);
+    if (!confirmApprove) return;
+    
+    try {
+        showLoading("Approving all employees...");
+        const response = await fetch(`${API_URL}/approve_all_timesheets`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                reporting_emp_code: loggedInEmployeeId,
+                source: source.charAt(0).toUpperCase() + source.slice(1) // Capitalize
+            })
+        });
+        
+        const result = await response.json();
         hideLoading();
         
         if (result.success) {
-            showPopup('Employee rejected successfully! ❌');
+            showPopup(`${result.approved} employee(s) approved successfully! 🎉`);
+            
+            // ✅ Clear the table
+            const tbody = document.getElementById(source === 'pending' ? 'pendingTableBody' : 'rejectedTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="3">No ${source} employees</td></tr>`;
+            }
             
             // Refresh all sections
             await loadPendingData();
             await loadApprovedData();
             await loadRejectedData();
         } else {
-            showPopup('Failed to reject employee', true);
+            showPopup('Failed to approve employees', true);
         }
     } catch (error) {
-        console.error('Error rejecting employee:', error);
+        console.error('Error approving all employees:', error);
         hideLoading();
-        showPopup('Failed to reject employee', true);
+        showPopup('Failed to approve employees', true);
     }
 }
 
@@ -597,10 +641,30 @@ function showError(message) {
 function showPopup(message, isError = false) {
     const popup = document.getElementById('successPopup');
     const popupMessage = document.getElementById('popupMessage');
+    
+    if (!popup || !popupMessage) {
+        console.error('❌ Popup elements not found');
+        return;
+    }
+    
     popupMessage.textContent = message;
     popup.className = 'popup' + (isError ? ' error' : '');
+    
+    // ✅ Force display with inline style
     popup.style.display = 'block';
-    setTimeout(closePopup, 3000);
+    popup.style.opacity = '1';
+    popup.style.visibility = 'visible';
+    
+    console.log('✅ Popup shown:', message);
+    
+    // Auto close after 3 seconds
+    setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => {
+            popup.style.display = 'none';
+            popup.style.visibility = 'hidden';
+        }, 400);
+    }, 3000);
 }
 
 function closePopup() {
@@ -1231,21 +1295,21 @@ function updateHistoryEntry() {
         return response.json();
     })
     .then(result => {
-        console.log("✅ Update result:", result);
-        hideLoading();
+    console.log("✅ Update result:", result);
+    hideLoading();
+    
+    if (result.success) {
+        showPopup('Entry updated successfully! 🎉'); // ✅ This line
+        closeModal();
         
-        if (result.success) {
-            showPopup('Entry updated successfully! 🎉');
-            closeModal();
-            
-            // ✅ Reload history to show changes
-            setTimeout(() => {
-                showSection('history');
-            }, 1000);
-        } else {
-            showPopup('Failed to update entry: ' + (result.message || 'Unknown error'), true);
-        }
-    })
+        // ✅ Reload history to show changes
+        setTimeout(() => {
+            showSection('history');
+        }, 1000);
+    } else {
+        showPopup('Failed to update entry: ' + (result.message || 'Unknown error'), true);
+    }
+})
     .catch(error => {
         console.error('❌ Error updating entry:', error);
         hideLoading();
@@ -2120,13 +2184,13 @@ async function saveDataToMongo() {
         console.log('Result:', result);
         
         hideLoading();
-        showPopup('Timesheet saved successfully!');
-        isExiting = true;
-        formModified = false;
-
-        setTimeout(() => {
-           window.location.replace('/dashboard');
+        showPopup('Timesheet saved successfully! 🎉');
+            setTimeout(() => {
+            isExiting = true;
+            formModified = false;
+            window.location.replace('/dashboard');
         }, 2000);
+        
     } catch (error) {
         console.error('=== CATCH ERROR ===');
         console.error('Error saving data:', error);
@@ -3392,13 +3456,13 @@ async function handleExcelUpload(event) {
             }
 
             const result = await response.json();
-            
+
             // ✅ Show success popup
             showPopup('Excel uploaded and saved successfully! 🎉');
-            
+
             // ✅ Clear the file input
             event.target.value = '';
-            
+
             // ✅ Redirect to dashboard after 1.5 seconds
             setTimeout(() => {
                 isExiting = true;
