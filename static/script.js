@@ -6,9 +6,11 @@ let currentRow = null;
 let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem('loggedInEmployeeId');
 let copiedData = null; // Store copied row data
-const API_URL = '';
+// const API_URL = '';
 // const API_URL = 'http://localhost:8000';
-// const API_URL = window.location.origin;
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000'    // Local development
+    : '';                   
 let isEditingHistory = false;
 let currentEntryId = null;
 let historyEntries = [];
