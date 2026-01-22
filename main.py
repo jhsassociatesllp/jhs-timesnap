@@ -88,7 +88,7 @@ class TimesheetEntry(BaseModel):
     gender: Optional[str] = None
     partner: Optional[str] = None
     reportingManager: Optional[str] = None
-    department: Optional[str] = None
+    # department: Optional[str] = None
     weekPeriod: Optional[str] = None
     date: Optional[str] = None
     location: Optional[str] = None

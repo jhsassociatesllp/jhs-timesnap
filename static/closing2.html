@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Time Sheet - Professional Time Tracking</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <!-- Font Awesome & Google Fonts -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      .cycle-closed-message {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, #fff8e1, #fff3e0);
+        border: 2px dashed #ff9800;
+        border-radius: 16px;
+        margin: 30px auto;
+        max-width: 900px;
+        font-size: 1.4rem;
+        color: #e65100;
+        font-weight: 600;
+      }
+      .cycle-closed-message i {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        color: #ff9800;
+      }
+      @media (max-width: 768px) {
+        .cycle-closed-message {
+          font-size: 1.2rem;
+          padding: 40px 15px;
+        }
+        .cycle-closed-message i {
+          font-size: 2.5rem;
+        }
+          /* Beautiful centered Approve All button - consistent across Pending & Rejected */
+.approve-all-btn {
+  background: #28a745;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+  transition: all 0.3s ease;
+  min-width: 200px;
+}
+
+.approve-all-btn:hover {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(40, 167, 69, 0.4);
+}
+
+.approve-all-btn:active {
+  transform: translateY(0);
+}
+
+.approve-all-btn i {
+  margin-right: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .approve-all-btn {
+    padding: 10px 20px;
+    font-size: 0.95rem;
+  }
+}
+        }
+    </style>
+  </head>
+  <body>
+    <!-- NAVBAR -->
+    <div class="navbar">
+      <div class="hamburger" onclick="toggleNavMenu()">
+        <i class="fas fa-bars"></i>
+      </div>
+      <div class="nav-menu" id="navMenu">
+        <a
+          href="#"
+          onclick="showSection('timesheet')"
+          id="timesheetLink"
+          class="active"
+          ><i class="fas fa-clock"></i> Timesheet</a
+        >
+        <a href="#" onclick="showSection('history')" id="historyLink"
+          ><i class="fas fa-history"></i> History</a
+        >
+        <!-- Manager Only Buttons -->
+        <a
+          href="#"
+          id="pendingBtn"
+          class="manager-only"
+          onclick="showSection('pending')"
+          ><i class="fas fa-hourglass-half"></i> Pending</a
+        >
+        <a
+          href="#"
+          id="approveBtn"
+          class="manager-only"
+          onclick="showSection('approve')"
+          ><i class="fas fa-check-circle"></i> Approved</a
+        >
+        <a
+          href="#"
+          id="rejectedBtn"
+          class="manager-only"
+          onclick="showSection('rejected')"
+          ><i class="fas fa-times-circle"></i> Rejected</a
+        >
+        <button onclick="showExitConfirmation()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1><i class="fas fa-stopwatch"></i> JHS TIMESHEET</h1>
+      </div>
+
+      <!-- TIMESHEET SECTION - REPLACED WITH MESSAGE -->
+      <div class="form-section active" id="timesheetSection">
+        <div class="cycle-closed-message">
+          <i class="fas fa-calendar-times"></i><br /><br />
+          Timesheet for Dec - Jan cycle will be released soon.<br />
+          <small style="color:#b71c1c; font-weight:bold;">Please wait for the new cycle to start.</small>
+        </div>
+      </div>
+
+      <!-- HISTORY SECTION - REPLACED WITH MESSAGE -->
+      <div class="history-section" id="historySection" style="display: none">
+        <div class="cycle-closed-message">
+          <i class="fas fa-info-circle"></i><br /><br />
+          Timesheet for Nov - Dec cycle will be released soon.<br />
+          <small style="color:#1976d2;">History of previous cycles will be available once the new cycle is live.</small>
+        </div>
+      </div>
+
+      <!-- PENDING APPROVAL SECTION (Manager only - unchanged) -->
+      <div class="pending-section" id="pendingSection" style="display: none">
+        <h2><i class="fas fa-hourglass-half"></i> Pending Approval</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pendingTableBody">
+              <tr>
+                <td colspan="3">Loading pending approvals...</td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- <h2>Pending Approvals</h2> -->
+          <div id="approveAllPendingContainer" style="margin: 20px 0; text-align: center; display: none; ">
+              <button class="action-btn approve-all-btn" onclick="approveAll('Pending')">
+                  Approve All
+              </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPROVED SECTION -->
+      <div class="approve-section" id="approveSection" style="display: none">
+        <h2><i class="fas fa-check-circle"></i> Approved Employees</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="approveTableBody">
+              <tr>
+                <td colspan="3">Loading approved list...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REJECTED SECTION -->
+      <div class="rejected-section" id="rejectedSection" style="display: none">
+        <h2><i class="fas fa-times-circle"></i> Rejected Employees</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rejectedTableBody">
+              <tr>
+                <td colspan="3">Loading rejected list...</td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- Fixed & Styled "Approve All Rejected" Button -->
+    <div id="approveAllRejectedContainer" style="margin: 20px 0; text-align: center; display: none;">
+      <button class="approve-all-btn" onclick="approveAll('Rejected')">
+        <i class="fas fa-check-double"></i> Approve All 
+      </button>
+    </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUPS & LOADING -->
+    <div class="popup" id="successPopup">
+      <p id="popupMessage"><i class="fas fa-check-circle"></i> Message</p>
+      <button class="popup-close" onclick="closePopup()">×</button>
+    </div>
+    <div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Saving...</div>
+
+    <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content">
+        <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()"></div>
+        <div><label id="modalLabel2">Location</label><select id="modalInput2" class="form-input">
+            <option value="Office">Office</option>
+            <option value="Client Site">Client Site</option>
+            <option value="Work From Home">Work From Home</option>
+            <option value="Field Work">Field Work</option>
+        </select></div>
+        <div><label id="modalLabel3">Punch In</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
+        <div><label id="modalLabel4">Punch Out</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
+        <div><label id="modalLabel5">Project Start</label><input type="time" id="modalInput5" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
+        <div><label id="modalLabel6">Project End</label><input type="time" id="modalInput6" class="form-input" onchange="validateTimes(null, true); updateModalHours()"></div>
+        <div><label id="modalLabel7">Client</label><input id="modalInput7" class="form-input" placeholder="Enter Client" onchange="updateModalHours()"></div>
+        <div><label id="modalLabel8">Project</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Project" onchange="updateModalHours()"></div>
+        <div><label id="modalLabel9">Project Code</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Project Code" onchange="updateModalHours()"></div>
+        <div><label id="modalLabel10">Reporting Manager</label><input type="text" id="modalInput10" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()"></div>
+        <div><label id="modalLabel11">Activity</label><input type="text" id="modalInput11" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()"></div>
+        <div><label id="modalLabel12">Project Hours</label><input type="number" id="modalInput12" class="form-input" readonly></div>
+        <div><label id="modalLabel13">Working Hours</label><input type="number" id="modalInput13" class="form-input" readonly></div>
+        <div><label id="modalLabel14">Billable</label><select id="modalInput14" class="form-input" onchange="updateModalHours()">
+            <option value="Yes">Billable</option>
+            <option value="No">Non-Billable</option>
+        </select></div>
+        <div><label id="modalLabel15">Remarks</label><input type="text" id="modalInput15" class="form-input" placeholder="Additional notes" onchange="updateModalHours()"></div>
+        <button id="modalCancelBtn" class="modal-cancel-btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+        <button id="modalAddBtn" class="modal-add-btn" onclick="saveModalEntry()"><i class="fas fa-check"></i> Add</button>
+    </div>
+</div>
+
+    <!-- EXIT CONFIRMATION -->
+    <div class="exit-confirmation" id="exitConfirmation">
+      <p>Do you want to exit?</p>
+      <button class="cancel-btn" onclick="cancelExit()">No</button>
+      <button class="confirm-btn" onclick="confirmExit()">Yes</button>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="/static/script.js"></script>
+  </body>
+</html>
