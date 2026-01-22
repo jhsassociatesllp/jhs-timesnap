@@ -146,46 +146,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
-    async function initWeekOptions() {
-  try {
-    // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
-    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
-    const data = await res.json();
-
-    let start, end;
-    if (data && data.start && data.end) {
-      start = new Date(data.start);
-      end = new Date(data.end);
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
-    } else {
-      const fallback = getPayrollWindow();
-      start = fallback.start;
-      end = fallback.end;
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
-    }
-
-    window.weekOptions = generateWeekOptions(start, end);
-
-    // update all existing selects
-    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-      select.innerHTML = "";
-      window.weekOptions.forEach(week => {
-        const o = document.createElement("option");
-        o.value = week.value;
-        o.textContent = week.text;
-        select.appendChild(o);
-      });
-    });
-
-    console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
-
-  } catch (err) {
-    console.error("❌ Error fetching payroll window:", err);
-    const { start, end } = getPayrollWindow();
-    window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
-    window.weekOptions = generateWeekOptions(start, end);
-  }
-}
+    
   const token = localStorage.getItem("access_token");
   if (!token) {
     window.location.href = "/static/login.html";
@@ -432,10 +393,10 @@ setInterval(() => {
 }, 30000);
 
 // Ensure initial run
-(async () => {
-    console.log("Initializing week options at startup")
-  await initWeekOptions();
-})();
+// (async () => {
+//     console.log("Initializing week options at startup")
+//   await initWeekOptions();
+// })();
 
 
 
