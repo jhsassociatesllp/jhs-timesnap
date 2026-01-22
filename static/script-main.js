@@ -52,6 +52,7 @@ function loadWeekOptionsFromBackend() {
             window.weekOptions = [];
         });
 }
+
 // Restore token from sessionStorage if localStorage got cleared
 window.addEventListener("load", () => {
   const localToken =
@@ -3150,20 +3151,10 @@ async function handleExcelUpload(event) {
     reader.onload = async function (e) {
         try {
             const data = new Uint8Array(e.target.result);
-            // const workbook = XLSX.read(data, { type: 'array' });
-            const workbook = XLSX.read(data, {
-              type: 'array',
-              cellDates: true
-            });
-
+            const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            // const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-            const jsonData = XLSX.utils.sheet_to_json(sheet, {
-              defval: '',
-              raw: false
-            });
-
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
             if (!jsonData || jsonData.length === 0) {
                 showPopup('Excel file is empty.', true);
@@ -3187,148 +3178,41 @@ async function handleExcelUpload(event) {
             }
 
             showLoading("Uploading Excel data");
-            const toStr = v =>
-              v instanceof Date
-                ? v.toISOString().split('T')[0]
-                : v !== null && v !== undefined
-                ? String(v)
-                : "";
 
-            function excelTimeToMinutes(value) {
-              if (value === '' || value === null || value === undefined) return null;
-
-              // Already formatted string "HH:mm"
-              if (typeof value === 'string' && value.includes(':')) {
-                const [h, m] = value.split(':').map(Number);
-                if (isNaN(h) || isNaN(m)) return null;
-                return h * 60 + m;
-              }
-
-              // Excel time fraction (0–1)
-              if (!isNaN(value)) {
-                return Math.round(Number(value) * 24 * 60);
-              }
-
-              return null;
-            }
-
-            function minutesToHours(minutes) {
-              return +(minutes / 60).toFixed(2);
-            }
-
-            function excelTimeToHHMM(value) {
-              const mins = excelTimeToMinutes(value);
-              if (mins === null) return '';
-
-              const h = String(Math.floor(mins / 60)).padStart(2, '0');
-              const m = String(mins % 60).padStart(2, '0');
-              return `${h}:${m}`;
-            }
-            
-            function calculateHours(row) {
-              const punchIn = excelTimeToMinutes(row['Punch In']);
-              const punchOut = excelTimeToMinutes(row['Punch Out']);
-
-              if (punchIn !== null && punchOut !== null && punchOut > punchIn) {
-                return minutesToHours(punchOut - punchIn);
-              }
-
-              const start = excelTimeToMinutes(row['Project Start Time']);
-              const end = excelTimeToMinutes(row['Project End Time']);
-
-              if (start !== null && end !== null && end > start) {
-                return minutesToHours(end - start);
-              }
-
-              // No valid time data → explicitly zero
-              return 0;
-            }
-
-
-
-          //   // ✅ Convert Excel data into API format
-          //   const timesheetData = jsonData.map(row => (
-          //     const calculatedHours = calculateHours(row);
-          //     {
-                
-          //       employeeId: toStr(row['Employee ID']) || '',
-          //       employeeName: toStr(row['Employee Name']) || '',
-          //       designation: toStr(row['Designation']) || '',
-          //       gender: toStr(row['Gender']) || '',
-          //       partner: toStr(row['Partner']) || '',
-          //       reportingManager: toStr(row['Reporting Manager']) || '',
-          //       weekPeriod: toStr(row['Week Period']) || '',
-          //       date: toStr(row['Date']) || '',
-          //       location: toStr(row['Location of Work']) || '',
-          //       // projectStartTime: toStr(row['Project Start Time']) || '',
-          //       // projectEndTime: toStr(row['Project End Time']) || '',
-          //       // punchIn: toStr(row['Punch In']) || '',
-          //       // punchOut: toStr(row['Punch Out']) || '',
-          //       projectStartTime: excelTimeToHHMM(row['Project Start Time']),
-          //       projectEndTime: excelTimeToHHMM(row['Project End Time']),
-          //       punchIn: excelTimeToHHMM(row['Punch In']),
-          //       punchOut: excelTimeToHHMM(row['Punch Out']),
-          //       client: toStr(row['Client']) || '',
-          //       project: toStr(row['Project']) || '',
-          //       projectCode: toStr(row['Project Code']) || '',
-          //       reportingManagerEntry: toStr(row['Reporting Manager Entry']) || '',
-          //       activity: toStr(row['Activity']) || '',
-          //       projectHours: toStr(row['Project Hours']) || '',
-          //       workingHours: toStr(row['Working Hours']) || '',
-          //       billable: toStr(row['Billable']) || '',
-          //       remarks: toStr(row['Remarks']) || '',
-          //       hits: toStr(row['3 Hits']) || '',
-          //       misses: toStr(row['3 Misses']) || '',
-          //       feedback_hr: toStr(row['Feedback for HR']) || '',
-          //       feedback_it: toStr(row['Feedback for IT']) || '',
-          //       feedback_crm: toStr(row['Feedback for CRM']) || '',
-          //       feedback_others: toStr(row['Feedback for Others']) || '',
-          //       totalHours: toStr(row['Total Hours']) || '0.00',
-          //       totalBillableHours: toStr(row['Total Billable Hours']) || '0.00',
-          //       totalNonBillableHours: toStr(row['Total Non-Billable Hours']) || '0.00'
-          //   }
-          // ));
-
-          const timesheetData = jsonData.map(row => {
-            const calculatedHours = calculateHours(row);
-
-            return {
-              employeeId: toStr(row['Employee ID']) || '',
-              employeeName: toStr(row['Employee Name']) || '',
-              designation: toStr(row['Designation']) || '',
-              gender: toStr(row['Gender']) || '',
-              partner: toStr(row['Partner']) || '',
-              reportingManager: toStr(row['Reporting Manager']) || '',
-              weekPeriod: toStr(row['Week Period']) || '',
-              date: toStr(row['Date']) || '',
-              location: toStr(row['Location of Work']) || '',
-
-              projectStartTime: excelTimeToHHMM(row['Project Start Time']),
-              projectEndTime: excelTimeToHHMM(row['Project End Time']),
-              punchIn: excelTimeToHHMM(row['Punch In']),
-              punchOut: excelTimeToHHMM(row['Punch Out']),
-
-              client: toStr(row['Client']) || '',
-              project: toStr(row['Project']) || '',
-              projectCode: toStr(row['Project Code']) || '',
-              reportingManagerEntry: toStr(row['Reporting Manager Entry']) || '',
-              activity: toStr(row['Activity']) || '',
-
-              // 🔥 ONLY calculated values (as per your rule)
-              projectHours: calculatedHours.toString(),
-              workingHours: calculatedHours.toString(),
-
-              billable: toStr(row['Billable']) || '',
-              remarks: toStr(row['Remarks']) || '',
-              hits: toStr(row['3 Hits']) || '',
-              misses: toStr(row['3 Misses']) || '',
-              feedback_hr: toStr(row['Feedback for HR']) || '',
-              feedback_it: toStr(row['Feedback for IT']) || '',
-              feedback_crm: toStr(row['Feedback for CRM']) || '',
-              feedback_others: toStr(row['Feedback for Others']) || ''
-            };
-          });
-
+            // ✅ Convert Excel data into API format
+            const timesheetData = jsonData.map(row => ({
+                employeeId: row['Employee ID'] || '',
+                employeeName: row['Employee Name'] || '',
+                designation: row['Designation'] || '',
+                gender: row['Gender'] || '',
+                partner: row['Partner'] || '',
+                reportingManager: row['Reporting Manager'] || '',
+                weekPeriod: row['Week Period'] || '',
+                date: row['Date'] || '',
+                location: row['Location of Work'] || '',
+                projectStartTime: row['Project Start Time'] || '',
+                projectEndTime: row['Project End Time'] || '',
+                punchIn: row['Punch In'] || '',
+                punchOut: row['Punch Out'] || '',
+                client: row['Client'] || '',
+                project: row['Project'] || '',
+                projectCode: row['Project Code'] || '',
+                reportingManagerEntry: row['Reporting Manager Entry'] || '',
+                activity: row['Activity'] || '',
+                projectHours: row['Project Hours'] || '',
+                workingHours: row['Working Hours'] || '',
+                billable: row['Billable'] || '',
+                remarks: row['Remarks'] || '',
+                hits: row['3 HITS'] || '',
+                misses: row['3 MISSES'] || '',
+                feedback_hr: row['FEEDBACK FOR HR'] || '',
+                feedback_it: row['FEEDBACK FOR IT'] || '',
+                feedback_crm: row['FEEDBACK FOR CRM'] || '',
+                feedback_others: row['FEEDBACK FOR OTHERS'] || '',
+                totalHours: row['Total Hours'] || '0.00',
+                totalBillableHours: row['Total Billable Hours'] || '0.00',
+                totalNonBillableHours: row['Total Non-Billable Hours'] || '0.00'
+            }));
 
             const token = localStorage.getItem('access_token');
             const response = await fetch(`${API_URL}/save_timesheets`, {
@@ -3341,17 +3225,11 @@ async function handleExcelUpload(event) {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                // throw new Error(errorData.detail || 'Failed to upload Excel data.');
-                const message = Array.isArray(errorData.detail)
-                  ? errorData.detail.map(e => `${e.loc.join('.')} → ${e.msg}`).join('\n')
-                  : errorData.detail;
-
-                throw new Error(message);
-
+                throw new Error(errorData.detail || 'Failed to upload Excel data.');
             }
 
             const result = await response.json();
-            showPopup('Excel uploaded and submitted successfully!');
+            showPopup('Excel uploaded and saved successfully!');
             setTimeout(() => window.location.reload(), 2000);
 
         } catch (error) {
