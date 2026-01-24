@@ -1677,7 +1677,7 @@ async function loadHistory(){
         } catch (error) {
             console.error('Error fetching history:', error);
             hideLoading();
-            showPopup('Failed to load history: ' + error.message, true);
+            // showPopup('Failed to load history: ' + error.message, true);
         }
 }
 
