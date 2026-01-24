@@ -1,3 +1,78 @@
+# name: 🚀 Deploy to Server
+
+# on:
+#   push:
+#     branches:
+#       - main
+#       - staging
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Setup SSH Agent
+#         uses: webfactory/ssh-agent@v0.8.0
+#         with:
+#           ssh-private-key: ${{ secrets.SERVER_KEY }}
+
+#       - name: Deploy to Server
+#         run: |
+#           BRANCH=${GITHUB_REF_NAME}
+
+#           # Map branch → tag + container + port
+#           if [ "$BRANCH" = "main" ]; then
+#             TAG="production"
+#             APP_NAME="jhs_timesnap_production"
+#             PORT=8011
+#             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
+#           else
+#             TAG="staging"
+#             APP_NAME="jhs_timesnap_staging"
+#             PORT=8010
+#             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
+#           fi
+
+#           IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$TAG"
+
+#           echo "🌍 Environment: $TAG"
+#           echo "🐳 Image: $IMAGE"
+#           echo "🔌 Port: $PORT"
+#           echo "📦 Container: $APP_NAME"
+
+#           ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
+#             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+              
+#               echo '🔐 Logging into GHCR...'
+#               echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+#               echo '📥 Pulling latest image...'
+#               docker pull $IMAGE || {
+#                 echo '❌ Pull failed — keeping old container alive.';
+#                 exit 1;
+#               }
+
+#               echo '🛑 Stopping old container...'
+#               docker stop $APP_NAME || true
+#               docker rm $APP_NAME || true
+
+#               echo '▶️ Starting new container...'
+#               docker run -d \
+#                 --name $APP_NAME \
+#                 -p $PORT:8000 \
+#                 -e APP_ENV=$TAG \
+#                 -e MONGO_CONNECTION_STRING=\"${{ secrets.MONGO_CONNECTION_STRING }}\" \
+#                 -e SMTP_KEY=\"$SMTP\" \
+#                 -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
+#                 $IMAGE
+
+#               echo '🧹 Cleaning unused images...'
+#               docker image prune -f
+
+#               echo '✅ Deployment successful for $TAG!'
+#           "
+
+
 name: 🚀 Deploy to Server
 
 on:
@@ -16,58 +91,70 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SERVER_KEY }}
 
-      - name: Deploy to Server
+      - name: Deploy Application
         run: |
-          BRANCH=${GITHUB_REF_NAME}
+          set -e
 
-          # Map branch → tag + container + port
-          if [ "$BRANCH" = "main" ]; then
-            TAG="production"
-            APP_NAME="jhs_timesnap_production"
-            PORT=8011
-            SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
-          else
-            TAG="staging"
-            APP_NAME="jhs_timesnap_staging"
-            PORT=8010
-            SMTP="${{ secrets.SMTP_KEY_STAGING }}"
-          fi
+          BRANCH="${GITHUB_REF_NAME}"
 
-          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$TAG"
+          case "$BRANCH" in
+            main)
+              ENV="production"
+              APP_NAME="jhs_timesnap_production"
+              PORT=8011
+              SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
+              ;;
+            staging)
+              ENV="staging"
+              APP_NAME="jhs_timesnap_staging"
+              PORT=8010
+              SMTP="${{ secrets.SMTP_KEY_STAGING }}"
+              ;;
+            *)
+              echo "❌ Unsupported branch: $BRANCH"
+              exit 1
+              ;;
+          esac
 
-          echo "🌍 Environment: $TAG"
+          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$ENV"
+
+          echo "🌍 Environment: $ENV"
           echo "🐳 Image: $IMAGE"
-          echo "🔌 Port: $PORT"
           echo "📦 Container: $APP_NAME"
+          echo "🔌 Port: $PORT"
 
-          ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-              
-              echo '🔐 Logging into GHCR...'
-              echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+          ssh -p "${{ secrets.SERVER_PORT }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" << EOF
+              set -e
 
-              echo '📥 Pulling latest image...'
-              docker pull $IMAGE || {
-                echo '❌ Pull failed — keeping old container alive.';
-                exit 1;
-              }
+              echo "🔐 Logging into GHCR..."
+              echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-              echo '🛑 Stopping old container...'
-              docker stop $APP_NAME || true
-              docker rm $APP_NAME || true
+              echo "📥 Pulling latest image..."
+              docker pull "$IMAGE"
 
-              echo '▶️ Starting new container...'
+              echo "🔍 Checking port ownership..."
+              if docker ps --format "{{.Names}} {{.Ports}}" | grep ":$PORT->" | grep -v "$APP_NAME"; then
+                echo "❌ Port $PORT is already used by another container"
+                exit 1
+              fi
+
+              echo "🛑 Stopping existing container (if any)..."
+              docker stop "$APP_NAME" || true
+              docker rm "$APP_NAME" || true
+
+              echo "▶️ Starting new container..."
               docker run -d \
-                --name $APP_NAME \
-                -p $PORT:8000 \
-                -e APP_ENV=$TAG \
-                -e MONGO_CONNECTION_STRING=\"${{ secrets.MONGO_CONNECTION_STRING }}\" \
-                -e SMTP_KEY=\"$SMTP\" \
-                -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
-                $IMAGE
+                --name "$APP_NAME" \
+                -p "$PORT:8000" \
+                -e APP_ENV="$ENV" \
+                -e MONGO_CONNECTION_STRING="${{ secrets.MONGO_CONNECTION_STRING }}" \
+                -e SMTP_KEY="$SMTP" \
+                -e JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
+                "$IMAGE"
 
-              echo '🧹 Cleaning unused images...'
-              docker image prune -f
+              echo "🧹 Cleaning dangling images..."
+              docker image prune -f --filter "dangling=true"
 
-              echo '✅ Deployment successful for $TAG!'
-          "
+              echo "✅ Deployment successful for $ENV"
+          EOF
