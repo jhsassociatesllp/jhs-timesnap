@@ -645,11 +645,13 @@ function createSmartDropdown(type, container, currentValue = "", currentClient =
             // projectCodeCell.appendChild(codeInput);
             // In places where you create auto-filled code field:
             projectCodeCell.innerHTML = "";
-            if (projectData) {
-                projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
-            } else {
-                projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
-            }        }
+            projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+            // if (projectData) {
+            //     projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
+            // } else {
+            //     projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+            // }        
+          }
     }
     // PROJECT CHANGE: Auto-fill project code (only for non-custom selections)
     else if (type === "project" && row) {
