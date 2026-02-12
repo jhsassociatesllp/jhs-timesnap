@@ -61,7 +61,7 @@ if not MONGO_CONNECTION_STRING:
 
 print(MONGO_CONNECTION_STRING)
 client = MongoClient(MONGO_CONNECTION_STRING)
-db = client["Timesheets"]
+db = client["staging_Timesheet"]
 timesheets_collection = db["Timesheet_data"]
 sessions_collection = db["sessions"]
 employee_details_collection = db["Employee_details"]
