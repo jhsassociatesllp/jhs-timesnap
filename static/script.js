@@ -14,6 +14,14 @@ let currentRow = null; // used by modal if present
 let isEditingHistory = false;
 let currentEntryId = null;
 let historyEntries = [];
+// Replace your polling interval with this - only poll every 5 MINUTES instead of 30 seconds
+let pollingInterval = null;
+// Debounced version of refreshPayrollWeeks
+const debouncedRefreshWeeks = debounce(refreshPayrollWeeks, 1000);
+
+// Update initWeekOptions to only fetch ONCE
+let weekOptionsInitialized = false;
+
 // 1. ADD THIS GLOBAL VARIABLE (after line with historyEntries)
 let employeeProjects = {
   clients: [],
@@ -24,6 +32,41 @@ let employeeProjects = {
 // Ye variable bana de top me
 let weekOptionsReady = false;
 window.weekOptions = [];
+
+function startPayrollPolling() {
+  // Clear any existing interval first
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+  
+  // Poll every 5 minutes (300000ms) instead of 30 seconds
+  pollingInterval = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      refreshPayrollWeeks();
+    }
+  }, 300000); // 5 minutes
+}
+
+
+// Stop polling when leaving the page
+window.addEventListener('beforeunload', () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+});
+
+// At the top of script.js, add a debounce helper
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 async function loadEmployeeProjects() {
   if (!loggedInEmployeeId) return;
@@ -46,38 +89,6 @@ async function loadEmployeeProjects() {
   }
 }
 
-// Jab backend se weekOptions aaye (jo bhi function se aa raha hai, usme ye add kar de)
-function loadWeekOptionsFromBackend() {
-    // Ye tera existing function hoga jo /get-par-current-status call karta hai
-    fetch("/get-par-current-status")
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.weeks && Array.isArray(data.weeks)) {
-                window.weekOptions = data.weeks;
-                console.log("weekOptions loaded successfully:", window.weekOptions);
-                weekOptionsReady = true;
-
-                // Ab saare existing sections ko update kar do
-                document.querySelectorAll('.timesheet-section').forEach(section => {
-                    const sectionId = section.id;
-                    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-                    if (weekSelect) {
-                        // Re-populate options if needed
-                        populateWeekDropdown(weekSelect, window.weekOptions);
-                        // Reset week value if invalid
-                        if (!window.weekOptions.find(w => w.value === weekSelect.value)) {
-                            weekSelect.value = window.weekOptions[0]?.value || "";
-                        }
-                        updateExistingRowDates(sectionId);
-                    }
-                });
-            }
-        })
-        .catch(err => {
-            console.error("Failed to load weeks:", err);
-            window.weekOptions = [];
-        });
-}
 // Restore token from sessionStorage if localStorage got cleared
 window.addEventListener("load", () => {
   const localToken =
@@ -794,57 +805,164 @@ function makeWeekObject(start, end, weekNum, months) {
 window._currentPayrollWindow = null; // { start: ISO, end: ISO }
 
 // Improved init — fetch from server and build weekOptions
+// async function initWeekOptions() {
+//   try {
+//     // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
+//     const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+//     const data = await res.json();
+
+//     let start, end;
+//     if (data && data.start && data.end) {
+//       start = new Date(data.start);
+//       end = new Date(data.end);
+//       window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     } else {
+//       const fallback = getPayrollWindow();
+//       start = fallback.start;
+//       end = fallback.end;
+//       window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     }
+
+//     window.weekOptions = generateWeekOptions(start, end);
+
+//     // update all existing selects
+//     document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+//       select.innerHTML = "";
+//       window.weekOptions.forEach(week => {
+//         const o = document.createElement("option");
+//         o.value = week.value;
+//         o.textContent = week.text;
+//         select.appendChild(o);
+//       });
+//     });
+
+//     console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+
+//   } catch (err) {
+//     console.error("❌ Error fetching payroll window:", err);
+//     const { start, end } = getPayrollWindow();
+//     window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     window.weekOptions = generateWeekOptions(start, end);
+//   }
+// }
+
 async function initWeekOptions() {
+  // Prevent multiple calls
+  if (weekOptionsInitialized) {
+    console.log("Week options already initialized, skipping");
+    return;
+  }
+  
   try {
-    // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
-    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    const res = await fetch("/get-par-current-status", { 
+      headers: getHeaders() 
+    });
     const data = await res.json();
 
     let start, end;
     if (data && data.start && data.end) {
       start = new Date(data.start);
       end = new Date(data.end);
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+      window._currentPayrollWindow = { 
+        start: start.toISOString(), 
+        end: end.toISOString() 
+      };
     } else {
       const fallback = getPayrollWindow();
       start = fallback.start;
       end = fallback.end;
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+      window._currentPayrollWindow = { 
+        start: start.toISOString(), 
+        end: end.toISOString() 
+      };
     }
 
     window.weekOptions = generateWeekOptions(start, end);
-
-    // update all existing selects
-    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-      select.innerHTML = "";
-      window.weekOptions.forEach(week => {
-        const o = document.createElement("option");
-        o.value = week.value;
-        o.textContent = week.text;
-        select.appendChild(o);
-      });
-    });
-
+    weekOptionsInitialized = true; // Mark as initialized
+    
     console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
-
+    
+    // Start polling ONLY AFTER initial load
+    startPayrollPolling();
+    
   } catch (err) {
     console.error("❌ Error fetching payroll window:", err);
     const { start, end } = getPayrollWindow();
-    window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+    window._currentPayrollWindow = { 
+      start: start.toISOString(), 
+      end: end.toISOString() 
+    };
     window.weekOptions = generateWeekOptions(start, end);
+    weekOptionsInitialized = true;
   }
 }
 
 // Refresh function — update weekOptions only if admin changed payroll window
+// async function refreshPayrollWeeks() {
+//   try {
+//     const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+//     if (!res.ok) {
+//       console.warn("refreshPayrollWeeks: server returned", res.status);
+//       return;
+//     }
+//     const data = await res.json();
+
+//     let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
+//     let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
+
+//     if (!startISO || !endISO) {
+//       const local = getPayrollWindow();
+//       startISO = local.start.toISOString();
+//       endISO = local.end.toISOString();
+//     }
+
+//     const newWindowHash = startISO + "|" + endISO;
+//     const oldWindow = window._currentPayrollWindow ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) : null;
+
+//     if (oldWindow !== newWindowHash) {
+//       console.log("🔄 Payroll window changed — updating week dropdowns");
+//       window._currentPayrollWindow = { start: startISO, end: endISO };
+//       const start = new Date(startISO);
+//       const end = new Date(endISO);
+//       window.weekOptions = generateWeekOptions(start, end);
+
+//       document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+//         const prevVal = select.value;
+//         select.innerHTML = "";
+//         window.weekOptions.forEach(week => {
+//           const o = document.createElement("option");
+//           o.value = week.value;
+//           o.textContent = week.text;
+//           select.appendChild(o);
+//         });
+
+//         // try to keep selection if same value exists
+//         if (prevVal) {
+//           const found = Array.from(select.options).find(opt => opt.value === prevVal);
+//           if (found) select.value = prevVal;
+//         }
+//       });
+
+//       showPopup("Payroll weeks updated by admin — week period dropdown refreshed.");
+//     }
+//   } catch (err) {
+//     console.error("❌ Error refreshing payroll weeks:", err);
+//   }
+// }
+
+// Update refreshPayrollWeeks to avoid unnecessary updates
 async function refreshPayrollWeeks() {
   try {
-    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    const res = await fetch("/get-par-current-status", { 
+      headers: getHeaders() 
+    });
+    
     if (!res.ok) {
       console.warn("refreshPayrollWeeks: server returned", res.status);
       return;
     }
+    
     const data = await res.json();
-
     let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
     let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
 
@@ -855,52 +973,45 @@ async function refreshPayrollWeeks() {
     }
 
     const newWindowHash = startISO + "|" + endISO;
-    const oldWindow = window._currentPayrollWindow ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) : null;
+    const oldWindow = window._currentPayrollWindow 
+      ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) 
+      : null;
 
-    if (oldWindow !== newWindowHash) {
-      console.log("🔄 Payroll window changed — updating week dropdowns");
-      window._currentPayrollWindow = { start: startISO, end: endISO };
-      const start = new Date(startISO);
-      const end = new Date(endISO);
-      window.weekOptions = generateWeekOptions(start, end);
-
-      document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-        const prevVal = select.value;
-        select.innerHTML = "";
-        window.weekOptions.forEach(week => {
-          const o = document.createElement("option");
-          o.value = week.value;
-          o.textContent = week.text;
-          select.appendChild(o);
-        });
-
-        // try to keep selection if same value exists
-        if (prevVal) {
-          const found = Array.from(select.options).find(opt => opt.value === prevVal);
-          if (found) select.value = prevVal;
-        }
-      });
-
-      showPopup("Payroll weeks updated by admin — week period dropdown refreshed.");
+    // ✅ Only update if actually changed
+    if (oldWindow === newWindowHash) {
+      console.log("✅ Payroll window unchanged, skipping update");
+      return;
     }
+
+    console.log("🔄 Payroll window changed — updating week dropdowns");
+    window._currentPayrollWindow = { start: startISO, end: endISO };
+    
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    window.weekOptions = generateWeekOptions(start, end);
+
+    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+      const prevVal = select.value;
+      select.innerHTML = "";
+      window.weekOptions.forEach(week => {
+        const o = document.createElement("option");
+        o.value = week.value;
+        o.textContent = week.text;
+        select.appendChild(o);
+      });
+      
+      if (prevVal) {
+        const found = Array.from(select.options).find(opt => opt.value === prevVal);
+        if (found) select.value = prevVal;
+      }
+    });
+
+    showPopup("Payroll weeks updated by admin");
+    
   } catch (err) {
     console.error("❌ Error refreshing payroll weeks:", err);
   }
 }
-
-// Auto-polling every 20 seconds (only when tab visible)
-setInterval(() => {
-  if (document.visibilityState === "visible") {
-    refreshPayrollWeeks();
-  }
-}, 30000);
-
-// Ensure initial run
-(async () => {
-  await initWeekOptions();
-})();
-
-
 
 
 function addWeekSection() {
