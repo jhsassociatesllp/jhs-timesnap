@@ -25,8 +25,6 @@ from datetime import datetime, timedelta
 import requests
 
 
-
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__ident="2b", bcrypt__rounds=12)
 
 # Load environment variables
