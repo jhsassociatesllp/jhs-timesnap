@@ -300,7 +300,7 @@
           </select>
         </div>
         <div>
-          <label id="modalLabel3">Punch In</label
+          <label id="modalLabel3">Project Start</label
           ><input
             type="time"
             id="modalInput3"
@@ -309,7 +309,7 @@
           />
         </div>
         <div>
-          <label id="modalLabel4">Punch Out</label
+          <label id="modalLabel4">Project End</label
           ><input
             type="time"
             id="modalInput4"
@@ -317,85 +317,79 @@
             onchange="validateTimes(null, true); updateModalHours()"
           />
         </div>
-        <div>
-          <label id="modalLabel5">Project Start</label
+        <!-- <div>
+          <label id="modalLabel5">Client</label
           ><input
-            type="time"
             id="modalInput5"
-            class="form-input"
-            onchange="validateTimes(null, true); updateModalHours()"
-          />
-        </div>
-        <div>
-          <label id="modalLabel6">Project End</label
-          ><input
-            type="time"
-            id="modalInput6"
-            class="form-input"
-            onchange="validateTimes(null, true); updateModalHours()"
-          />
-        </div>
-        <div>
-          <label id="modalLabel7">Client</label
-          ><input
-            id="modalInput7"
             class="form-input"
             placeholder="Enter Client"
             onchange="updateModalHours()"
           />
         </div>
         <div>
-          <label id="modalLabel8">Project</label
+          <label id="modalLabel6">Project</label
           ><input
             type="text"
-            id="modalInput8"
+            id="modalInput6"
             class="form-input"
             placeholder="Enter Project"
             onchange="updateModalHours()"
           />
         </div>
         <div>
-          <label id="modalLabel9">Project Code</label
+          <label id="modalLabel7">Project Code</label
           ><input
             type="text"
-            id="modalInput9"
+            id="modalInput7"
             class="form-input"
             placeholder="Enter Project Code"
             onchange="updateModalHours()"
           />
-        </div>
+        </div> -->
+
         <div>
-          <label id="modalLabel10">Reporting Manager</label
+          <label id="modalLabel5">Client</label>
+          <div id="modalClientContainer"></div>
+        </div>
+
+        <div>
+          <label id="modalLabel6">Project</label>
+          <div id="modalProjectContainer"></div>
+        </div>
+
+        <div>
+          <label id="modalLabel7">Project Code</label>
+          <div id="modalProjectCodeContainer"></div>
+        </div>
+
+        <div>
+          <label id="modalLabel8">Reporting Manager</label
           ><input
             type="text"
-            id="modalInput10"
+            id="modalInput8"
             class="form-input"
             placeholder="Enter Reporting Manager"
             onchange="updateModalHours()"
           />
         </div>
         <div>
-          <label id="modalLabel11">Activity</label
+          <label id="modalLabel9">Activity</label
           ><input
             type="text"
-            id="modalInput11"
+            id="modalInput9"
             class="form-input"
             placeholder="Enter Activity"
             onchange="updateModalHours()"
           />
         </div>
         <div>
-          <label id="modalLabel12">Project Hours</label
-          ><input type="number" id="modalInput12" class="form-input" readonly />
+          <label id="modalLabel10">Project Hours</label
+          ><input type="number" id="modalInput10" class="form-input" readonly />
         </div>
         <div>
-          <label id="modalLabel13">Working Hours</label
-          ><input type="number" id="modalInput13" class="form-input" readonly />
-        </div>
-        <div>
-          <label id="modalLabel14">Billable</label
+          <label id="modalLabel11">Billable</label
           ><select
-            id="modalInput14"
+            id="modalInput11"
             class="form-input"
             onchange="updateModalHours()"
           >
@@ -404,10 +398,10 @@
           </select>
         </div>
         <div>
-          <label id="modalLabel15">Remarks</label
+          <label id="modalLabel12">Remarks</label
           ><input
             type="text"
-            id="modalInput15"
+            id="modalInput12"
             class="form-input"
             placeholder="Additional notes"
             onchange="updateModalHours()"
