@@ -94,12 +94,15 @@ class TimesheetEntry(BaseModel):
     location: Optional[str] = None
     projectStartTime: Optional[str] = None
     projectEndTime: Optional[str] = None
+    punchIn: Optional[str] = None
+    punchOut: Optional[str] = None
     client: Optional[str] = None
     project: Optional[str] = None
     projectCode: Optional[str] = None
     reportingManagerEntry: Optional[str] = None
     activity: Optional[str] = None
     projectHours: Optional[str] = None
+    workingHours: Optional[str] = None
     billable: Optional[str] = None
     remarks: Optional[str] = None
     hits: Optional[str] = None
@@ -116,6 +119,8 @@ class LoginRequest(BaseModel):
 class UpdateTimesheetRequest(BaseModel):
     date: str
     location: Optional[str] = None
+    punchIn: Optional[str] = None
+    punchOut: Optional[str] = None
     projectStartTime: Optional[str] = None
     projectEndTime: Optional[str] = None
     client: Optional[str] = None
@@ -124,18 +129,9 @@ class UpdateTimesheetRequest(BaseModel):
     reportingManagerEntry: Optional[str] = None
     activity: Optional[str] = None
     projectHours: Optional[str] = None
+    workingHours: Optional[str] = None
     billable: Optional[str] = None
     remarks: Optional[str] = None
-    
-# Add this Pydantic model with your other models
-class VerifyUserRequest(BaseModel):
-    empid: str
-    verification_code: str
-
-class ResetPasswordRequest(BaseModel):
-    empid: str
-    new_password: str
-
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -318,205 +314,199 @@ async def verify_session(credentials: HTTPAuthorizationCredentials = Depends(oau
     
     return {"message": "Session valid"}
 
-# ==========================================
-# FORGOT PASSWORD ENDPOINTS
-# ==========================================
 
-@app.post("/verify-user")
-async def verify_user(request: VerifyUserRequest):
-    """
-    Verify user by employee ID and verification code (DDYYYYMMMM format)
-    DD = Date of birth (2 digits)
-    YYYY = Year of birth (4 digits)  
-    MMMM = First 4 digits of mobile number
+# @app.post("/logout")
+# async def logout(token: str = Depends(oauth2_scheme)):
+#     sessions_collection.delete_one({"token": token})
+#     return {"message": "Logged out successfully"}
+
+# @app.post("/save_timesheets")
+# async def save_timesheets(entries: List[TimesheetEntry], current_user: str = Depends(get_current_user)):
+#     print(f"✅ Received {len(entries)} entries from user {current_user}")
+#     collection = timesheets_collection
+
+#     if not entries:
+#         print("No timesheets to save.")
+#         return {"message": "No data to save", "success": False}
+
+#     # Validate that employeeId matches the authenticated user
+#     for entry in entries:
+#         if entry.employeeId != current_user:
+#             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized employee ID")
+
+#     employee_data = {}
+#     now_iso = datetime.utcnow().isoformat()
     
-    Example: DOB = 01/01/1991, Mobile = 9876543210 → Code = 0119919876
-    """
-    try:
-        empid = request.empid.strip().upper()
-        verification_code = request.verification_code.strip()
-        
-        # Validate verification code length
-        if len(verification_code) != 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification code must be exactly 10 digits"
-            )
-        
-        # Find employee in database
-        employee = employee_details_collection.find_one({"EmpID": empid})
-        
-        if not employee:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Employee not found"
-            )
-        
-        # Extract verification components
-        try:
-            input_date = verification_code[0:2]      # DD
-            input_year = verification_code[2:6]      # YYYY
-            input_mobile = verification_code[6:10]   # MMMM (first 4 digits)
-        except:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid verification code format"
-            )
-        
-        # Get employee DOB and mobile from database
-        # Adjust field names according to your database schema
-        emp_dob = employee.get("DOB") or employee.get("Date of Birth") or employee.get("DateOfBirth")
-        emp_mobile = employee.get("Mobile") or employee.get("Personal Mobile") or employee.get("MobileNumber")
-        
-        if not emp_dob or not emp_mobile:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Employee DOB or Mobile number not found in database"
-            )
-        
-        # Parse DOB (handle multiple formats: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
-        emp_dob_str = str(emp_dob)
-        
-        # Try different date formats
-        actual_date = None
-        actual_year = None
-        
-        for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%m/%d/%Y"]:
-            try:
-                parsed_date = datetime.strptime(emp_dob_str, fmt)
-                actual_date = parsed_date.strftime("%d")
-                actual_year = parsed_date.strftime("%Y")
-                break
-            except:
-                continue
-        
-        if not actual_date or not actual_year:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unable to parse employee date of birth"
-            )
-        
-        # Get first 4 digits of mobile number (remove any non-digit characters)
-        emp_mobile_str = str(emp_mobile).replace(" ", "").replace("-", "").replace("+", "")
-        
-        # Handle mobile numbers with country code
-        if len(emp_mobile_str) > 10:
-            emp_mobile_str = emp_mobile_str[-10:]  # Get last 10 digits
-        
-        actual_mobile = emp_mobile_str[:4]
-        
-        # Verify the code
-        if input_date != actual_date or input_year != actual_year or input_mobile != actual_mobile:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Verification failed. Invalid verification code."
-            )
-        
-        return {
-            "success": True,
-            "message": "Verification successful",
-            "empid": empid
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in verify_user: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Server error: {str(e)}"
-        )
+#     for timesheet in entries:
+#         employee_id = timesheet.employeeId
+#         week_period = timesheet.weekPeriod or "No Week"
 
+#         if employee_id not in employee_data:
+#             employee_data[employee_id] = {
+#                 "employeeId": timesheet.employeeId,
+#                 "employeeName": timesheet.employeeName or "",
+#                 "designation": timesheet.designation or "",
+#                 "gender": timesheet.gender or "",
+#                 "partner": timesheet.partner or "",
+#                 "reportingManager": timesheet.reportingManager or "",
+#                 "department": timesheet.department or "",
+#                 "Data": [],
+#                 "hits": timesheet.hits or "",
+#                 "misses": timesheet.misses or "",
+#                 "feedback_hr": timesheet.feedback_hr or "",
+#                 "feedback_it": timesheet.feedback_it or "",
+#                 "feedback_crm": timesheet.feedback_crm or "",
+#                 "feedback_others": timesheet.feedback_others or "",
+#                 "created_time": now_iso,
+#                 "updated_time": now_iso
+#             }
 
-@app.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest):
-    """
-    Reset user password after verification
-    """
-    try:
-        empid = request.empid.strip().upper()
-        new_password = request.new_password
-        
-        # Validate password strength
-        if len(new_password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters"
-            )
-        
-        if not re.search(r'[A-Z]', new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must contain at least one uppercase letter"
-            )
-        
-        if not re.search(r'[a-z]', new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must contain at least one lowercase letter"
-            )
-        
-        if not re.search(r'\d', new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must contain at least one number"
-            )
-        
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must contain at least one special character"
-            )
-        
-        # Check if user exists
-        user = users_collection.find_one({"empid": empid})
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found. Please register first."
-            )
-        
-        # Hash the new password
-        hashed_password = pwd_context.hash(new_password)
-        
-        # Update password in database
-        result = users_collection.update_one(
-            {"empid": empid},
-            {"$set": {
-                "password": hashed_password,
-                "password_updated_at": datetime.utcnow()
-            }}
-        )
-        
-        if result.modified_count == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update password"
-            )
-        
-        return {
-            "success": True,
-            "message": "Password reset successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in reset_password: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Server error: {str(e)}"
-        )
+#         daily_entry = {
+#             "date": timesheet.date or "",
+#             "location": timesheet.location or "",
+#             "projectStartTime": timesheet.projectStartTime or "",
+#             "projectEndTime": timesheet.projectEndTime or "",
+#             "punchIn": timesheet.punchIn or "",
+#             "punchOut": timesheet.punchOut or "",
+#             "client": timesheet.client or "",
+#             "project": timesheet.project or "",
+#             "projectCode": timesheet.projectCode or "",
+#             "reportingManagerEntry": timesheet.reportingManagerEntry or "",
+#             "activity": timesheet.activity or "",
+#             "projectHours": timesheet.projectHours or "",
+#             "workingHours": timesheet.workingHours or "",
+#             "billable": timesheet.billable or "",
+#             "remarks": timesheet.remarks or "",
+#             "id": str(ObjectId()),
+#             "created_time": now_iso,
+#             "updated_time": now_iso
+#         }
 
+#         # Find or create the week entry in employee_data
+#         week_found = False
+#         for week_obj in employee_data[employee_id]["Data"]:
+#             if week_period in week_obj:
+#                 week_obj[week_period].append(daily_entry)
+#                 week_found = True
+#                 break
+#         if not week_found:
+#             employee_data[employee_id]["Data"].append({week_period: [daily_entry]})
 
-# Optional: Add route to serve forgot password page
-@app.get("/forgot-password", response_class=FileResponse)
-async def forgot_password_page():
-    return FileResponse(os.path.join(frontend_path, "forgot_password.html"))
+#     print("Processing and saving data to DB...")
+#     for employee_id, data in employee_data.items():
+#         existing_doc = collection.find_one({"employeeId": employee_id})
+#         if existing_doc:
+#             print(f"Updating existing document for employeeId: {employee_id}")
+#             existing_data = existing_doc.get("Data", [])
+            
+#             # Pre-compute hashes for all existing entries (for duplicate check)
+#             existing_hashes = set()
+#             for week_obj in existing_data:
+#                 for week, entries in week_obj.items():
+#                     for entry in entries:
+#                         existing_hashes.add(compute_entry_hash(entry))
+            
+#             # Merge new data with existing data, skipping duplicates
+#             new_data = data["Data"]
+#             skipped_count = 0
+#             for new_week_obj in new_data:
+#                 week = list(new_week_obj.keys())[0]
+#                 new_week_entries = new_week_obj[week]
+                
+#                 # Filter out duplicates from new entries
+#                 filtered_entries = []
+#                 for new_entry in new_week_entries:
+#                     new_hash = compute_entry_hash(new_entry)
+#                     if new_hash in existing_hashes:
+#                         print(f"Skipping duplicate entry for date {new_entry['date']} (hash: {new_hash})")
+#                         skipped_count += 1
+#                         continue
+#                     filtered_entries.append(new_entry)
+#                     # Add to existing hashes to prevent intra-batch duplicates
+#                     existing_hashes.add(new_hash)
+                
+#                 if not filtered_entries:
+#                     continue  # Skip empty week
+                
+#                 # Find if the week exists in existing_data
+#                 week_found = False
+#                 for existing_week_obj in existing_data:
+#                     if week in existing_week_obj:
+#                         existing_week_obj[week].extend(filtered_entries)
+#                         week_found = True
+#                         break
+#                 if not week_found:
+#                     existing_data.append({week: filtered_entries})
+            
+#             # Recalculate totals from all entries
+#             total_hours = 0
+#             total_billable_hours = 0
+#             total_non_billable_hours = 0
+#             for week_obj in existing_data:
+#                 for week, entries in week_obj.items():
+#                     for entry in entries:
+#                         try:
+#                             hours = float(entry['projectHours'] or 0)
+#                         except ValueError:
+#                             hours = 0
+#                         total_hours += hours
+#                         if entry.get('billable') == "Yes":
+#                             total_billable_hours += hours
+#                         elif entry.get('billable') == "No":
+#                             total_non_billable_hours += hours
 
+#             # Update the document
+#             result = collection.update_one(
+#                 {"employeeId": employee_id},
+#                 {"$set": {
+#                     "Data": existing_data,
+#                     "employeeName": data["employeeName"],
+#                     "designation": data["designation"],
+#                     "gender": data["gender"],
+#                     "partner": data["partner"],
+#                     "reportingManager": data["reportingManager"],
+#                     "department": data["department"],
+#                     "updated_time": now_iso,
+#                     "hits": data["hits"] or "",
+#                     "misses": data["misses"] or "",
+#                     "feedback_hr": data["feedback_hr"] or "",
+#                     "feedback_it": data["feedback_it"] or "",
+#                     "feedback_crm": data["feedback_crm"] or "",
+#                     "feedback_others": data["feedback_others"] or "",
+#                     "totalHours": total_hours,
+#                     "totalBillableHours": total_billable_hours,
+#                     "totalNonBillableHours": total_non_billable_hours
+#                 }}
+#             )
+#             print(f"Updated {result.modified_count} document(s). Skipped {skipped_count} duplicates.")
+#         else:
+#             print(f"Inserting new document for employeeId: {employee_id}")
+#             # For new docs, no duplicate check needed (nothing existing)
+#             # Calculate totals for new document
+#             total_hours = 0
+#             total_billable_hours = 0
+#             total_non_billable_hours = 0
+#             for week_obj in data["Data"]:
+#                 for week, entries in week_obj.items():
+#                     for entry in entries:
+#                         try:
+#                             hours = float(entry['projectHours'] or 0)
+#                         except ValueError:
+#                             hours = 0
+#                         total_hours += hours
+#                         if entry.get('billable') == "Yes":
+#                             total_billable_hours += hours
+#                         elif entry.get('billable') == "No":
+#                             total_non_billable_hours += hours
 
+#             data["totalHours"] = total_hours
+#             data["totalBillableHours"] = total_billable_hours
+#             data["totalNonBillableHours"] = total_non_billable_hours
+#             data["created_time"] = now_iso
+#             result = collection.insert_one(data)
+#             print(f"Inserted document with ID: {result.inserted_id}")
 
+#     return {"message": "Timesheets saved successfully", "employee_ids": list(employee_data.keys()), "success": True}
 
 from fastapi import HTTPException, Depends
 from typing import List
@@ -575,12 +565,15 @@ async def save_timesheets(entries: List[TimesheetEntry], current_user: str = Dep
             "location": entry.get("location", ""),
             "projectStartTime": entry.get("projectStartTime", ""),
             "projectEndTime": entry.get("projectEndTime", ""),
+            "punchIn": entry.get("punchIn", ""),
+            "punchOut": entry.get("punchOut", ""),
             "client": entry.get("client", ""),
             "project": entry.get("project", ""),
             "projectCode": entry.get("projectCode", ""),
             "reportingManagerEntry": entry.get("reportingManagerEntry", ""),
             "activity": entry.get("activity", ""),
             "projectHours": entry.get("projectHours", "0"),
+            "workingHours": entry.get("workingHours", ""),
             "billable": entry.get("billable", "No"),
             "remarks": entry.get("remarks", ""),
             "id": str(ObjectId()),
@@ -818,6 +811,8 @@ async def update_timesheet(employee_id: str, entry_id: str, update_data: UpdateT
                                 updated_entry = {
                                     "date": update_data.date or entry.get("date", ""),
                                     "location": update_data.location or entry.get("location", ""),
+                                    "punchIn": update_data.punchIn or entry.get("punchIn", ""),
+                                    "punchOut": update_data.punchOut or entry.get("punchOut", ""),
                                     "projectStartTime": update_data.projectStartTime or entry.get("projectStartTime", ""),
                                     "projectEndTime": update_data.projectEndTime or entry.get("projectEndTime", ""),
                                     "client": update_data.client or entry.get("client", ""),
@@ -826,6 +821,7 @@ async def update_timesheet(employee_id: str, entry_id: str, update_data: UpdateT
                                     "reportingManagerEntry": update_data.reportingManagerEntry or entry.get("reportingManagerEntry", ""),
                                     "activity": update_data.activity or entry.get("activity", ""),
                                     "projectHours": update_data.projectHours or entry.get("projectHours", ""),
+                                    "workingHours": update_data.workingHours or entry.get("workingHours", ""),
                                     "billable": update_data.billable or entry.get("billable", ""),
                                     "remarks": update_data.remarks or entry.get("remarks", ""),
                                     "updated_time": now_iso,
@@ -901,12 +897,15 @@ def compute_entry_hash(entry: dict) -> str:
         "location": entry.get("location", ""),
         "projectStartTime": entry.get("projectStartTime", ""),
         "projectEndTime": entry.get("projectEndTime", ""),
+        "punchIn": entry.get("punchIn", ""),
+        "punchOut": entry.get("punchOut", ""),
         "client": entry.get("client", ""),
         "project": entry.get("project", ""),
         "projectCode": entry.get("projectCode", ""),
         "reportingManagerEntry": entry.get("reportingManagerEntry", ""),
         "activity": entry.get("activity", ""),
         "projectHours": entry.get("projectHours", ""),
+        "workingHours": entry.get("workingHours", ""),
         "billable": entry.get("billable", ""),
         "remarks": entry.get("remarks", "")
     }
@@ -1471,6 +1470,7 @@ async def forgot_password(empid: str = Body(...)):
 
     return {"success": True, "message": "OTP sent to registered email"}
 
+
 @app.post("/verify-otp")
 async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
     empid = empid.strip().upper()
@@ -1761,7 +1761,7 @@ async def webhook(request: Request):
                         "hr_email": record["hr_email"],
                         "candidate_number": from_number,
                         "candidate_name": record["candidate_name"],
-                        "candidate_id": record.get("candidate_id"), 
+                        "candidate_id": record.get("candidate_id"),
                         "role": record["role"],
                         "date": selected_date,
                         "slot": slot,
@@ -1832,105 +1832,3 @@ async def webhook(request: Request):
 async def root_fallback(request: Request):
     print("\n=== Incoming POST on root ===")
     return await webhook(request)
-
-# @app.get("/get_employee_projects/{employee_id}")
-# async def get_employee_projects(employee_id: str, current_user: str = Depends(get_current_user)):
-#     """
-#     Fetch projects filtered by employee's partner code.
-#     Returns unique clients, projects, and project codes.
-#     """
-#     if employee_id != current_user:
-#         raise HTTPException(status_code=403, detail="Unauthorized access")
-    
-#     try:
-#         # Get employee details
-#         employee = employee_details_collection.find_one({"EmpID": employee_id})
-#         if not employee:
-#             return {"clients": [], "projects": [], "project_codes": []}
-        
-#         partner_emp_code = employee.get("PartnerEmpCode", "").strip().upper()
-#         if not partner_emp_code:
-#             return {"clients": [], "projects": [], "project_codes": []}
-        
-#         # Fetch all projects for this partner
-#         projects = list(db["Projects"].find({"partner_emp_code": partner_emp_code}))
-        
-#         # Extract unique values
-#         clients = list(set([p.get("client_name", "") for p in projects if p.get("client_name")]))
-#         project_names = list(set([p.get("project_name", "") for p in projects if p.get("project_name")]))
-#         project_codes = list(set([p.get("project_code", "") for p in projects if p.get("project_code")]))
-        
-#         # Sort alphabetically
-#         clients.sort()
-#         project_names.sort()
-#         project_codes.sort()
-        
-#         return {
-#             "clients": clients,
-#             "projects": project_names,
-#             "project_codes": project_codes
-#         }
-    
-#     except Exception as e:
-#         print(f"Error fetching employee projects: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/get_employee_projects/{employee_id}")
-async def get_employee_projects(employee_id: str, current_user: str = Depends(get_current_user)):
-    """
-    Fetch projects filtered by employee's partner code.
-    Returns clients with their associated projects and project codes.
-    """
-    if employee_id != current_user:
-        raise HTTPException(status_code=403, detail="Unauthorized access")
-    
-    try:
-        # Get employee details
-        employee = employee_details_collection.find_one({"EmpID": employee_id})
-        if not employee:
-            return {"clients": [], "projects_by_client": {}}
-        
-        partner_emp_code = employee.get("PartnerEmpCode", "").strip().upper()
-        if not partner_emp_code:
-            return {"clients": [], "projects_by_client": {}}
-        
-        # Fetch all projects for this partner
-        projects = list(db["Projects"].find({"partner_emp_code": partner_emp_code}))
-        
-        # Build nested structure: client -> projects with codes
-        projects_by_client = {}
-        
-        for p in projects:
-            client = p.get("client_name", "").strip()
-            proj_name = p.get("project_name", "").strip()
-            proj_code = p.get("project_code", "").strip()
-            
-            if not client or not proj_name or not proj_code:
-                continue
-            
-            if client not in projects_by_client:
-                projects_by_client[client] = []
-            
-            # Avoid duplicates
-            if not any(item["project_name"] == proj_name for item in projects_by_client[client]):
-                projects_by_client[client].append({
-                    "project_name": proj_name,
-                    "project_code": proj_code
-                })
-        
-        # Sort clients alphabetically
-        clients = sorted(projects_by_client.keys())
-        
-        # Sort projects within each client
-        for client in projects_by_client:
-            projects_by_client[client].sort(key=lambda x: x["project_name"])
-        
-        return {
-            "clients": clients,
-            "projects_by_client": projects_by_client
-        }
-    
-    except Exception as e:
-        print(f"Error fetching employee projects: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
