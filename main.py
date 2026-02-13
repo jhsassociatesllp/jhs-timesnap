@@ -38,7 +38,7 @@ app = FastAPI(title="Professional Time Sheet API", version="1.0.0")
 # CORS middleware - Update allow_origins for production security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["jhstimesnap.in"],  
+    allow_origins=["http://45.198.225.149:8010"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
