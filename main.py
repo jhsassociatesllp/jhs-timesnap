@@ -148,36 +148,6 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# async def get_current_user(token: str = Depends(oauth2_scheme)):
-#     if not token:
-#         print("No token")
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    
-#     try:
-#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         employee_id: str = payload.get("sub")
-#         print(f"Decoded payload: {payload}")
-#         if employee_id is None:
-#             print("No employee_id")
-#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        
-#         print(f"Token: {token}, Employee_id: {employee_id}")
-        
-#         session = sessions_collection.find_one({
-#             "token": token, 
-#             "employeeId": employee_id,
-#             "expires_at": {"$gt": datetime.utcnow()}
-#         })
-        
-#         if not session:
-#             print("No session")
-#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or invalid")
-            
-#         return employee_id
-#     except jwt.PyJWTError:
-#         print(f"Error decoding token: {token}")
-#         print("Invalid token")
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     token = credentials.credentials  # Extract Bearer token
