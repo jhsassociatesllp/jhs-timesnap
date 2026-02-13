@@ -31,4 +31,3 @@ pending_collection = db["Pending"]
 approved_collection = db["Approved"]
 rejected_collection = db["Rejected"]
 forgot_password_otps_collection = db["forgot_password_otps"]
-
