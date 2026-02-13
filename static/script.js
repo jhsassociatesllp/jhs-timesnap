@@ -4267,4 +4267,8 @@ function updateApproveAllButtons() {
         rejectedRows > 0 ? "block" : "none";
 }
 
+// Call this after every load of the tables
+// (add it at the end of loadPendingList() and loadRejectedList())
+
+
 /* End of file */
