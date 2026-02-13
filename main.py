@@ -1934,3 +1934,4 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
     except Exception as e:
         print(f"Error fetching employee projects: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
