@@ -175,6 +175,25 @@
             transform: translateY(0);
         }
 
+        .forgot-password {
+            text-align: right;
+            margin-top: -1rem;
+            margin-bottom: 1rem;
+        }
+
+        .forgot-password a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .forgot-password a:hover {
+            text-decoration: underline;
+            color: #764ba2;
+        }
+
         .register-link {
             margin-top: 1.5rem;
             font-size: 1rem;
@@ -297,6 +316,9 @@
             <input type="password" id="password" placeholder="Enter your password">
             <i class="fas fa-eye toggle-password" onclick="togglePassword('password')"></i>
         </div>
+        <div class="forgot-password">
+            <a href="/static/forgot_password.html"><i class="fas fa-key"></i> Forgot Password?</a>
+        </div>
         <button class="login-btn" onclick="login()"><i class="fas fa-arrow-right"></i> Login</button>
         <div class="register-link">
             Don't have an account? <a href="/static/register.html">Register</a>
@@ -360,43 +382,6 @@
             }
         }
 
-        async function nlogin() {
-            const empid = document.getElementById('empid').value.trim();
-            const password = document.getElementById('password').value.trim();
-            
-            if (!empid || !password) {
-                showMessage('Please enter both Employee Code and Password', 'error');
-                return;
-            }
-
-            const btn = document.querySelector('.login-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ empid, password })
-                });
-                const result = await response.json();
-                if (response.ok && result.success) {
-                    localStorage.setItem('access_token', result.access_token);
-                    localStorage.setItem('loggedInEmployeeId', empid);
-                    window.location.href = '/dashboard';
-                } else {
-                    showMessage(result.detail || 'Invalid Employee Code or Password', 'error');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showMessage('Failed to login: ' + error.message, 'error');
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-        }
-
         function showMessage(message, type) {
             const messageDiv = document.getElementById('message');
             if (messageDiv) {
@@ -418,5 +403,4 @@
         });
     </script>
 </body>
-</html> 
-
+</html>

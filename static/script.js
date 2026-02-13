@@ -1,4 +1,4 @@
-/* script.js - cleaned (punchIn/punchOut removed) */
+
 console.log("✅ script.js loaded successfully");
 
 let sectionCount = 0;
@@ -14,44 +14,81 @@ let currentRow = null; // used by modal if present
 let isEditingHistory = false;
 let currentEntryId = null;
 let historyEntries = [];
+// Replace your polling interval with this - only poll every 5 MINUTES instead of 30 seconds
+let pollingInterval = null;
+// Debounced version of refreshPayrollWeeks
+const debouncedRefreshWeeks = debounce(refreshPayrollWeeks, 1000);
 
+// Update initWeekOptions to only fetch ONCE
+let weekOptionsInitialized = false;
+
+// 1. ADD THIS GLOBAL VARIABLE (after line with historyEntries)
+let employeeProjects = {
+  clients: [],
+  projects: [],
+  project_codes: []
+};
 
 // Ye variable bana de top me
 let weekOptionsReady = false;
 window.weekOptions = [];
 
-// Jab backend se weekOptions aaye (jo bhi function se aa raha hai, usme ye add kar de)
-function loadWeekOptionsFromBackend() {
-    // Ye tera existing function hoga jo /get-par-current-status call karta hai
-    fetch("/get-par-current-status")
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.weeks && Array.isArray(data.weeks)) {
-                window.weekOptions = data.weeks;
-                console.log("weekOptions loaded successfully:", window.weekOptions);
-                weekOptionsReady = true;
-
-                // Ab saare existing sections ko update kar do
-                document.querySelectorAll('.timesheet-section').forEach(section => {
-                    const sectionId = section.id;
-                    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-                    if (weekSelect) {
-                        // Re-populate options if needed
-                        populateWeekDropdown(weekSelect, window.weekOptions);
-                        // Reset week value if invalid
-                        if (!window.weekOptions.find(w => w.value === weekSelect.value)) {
-                            weekSelect.value = window.weekOptions[0]?.value || "";
-                        }
-                        updateExistingRowDates(sectionId);
-                    }
-                });
-            }
-        })
-        .catch(err => {
-            console.error("Failed to load weeks:", err);
-            window.weekOptions = [];
-        });
+function startPayrollPolling() {
+  // Clear any existing interval first
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+  
+  // Poll every 5 minutes (300000ms) instead of 30 seconds
+  pollingInterval = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      refreshPayrollWeeks();
+    }
+  }, 300000); // 5 minutes
 }
+
+
+// Stop polling when leaving the page
+window.addEventListener('beforeunload', () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+});
+
+// At the top of script.js, add a debounce helper
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+async function loadEmployeeProjects() {
+  if (!loggedInEmployeeId) return;
+  
+  try {
+    const res = await fetch(`${API_URL}/get_employee_projects/${loggedInEmployeeId}`, {
+      headers: getHeaders()
+    });
+    
+    if (res.ok) {
+      employeeProjects = await res.json();
+      console.log("✅ Employee projects loaded:", employeeProjects);
+       console.log("📊 Clients:", employeeProjects.clients);
+  console.log("📊 Projects by client:", employeeProjects.projects_by_client);
+    } else {
+      console.warn("Failed to load employee projects");
+    }
+  } catch (err) {
+    console.error("Error loading employee projects:", err);
+  }
+}
+
 // Restore token from sessionStorage if localStorage got cleared
 window.addEventListener("load", () => {
   const localToken =
@@ -126,9 +163,9 @@ function showError(message) {
   }
   dv.textContent = message;
   dv.style.display = "block";
-  setTimeout(() => {
-    dv.style.display = "none";
-  }, 5000);
+  // setTimeout(() => {
+  //   dv.style.display = "none";
+  // }, 5000);
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -173,6 +210,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     employeeData = await safeFetchJson("/employees");
     clientData = await safeFetchJson("/clients");
 
+    // ✅ NEW: Load employee projects
+    await loadEmployeeProjects();
+
     // ✅ Step 2: initialize week options BEFORE creating UI
     await initWeekOptions();
 
@@ -190,6 +230,482 @@ document.addEventListener("DOMContentLoaded", async () => {
     hideLoading();
   }
 });
+
+
+function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
+  // type = "client", "project", or "project_code"
+  let options = [];
+  
+  if (type === "client") {
+    options = employeeProjects.clients || [];
+  } else if (type === "project") {
+    // Filter projects based on selected client
+    if (currentClient && employeeProjects.projects_by_client && employeeProjects.projects_by_client[currentClient]) {
+      options = employeeProjects.projects_by_client[currentClient].map(p => p.project_name);
+    } else {
+      options = [];
+    }
+  } else if (type === "project_code") {
+    // Project codes are auto-filled, so we don't need options
+    options = [];
+  }
+  
+  const select = document.createElement("select");
+  select.className = `${type}-field form-input smart-dropdown`;
+  select.style.width = "100%";
+  
+  // Add default option
+  const defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = `Select ${type.replace('_', ' ')}`;
+  select.appendChild(defaultOpt);
+  
+  // Add filtered options
+  options.forEach(opt => {
+    const option = document.createElement("option");
+    option.value = opt;
+    option.textContent = opt;
+    if (opt === currentValue) option.selected = true;
+    select.appendChild(option);
+  });
+  
+  // Add "Type here" option only for client and project
+  if (type !== "project_code") {
+    const typeOption = document.createElement("option");
+    typeOption.value = "__TYPE_HERE__";
+    typeOption.textContent = "✏️ Type here (custom entry)";
+    typeOption.style.fontStyle = "italic";
+    typeOption.style.color = "#666";
+    select.appendChild(typeOption);
+  }
+  
+  // Handle selection changes
+  // select.addEventListener("change", function() {
+  //   const row = this.closest("tr");
+    
+  //   if (this.value === "__TYPE_HERE__") {
+  //     // Replace with input field
+  //     const input = document.createElement("input");
+  //     input.type = "text";
+  //     input.className = `${type}-field form-input`;
+  //     input.placeholder = `Enter ${type.replace('_', ' ')}`;
+  //     input.value = currentValue;
+  //     input.style.width = "calc(100% - 35px)";
+      
+  //     // Add button to go back to dropdown
+  //     const backBtn = document.createElement("button");
+  //     backBtn.className = "back-to-dropdown-btn";
+  //     backBtn.innerHTML = '<i class="fas fa-list"></i>';
+  //     backBtn.title = "Back to dropdown";
+  //     backBtn.type = "button";
+  //     backBtn.style.marginLeft = "5px";
+  //     backBtn.style.padding = "6px 10px";
+  //     backBtn.style.cursor = "pointer";
+  //     // backBtn.onclick = () => {
+  //     //   const clientValue = type === "project" ? getFieldValue(row, '.col-client') : "";
+  //     //   const newDropdown = createSmartDropdown(type, container, input.value, clientValue);
+  //     //   container.innerHTML = "";
+  //     //   container.appendChild(newDropdown);
+  //     // };
+
+  //    backBtn.onclick = () => {
+  //     const isModal = container.closest("#modalOverlay") !== null;
+  //     let clientValue = "";
+
+  //     if (type === "project") {
+  //         if (isModal) {
+  //             const clientSelect = document.querySelector("#modalClientContainer select");
+  //             clientValue = clientSelect?.value || "";
+  //         } else {
+  //             const row = container.closest("tr");
+  //             clientValue = row ? getFieldValue(row, '.col-client') : "";
+  //         }
+  //     }
+
+  //     const newDropdown = createSmartDropdown(type, container, input.value || "", clientValue);
+  //     container.innerHTML = "";
+  //     container.appendChild(newDropdown);
+
+  //     // ────────────────────────────────────────────────
+  //     // Reset project code field (table OR modal)
+  //     // ────────────────────────────────────────────────
+  //     let codeContainer, codeElement;
+
+  //     if (isModal) {
+  //         codeContainer = document.getElementById("modalProjectCodeContainer");
+  //         codeElement = document.getElementById("modalProjectCodeInput");
+  //     } else {
+  //         const row = container.closest("tr");
+  //         if (row) {
+  //             codeContainer = row.querySelector(".col-project-code");
+  //             codeElement = codeContainer?.querySelector("input");
+  //         }
+  //     }
+
+  //     if (codeContainer) {
+  //         codeContainer.innerHTML = "";
+
+  //         const currentProjectVal = newDropdown.value;
+
+  //         const inputElem = document.createElement("input");
+  //         inputElem.type = "text";
+  //         inputElem.className = "form-input project-code";
+
+  //         if (currentProjectVal === "" || currentProjectVal === "__TYPE_HERE__") {
+  //             inputElem.placeholder = currentProjectVal === "__TYPE_HERE__" ? "Enter Project Code" : "Auto-filled";
+  //             inputElem.readOnly = false;
+  //             if (currentProjectVal !== "__TYPE_HERE__") {
+  //                 inputElem.style.backgroundColor = "#f0f0f0";
+  //             }
+  //         } else {
+  //             let projectCode = "";
+  //             if (clientValue && employeeProjects.projects_by_client?.[clientValue]) {
+  //                 const match = employeeProjects.projects_by_client[clientValue]
+  //                     .find(p => p.project_name === currentProjectVal);
+  //                 projectCode = match?.project_code || "";
+  //             }
+  //             inputElem.value = projectCode;
+  //             inputElem.readOnly = true;
+  //             inputElem.style.backgroundColor = "#f0f0f0";
+  //         }
+
+  //         if (isModal) {
+  //             inputElem.id = "modalProjectCodeInput";
+  //         }
+
+  //         codeContainer.appendChild(inputElem);
+  //     }
+  // };
+      
+  //     container.innerHTML = "";
+  //     const wrapper = document.createElement("div");
+  //     wrapper.style.display = "flex";
+  //     wrapper.style.alignItems = "center";
+  //     wrapper.style.gap = "5px";
+  //     wrapper.appendChild(input);
+  //     wrapper.appendChild(backBtn);
+  //     container.appendChild(wrapper);
+      
+  //     input.focus();
+  //     input.addEventListener("input", updateSummary);
+  //   } 
+  //   // CLIENT CHANGE: Update project dropdown
+  //   else if (type === "client" && row) {
+  //     const selectedClient = this.value;
+  //     const projectCell = row.querySelector(".col-project");
+  //     const projectCodeCell = row.querySelector(".col-project-code");
+      
+  //     // Clear project and project code
+  //     if (projectCell) {
+  //       // projectCell.innerHTML = "";
+  //       // projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
+  //       const currentProjectInput = projectCell.querySelector("input");
+
+  //       projectCell.innerHTML = "";
+
+  //       if (currentProjectInput) {
+  //         // Preserve input mode
+  //         const input = document.createElement("input");
+  //         input.type = "text";
+  //         input.className = "project form-input";
+  //         input.placeholder = "Enter project";
+  //         projectCell.appendChild(input);
+  //       } else {
+  //         // Normal dropdown mode
+  //         projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
+  //       }
+
+  //     }
+      
+  //     if (projectCodeCell) {
+  //       projectCodeCell.innerHTML = "";
+  //       const codeInput = document.createElement("input");
+  //       codeInput.type = "text";
+  //       codeInput.className = "project-code form-input";
+  //       codeInput.placeholder = "Auto-filled";
+  //       codeInput.readOnly = true;
+  //       codeInput.style.backgroundColor = "#f0f0f0";
+  //       projectCodeCell.appendChild(codeInput);
+  //     }
+  //   }
+  //   // PROJECT CHANGE: Auto-fill project code
+  //   // else if (type === "project" && row) {
+  //   //   const selectedProject = this.value;
+  //   //   const clientValue = getFieldValue(row, '.col-client');
+      
+  //   //   if (clientValue && employeeProjects.projects_by_client && employeeProjects.projects_by_client[clientValue]) {
+  //   //     const projectData = employeeProjects.projects_by_client[clientValue].find(
+  //   //       p => p.project_name === selectedProject
+  //   //     );
+        
+  //   //     if (projectData) {
+  //   //       const projectCodeCell = row.querySelector(".col-project-code");
+  //   //       if (projectCodeCell) {
+  //   //         projectCodeCell.innerHTML = "";
+  //   //         const codeInput = document.createElement("input");
+  //   //         codeInput.type = "text";
+  //   //         codeInput.className = "project-code form-input";
+  //   //         codeInput.value = projectData.project_code;
+  //   //         codeInput.readOnly = true;
+  //   //         codeInput.style.backgroundColor = "#f0f0f0";
+  //   //         projectCodeCell.appendChild(codeInput);
+  //   //       }
+  //   //     }
+  //   //   }
+  //   // }
+  //   else if (type === "project" && row) {
+  //     const selectedProject = this.value;
+  //     const clientValue = getFieldValue(row, '.col-client');
+  //     const projectCodeCell = row.querySelector(".col-project-code");
+
+  //     if (!projectCodeCell) return;
+
+  //     projectCodeCell.innerHTML = "";
+
+  //     // 🟢 If project is custom
+  //     if (selectedProject === "__TYPE_HERE__") {
+  //       const codeInput = document.createElement("input");
+  //       codeInput.type = "text";
+  //       codeInput.className = "project-code form-input";
+  //       codeInput.placeholder = "Enter Project Code";
+  //       codeInput.readOnly = false;
+  //       projectCodeCell.appendChild(codeInput);
+  //       return;
+  //     }
+
+  //     // 🟢 If project is normal (from dropdown)
+  //     if (
+  //       clientValue &&
+  //       employeeProjects.projects_by_client &&
+  //       employeeProjects.projects_by_client[clientValue]
+  //     ) {
+  //       const projectData =
+  //         employeeProjects.projects_by_client[clientValue].find(
+  //           p => p.project_name === selectedProject
+  //         );
+
+  //       if (projectData) {
+  //         const codeInput = document.createElement("input");
+  //         codeInput.type = "text";
+  //         codeInput.className = "project-code form-input";
+  //         codeInput.value = projectData.project_code;
+  //         codeInput.readOnly = true;
+  //         codeInput.style.backgroundColor = "#f0f0f0";
+  //         projectCodeCell.appendChild(codeInput);
+  //       }
+  //     }
+  //   }
+
+  // });
+
+  select.addEventListener("change", function() {
+    const row = this.closest("tr");
+    
+    if (this.value === "__TYPE_HERE__") {
+        // Replace with input field
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = `${type}-field form-input`;
+        input.placeholder = `Enter ${type.replace('_', ' ')}`;
+        input.value = currentValue;
+        input.style.width = "calc(100% - 35px)";
+        
+        // Add button to go back to dropdown
+        const backBtn = document.createElement("button");
+        backBtn.className = "back-to-dropdown-btn";
+        backBtn.innerHTML = '<i class="fas fa-list"></i>';
+        backBtn.title = "Back to dropdown";
+        backBtn.type = "button";
+        backBtn.style.marginLeft = "5px";
+        backBtn.style.padding = "6px 10px";
+        backBtn.style.cursor = "pointer";
+        backBtn.onclick = () => {
+            const isModal = container.closest("#modalOverlay") !== null;
+            let clientValue = "";
+            if (type === "project") {
+                if (isModal) {
+                    const clientSelect = document.querySelector("#modalClientContainer select");
+                    clientValue = clientSelect?.value || "";
+                } else {
+                    const row = container.closest("tr");
+                    clientValue = row ? getFieldValue(row, '.col-client') : "";
+                }
+            }
+            const newDropdown = createSmartDropdown(type, container, input.value || "", clientValue);
+            container.innerHTML = "";
+            container.appendChild(newDropdown);
+            
+            // If typed value not in options → auto-trigger type here mode to preserve it
+            const hasOption = Array.from(newDropdown.options).some(opt => opt.value === input.value && opt.value !== "" && opt.value !== "__TYPE_HERE__");
+            if (input.value && !hasOption) {
+                newDropdown.value = "__TYPE_HERE__";
+                const changeEvent = new Event("change");
+                newDropdown.dispatchEvent(changeEvent);
+            }
+            // ────────────────────────────────────────────────
+            // Reset project code field (table OR modal)
+            // ────────────────────────────────────────────────
+            let codeContainer, codeElement;
+            if (isModal) {
+                codeContainer = document.getElementById("modalProjectCodeContainer");
+                codeElement = document.getElementById("modalProjectCodeInput");
+            } else {
+                const row = container.closest("tr");
+                if (row) {
+                    codeContainer = row.querySelector(".col-project-code");
+                    codeElement = codeContainer?.querySelector("input");
+                }
+            }
+            if (codeContainer) {
+                codeContainer.innerHTML = "";
+                const currentProjectVal = newDropdown.value;
+                const inputElem = document.createElement("input");
+                inputElem.type = "text";
+                inputElem.className = "form-input project-code";
+                if (currentProjectVal === "" || currentProjectVal === "__TYPE_HERE__") {
+                    inputElem.placeholder = currentProjectVal === "__TYPE_HERE__" ? "Enter Project Code" : "Auto-filled";
+                    inputElem.readOnly = false;
+                    if (currentProjectVal !== "__TYPE_HERE__") {
+                        inputElem.style.backgroundColor = "#f0f0f0";
+                    }
+                } else {
+                    let projectCode = "";
+                    if (clientValue && employeeProjects.projects_by_client?.[clientValue]) {
+                        const match = employeeProjects.projects_by_client[clientValue]
+                            .find(p => p.project_name === currentProjectVal);
+                        projectCode = match?.project_code || "";
+                    }
+                    inputElem.value = projectCode;
+                    inputElem.readOnly = true;
+                    inputElem.style.backgroundColor = "#f0f0f0";
+                }
+                if (isModal) {
+                    inputElem.id = "modalProjectCodeInput";
+                }
+                codeContainer.appendChild(inputElem);
+            }
+        };
+        
+        container.innerHTML = "";
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.alignItems = "center";
+        wrapper.style.gap = "5px";
+        wrapper.appendChild(input);
+        wrapper.appendChild(backBtn);
+        container.appendChild(wrapper);
+        
+        input.focus();
+        input.addEventListener("input", updateSummary);
+
+        // ────────────────────────────────────────────────
+        // NEW: Handle project code editable for custom (table OR modal)
+        // ────────────────────────────────────────────────
+        if (type === "project") {
+            const isModal = container.closest("#modalOverlay") !== null;
+            let projectCodeContainer;
+            if (isModal) {
+                projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+            } else if (row) {
+                projectCodeContainer = row.querySelector(".col-project-code");
+            }
+            if (projectCodeContainer) {
+                projectCodeContainer.innerHTML = "";
+                const codeInput = document.createElement("input");
+                codeInput.type = "text";
+                codeInput.className = "project-code form-input";
+                codeInput.placeholder = "Enter Project Code";
+                codeInput.readOnly = false;
+                codeInput.style.backgroundColor = "";
+                if (isModal) codeInput.id = "modalProjectCodeInput";
+                projectCodeContainer.appendChild(codeInput);
+            }
+        }
+    }
+    // CLIENT CHANGE: Update project dropdown
+    else if (type === "client" && row) {
+        const selectedClient = this.value;
+        const projectCell = row.querySelector(".col-project");
+        const projectCodeCell = row.querySelector(".col-project-code");
+        
+        // Clear project and project code
+        if (projectCell) {
+            const currentProjectInput = projectCell.querySelector("input");
+            projectCell.innerHTML = "";
+            if (currentProjectInput) {
+                // Preserve input mode
+                const input = document.createElement("input");
+                input.type = "text";
+                input.className = "project form-input";
+                input.placeholder = "Enter project";
+                projectCell.appendChild(input);
+            } else {
+                // Normal dropdown mode
+                projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
+            }
+        }
+        
+        if (projectCodeCell) {
+            // projectCodeCell.innerHTML = "";
+            // const codeInput = document.createElement("input");
+            // codeInput.type = "text";
+            // codeInput.className = "project-code form-input";
+            // codeInput.placeholder = "Auto-filled";
+            // codeInput.readOnly = true;
+            // codeInput.style.backgroundColor = "#f0f0f0";
+            // projectCodeCell.appendChild(codeInput);
+            // In places where you create auto-filled code field:
+            projectCodeCell.innerHTML = "";
+            projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+            // if (projectData) {
+            //     projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
+            // } else {
+            //     projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+            // }        
+          }
+    }
+    // PROJECT CHANGE: Auto-fill project code (only for non-custom selections)
+    else if (type === "project" && row) {
+        const selectedProject = this.value;
+        const clientValue = getFieldValue(row, '.col-client');
+        const projectCodeCell = row.querySelector(".col-project-code");
+        if (!projectCodeCell) return;
+        projectCodeCell.innerHTML = "";
+        // 🟢 If project is normal (from dropdown)
+        if (
+            clientValue &&
+            employeeProjects.projects_by_client &&
+            employeeProjects.projects_by_client[clientValue]
+        ) {
+            const projectData =
+                employeeProjects.projects_by_client[clientValue].find(
+                    p => p.project_name === selectedProject
+                );
+            if (projectData) {
+                // const codeInput = document.createElement("input");
+                // codeInput.type = "text";
+                // codeInput.className = "project-code form-input";
+                // codeInput.value = projectData.project_code;
+                // codeInput.readOnly = true;
+                // codeInput.style.backgroundColor = "#f0f0f0";
+                // projectCodeCell.appendChild(codeInput);
+
+                // In places where you create auto-filled code field:
+                projectCodeCell.innerHTML = "";
+                if (projectData) {
+                    projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
+                } else {
+                    projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+                }            }
+        }
+    }
+}); 
+  
+  // Trigger summary update on dropdown change
+  select.addEventListener("change", updateSummary);
+  
+  return select;
+}
 
 
 async function safeFetchJson(endpoint, opts = {}) {
@@ -289,57 +805,164 @@ function makeWeekObject(start, end, weekNum, months) {
 window._currentPayrollWindow = null; // { start: ISO, end: ISO }
 
 // Improved init — fetch from server and build weekOptions
+// async function initWeekOptions() {
+//   try {
+//     // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
+//     const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+//     const data = await res.json();
+
+//     let start, end;
+//     if (data && data.start && data.end) {
+//       start = new Date(data.start);
+//       end = new Date(data.end);
+//       window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     } else {
+//       const fallback = getPayrollWindow();
+//       start = fallback.start;
+//       end = fallback.end;
+//       window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     }
+
+//     window.weekOptions = generateWeekOptions(start, end);
+
+//     // update all existing selects
+//     document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+//       select.innerHTML = "";
+//       window.weekOptions.forEach(week => {
+//         const o = document.createElement("option");
+//         o.value = week.value;
+//         o.textContent = week.text;
+//         select.appendChild(o);
+//       });
+//     });
+
+//     console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
+
+//   } catch (err) {
+//     console.error("❌ Error fetching payroll window:", err);
+//     const { start, end } = getPayrollWindow();
+//     window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+//     window.weekOptions = generateWeekOptions(start, end);
+//   }
+// }
+
 async function initWeekOptions() {
+  // Prevent multiple calls
+  if (weekOptionsInitialized) {
+    console.log("Week options already initialized, skipping");
+    return;
+  }
+  
   try {
-    // If /get-par-current-status requires auth, use getHeaders() else getHeaders(false)
-    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    const res = await fetch("/get-par-current-status", { 
+      headers: getHeaders() 
+    });
     const data = await res.json();
 
     let start, end;
     if (data && data.start && data.end) {
       start = new Date(data.start);
       end = new Date(data.end);
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+      window._currentPayrollWindow = { 
+        start: start.toISOString(), 
+        end: end.toISOString() 
+      };
     } else {
       const fallback = getPayrollWindow();
       start = fallback.start;
       end = fallback.end;
-      window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+      window._currentPayrollWindow = { 
+        start: start.toISOString(), 
+        end: end.toISOString() 
+      };
     }
 
     window.weekOptions = generateWeekOptions(start, end);
-
-    // update all existing selects
-    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-      select.innerHTML = "";
-      window.weekOptions.forEach(week => {
-        const o = document.createElement("option");
-        o.value = week.value;
-        o.textContent = week.text;
-        select.appendChild(o);
-      });
-    });
-
+    weekOptionsInitialized = true; // Mark as initialized
+    
     console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
-
+    
+    // Start polling ONLY AFTER initial load
+    startPayrollPolling();
+    
   } catch (err) {
     console.error("❌ Error fetching payroll window:", err);
     const { start, end } = getPayrollWindow();
-    window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+    window._currentPayrollWindow = { 
+      start: start.toISOString(), 
+      end: end.toISOString() 
+    };
     window.weekOptions = generateWeekOptions(start, end);
+    weekOptionsInitialized = true;
   }
 }
 
 // Refresh function — update weekOptions only if admin changed payroll window
+// async function refreshPayrollWeeks() {
+//   try {
+//     const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+//     if (!res.ok) {
+//       console.warn("refreshPayrollWeeks: server returned", res.status);
+//       return;
+//     }
+//     const data = await res.json();
+
+//     let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
+//     let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
+
+//     if (!startISO || !endISO) {
+//       const local = getPayrollWindow();
+//       startISO = local.start.toISOString();
+//       endISO = local.end.toISOString();
+//     }
+
+//     const newWindowHash = startISO + "|" + endISO;
+//     const oldWindow = window._currentPayrollWindow ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) : null;
+
+//     if (oldWindow !== newWindowHash) {
+//       console.log("🔄 Payroll window changed — updating week dropdowns");
+//       window._currentPayrollWindow = { start: startISO, end: endISO };
+//       const start = new Date(startISO);
+//       const end = new Date(endISO);
+//       window.weekOptions = generateWeekOptions(start, end);
+
+//       document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+//         const prevVal = select.value;
+//         select.innerHTML = "";
+//         window.weekOptions.forEach(week => {
+//           const o = document.createElement("option");
+//           o.value = week.value;
+//           o.textContent = week.text;
+//           select.appendChild(o);
+//         });
+
+//         // try to keep selection if same value exists
+//         if (prevVal) {
+//           const found = Array.from(select.options).find(opt => opt.value === prevVal);
+//           if (found) select.value = prevVal;
+//         }
+//       });
+
+//       showPopup("Payroll weeks updated by admin — week period dropdown refreshed.");
+//     }
+//   } catch (err) {
+//     console.error("❌ Error refreshing payroll weeks:", err);
+//   }
+// }
+
+// Update refreshPayrollWeeks to avoid unnecessary updates
 async function refreshPayrollWeeks() {
   try {
-    const res = await fetch("/get-par-current-status", { headers: getHeaders() });
+    const res = await fetch("/get-par-current-status", { 
+      headers: getHeaders() 
+    });
+    
     if (!res.ok) {
       console.warn("refreshPayrollWeeks: server returned", res.status);
       return;
     }
+    
     const data = await res.json();
-
     let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
     let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
 
@@ -350,52 +973,45 @@ async function refreshPayrollWeeks() {
     }
 
     const newWindowHash = startISO + "|" + endISO;
-    const oldWindow = window._currentPayrollWindow ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) : null;
+    const oldWindow = window._currentPayrollWindow 
+      ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) 
+      : null;
 
-    if (oldWindow !== newWindowHash) {
-      console.log("🔄 Payroll window changed — updating week dropdowns");
-      window._currentPayrollWindow = { start: startISO, end: endISO };
-      const start = new Date(startISO);
-      const end = new Date(endISO);
-      window.weekOptions = generateWeekOptions(start, end);
-
-      document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-        const prevVal = select.value;
-        select.innerHTML = "";
-        window.weekOptions.forEach(week => {
-          const o = document.createElement("option");
-          o.value = week.value;
-          o.textContent = week.text;
-          select.appendChild(o);
-        });
-
-        // try to keep selection if same value exists
-        if (prevVal) {
-          const found = Array.from(select.options).find(opt => opt.value === prevVal);
-          if (found) select.value = prevVal;
-        }
-      });
-
-      showPopup("Payroll weeks updated by admin — week period dropdown refreshed.");
+    // ✅ Only update if actually changed
+    if (oldWindow === newWindowHash) {
+      console.log("✅ Payroll window unchanged, skipping update");
+      return;
     }
+
+    console.log("🔄 Payroll window changed — updating week dropdowns");
+    window._currentPayrollWindow = { start: startISO, end: endISO };
+    
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    window.weekOptions = generateWeekOptions(start, end);
+
+    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+      const prevVal = select.value;
+      select.innerHTML = "";
+      window.weekOptions.forEach(week => {
+        const o = document.createElement("option");
+        o.value = week.value;
+        o.textContent = week.text;
+        select.appendChild(o);
+      });
+      
+      if (prevVal) {
+        const found = Array.from(select.options).find(opt => opt.value === prevVal);
+        if (found) select.value = prevVal;
+      }
+    });
+
+    showPopup("Payroll weeks updated by admin");
+    
   } catch (err) {
     console.error("❌ Error refreshing payroll weeks:", err);
   }
 }
-
-// Auto-polling every 20 seconds (only when tab visible)
-setInterval(() => {
-  if (document.visibilityState === "visible") {
-    refreshPayrollWeeks();
-  }
-}, 30000);
-
-// Ensure initial run
-(async () => {
-  await initWeekOptions();
-})();
-
-
 
 
 function addWeekSection() {
@@ -478,10 +1094,10 @@ if (window.weekOptions && window.weekOptions.length > 0) {
     <table class="timesheet-table">
       <thead>
         <tr>
-          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th><th>Punch In</th><th>Punch Out</th>
+          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th>
           <th>Project Start</th><th>Project End</th><th>Client</th><th>Project</th>
           <th>Project Code</th><th>Reporting Manager</th><th>Activity</th>
-          <th>Project Hours</th><th>Working Hours</th><th>Billable</th><th>Remarks</th><th>Delete</th>
+          <th>Project Hours</th><th>Billable</th><th>Remarks</th><th>Delete</th>
         </tr>
       </thead>
       <tbody id="timesheetBody_${sectionCount}"></tbody>
@@ -575,126 +1191,6 @@ function updateExistingRowDates(sectionId) {
     }
 }
 
-/* add a new entry row */
-// function addRow(sectionId, specificDate = null) {
-//   const sectionNum = sectionId.split("_")[1];
-//   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
-//   if (!tbody) {
-//     console.error("Table body not found for", sectionId);
-//     return;
-//   }
-
-//   const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
-//   const selectedWeek = weekOptions.find(
-//     (opt) => opt.value === (weekSelect ? weekSelect.value : "")
-//   );
-//   // const weekDates =
-//   //   selectedWeek && selectedWeek.start ? getWeekDates(selectedWeek.start) : [];
-//   // const defaultDate =
-//   //   specificDate ||
-//   //   (weekDates.length ? weekDates[0] : new Date().toISOString().split("T")[0]);
-  
-// // let defaultDate;
-// // if (specificDate) {
-// //     defaultDate = specificDate;
-// // } else if (selectedWeek && selectedWeek.start) {
-// //     const ws = new Date(selectedWeek.start);
-// //     defaultDate = `${ws.getFullYear()}-${String(ws.getMonth()+1).padStart(2,"0")}-${String(ws.getDate()).padStart(2,"0")}`;
-// // } else {
-// //     defaultDate = new Date().toISOString().split("T")[0];
-// // }
-
-// let defaultDate;
-// if (specificDate) {
-//     defaultDate = specificDate;
-// } else if (selectedWeek && selectedWeek.start && selectedWeek.end) {
-//     // Get the tbody for this section
-//     const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
-//     const existingDateInputs = tbody.querySelectorAll(".date-field");
-
-//     let lastDateStr = null;
-//     if (existingDateInputs.length > 0) {
-//         // Get the last row's date
-//         lastDateStr = existingDateInputs[existingDateInputs.length - 1].value;
-//     }
-
-//     if (lastDateStr) {
-//         // Parse last date and add 1 day
-//         const lastDate = new Date(lastDateStr);
-//         const nextDate = new Date(lastDate);
-//         nextDate.setDate(lastDate.getDate() + 1);
-
-//         // Get week end date
-//         const weekEndDate = new Date(selectedWeek.end);
-
-//         // If nextDate > weekEnd, set to weekEnd
-//         if (nextDate > weekEndDate) {
-//             defaultDate = weekEndDate.toISOString().split("T")[0];
-//         } else {
-//             defaultDate = nextDate.toISOString().split("T")[0];
-//         }
-//     } else {
-//         // No existing rows: use week start
-//         defaultDate = new Date(selectedWeek.start).toISOString().split("T")[0];
-//     }
-// } else {
-//     defaultDate = new Date().toISOString().split("T")[0];
-// }
-
-
-//   const rowIndex = tbody.querySelectorAll("tr").length + 1;
-//   const tr = document.createElement("tr");
-//   tr.innerHTML = `
-//   <td class="col-sno">${rowIndex}</td>
-//   <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
-//   <td class="col-action">
-//     <button class="copy-btn" onclick="copyRow(this)"><i class="fas fa-copy"></i> Copy</button>
-//     <button class="paste-btn" onclick="pasteRow(this)"><i class="fas fa-paste"></i> Paste</button>
-//   </td>
-//   <td class="col-date form-input"><input type="date" class="date-field form-input" value="${defaultDate}" onchange="validateDate(this); updateSummary()"></td>
-//   <td class="col-location">
-//     <select class="location-select form-input" onchange="updateSummary()">
-//       <option value="Office">Office</option>
-//       <option value="Client Site">Client Site</option>
-//       <option value="Work From Home">Work From Home</option>
-//       <option value="Field Work">Field Work</option>
-//     </select>
-//   </td>
-
-//   <!-- NEW: Punch In / Punch Out / Working Hours -->
-//   <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
-//   <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
-//   <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//   <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-//   <td class="col-client form-input "><input type="text" class="client-field form-input" placeholder="Enter Client"></td>
-//   <td class="col-project"><input type="text" class="project-field form-input" placeholder="Enter Project"></td>
-//   <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code"></td>
-//   <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
-//   <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
-//   <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
-//    <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
-//   <td class="col-billable">
-//     <select class="billable-select form-input" onchange="updateSummary()">
-//       <option value="Yes">Billable</option>
-//       <option value="No">Non-Billable</option>
-//     </select>
-//   </td>
-//   <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
-//   <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
-// `;
-
-//   tbody.appendChild(tr);
-
-//   // const dateInput = tr.querySelector(".date-field");
-//   // if (dateInput) validateDate(dateInput);
-//   const dateInput = tr.querySelector(".date-field");
-// if (dateInput && window.weekOptions && window.weekOptions.length > 0) {
-//     setTimeout(() => validateDate(dateInput), 500); // Thoda delay to ensure weekOptions ready
-// }
-//   updateRowNumbers(tbody.id);
-//   updateSummary();
-// }
-
 function addRow(sectionId, specificDate = null) {
   const sectionNum = sectionId.split("_")[1];
   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
@@ -761,17 +1257,14 @@ function addRow(sectionId, specificDate = null) {
         <option value="Field Work">Field Work</option>
       </select>
     </td>
-    <td class="col-punch-in"><input type="time" class="punch-in form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
-    <td class="col-punch-out"><input type="time" class="punch-out form-input" onchange="validateTimes(this.closest('tr')); calculateWorkingHours(this.closest('tr'))"></td>
     <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
     <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-    <td class="col-client form-input "><input type="text" class="client-field form-input" placeholder="Enter Client"></td>
-    <td class="col-project"><input type="text" class="project-field form-input" placeholder="Enter Project"></td>
-    <td class="col-project-code"><input type="text" class="project-code form-input" placeholder="Enter Project Code"></td>
+    <td class="col-client"></td>
+    <td class="col-project"></td>
+    <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
     <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
     <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
-    <td class="col-working-hours"><input type="number" step="0.01" class="working-hours-field form-input" readonly></td>
     <td class="col-billable">
       <select class="billable-select form-input" onchange="updateSummary()">
         <option value="Yes">Billable</option>
@@ -784,12 +1277,204 @@ function addRow(sectionId, specificDate = null) {
 
   tbody.appendChild(tr);
 
+  // ✅ Setup smart dropdowns for client, project, project code
+  setupSmartDropdowns(tr);
+
   // Auto focus first input
   setTimeout(() => tr.querySelector("input, select")?.focus(), 100);
 
   updateRowNumbers(tbody.id);
   updateSummary();
 }
+
+function createReadonlyProjectCode(value = "", placeholder = "Auto-filled") {
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "relative";
+    wrapper.style.width = "100%";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "project-code form-input";
+    input.value = value || "";                      // ensure no undefined
+    input.placeholder = placeholder;
+    input.readOnly = true;
+    input.disabled = true;
+    input.setAttribute("readonly", "readonly");
+    input.style.backgroundColor = "#f0f0f0";
+    input.style.color = value ? "#444" : "#999";   // lighter when empty
+    input.style.border = "1px solid #ccc";
+    input.style.cursor = "not-allowed";
+
+    // Block all input attempts
+    ['keydown', 'keypress', 'input', 'paste'].forEach(event => {
+        input.addEventListener(event, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    wrapper.appendChild(input);
+    return wrapper;
+}
+
+function setupSmartDropdowns(row) {
+  const clientCell = row.querySelector(".col-client");
+  const projectCell = row.querySelector(".col-project");
+  const projectCodeCell = row.querySelector(".col-project-code");
+  
+  // Setup client dropdown
+  if (clientCell) {
+    clientCell.innerHTML = "";
+    clientCell.appendChild(createSmartDropdown("client", clientCell));
+  }
+  
+  // Setup project dropdown (empty initially)
+  if (projectCell) {
+    projectCell.innerHTML = "";
+    const emptyProjectDropdown = createSmartDropdown("project", projectCell, "", "");
+    projectCell.appendChild(emptyProjectDropdown);
+  }
+  
+  // Setup project code field (readonly input)
+  if (projectCodeCell) {
+    // projectCodeCell.innerHTML = "";
+    // const codeInput = document.createElement("input");
+    // codeInput.type = "text";
+    // codeInput.className = "project-code form-input";
+    // codeInput.placeholder = "Auto-filled";
+    // codeInput.readOnly = true;
+    // codeInput.style.backgroundColor = "#f0f0f0";
+    // projectCodeCell.appendChild(codeInput);
+    // In places where you create auto-filled code field:
+    projectCodeCell.innerHTML = "";
+    projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+  }
+}
+
+// ✅ Smart dropdown creator
+// function createSmartDropdown(type, container, currentValue = "") {
+//   const dataKey = type === "client" ? "clients" : 
+//                   type === "project" ? "projects" : "project_codes";
+//   const options = employeeProjects[dataKey] || [];
+  
+//   const select = document.createElement("select");
+//   select.className = `${type}-field form-input smart-dropdown`;
+//   select.style.width = "100%";
+  
+//   // Add default option
+//   const defaultOpt = document.createElement("option");
+//   defaultOpt.value = "";
+//   defaultOpt.textContent = `Select ${type.replace('_', ' ')}`;
+//   select.appendChild(defaultOpt);
+  
+//   // Add filtered options
+//   options.forEach(opt => {
+//     const option = document.createElement("option");
+//     option.value = opt;
+//     option.textContent = opt;
+//     if (opt === currentValue) option.selected = true;
+//     select.appendChild(option);
+//   });
+  
+//   // Add "Type here" option
+//   const typeOption = document.createElement("option");
+//   typeOption.value = "__TYPE_HERE__";
+//   typeOption.textContent = "✏️ Type here (custom entry)";
+//   typeOption.style.fontStyle = "italic";
+//   typeOption.style.color = "#666";
+//   select.appendChild(typeOption);
+  
+//   // Handle selection
+//   select.addEventListener("change", function() {
+//     if (this.value === "__TYPE_HERE__") {
+//       // Replace with input field
+//       const input = document.createElement("input");
+//       input.type = "text";
+//       input.className = `${type}-field form-input`;
+//       input.placeholder = `Enter ${type.replace('_', ' ')}`;
+//       input.value = currentValue;
+//       input.style.width = "calc(100% - 35px)";
+      
+//       // Add button to go back to dropdown
+//       const backBtn = document.createElement("button");
+//       backBtn.className = "back-to-dropdown-btn";
+//       backBtn.innerHTML = '<i class="fas fa-list"></i>';
+//       backBtn.title = "Back to dropdown";
+//       backBtn.type = "button";
+//       backBtn.style.marginLeft = "5px";
+//       backBtn.style.padding = "6px 10px";
+//       backBtn.style.cursor = "pointer";
+//       backBtn.onclick = () => {
+//         const newDropdown = createSmartDropdown(type, container, input.value);
+//         container.innerHTML = "";
+//         container.appendChild(newDropdown);
+//       };
+      
+//       container.innerHTML = "";
+//       const wrapper = document.createElement("div");
+//       wrapper.style.display = "flex";
+//       wrapper.style.alignItems = "center";
+//       wrapper.style.gap = "5px";
+//       wrapper.appendChild(input);
+//       wrapper.appendChild(backBtn);
+//       container.appendChild(wrapper);
+      
+//       input.focus();
+      
+//       // Trigger summary update on input change
+//       input.addEventListener("input", updateSummary);
+//     }
+//   });
+  
+//   // Trigger summary update on dropdown change
+//   select.addEventListener("change", updateSummary);
+  
+//   return select;
+// }
+
+// ✅ Helper to get field value (works with both select and input)
+// function getFieldValue(row, className) {
+//   const cell = row.querySelector(className);
+//   if (!cell) return "";
+  
+//   const select = cell.querySelector("select");
+//   const input = cell.querySelector("input");
+  
+//   if (select && select.value !== "__TYPE_HERE__" && select.value !== "") {
+//     return select.value;
+//   } else if (input) {
+//     return input.value;
+//   }
+//   return "";
+// }
+
+// ✅ Helper to set field value (works with both select and input)
+// function setFieldValue(row, className, value) {
+//   const cell = row.querySelector(className);
+//   if (!cell) return;
+  
+//   const select = cell.querySelector("select");
+//   const input = cell.querySelector("input");
+  
+//   if (select) {
+//     // Check if value exists in options
+//     const option = Array.from(select.options).find(opt => opt.value === value);
+//     if (option && value !== "") {
+//       select.value = value;
+//     } else if (value && value !== "") {
+//       // Trigger "Type here" mode
+//       select.value = "__TYPE_HERE__";
+//       const changeEvent = new Event("change", { bubbles: true });
+//       select.dispatchEvent(changeEvent);
+//       setTimeout(() => {
+//         const newInput = cell.querySelector("input");
+//         if (newInput) newInput.value = value;
+//       }, 100);
+//     }
+//   } else if (input) {
+//     input.value = value;
+//   }
+// }
 
 /* utility to create 7 daily dates from a week start */
 function getWeekDates(startDate) {
@@ -832,7 +1517,7 @@ function deleteWeekSection(sectionId) {
   updateSummary();
 }
 
-/* Calculations & validations (punch removed) */
+/* Calculations & validations */
 function calculateHours(row) {
   if (!row) return;
   const start = row.querySelector(".project-start")?.value;
@@ -840,8 +1525,6 @@ function calculateHours(row) {
   const hoursField = row.querySelector(".project-hours-field");
   if (!start || !end) {
     if (hoursField) hoursField.value = "";
-    // still compute working hours separately (if any)
-    calculateWorkingHours(row);
     updateSummary();
     return;
   }
@@ -853,30 +1536,6 @@ function calculateHours(row) {
   const hrs = ((endMin - startMin) / 60).toFixed(2);
   if (hoursField) hoursField.value = hrs;
 
-  // also update working hours (punch-in/out) if those are present
-  calculateWorkingHours(row);
-  updateSummary();
-}
-
-function calculateWorkingHours(row) {
-  if (!row) return;
-  const punchIn = row.querySelector(".punch-in")?.value;
-  const punchOut = row.querySelector(".punch-out")?.value;
-  const workingField = row.querySelector(".working-hours-field");
-
-  if (!punchIn || !punchOut) {
-    if (workingField) workingField.value = "";
-    updateSummary();
-    return;
-  }
-
-  const [ih, im] = punchIn.split(":").map(Number);
-  const [oh, om] = punchOut.split(":").map(Number);
-  let inMin = ih * 60 + im;
-  let outMin = oh * 60 + om;
-  if (outMin < inMin) outMin += 24 * 60; // overnight
-  const whrs = ((outMin - inMin) / 60).toFixed(2);
-  if (workingField) workingField.value = whrs;
   updateSummary();
 }
 
@@ -887,13 +1546,10 @@ function validateTimes(rowOrModal, isModal = false) {
     let startEl, endEl;
 
     if (isModal) {
-      // For modal, we have both punch and project times - validate via modal ids
-      // modal project start/end ids: modalInput5 & modalInput6
-      // modal punch in/out ids: modalInput3 & modalInput4
-      const mPS = document.getElementById("modalInput5");
-      const mPE = document.getElementById("modalInput6");
-      const mPI = document.getElementById("modalInput3");
-      const mPO = document.getElementById("modalInput4");
+      // For modal, we have both and project times - validate via modal ids
+      // modal project start/end ids: modalInput3 & modalInput4
+      const mPS = document.getElementById("modalInput3");
+      const mPE = document.getElementById("modalInput4");
 
       // check project start/end
       if (mPS && mPE && mPS.value && mPE.value) {
@@ -907,24 +1563,10 @@ function validateTimes(rowOrModal, isModal = false) {
         } else mPE.classList.remove("validation-error");
       }
 
-      // check punch in/out
-      if (mPI && mPO && mPI.value && mPO.value) {
-        const [ph, pm] = mPI.value.split(":").map(Number);
-        const [oh, om] = mPO.value.split(":").map(Number);
-        let p = ph * 60 + pm, o = oh * 60 + om;
-        if (o <= p) {
-          mPO.classList.add("validation-error");
-          showPopup("Punch Out must be later than Punch In", true);
-          return false;
-        } else mPO.classList.remove("validation-error");
-      }
-
     } else {
-      // row validation - validate both project and punch pairs
+      // row validation - validate project times
       const projStart = rowOrModal.querySelector(".project-start");
       const projEnd = rowOrModal.querySelector(".project-end");
-      const pIn = rowOrModal.querySelector(".punch-in");
-      const pOut = rowOrModal.querySelector(".punch-out");
 
       if (projStart && projEnd && projStart.value && projEnd.value) {
         const [sh, sm] = projStart.value.split(":").map(Number);
@@ -937,16 +1579,6 @@ function validateTimes(rowOrModal, isModal = false) {
         } else projEnd.classList.remove("validation-error");
       }
 
-      if (pIn && pOut && pIn.value && pOut.value) {
-        const [ph, pm] = pIn.value.split(":").map(Number);
-        const [oh, om] = pOut.value.split(":").map(Number);
-        let p = ph * 60 + pm, o = oh * 60 + om;
-        if (o <= p) {
-          pOut.classList.add("validation-error");
-          showPopup("Punch Out must be later than Punch In", true);
-          return false;
-        } else pOut.classList.remove("validation-error");
-      }
     }
     return true;
   } catch (err) {
@@ -1084,11 +1716,160 @@ function pasteAboveCell(sectionId) {
   showPopup("Row duplicated");
 }
 
+function getFieldValue(row, className) {
+  const cell = row.querySelector(className);
+  if (!cell) return "";
+  
+  // Check if it's a select or input
+  const select = cell.querySelector("select");
+  const input = cell.querySelector("input");
+  
+  if (select && select.value !== "__TYPE_HERE__") {
+    return select.value;
+  } else if (input) {
+    return input.value;
+  }
+  return "";
+}
+
+// function setFieldValue(row, className, value) {
+//   const cell = row.querySelector(className);
+//   if (!cell) return;
+  
+//   const select = cell.querySelector("select");
+//   const input = cell.querySelector("input");
+  
+//   if (select) {
+//     // Check if value exists in options
+//     const option = Array.from(select.options).find(opt => opt.value === value);
+//     if (option) {
+//       select.value = value;
+//     } else if (value) {
+//       // Trigger "Type here" mode
+//       select.value = "__TYPE_HERE__";
+//       select.dispatchEvent(new Event("change"));
+//       setTimeout(() => {
+//         const newInput = cell.querySelector("input");
+//         if (newInput) newInput.value = value;
+//       }, 100);
+//     }
+//   } else if (input) {
+//     input.value = value;
+//   }
+// }
+
+
+// function openModal(button) {
+//   isEditingHistory = false;
+//   currentRow = button.closest("tr");
+//   currentEntryId = currentRow.getAttribute("data-entry-id");
+
+//   const modalOverlay = document.getElementById("modalOverlay");
+//   if (!modalOverlay) {
+//     showPopup("Modal not available in layout. Please add modalOverlay div.", true);
+//     return;
+//   }
+
+//   modalOverlay.style.display = "flex";
+
+//   // Updated mapping - use helper functions for client/project/code
+//   document.getElementById("modalInput1").value = currentRow.querySelector(".date-field")?.value || "";
+//   document.getElementById("modalInput2").value = currentRow.querySelector(".location-select")?.value || "";
+//   document.getElementById("modalInput3").value = currentRow.querySelector(".project-start")?.value || "";
+//   document.getElementById("modalInput4").value = currentRow.querySelector(".project-end")?.value || "";
+  
+//   // ✅ Use helper function for smart dropdown fields
+//   // document.getElementById("modalInput5").value = getFieldValue(currentRow, ".col-client");
+//   // document.getElementById("modalInput6").value = getFieldValue(currentRow, ".col-project");
+//   // document.getElementById("modalInput7").value = getFieldValue(currentRow, ".col-project-code");
+//   // In openModal() function, after setting modalInput7 (client)
+//   document.getElementById("modalInput5").value = getFieldValue(currentRow, ".col-client");
+
+//   // Add this event listener for client change in modal
+//   document.getElementById("modalInput6").addEventListener("change", function() {
+//     const selectedClient = this.value;
+//     const projectInput = document.getElementById("modalInput6");
+//     const projectCodeInput = document.getElementById("modalInput7");
+    
+//     // Clear project and code
+//     projectInput.value = "";
+//     projectCodeInput.value = "";
+    
+//     // Note: You might want to convert modalInput8 to a dropdown as well
+//     // For now, this just clears the values when client changes
+//   });
+
+//   // Add event listener for project change in modal
+//   document.getElementById("modalInput7").addEventListener("input", function() {
+//     const selectedProject = this.value;
+//     const selectedClient = document.getElementById("modalInput5").value;
+    
+//     if (selectedClient && employeeProjects.projects_by_client && employeeProjects.projects_by_client[selectedClient]) {
+//       const projectData = employeeProjects.projects_by_client[selectedClient].find(
+//         p => p.project_name === selectedProject
+//       );
+      
+//       if (projectData) {
+//         document.getElementById("modalInput7").value = projectData.project_code;
+//       }
+//     }
+//   });
+  
+//   document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
+//   document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
+//   document.getElementById("modalInput10").value = currentRow.querySelector(".project-hours-field")?.value || "";
+//   document.getElementById("modalInput11").value = currentRow.querySelector(".billable-select")?.value || "";
+//   document.getElementById("modalInput12").value = currentRow.querySelector(".remarks-field")?.value || "";
+
+//   updateModalProjectHours();
+
+//   const addBtn = document.getElementById("modalAddBtn");
+//   if (addBtn) {
+//     addBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+//     addBtn.onclick = saveModalEntry;
+//   }
+
+//   const cancelBtn = document.getElementById("modalCancelBtn");
+//   if (cancelBtn) {
+//     cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+//     cancelBtn.onclick = closeModal;
+//   }
+// }
+
+// ==========================================
+// UPDATED saveModalEntry FUNCTION
+// ==========================================
+
+function setFieldValue(row, className, value) {
+  const cell = row.querySelector(className);
+  if (!cell) return;
+
+  const select = cell.querySelector("select");
+  const input = cell.querySelector("input");
+
+  if (select) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === value);
+
+    if (optionExists) {
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    } else if (value) {
+      select.value = "__TYPE_HERE__";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      setTimeout(() => {
+        const newInput = cell.querySelector("input");
+        if (newInput) newInput.value = value;
+      }, 0);
+    }
+  } else if (input) {
+    input.value = value;
+  }
+}
+
 function openModal(button) {
   isEditingHistory = false;
   currentRow = button.closest("tr");
-
-   currentEntryId = currentRow.getAttribute("data-entry-id");
+  currentEntryId = currentRow.getAttribute("data-entry-id");
 
   const modalOverlay = document.getElementById("modalOverlay");
   if (!modalOverlay) {
@@ -1098,37 +1879,71 @@ function openModal(button) {
 
   modalOverlay.style.display = "flex";
 
-  // NEW → clean class-based mapping (supports punch in/out + working hours)
-  const modalMap = [
-    { modalId: "modalInput1", cls: ".date-field" },
-    { modalId: "modalInput2", cls: ".location-select" },
-    { modalId: "modalInput3", cls: ".punch-in" },
-    { modalId: "modalInput4", cls: ".punch-out" },
-    { modalId: "modalInput5", cls: ".project-start" },
-    { modalId: "modalInput6", cls: ".project-end" },
-    { modalId: "modalInput7", cls: ".client-field" },
-    { modalId: "modalInput8", cls: ".project-field" },
-    { modalId: "modalInput9", cls: ".project-code" },
-    { modalId: "modalInput10", cls: ".reporting-manager-field" },
-    { modalId: "modalInput11", cls: ".activity-field" },
-    { modalId: "modalInput12", cls: ".project-hours-field" },
-    { modalId: "modalInput13", cls: ".working-hours-field" },
-    { modalId: "modalInput14", cls: ".billable-select" },
-    { modalId: "modalInput15", cls: ".remarks-field" }
-  ];
+  // Set regular fields
+  document.getElementById("modalInput1").value = currentRow.querySelector(".date-field")?.value || "";
+  document.getElementById("modalInput2").value = currentRow.querySelector(".location-select")?.value || "";
+  document.getElementById("modalInput3").value = currentRow.querySelector(".project-start")?.value || "";
+  document.getElementById("modalInput4").value = currentRow.querySelector(".project-end")?.value || "";
+  
+  // ✅ CREATE SMART DROPDOWNS for Client, Project, Project Code
+  const clientValue = getFieldValue(currentRow, ".col-client");
+  const projectValue = getFieldValue(currentRow, ".col-project");
+  const projectCodeValue = getFieldValue(currentRow, ".col-project-code");
+  
+  // Clear and create client dropdown
+  const clientContainer = document.getElementById("modalClientContainer");
+  if (clientContainer) {
+    clientContainer.innerHTML = "";
+    const clientDropdown = createSmartDropdown("client", clientContainer, clientValue);
+    clientContainer.appendChild(clientDropdown);
+    
+    // Add change listener to update project dropdown
+    clientDropdown.addEventListener("change", function() {
+      const selectedClient = this.value;
+      updateModalProjectDropdown(selectedClient, "");
+    });
+  }
+  
+  // Clear and create project dropdown
+  const projectContainer = document.getElementById("modalProjectContainer");
+  if (projectContainer) {
+    projectContainer.innerHTML = "";
+    const projectDropdown = createSmartDropdown("project", projectContainer, projectValue, clientValue);
+    projectContainer.appendChild(projectDropdown);
+    
+    // Add change listener to auto-fill project code
+    // projectDropdown.addEventListener("change", function() {
+    //   updateModalProjectCode(clientValue, this.value);
+    // });
+    projectDropdown.addEventListener("change", function() {
+      const currentClient = clientContainer?.querySelector("select")?.value;
+      updateModalProjectCode(currentClient, this.value);
+  }); 
 
-  modalMap.forEach(m => {
-    const modalEl = document.getElementById(m.modalId);
-    const rowEl = currentRow.querySelector(m.cls);
+  }
+  
+  // Clear and create project code field (readonly)
+  const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+  if (projectCodeContainer) {
+    projectCodeContainer.innerHTML = "";
+    const codeInput = document.createElement("input");
+    codeInput.type = "text";
+    codeInput.id = "modalProjectCodeInput";
+    codeInput.className = "form-input";
+    codeInput.value = projectCodeValue;
+    codeInput.readOnly = true;
+    codeInput.style.backgroundColor = "#f0f0f0";
+    projectCodeContainer.appendChild(codeInput);
+  }
+  
+  // Set other fields
+  document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
+  document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
+  document.getElementById("modalInput10").value = currentRow.querySelector(".project-hours-field")?.value || "";
+  document.getElementById("modalInput11").value = currentRow.querySelector(".billable-select")?.value || "";
+  document.getElementById("modalInput12").value = currentRow.querySelector(".remarks-field")?.value || "";
 
-    if (modalEl) {
-      modalEl.value = rowEl
-        ? (rowEl.value || rowEl.textContent || "")
-        : "";
-    }
-  });
-
-  updateModalProjectHours();
+  updateModalHours();
 
   const addBtn = document.getElementById("modalAddBtn");
   if (addBtn) {
@@ -1143,6 +1958,195 @@ function openModal(button) {
   }
 }
 
+// Update project dropdown when client changes in modal
+function updateModalProjectDropdown(selectedClient, selectedProject = "") {
+  const projectContainer = document.getElementById("modalProjectContainer");
+  if (!projectContainer) return;
+  
+  projectContainer.innerHTML = "";
+  const projectDropdown = createSmartDropdown("project", projectContainer, selectedProject, selectedClient);
+  projectContainer.appendChild(projectDropdown);
+  
+  // Add change listener
+  projectDropdown.addEventListener("change", function() {
+    updateModalProjectCode(selectedClient, this.value);
+  });
+
+  // Reset project code to readonly
+  const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+  if (projectCodeContainer) {
+    projectCodeContainer.innerHTML = "";
+    const codeInput = document.createElement("input");
+    codeInput.type = "text";
+    codeInput.id = "modalProjectCodeInput";
+    codeInput.className = "form-input";
+    codeInput.value = "";
+    codeInput.readOnly = true;
+    codeInput.placeholder = "Auto-filled";
+    codeInput.style.backgroundColor = "#f0f0f0";
+    projectCodeContainer.appendChild(codeInput);
+  }
+  
+  // Clear project code when client changes
+  // const projectCodeInput = document.getElementById("modalProjectCodeInput");
+  // if (projectCodeInput) projectCodeInput.value = "";
+}
+
+// Auto-fill project code in modal
+// function updateModalProjectCode(clientValue, projectValue) {
+//   if (!clientValue || !projectValue) return;
+  
+//   if (employeeProjects.projects_by_client && employeeProjects.projects_by_client[clientValue]) {
+//     const projectData = employeeProjects.projects_by_client[clientValue].find(
+//       p => p.project_name === projectValue
+//     );
+    
+//     if (projectData) {
+//       const projectCodeInput = document.getElementById("modalProjectCodeInput");
+//       if (projectCodeInput) {
+//         projectCodeInput.value = projectData.project_code;
+//       }
+//     }
+//   }
+// }
+
+function updateModalProjectCode(clientValue, projectValue) {
+  const projectCodeInput = document.getElementById("modalProjectCodeInput");
+  if (!projectCodeInput) return;
+
+  // 🟢 Custom project
+  if (projectValue === "__TYPE_HERE__") {
+    projectCodeInput.value = "";
+    projectCodeInput.readOnly = false;
+    projectCodeInput.placeholder = "Enter Project Code";
+    projectCodeInput.style.backgroundColor = "";
+    return;
+  }
+
+  // 🟢 Normal project
+  if (
+    clientValue &&
+    employeeProjects.projects_by_client &&
+    employeeProjects.projects_by_client[clientValue]
+  ) {
+    const projectData =
+      employeeProjects.projects_by_client[clientValue].find(
+        p => p.project_name === projectValue
+      );
+
+    if (projectData) {
+      projectCodeInput.value = projectData.project_code;
+      projectCodeInput.readOnly = true;
+      projectCodeInput.style.backgroundColor = "#f0f0f0";
+    }
+  }
+}
+
+
+// function saveModalEntry() {
+//   if (!currentRow) return;
+
+//   // Date
+//   const dateField = currentRow.querySelector(".date-field");
+//   if (dateField) dateField.value = document.getElementById("modalInput1").value;
+
+//   // Location
+//   const locationField = currentRow.querySelector(".location-select");
+//   if (locationField) locationField.value = document.getElementById("modalInput2").value;
+
+//   // Times
+
+//   const projectStart = currentRow.querySelector(".project-start");
+//   if (projectStart) projectStart.value = document.getElementById("modalInput3").value;
+
+//   const projectEnd = currentRow.querySelector(".project-end");
+//   if (projectEnd) projectEnd.value = document.getElementById("modalInput4").value;
+
+//   // ✅ Smart dropdown fields - use helper function
+//   setFieldValue(currentRow, ".col-client", document.getElementById("modalInput5").value);
+//   setFieldValue(currentRow, ".col-project", document.getElementById("modalInput6").value);
+//   setFieldValue(currentRow, ".col-project-code", document.getElementById("modalInput7").value);
+
+//   // Other fields
+//   const reportingManager = currentRow.querySelector(".reporting-manager-field");
+//   if (reportingManager) reportingManager.value = document.getElementById("modalInput8").value;
+
+//   const activity = currentRow.querySelector(".activity-field");
+//   if (activity) activity.value = document.getElementById("modalInput9").value;
+
+//   const projectHours = currentRow.querySelector(".project-hours-field");
+//   if (projectHours) projectHours.value = document.getElementById("modalInput10").value;
+
+//   const billable = currentRow.querySelector(".billable-select");
+//   if (billable) billable.value = document.getElementById("modalInput11").value;
+
+//   const remarks = currentRow.querySelector(".remarks-field");
+//   if (remarks) remarks.value = document.getElementById("modalInput12").value;
+
+//   calculateHours(currentRow);
+//   validateDate(currentRow.querySelector(".date-field"));
+//   closeModal();
+//   updateSummary();
+// }
+
+
+function saveModalEntry() {
+  if (!currentRow) return;
+
+  // Date
+  const dateField = currentRow.querySelector(".date-field");
+  if (dateField) dateField.value = document.getElementById("modalInput1").value;
+
+  // Location
+  const locationField = currentRow.querySelector(".location-select");
+  if (locationField) locationField.value = document.getElementById("modalInput2").value;
+
+  // Times
+  const projectStart = currentRow.querySelector(".project-start");
+  if (projectStart) projectStart.value = document.getElementById("modalInput3").value;
+
+  const projectEnd = currentRow.querySelector(".project-end");
+  if (projectEnd) projectEnd.value = document.getElementById("modalInput4").value;
+
+  // ✅ Get values from smart dropdown containers
+  const clientContainer = document.getElementById("modalClientContainer");
+  const clientValue = clientContainer?.querySelector("select")?.value || 
+                       clientContainer?.querySelector("input")?.value || "";
+  
+  const projectContainer = document.getElementById("modalProjectContainer");
+  const projectValue = projectContainer?.querySelector("select")?.value || 
+                        projectContainer?.querySelector("input")?.value || "";
+
+  
+  const projectCodeInput = document.getElementById("modalProjectCodeInput");
+  const projectCodeValue = projectCodeInput?.value || "";
+  
+  // Set values using helper function
+  setFieldValue(currentRow, ".col-client", clientValue);
+  setFieldValue(currentRow, ".col-project", projectValue);
+  setFieldValue(currentRow, ".col-project-code", projectCodeValue);
+
+  // Other fields
+  const reportingManager = currentRow.querySelector(".reporting-manager-field");
+  if (reportingManager) reportingManager.value = document.getElementById("modalInput8").value;
+
+  const activity = currentRow.querySelector(".activity-field");
+  if (activity) activity.value = document.getElementById("modalInput9").value;
+
+  const projectHours = currentRow.querySelector(".project-hours-field");
+  if (projectHours) projectHours.value = document.getElementById("modalInput10").value;
+
+  const billable = currentRow.querySelector(".billable-select");
+  if (billable) billable.value = document.getElementById("modalInput11").value;
+
+  const remarks = currentRow.querySelector(".remarks-field");
+  if (remarks) remarks.value = document.getElementById("modalInput12").value;
+
+  calculateHours(currentRow);
+  validateDate(currentRow.querySelector(".date-field"));
+  closeModal();
+  updateSummary();
+}
 
 function closeModal() {
   const modal = document.getElementById("modalOverlay");
@@ -1152,11 +2156,11 @@ function closeModal() {
   currentEntryId = null;
 }
 
-function updateModalProjectHours() {
-  // Project hours from modalInput5/6 -> modalInput12
-  const projectStart = document.getElementById("modalInput5")?.value;
-  const projectEnd = document.getElementById("modalInput6")?.value;
-  const projectHoursInput = document.getElementById("modalInput12");
+function updateModalHours() {
+  // Project hours from modalInput4/5 -> modalInput10
+  const projectStart = document.getElementById("modalInput3")?.value;
+  const projectEnd = document.getElementById("modalInput4")?.value;
+  const projectHoursInput = document.getElementById("modalInput10");
 
   if (projectStart && projectEnd && projectHoursInput) {
     const [sh, sm] = projectStart.split(":").map(Number);
@@ -1166,72 +2170,8 @@ function updateModalProjectHours() {
     if (e < s) e += 24 * 60;
     projectHoursInput.value = ((e - s) / 60).toFixed(2);
   }
-
-  // Working hours from modalInput3/4 -> modalInput13
-  const punchIn = document.getElementById("modalInput3")?.value;
-  const punchOut = document.getElementById("modalInput4")?.value;
-  const workingHoursInput = document.getElementById("modalInput13");
-
-  if (punchIn && punchOut && workingHoursInput) {
-    const [ph, pm] = punchIn.split(":").map(Number);
-    const [oh, om] = punchOut.split(":").map(Number);
-    let p = ph * 60 + pm;
-    let o = oh * 60 + om;
-    if (o < p) o += 24 * 60;
-    workingHoursInput.value = ((o - p) / 60).toFixed(2);
-  }
 }
 
-
-function saveModalEntry() {
-  if (!currentRow) return;
-
-  const modalInputs = document.querySelectorAll(
-    "#modalOverlay input, #modalOverlay select"
-  );
-  const mapping = [
-  { modalId: "modalInput1", rowClass: ".date-field" },
-  { modalId: "modalInput2", rowClass: ".location-select" },
-  { modalId: "modalInput3", rowClass: ".punch-in" },
-  { modalId: "modalInput4", rowClass: ".punch-out" },
-  { modalId: "modalInput5", rowClass: ".project-start" },
-  { modalId: "modalInput6", rowClass: ".project-end" },
-  { modalId: "modalInput7", rowClass: ".client-field" },
-  { modalId: "modalInput8", rowClass: ".project-field" },
-  { modalId: "modalInput9", rowClass: ".project-code" },
-  { modalId: "modalInput10", rowClass: ".reporting-manager-field" },
-  { modalId: "modalInput11", rowClass: ".activity-field" },
-  { modalId: "modalInput12", rowClass: ".project-hours-field" },
-  { modalId: "modalInput13", rowClass: ".working-hours-field" },
-  { modalId: "modalInput14", rowClass: ".billable-select" },
-  { modalId: "modalInput15", rowClass: ".remarks-field" }
-];
-
-
-  mapping.forEach((map) => {
-  const modalInput = document.getElementById(map.modalId);
-  const rowField = currentRow.querySelector(map.rowClass);
-
-  if (modalInput && rowField) {
-    if (
-      rowField.tagName === "INPUT" ||
-      rowField.tagName === "SELECT" ||
-      rowField.tagName === "TEXTAREA"
-    ) {
-      rowField.value = modalInput.value;
-    } else {
-      const inner = rowField.querySelector("input, select, textarea");
-      if (inner) inner.value = modalInput.value;
-    }
-  }
-});
-
-
-  calculateHours(currentRow);
-  validateDate(currentRow.querySelector(".date-field"));
-  closeModal();
-  updateSummary();
-}
 
 /* Manager employee details modal (opens timeline and feedback) */
 async function openEmployeeDetails(employeeId) {
@@ -1378,156 +2318,6 @@ function closeModalAndRestore() {
   }
 }
 
-// /* History loader */
-// async function loadHistory() {
-//   if (!loggedInEmployeeId) {
-//     showPopup("Employee ID not found", true);
-//     return;
-//   }
-
-//   showLoading("Fetching history...");
-
-//   try {
-//     const res = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, {
-//       headers: getHeaders(),
-//     });
-//     if (!res.ok) throw new Error(`Failed to fetch history: ${res.status}`);
-
-//     const data = await res.json();
-//     historyEntries = Array.isArray(data.Data) ? data.Data : [];
-//     console.log(data);
-//     const historyContent = document.getElementById("historyContent");
-//     console.log(`History Entries: ${historyEntries}`)
-//     if (!historyContent) {
-//       showPopup("History container not found", true);
-//       hideLoading();
-//       return;
-//     }
-
-//     historyContent.innerHTML = "";
-
-//     const totalEl = document.querySelector(
-//       ".history-summary .total-hours .value"
-//     );
-//     const billEl = document.querySelector(
-//       ".history-summary .billable-hours .value"
-//     );
-//     const nonBillEl = document.querySelector(
-//       ".history-summary .non-billable-hours .value"
-//     );
-
-//     if (totalEl) totalEl.textContent = (data.totalHours || 0).toFixed(2);
-//     if (billEl) billEl.textContent = (data.totalBillableHours || 0).toFixed(2);
-//     if (nonBillEl)
-//       nonBillEl.textContent = (data.totalNonBillableHours || 0).toFixed(2);
-
-//     const entriesList = data.Data || [];
-//     if (!entriesList.length) {
-//       historyContent.innerHTML = "<p>No timesheet entries found.</p>";
-//       hideLoading();
-//       return;
-//     }
-
-//     const groupedWeeks = {};
-//     entriesList.forEach((entry) => {
-//       const week = entry.weekPeriod || "No Week";
-//       if (!groupedWeeks[week]) groupedWeeks[week] = [];
-//       groupedWeeks[week].push(entry);
-//     });
-
-//     Object.keys(groupedWeeks).forEach((weekPeriod, index) => {
-//       const weekEntries = groupedWeeks[weekPeriod];
-//       const weekDiv = document.createElement("div");
-//       weekDiv.className = "history-week";
-//       weekDiv.innerHTML = `<h3>Week Period: ${weekPeriod}</h3>`;
-
-//       const tableWrapper = document.createElement("div");
-//       tableWrapper.className = "table-responsive";
-//       const table = document.createElement("table");
-//       table.className = "timesheet-table history-table";
-//       table.innerHTML = `
-//         <thead>
-//           <tr>
-//             <th>S.No</th>
-//             <th>Action</th>
-//             <th>Date</th>
-//             <th>Location</th>
-//             <th>Punch IN</th>
-//             <th>Punch Out</th>
-//             <th>Project Start</th>
-//             <th>Project End</th>
-//             <th>Client</th>
-//             <th>Project</th>
-//             <th>Project Code</th>
-//             <th>Reporting Manager</th>
-//             <th>Activity</th>
-//             <th>working Hours</th>
-//             <th>project Hours</th>
-//             <th>Billable</th>
-//             <th>Remarks</th>
-//           </tr>
-//         </thead>
-//         <tbody></tbody>
-//       `;
-
-//       const tbody = table.querySelector("tbody");
-
-//       weekEntries.forEach((entry, idx) => {
-//         const tr = document.createElement("tr");
-//         const id = entry.id || "";
-
-//         tr.innerHTML = `
-//           <td>${idx + 1}</td>
-//           <td style="min-width:160px;">
-//             <button class="action-btn edit-btn" onclick="editHistoryRow(this, '${id}')"><i class="fas fa-edit"></i> Edit</button>
-//             <button class="action-btn delete-btn" onclick="deleteHistoryRow(this, '${id}')"><i class="fas fa-trash"></i> Delete</button>
-//           </td>
-//           <td>${entry.date || ""}</td>
-//           <td>${entry.location || ""}</td>
-//           <td>${entry.punchIn || ""}</td>
-//           <td>${entry.punchOut || ""}</td>
-//           <td>${entry.projectStartTime || ""}</td>
-//           <td>${entry.projectEndTime || ""}</td>
-//           <td>${entry.client || ""}</td>
-//           <td>${entry.project || ""}</td>
-//           <td>${entry.projectCode || ""}</td>
-//           <td>${entry.reportingManagerEntry || ""}</td>
-//           <td>${entry.activity || ""}</td>
-//           <td>${entry.workingHours || ""}</td>
-//           <td>${entry.projectHours || ""}</td>
-//           <td>${entry.billable || ""}</td>
-//           <td>${entry.remarks || ""}</td>
-//         `;
-//         tbody.appendChild(tr);
-//       });
-
-//       tableWrapper.appendChild(table);
-//       weekDiv.appendChild(tableWrapper);
-
-//       const fb = weekEntries[0] || {};
-//       const feedbackHtml = `
-//         <div class="history-feedback">
-//           <strong>3 HITS:</strong> ${fb.hits || ""} <br>
-//           <strong>3 MISSES:</strong> ${fb.misses || ""} <br>
-//           <strong>Feedback HR:</strong> ${fb.feedback_hr || ""} <br>
-//           <strong>Feedback IT:</strong> ${fb.feedback_it || ""} <br>
-//           <strong>Feedback CRM:</strong> ${fb.feedback_crm || ""} <br>
-//           <strong>Feedback Others:</strong> ${fb.feedback_others || ""}
-//         </div>
-//       `;
-//       weekDiv.insertAdjacentHTML("beforeend", feedbackHtml);
-
-//       historyEntries.appendChild(weekDiv);
-//     });
-
-//     hideLoading();
-//   } catch (err) {
-//     console.error("loadHistory error:", err);
-//     showPopup("Failed to load history", true);
-//     hideLoading();
-//   }
-// }
-
 async function loadHistory(){
           try {
             showLoading("Fetching History...");
@@ -1607,8 +2397,6 @@ async function loadHistory(){
                             <th class="col-narrow col-action">Action</th>
                             <th class="col-medium col-date">Date</th>
                             <th class="col-wide col-location">Location of Work</th>
-                            <th class="col-medium col-punch-in">Punch In</th>
-                            <th class="col-medium col-punch-out">Punch Out</th>
                             <th class="col-medium col-project-start">Project Start Time</th>
                             <th class="col-medium col-project-end">Project End Time</th>
                             <th class="col-wide col-client">Client</th>
@@ -1617,7 +2405,6 @@ async function loadHistory(){
                             <th class="col-wide col-reporting-manager">Reporting Manager</th>
                             <th class="col-wide col-activity">Activity</th>
                             <th class="col-narrow col-project-hours">Project Hours</th>
-                            <th class="col-narrow col-working-hours">Working Hours</th>
                             <th class="col-medium col-billable">Billable</th>
                             <th class="col-wide col-remarks">Remarks</th>
                         </tr>
@@ -1638,8 +2425,6 @@ async function loadHistory(){
                     </td>
                     <td class="col-date">${entry.date || ''}</td>
                     <td class="col-location">${entry.location || ''}</td>
-                    <td class="col-punch-in">${entry.punchIn || ''}</td>
-                    <td class="col-punch-out">${entry.punchOut || ''}</td>
                     <td class="col-project-start">${entry.projectStartTime || ''}</td>
                     <td class="col-project-end">${entry.projectEndTime || ''}</td>
                     <td class="col-client">${entry.client || ''}</td>
@@ -1648,7 +2433,6 @@ async function loadHistory(){
                     <td class="col-reporting-manager">${entry.reportingManagerEntry || ''}</td>
                     <td class="col-activity">${entry.activity || ''}</td>
                     <td class="col-project-hours">${entry.projectHours || ''}</td>
-                    <td class="col-working-hours">${entry.workingHours || ''}</td>
                     <td class="col-billable">${entry.billable || ''}</td>
                     <td class="col-remarks">${entry.remarks || ''}</td>
                 `;
@@ -1696,19 +2480,59 @@ function editHistoryRow(button, entryId) {
   try {
     document.getElementById("modalInput1").value = cells[2].textContent.trim();  // Date
     document.getElementById("modalInput2").value = cells[3].textContent.trim();  // Location
-    document.getElementById("modalInput3").value = cells[4].textContent.trim();  // Punch In
-    document.getElementById("modalInput4").value = cells[5].textContent.trim();  // Punch Out
-    document.getElementById("modalInput5").value = cells[6].textContent.trim();  // Project Start
-    document.getElementById("modalInput6").value = cells[7].textContent.trim();  // Project End
-    document.getElementById("modalInput7").value = cells[8].textContent.trim();  // Client
-    document.getElementById("modalInput8").value = cells[9].textContent.trim();  // Project
-    document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Project Code
-    document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Reporting Manager
-    document.getElementById("modalInput11").value = cells[12].textContent.trim(); // Activity
-    document.getElementById("modalInput13").value = cells[13].textContent.trim(); // Working Hours
-    document.getElementById("modalInput12").value = cells[14].textContent.trim(); // Project Hours
-    document.getElementById("modalInput14").value = cells[15].textContent.trim(); // Billable
-    document.getElementById("modalInput15").value = cells[16].textContent.trim(); // Remarks
+    document.getElementById("modalInput3").value = cells[4].textContent.trim();  // Project Start
+    document.getElementById("modalInput4").value = cells[5].textContent.trim();  // Project End
+    // document.getElementById("modalInput5").value = cells[6].textContent.trim();  // Client
+    // document.getElementById("modalInput6").value = cells[7].textContent.trim();  // Project
+    // document.getElementById("modalInput7").value = cells[8].textContent.trim(); // Project Code
+
+      const clientValue = cells[6].textContent.trim();
+      const projectValue = cells[7].textContent.trim();
+      const projectCodeValue = cells[8].textContent.trim();
+
+      // 🔥 Create smart dropdowns like openModal()
+
+      const clientContainer = document.getElementById("modalClientContainer");
+      clientContainer.innerHTML = "";
+      const clientDropdown = createSmartDropdown("client", clientContainer, clientValue);
+      clientContainer.appendChild(clientDropdown);
+
+      clientDropdown.addEventListener("change", function () {
+          const selectedClient = this.value;
+          updateModalProjectDropdown(selectedClient, "");
+      });
+
+      const projectContainer = document.getElementById("modalProjectContainer");
+      projectContainer.innerHTML = "";
+      const projectDropdown = createSmartDropdown(
+          "project",
+          projectContainer,
+          projectValue,
+          clientValue
+      );
+      projectContainer.appendChild(projectDropdown);
+
+      projectDropdown.addEventListener("change", function () {
+          const currentClient = clientContainer?.querySelector("select")?.value;
+          updateModalProjectCode(currentClient, this.value);
+      });
+
+      const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+      projectCodeContainer.innerHTML = "";
+      const codeInput = document.createElement("input");
+      codeInput.type = "text";
+      codeInput.id = "modalProjectCodeInput";
+      codeInput.className = "form-input";
+      codeInput.value = projectCodeValue;
+      codeInput.readOnly = true;
+      codeInput.style.backgroundColor = "#f0f0f0";
+      projectCodeContainer.appendChild(codeInput);
+      
+    document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
+    document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Activity
+    document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Project Hours
+    document.getElementById("modalInput11").value = cells[12].textContent.trim(); // Billable
+    document.getElementById("modalInput12").value = cells[13].textContent.trim(); // Remarks
   } catch (err) {
     console.warn("Mapping modal inputs failed", err);
   }
@@ -1735,23 +2559,37 @@ function updateHistoryEntry() {
     showPopup("Modal not present", true);
     return;
   }
+  const clientContainer = document.getElementById("modalClientContainer");
+  const clientValue =
+    clientContainer?.querySelector("select")?.value ||
+    clientContainer?.querySelector("input")?.value || "";
+
+  const projectContainer = document.getElementById("modalProjectContainer");
+  const projectValue =
+    projectContainer?.querySelector("select")?.value ||
+    projectContainer?.querySelector("input")?.value || "";
+
+  const projectCodeValue =
+    document.getElementById("modalProjectCodeInput")?.value || "";
+
   const inputs = modal.querySelectorAll("input, select, textarea");
   const updatePayload = {
     date: document.getElementById("modalInput1").value,
     location: document.getElementById("modalInput2").value,
-    punchIn: document.getElementById("modalInput3").value,
-    punchOut: document.getElementById("modalInput4").value,
-    projectStartTime: document.getElementById("modalInput5").value,
-    projectEndTime: document.getElementById("modalInput6").value,
-    client: document.getElementById("modalInput7").value,
-    project: document.getElementById("modalInput8").value,
-    projectCode: document.getElementById("modalInput9").value,
-    reportingManagerEntry: document.getElementById("modalInput10").value,
-    activity: document.getElementById("modalInput11").value,
-    projectHours: document.getElementById("modalInput12").value,
-    workingHours: document.getElementById("modalInput13").value,
-    billable: document.getElementById("modalInput14").value,
-    remarks: document.getElementById("modalInput15").value,
+    projectStartTime: document.getElementById("modalInput3").value,
+    projectEndTime: document.getElementById("modalInput4").value,
+    // client: document.getElementById("modalInput5").value,
+    // project: document.getElementById("modalInput6").value,
+    // projectCode: document.getElementById("modalInput7").value,
+    client: clientValue,
+    project: projectValue,
+    projectCode: projectCodeValue,
+    
+    reportingManagerEntry: document.getElementById("modalInput8").value,
+    activity: document.getElementById("modalInput9").value,
+    projectHours: document.getElementById("modalInput10").value,
+    billable: document.getElementById("modalInput11").value,
+    remarks: document.getElementById("modalInput12").value,
   };
 
   showLoading("Updating entry...");
@@ -1803,7 +2641,6 @@ function deleteHistoryRow(button, entryId) {
 }
 
 
-// document.getElementById("submitBtn").addEventListener("click", saveDataToMongo);
 async function saveDataToMongo() {
   console.log("Starting saveDataToMongo");
   showLoading("Saving data...");
@@ -1831,25 +2668,28 @@ async function saveDataToMongo() {
 
     const rows = section.querySelectorAll('tbody tr');
     rows.forEach((row, rowIndex) => {
-      // Get inputs by CLASS, not by index
       const date = row.querySelector('.date-field')?.value;
       const location = row.querySelector('.location-select')?.value;
-      const punchIn = row.querySelector('.punch-in')?.value;
-      const punchOut = row.querySelector('.punch-out')?.value;
       const projectStart = row.querySelector('.project-start')?.value;
       const projectEnd = row.querySelector('.project-end')?.value;
-      const client = row.querySelector('.client-field')?.value;
-      const project = row.querySelector('.project-field')?.value;
-      const projectCode = row.querySelector('.project-code')?.value;
+      
+      // ✅ Use helper function for smart dropdown fields
+      const client = getFieldValue(row, '.col-client');
+      const project = getFieldValue(row, '.col-project');
+      const projectCode = getFieldValue(row, '.col-project-code');
+      
       const reportingManager = row.querySelector('.reporting-manager-field')?.value;
       const activity = row.querySelector('.activity-field')?.value;
-      const workingHours = row.querySelector('.working-hours-field')?.value;
       const projectHours = row.querySelector('.project-hours-field')?.value;
       const billable = row.querySelector('.billable-select')?.value;
       const remarks = row.querySelector('.remarks-field')?.value;
 
       // Mandatory field check
-      const mandatory = { date,punchIn,punchOut, projectStart, projectEnd, client, project, projectCode, reportingManager, activity };
+      const mandatory = { 
+        date, projectStart, projectEnd, 
+        client, project, projectCode, reportingManager, activity 
+      };
+      
       for (const [field, value] of Object.entries(mandatory)) {
         if (!value || value.trim() === '') {
           console.log(`${field}: ${value}`)
@@ -1873,8 +2713,6 @@ async function saveDataToMongo() {
         weekPeriod,
         date,
         location,
-        punchIn,
-        punchOut,
         projectStartTime: projectStart,
         projectEndTime: projectEnd,
         client,
@@ -1883,7 +2721,6 @@ async function saveDataToMongo() {
         reportingManagerEntry: reportingManager,
         activity,
         projectHours: projectHours || "0",
-        workingHours: workingHours || "0",
         billable,
         remarks,
         hits: document.getElementById('hits')?.value || '',
@@ -1932,8 +2769,11 @@ async function saveDataToMongo() {
     hideLoading();
 
     if (response.ok && result.success) {
-      showPopup('Timesheet saved successfully!');
-      setTimeout(() => location.reload(), 1500);
+      showPopup('Timesheet submitted successfully. You can review it in the History section.');
+      // setTimeout(() => location.reload(), 1500);
+      setTimeout(() => {
+        clearTimesheet(true);
+      }, 1500);
     } else {
       showPopup('Save failed: ' + (result.message || 'Unknown error'), true);
     }
@@ -1942,6 +2782,77 @@ async function saveDataToMongo() {
     console.error("Save error:", err);
     showPopup('Network error. Check console.', true);
   }
+}
+
+// ==========================================
+// UPDATED copyRow FUNCTION
+// ==========================================
+function copyRow(button) {
+  const row = button.closest("tr");
+  if (!row) return;
+  
+  copiedData = {
+    date: row.querySelector('.date-field')?.value || '',
+    location: row.querySelector('.location-select')?.value || '',
+    projectStart: row.querySelector('.project-start')?.value || '',
+    projectEnd: row.querySelector('.project-end')?.value || '',
+    client: getFieldValue(row, '.col-client'),  // ✅ Smart dropdown
+    project: getFieldValue(row, '.col-project'), // ✅ Smart dropdown
+    projectCode: getFieldValue(row, '.col-project-code'), // ✅ Smart dropdown
+    reportingManager: row.querySelector('.reporting-manager-field')?.value || '',
+    activity: row.querySelector('.activity-field')?.value || '',
+    billable: row.querySelector('.billable-select')?.value || '',
+    remarks: row.querySelector('.remarks-field')?.value || ''
+  };
+  
+  showPopup("Row copied!");
+}
+
+// ==========================================
+// UPDATED pasteRow FUNCTION
+// ==========================================
+function pasteRow(button) {
+  if (!copiedData) {
+    showPopup("No copied row found", true);
+    return;
+  }
+  
+  const row = button.closest("tr");
+  if (!row) return;
+  
+  // Paste regular fields
+  const dateField = row.querySelector('.date-field');
+  if (dateField) dateField.value = copiedData.date;
+  
+  const locationField = row.querySelector('.location-select');
+  if (locationField) locationField.value = copiedData.location;
+  
+  const projectStartField = row.querySelector('.project-start');
+  if (projectStartField) projectStartField.value = copiedData.projectStart;
+  
+  const projectEndField = row.querySelector('.project-end');
+  if (projectEndField) projectEndField.value = copiedData.projectEnd;
+  
+  // ✅ Paste smart dropdown fields
+  setFieldValue(row, '.col-client', copiedData.client);
+  setFieldValue(row, '.col-project', copiedData.project);
+  setFieldValue(row, '.col-project-code', copiedData.projectCode);
+  
+  const reportingManagerField = row.querySelector('.reporting-manager-field');
+  if (reportingManagerField) reportingManagerField.value = copiedData.reportingManager;
+  
+  const activityField = row.querySelector('.activity-field');
+  if (activityField) activityField.value = copiedData.activity;
+  
+  const billableField = row.querySelector('.billable-select');
+  if (billableField) billableField.value = copiedData.billable;
+  
+  const remarksField = row.querySelector('.remarks-field');
+  if (remarksField) remarksField.value = copiedData.remarks;
+  
+  calculateHours(row);
+  updateSummary();
+  showPopup("Row pasted!");
 }
 
 
@@ -2149,15 +3060,12 @@ function getEmployeeInfoForExport() {
         'Location of Work': '',
         'Project Start Time': '',
         'Project End Time': '',
-        'Punch In': '',
-        'Punch Out': '',
         'Client': '',
         'Project': '',
         'Project Code': '',
         'Reporting Manager Entry': '',
         'Activity': '',
         'Project Hours': '',
-        'Working Hours': '',
         'Billable': '',
         'Remarks': '',
         '3 HITS': '',
@@ -2184,8 +3092,6 @@ function exportTimesheetToExcel() {
         "weekPeriod",
         "date",
         "location",
-        "punchIn",
-        "punchOut",
         "projectStartTime",
         "projectEndTime",
         "client",
@@ -2194,7 +3100,6 @@ function exportTimesheetToExcel() {
         "reportingManagerEntry",
         "activity",
         "projectHours",
-        "workingHours",
         "billable",
         "remarks",
         "hits",
@@ -2216,8 +3121,6 @@ function exportTimesheetToExcel() {
         "Week Period",
         "Date",
         "Location of Work",
-        "Punch In",
-        "Punch Out",
         "Project Start Time",
         "Project End Time",
         "Client",
@@ -2226,7 +3129,6 @@ function exportTimesheetToExcel() {
         "Reporting Manager Entry",
         "Activity",
         "Project Hours",
-        "Working Hours",
         "Billable",
         "Remarks",
         "3 HITS",
@@ -2252,10 +3154,10 @@ function exportTimesheetToExcel() {
 
             // Detect empty row (same logic as history)
             const date = inputs[0]?.value?.trim() || "";
-            const project = inputs[7]?.value?.trim() || "";
+            const project = inputs[5]?.value?.trim() || "";
             const client =
-                inputs[6]?.value ||
-                inputs[6]?.querySelector("option:checked")?.value ||
+                inputs[4]?.value ||
+                inputs[4]?.querySelector("option:checked")?.value ||
                 "";
 
             if (!date && !project && !client) return;
@@ -2273,19 +3175,16 @@ function exportTimesheetToExcel() {
                     inputs[1]?.value ||
                     inputs[1]?.querySelector("option:checked")?.value ||
                     "",
-                punchIn: inputs[4]?.value || "",
-                punchOut: inputs[5]?.value || "",
                 projectStartTime: inputs[2]?.value || "",
                 projectEndTime: inputs[3]?.value || "",
                 client: client,
                 project: project,
-                projectCode: inputs[8]?.value || "",
-                reportingManagerEntry: inputs[9]?.value || "",
-                activity: inputs[10]?.value || "",
-                projectHours: inputs[11]?.value || "",
-                workingHours: inputs[12]?.value || "",
-                billable: inputs[13]?.value || "",
-                remarks: inputs[14]?.value || "",
+                projectCode: inputs[6]?.value || "",
+                reportingManagerEntry: inputs[7]?.value || "",
+                activity: inputs[8]?.value || "",
+                projectHours: inputs[9]?.value || "",
+                billable: inputs[10]?.value || "",
+                remarks: inputs[11]?.value || "",
                 hits: document.getElementById("hits").value || "",
                 misses: document.getElementById("misses").value || "",
                 feedback_hr: document.getElementById("feedback_hr").value || "",
@@ -2333,8 +3232,6 @@ function exportHistoryToExcel() {
         "weekPeriod",
         "date",
         "location",
-        "punchIn",
-        "punchOut",
         "projectStartTime",
         "projectEndTime",
         "client",
@@ -2343,7 +3240,6 @@ function exportHistoryToExcel() {
         "reportingManagerEntry",
         "activity",
         "projectHours",
-        "workingHours",
         "billable",
         "remarks",
         "hits",
@@ -2368,8 +3264,6 @@ function exportHistoryToExcel() {
         "Week Period",
         "Date",
         "Location of Work",
-        "Punch In",
-        "Punch Out",
         "Project Start Time",
         "Project End Time",
         "Client",
@@ -2378,7 +3272,6 @@ function exportHistoryToExcel() {
         "Reporting Manager Entry",
         "Activity",
         "Project Hours",
-        "Working Hours",
         "Billable",
         "Remarks",
         "3 HITS",
@@ -2403,8 +3296,6 @@ function exportHistoryToExcel() {
         weekPeriod: row.weekPeriod || "",
         date: row.date || "",
         location: row.location || "",
-        punchIn: row.punchIn || "",
-        punchOut: row.punchOut || "",
         projectStartTime: row.projectStartTime || "",
         projectEndTime: row.projectEndTime || "",
         client: row.client || "",
@@ -2413,7 +3304,6 @@ function exportHistoryToExcel() {
         reportingManagerEntry: row.reportingManagerEntry || "",
         activity: row.activity || "",
         projectHours: row.projectHours || "",
-        workingHours: row.workingHours || "",
         billable: row.billable || "",
         remarks: row.remarks || "",
         hits: row.hits || "",
@@ -2867,7 +3757,7 @@ function showPopup(message, isError = false) {
 
   const popup = document.getElementById("successPopup");
   const msg = document.getElementById("popupMessage");
-  if (!popup || !msg) return alert(message);
+  // if (!popup || !msg) return alert(message);
 
   msg.innerHTML = isError
     ? `<i class='fas fa-times-circle'></i> ${message}`
@@ -3226,13 +4116,6 @@ async function handleExcelUpload(event) {
             }
             
             function calculateHours(row) {
-              const punchIn = excelTimeToMinutes(row['Punch In']);
-              const punchOut = excelTimeToMinutes(row['Punch Out']);
-
-              if (punchIn !== null && punchOut !== null && punchOut > punchIn) {
-                return minutesToHours(punchOut - punchIn);
-              }
-
               const start = excelTimeToMinutes(row['Project Start Time']);
               const end = excelTimeToMinutes(row['Project End Time']);
 
@@ -3243,51 +4126,6 @@ async function handleExcelUpload(event) {
               // No valid time data → explicitly zero
               return 0;
             }
-
-
-
-          //   // ✅ Convert Excel data into API format
-          //   const timesheetData = jsonData.map(row => (
-          //     const calculatedHours = calculateHours(row);
-          //     {
-                
-          //       employeeId: toStr(row['Employee ID']) || '',
-          //       employeeName: toStr(row['Employee Name']) || '',
-          //       designation: toStr(row['Designation']) || '',
-          //       gender: toStr(row['Gender']) || '',
-          //       partner: toStr(row['Partner']) || '',
-          //       reportingManager: toStr(row['Reporting Manager']) || '',
-          //       weekPeriod: toStr(row['Week Period']) || '',
-          //       date: toStr(row['Date']) || '',
-          //       location: toStr(row['Location of Work']) || '',
-          //       // projectStartTime: toStr(row['Project Start Time']) || '',
-          //       // projectEndTime: toStr(row['Project End Time']) || '',
-          //       // punchIn: toStr(row['Punch In']) || '',
-          //       // punchOut: toStr(row['Punch Out']) || '',
-          //       projectStartTime: excelTimeToHHMM(row['Project Start Time']),
-          //       projectEndTime: excelTimeToHHMM(row['Project End Time']),
-          //       punchIn: excelTimeToHHMM(row['Punch In']),
-          //       punchOut: excelTimeToHHMM(row['Punch Out']),
-          //       client: toStr(row['Client']) || '',
-          //       project: toStr(row['Project']) || '',
-          //       projectCode: toStr(row['Project Code']) || '',
-          //       reportingManagerEntry: toStr(row['Reporting Manager Entry']) || '',
-          //       activity: toStr(row['Activity']) || '',
-          //       projectHours: toStr(row['Project Hours']) || '',
-          //       workingHours: toStr(row['Working Hours']) || '',
-          //       billable: toStr(row['Billable']) || '',
-          //       remarks: toStr(row['Remarks']) || '',
-          //       hits: toStr(row['3 Hits']) || '',
-          //       misses: toStr(row['3 Misses']) || '',
-          //       feedback_hr: toStr(row['Feedback for HR']) || '',
-          //       feedback_it: toStr(row['Feedback for IT']) || '',
-          //       feedback_crm: toStr(row['Feedback for CRM']) || '',
-          //       feedback_others: toStr(row['Feedback for Others']) || '',
-          //       totalHours: toStr(row['Total Hours']) || '0.00',
-          //       totalBillableHours: toStr(row['Total Billable Hours']) || '0.00',
-          //       totalNonBillableHours: toStr(row['Total Non-Billable Hours']) || '0.00'
-          //   }
-          // ));
 
           const timesheetData = jsonData.map(row => {
             const calculatedHours = calculateHours(row);
@@ -3305,8 +4143,6 @@ async function handleExcelUpload(event) {
 
               projectStartTime: excelTimeToHHMM(row['Project Start Time']),
               projectEndTime: excelTimeToHHMM(row['Project End Time']),
-              punchIn: excelTimeToHHMM(row['Punch In']),
-              punchOut: excelTimeToHHMM(row['Punch Out']),
 
               client: toStr(row['Client']) || '',
               project: toStr(row['Project']) || '',
@@ -3316,7 +4152,6 @@ async function handleExcelUpload(event) {
 
               // 🔥 ONLY calculated values (as per your rule)
               projectHours: calculatedHours.toString(),
-              workingHours: calculatedHours.toString(),
 
               billable: toStr(row['Billable']) || '',
               remarks: toStr(row['Remarks']) || '',
@@ -3352,7 +4187,7 @@ async function handleExcelUpload(event) {
 
             const result = await response.json();
             showPopup('Excel uploaded and saved successfully!');
-            setTimeout(() => window.location.reload(), 2000);
+            // setTimeout(() => window.location.reload(), 2000);
 
         } catch (error) {
             console.error('Error reading Excel:', error);
