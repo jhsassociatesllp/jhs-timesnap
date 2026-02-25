@@ -204,7 +204,6 @@ async def login_page():
 async def dashboard_page():
     return FileResponse(os.path.join(frontend_path, "index.html"))
 
-
 @app.post("/register")
 async def register(request: RegisterRequest):
     empid = request.empid.strip().upper()
