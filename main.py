@@ -268,14 +268,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     return {"success": True, "access_token": access_token, "token_type": "bearer", "employeeId": empid, "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60}
 
-# @app.post("/verify_session")
-# async def verify_session(token: str = Depends(oauth2_scheme)):
-#     employee_id = await get_current_user(token)
-#     session = sessions_collection.find_one({"token": token, "employeeId": employee_id})
-#     if not session or session["expires_at"] < datetime.utcnow():
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or invalid")
-#     return {"message": "Session valid"}
-
 @app.post("/verify_session")
 async def verify_session(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     token = credentials.credentials  # ✅ Extract the Bearer token string
