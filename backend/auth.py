@@ -5,7 +5,6 @@ Shared authentication utilities used by all routers.
 import os
 import secrets
 from datetime import datetime, timedelta
-
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
