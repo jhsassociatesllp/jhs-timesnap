@@ -216,7 +216,6 @@ def _send_otp_email(to_email: str, otp: str):
     headers = {"accept": "application/json", "api-key": BREVO_API_KEY, "content-type": "application/json"}
     return requests.post(url, json=payload, headers=headers)
 
-
 @app.post("/forgot-password")
 async def forgot_password(empid: str = Body(...)):
     empid = empid.strip().upper()
