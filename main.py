@@ -145,7 +145,7 @@ def _validate_password(password: str):
 async def register(request: RegisterRequest):
     empid = request.empid.strip().upper()
     _validate_password(request.password)
-
+    print(employee_details_collection)
     if not employee_details_collection.find_one({"EmpID": empid}):
         raise HTTPException(400, "Employee does not exist")
     if users_collection.find_one({"empid": empid}):
