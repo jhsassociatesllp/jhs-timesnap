@@ -251,7 +251,6 @@ async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
         raise HTTPException(400, "Invalid OTP")
     return {"success": True, "message": "OTP verified"}
 
-
 @app.post("/verify-user")
 async def verify_user(request: VerifyUserRequest):
     """
