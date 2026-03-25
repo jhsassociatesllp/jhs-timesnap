@@ -233,7 +233,6 @@ def verify_token(token: str):
 async def admin_page():
     return FileResponse(os.path.join(frontend_path, "timesheet", "admin.html"))
 
-
 @admin_router.post("/admin-login")
 async def admin_login(request: AdminLoginRequest):
     userid = request.userid.strip().upper()
