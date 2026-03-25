@@ -231,7 +231,7 @@ def verify_token(token: str):
 # ---------------- ROUTES ----------------
 @admin_router.get("/admin", response_class=FileResponse)
 async def admin_page():
-    return FileResponse(os.path.join(frontend_path, r"timesheet\admin.html"))
+    return FileResponse(os.path.join(frontend_path, "timesheet", "admin.html"))
 
 
 @admin_router.post("/admin-login")
@@ -312,7 +312,7 @@ async def logout():
 
 @admin_router.get("/admin-dashboard", response_class=FileResponse)
 async def admin_dashboard():
-    return FileResponse(os.path.join(frontend_path, "timesheet/dashboard.html"))
+    return FileResponse(os.path.join(frontend_path, "timesheet", "dashboard.html"))
 
 
 # @admin_router.post("/update-par-status")
