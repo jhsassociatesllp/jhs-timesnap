@@ -9,7 +9,6 @@ import re
 import json
 import secrets
 from datetime import datetime, timedelta
-
 import jwt
 import requests
 from bson import ObjectId
