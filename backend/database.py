@@ -14,7 +14,7 @@ if not MONGO_CONNECTION_STRING:
     raise ValueError("MONGO_CONNECTION_STRING env var is required")
 
 _client = MongoClient(MONGO_CONNECTION_STRING)
-db = _client["staging_Timesheet"]
+db = _client["Timesheets"]
 appraisal_db = _client["staging_Appraisal"]
 
 # ── shared collections ────────────────────────────────────────────────────────
