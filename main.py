@@ -252,15 +252,192 @@ async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
     return {"success": True, "message": "OTP verified"}
 
 
+@app.post("/verify-user")
+async def verify_user(request: VerifyUserRequest):
+    """
+    Verify user by employee ID and verification code (DDYYYYMMMM format)
+    DD = Date of birth (2 digits)
+    YYYY = Year of birth (4 digits)  
+    MMMM = First 4 digits of mobile number
+    
+    Example: DOB = 01/01/1991, Mobile = 9876543210 → Code = 0119919876
+    """
+    try:
+        empid = request.empid.strip().upper()
+        verification_code = request.verification_code.strip()
+        
+        # Validate verification code length
+        if len(verification_code) != 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code must be exactly 10 digits"
+            )
+        
+        # Find employee in database
+        employee = employee_details_collection.find_one({"EmpID": empid})
+        
+        if not employee:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Employee not found"
+            )
+        
+        # Extract verification components
+        try:
+            input_date = verification_code[0:2]      # DD
+            input_year = verification_code[2:6]      # YYYY
+            input_mobile = verification_code[6:10]   # MMMM (first 4 digits)
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code format"
+            )
+        
+        # Get employee DOB and mobile from database
+        # Adjust field names according to your database schema
+        emp_dob = employee.get("DOB") or employee.get("Date of Birth") or employee.get("DateOfBirth")
+        emp_mobile = employee.get("Mobile") or employee.get("Personal Mobile") or employee.get("MobileNumber")
+        
+        if not emp_dob or not emp_mobile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee DOB or Mobile number not found in database"
+            )
+        
+        # Parse DOB (handle multiple formats: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
+        emp_dob_str = str(emp_dob)
+        
+        # Try different date formats
+        actual_date = None
+        actual_year = None
+        
+        for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%m/%d/%Y"]:
+            try:
+                parsed_date = datetime.strptime(emp_dob_str, fmt)
+                actual_date = parsed_date.strftime("%d")
+                actual_year = parsed_date.strftime("%Y")
+                break
+            except:
+                continue
+        
+        if not actual_date or not actual_year:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to parse employee date of birth"
+            )
+        
+        # Get first 4 digits of mobile number (remove any non-digit characters)
+        emp_mobile_str = str(emp_mobile).replace(" ", "").replace("-", "").replace("+", "")
+        
+        # Handle mobile numbers with country code
+        if len(emp_mobile_str) > 10:
+            emp_mobile_str = emp_mobile_str[-10:]  # Get last 10 digits
+        
+        actual_mobile = emp_mobile_str[:4]
+        
+        # Verify the code
+        if input_date != actual_date or input_year != actual_year or input_mobile != actual_mobile:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Verification failed. Invalid verification code."
+            )
+        
+        return {
+            "success": True,
+            "message": "Verification successful",
+            "empid": empid
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in verify_user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server error: {str(e)}"
+        )
+
+
 @app.post("/reset-password")
-async def reset_password(empid: str = Body(...), password: str = Body(...)):
-    empid = empid.strip().upper()
-    _validate_password(password)
-    result = users_collection.update_one({"empid": empid}, {"$set": {"password": pwd_context.hash(password)}})
-    if result.matched_count == 0:
-        raise HTTPException(400, "Employee not registered")
-    forgot_password_otps_collection.delete_one({"empid": empid})
-    return {"success": True, "message": "Password updated"}
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Reset user password after verification
+    """
+    try:
+        empid = request.empid.strip().upper()
+        new_password = request.new_password
+        
+        # Validate password strength
+        if len(new_password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters"
+            )
+        
+        if not re.search(r'[A-Z]', new_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must contain at least one uppercase letter"
+            )
+        
+        if not re.search(r'[a-z]', new_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must contain at least one lowercase letter"
+            )
+        
+        if not re.search(r'\d', new_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must contain at least one number"
+            )
+        
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must contain at least one special character"
+            )
+        
+        # Check if user exists
+        user = users_collection.find_one({"empid": empid})
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found. Please register first."
+            )
+        
+        # Hash the new password
+        hashed_password = pwd_context.hash(new_password)
+        
+        # Update password in database
+        result = users_collection.update_one(
+            {"empid": empid},
+            {"$set": {
+                "password": hashed_password,
+                "password_updated_at": datetime.utcnow()
+            }}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update password"
+            )
+        
+        return {
+            "success": True,
+            "message": "Password reset successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in reset_password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server error: {str(e)}"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
