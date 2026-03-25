@@ -178,7 +178,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
 # ---------------- PASSWORD HASHER ----------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-frontend_path = os.path.join(os.path.dirname(__file__), "static")
+# frontend_path = os.path.join(os.path.dirname(__file__), "static")
+frontend_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "../../static")
+)
 admin_router = APIRouter()
 
 # ---------------- MODELS ----------------
@@ -228,7 +231,7 @@ def verify_token(token: str):
 # ---------------- ROUTES ----------------
 @admin_router.get("/admin", response_class=FileResponse)
 async def admin_page():
-    return FileResponse(os.path.join(frontend_path, "admin.html"))
+    return FileResponse(os.path.join(frontend_path, r"timesheet\admin.html"))
 
 
 @admin_router.post("/admin-login")
@@ -309,7 +312,7 @@ async def logout():
 
 @admin_router.get("/admin-dashboard", response_class=FileResponse)
 async def admin_dashboard():
-    return FileResponse(os.path.join(frontend_path, "dashboard.html"))
+    return FileResponse(os.path.join(frontend_path, "timesheet/dashboard.html"))
 
 
 # @admin_router.post("/update-par-status")

@@ -43,7 +43,7 @@ from backend.timesheet.router import router as timesheet_router
 from backend.appraisal.router  import router as appraisal_router
 
 # ── admin router (keep existing admin.py) ────────────────────────────────────
-from admin import admin_router   # your existing admin.py
+from backend.timesheet.timesheet_admin import admin_router   # your existing admin.py
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="2.0.0")

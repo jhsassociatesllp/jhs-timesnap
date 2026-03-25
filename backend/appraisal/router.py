@@ -204,7 +204,7 @@ async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends
 
     return {
         "success": True,
-        "message": "Appraisal submitted successfully!" if data.status == "submitted"
+        "message": "KRA submitted successfully!" if data.status == "submitted"
                    else "Draft saved successfully.",
         "id":      record_id,
         "status":  data.status,
