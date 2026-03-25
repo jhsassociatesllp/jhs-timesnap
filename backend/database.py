@@ -15,7 +15,7 @@ if not MONGO_CONNECTION_STRING:
 
 _client = MongoClient(MONGO_CONNECTION_STRING)
 db = _client["Timesheets"]
-appraisal_db = _client["staging_Appraisal"]
+appraisal_db = _client["Appraisal"]
 
 # ── shared collections ────────────────────────────────────────────────────────
 sessions_collection           = db["sessions"]
