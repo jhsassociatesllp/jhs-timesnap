@@ -239,7 +239,6 @@ async def forgot_password(empid: str = Body(...)):
         raise HTTPException(500, "Failed to send OTP email")
     return {"success": True, "message": "OTP sent to registered email"}
 
-
 @app.post("/verify-otp")
 async def verify_otp(empid: str = Body(...), otp: str = Body(...)):
     empid  = empid.strip().upper()
