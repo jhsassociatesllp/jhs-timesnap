@@ -1259,3 +1259,4 @@ async def admin_par_stats(request: Request):
         },
         "managerWise": result_list
     }
+      
