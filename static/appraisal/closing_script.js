@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     } catch (err) {
         console.error("Init error:", err);
-        showPopup("Failed to initialise appraisal. Please refresh.", true);
+        showPopup("Failed to initialise KRA. Please refresh.", true);
     } finally {
         hideLoading();
     }
@@ -209,7 +209,7 @@ function _buildSection(sectionName, questions, savedAnswers, readOnly, isRole) {
 const YES_NO_TYPES = new Set([
     "yes_no", "yes_no_example", "yes_no_reason", "yes_no_description",
     "yes_no_details", "yes_no_justification", "yes_no_notes",
-    "yes_no_explanation", "yes_no_comments",
+    "yes_no_explanation", "yes_no_comments", "yes_no_number",
 ]);
 
 // hint label per yes/no sub-type
@@ -250,13 +250,23 @@ function _buildQuestion(q, savedValue, readOnly) {
         block.appendChild(ta);
     }
 
-    // ── rating (star 1-5) ──
+    // ── rating (0–5 scale) ──
     else if (q.type === "rating") {
+        const outer = document.createElement("div");
+        outer.style.cssText = "display:flex;flex-direction:column;gap:.5rem;";
+
+        // Scale label
+        const scaleLabel = document.createElement("p");
+        scaleLabel.className = "rating-scale-label";
+        scaleLabel.innerHTML = `<span class="scale-low">0 — Lowest</span><span class="scale-high">5 — Highest</span>`;
+        outer.appendChild(scaleLabel);
+
         const wrapper = document.createElement("div");
         wrapper.className = "star-rating" + (readOnly ? " disabled" : "");
         wrapper.setAttribute("data-qid", q.id);
 
-        for (let i = 5; i >= 1; i--) {
+        // 5 → 0 (RTL CSS trick renders right-to-left visually as 0–5)
+        for (let i = 5; i >= 0; i--) {
             const radio = document.createElement("input");
             radio.type     = "radio";
             radio.name     = "q_" + q.id;
@@ -267,8 +277,8 @@ function _buildQuestion(q, savedValue, readOnly) {
 
             const lbl = document.createElement("label");
             lbl.setAttribute("for", `q_${q.id}_${i}`);
-            lbl.innerHTML = "★";
-            lbl.title     = `${i} out of 5`;
+            lbl.innerHTML = i === 0 ? "☆" : "★";
+            lbl.title     = i === 0 ? "0 — Lowest" : `${i} out of 5`;
             wrapper.appendChild(radio);
             wrapper.appendChild(lbl);
         }
@@ -276,7 +286,7 @@ function _buildQuestion(q, savedValue, readOnly) {
         const val = document.createElement("span");
         val.className   = "rating-value";
         val.id          = "rval_" + q.id;
-        val.textContent = savedValue ? `${savedValue}/5` : "";
+        val.textContent = savedValue !== undefined && savedValue !== "" ? `${savedValue}/5` : "";
         wrapper.appendChild(val);
 
         wrapper.addEventListener("change", e => {
@@ -284,7 +294,84 @@ function _buildQuestion(q, savedValue, readOnly) {
                 document.getElementById("rval_" + q.id).textContent = `${e.target.value}/5`;
         });
 
-        block.appendChild(wrapper);
+        outer.appendChild(wrapper);
+        block.appendChild(outer);
+    }
+
+    // ── yes_no_number (Yes/No + conditional count input) ──
+    else if (q.type === "yes_no_number") {
+        const radioWrapper = document.createElement("div");
+        radioWrapper.className = "yes-no-wrapper";
+
+        // Keep direct references — don't use querySelector before appending
+        let yesRadio = null;
+        let noRadio  = null;
+
+        ["Yes", "No"].forEach(choice => {
+            const rb = document.createElement("input");
+            rb.type     = "radio";
+            rb.name     = `q_${q.id}_yn`;
+            rb.id       = `q_${q.id}_${choice}`;
+            rb.value    = choice;
+            rb.disabled = readOnly;
+
+            const savedStr = String(savedValue || "").toLowerCase();
+            if (savedStr.startsWith(choice.toLowerCase())) rb.checked = true;
+
+            if (choice === "Yes") yesRadio = rb;
+            else                  noRadio  = rb;
+
+            const lbl = document.createElement("label");
+            lbl.setAttribute("for", `q_${q.id}_${choice}`);
+            lbl.textContent = choice;
+            lbl.className   = "yn-label";
+
+            radioWrapper.appendChild(rb);
+            radioWrapper.appendChild(lbl);
+        });
+
+        block.appendChild(radioWrapper);
+
+        // Count wrapper — hidden by default, shown when Yes is selected
+        const countWrapper = document.createElement("div");
+        countWrapper.className = "yn-count-wrapper";
+        countWrapper.id        = `q_${q.id}_count_wrapper`;
+
+        const countLabel = document.createElement("label");
+        countLabel.textContent = "If Yes, enter the number:";
+        countLabel.className   = "yn-hint";
+        countLabel.setAttribute("for", `q_${q.id}_count`);
+
+        const countInput = document.createElement("input");
+        countInput.type        = "number";
+        countInput.className   = "q-input yn-count-input";
+        countInput.id          = `q_${q.id}_count`;
+        countInput.name        = `q_${q.id}_count`;
+        countInput.min         = 0;
+        countInput.placeholder = "Enter count";
+        countInput.disabled    = readOnly;
+
+        // Restore saved count (format: "Yes — 3")
+        const savedCount = String(savedValue || "").match(/\d+/);
+        if (savedCount) countInput.value = savedCount[0];
+
+        countWrapper.appendChild(countLabel);
+        countWrapper.appendChild(countInput);
+        block.appendChild(countWrapper);
+
+        // Set initial visibility using direct references
+        const savedYes = String(savedValue || "").toLowerCase().startsWith("yes");
+        countWrapper.style.display = (savedYes && !readOnly) || (savedYes && readOnly) ? "flex" : "none";
+
+        // Listen for change — use direct references, not querySelector
+        yesRadio.addEventListener("change", () => {
+            countWrapper.style.display = "flex";
+            countInput.focus();
+        });
+        noRadio.addEventListener("change", () => {
+            countWrapper.style.display = "none";
+            countInput.value = "";
+        });
     }
 
     // ── number (plain numeric input) ──
@@ -434,7 +521,11 @@ function collectAnswers() {
             const checked = document.querySelector(`input[name="q_${q.id}_yn"]:checked`);
             if (checked) {
                 let val = checked.value;
-                if (qtype !== "yes_no") {
+                if (qtype === "yes_no_number") {
+                    const countEl = document.getElementById(`q_${q.id}_count`);
+                    const countVal = countEl?.value?.trim();
+                    if (val === "Yes" && countVal) val = `Yes — ${countVal}`;
+                } else if (qtype !== "yes_no") {
                     const reason = document.getElementById(`q_${q.id}_reason`);
                     const reasonText = reason?.value?.trim();
                     if (reasonText) val = `${val} — ${reasonText}`;
@@ -500,7 +591,7 @@ function validateAnswers(answers) {
 
 // ── Save (draft or submit) ────────────────────────────────────────────────────
 async function saveAppraisal(status) {
-    if (_isReadOnly) { showPopup("Appraisal already submitted.", true); return; }
+    if (_isReadOnly) { showPopup("KRA already submitted.", true); return; }
 
     const answers = collectAnswers();
 
@@ -583,7 +674,7 @@ async function loadHistory() {
         const data = await res.json();
 
         if (!data.success || !data.data || data.data.length === 0) {
-            container.innerHTML = `<p class="empty-msg">No appraisal records found.</p>`;
+            container.innerHTML = `<p class="empty-msg">No KRA records found.</p>`;
             return;
         }
 
@@ -782,7 +873,7 @@ async function loadStatus() {
             : "—";
 
         subCard.innerHTML = `
-            <h3><i class="fas fa-paper-plane"></i> Appraisal Submission — ${_currentPeriod}</h3>
+            <h3><i class="fas fa-paper-plane"></i> KRA Submission — ${_currentPeriod}</h3>
             <div class="status-row">
                 <span class="status-key">Current Status</span>
                 <span class="status-val"><span class="pill ${pillClass}">${statusLabel}</span></span>
@@ -799,10 +890,10 @@ async function loadStatus() {
                 <span class="status-key">Next Steps</span>
                 <span class="status-val" style="font-weight:400;color:var(--text-light)">
                     ${statusData.status === "submitted"
-                        ? "Your appraisal is under review by your reporting manager and partner."
+                        ? "Your KRA is under review by your reporting manager and partner."
                         : statusData.status === "draft"
                         ? "You have a saved draft. Go to the Form tab to complete and submit."
-                        : "You haven't started your appraisal yet. Go to the Form tab to begin."}
+                        : "You haven't started your KRA yet. Go to the Form tab to begin."}
                 </span>
             </div>
         `;

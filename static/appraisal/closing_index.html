@@ -34,11 +34,46 @@
     <!-- ── FORM TAB ───────────────────────────────────────────────────────── -->
     <div class="tab-content active" id="formTab">
 
-      <!-- KRA Form Closed Notice -->
-      <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
-        <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
-        <strong style="font-size:1.3rem;margin-bottom:.5rem;">KRA Form has been closed</strong>
-        <p style="font-size:.95rem;color:#7d5a00;">The KRA submission window is currently closed. Please check back later or contact HR for more information.</p>
+      <!-- Not eligible state -->
+      <div id="notEligibleBlock" class="info-strip info-warning" style="display:none">
+        <i class="fas fa-lock"></i>
+        <div>
+          <strong>Not Eligible</strong>
+          <p id="notEligibleMsg"></p>
+        </div>
+      </div>
+
+      <!-- Submitted state (read-only view) -->
+      <div id="submittedBanner" class="info-strip info-success" style="display:none">
+        <i class="fas fa-check-circle"></i>
+        <div>
+          <strong>KRA Submitted</strong>
+          <p>Your KRA for <span id="submittedPeriod"></span> has been submitted and is under review. No further edits are allowed.</p>
+        </div>
+      </div>
+
+      <!-- Employee info bar -->
+      <div class="employee-info" id="empInfoBar" style="display:none">
+        <div class="form-group"><label>Employee ID</label><input type="text" id="empId"    readonly /></div>
+        <div class="form-group"><label>Name</label>       <input type="text" id="empName"  readonly /></div>
+        <div class="form-group"><label>Designation</label><input type="text" id="empDesig" readonly /></div>
+        <div class="form-group"><label>Partner</label>    <input type="text" id="empPart"  readonly /></div>
+        <div class="form-group"><label>Reporting Manager</label><input type="text" id="empMgr" readonly /></div>
+        <div class="form-group"><label>KRA Period</label> <input type="text" id="empPeriod" readonly /></div>
+      </div>
+
+      <!-- Form body -->
+      <div id="formBody" style="display:none">
+        <div id="formSections"></div>
+
+        <div class="export-section" id="formActions">
+          <button class="export-btn" onclick="saveAppraisal('draft')">
+            <i class="fas fa-save"></i> Save Draft
+          </button>
+          <button class="export-btn btn-submit" onclick="confirmSubmit()">
+            <i class="fas fa-paper-plane"></i> Submit KRA
+          </button>
+        </div>
       </div>
 
     </div><!-- /formTab -->
@@ -72,6 +107,14 @@
   <div class="popup" id="popup">
     <p id="popupMsg"></p>
     <button class="popup-close" onclick="closePopup()">&times;</button>
+  </div>
+
+  <!-- Confirm submit dialog -->
+  <div class="exit-confirmation" id="submitConfirm">
+    <p><i class="fas fa-exclamation-triangle" style="color:#e67e22;font-size:1.5rem;margin-bottom:.5rem;display:block"></i>
+       Once submitted, your KRA <strong>cannot be edited</strong>.<br>Are you sure you want to submit?</p>
+    <button class="confirm-btn"  onclick="doSubmit()">Yes, Submit</button>
+    <button class="cancel-btn"   onclick="closeSubmitConfirm()">Cancel</button>
   </div>
 
   <!-- Logout confirm -->
