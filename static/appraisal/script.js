@@ -72,6 +72,7 @@ function showTab(tab) {
 // ── Initialise ────────────────────────────────────────────────────────────────
 // Only fetch the period to update the header subtitle.
 // All form/eligibility logic is disabled since the form is closed.
+
 document.addEventListener("DOMContentLoaded", async () => {
     showLoading("Loading…");
     try {
