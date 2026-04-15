@@ -803,10 +803,11 @@ def _require_admin(current_user: str):
 
 @router.get("/admin/pending")
 async def admin_pending(current_user: str = Depends(get_current_user)):
-    """Admin sees all submitted/TL_approved records across all periods."""
+    """Admin sees all submitted/TL_approved records."""
     _require_admin(current_user)
+    period  = _get_current_period()
     records = list(appraisal_collection.find(
-        {"status": {"$in": ["submitted", "TL_approved"]}},
+        {"period": period, "status": {"$in": ["submitted", "TL_approved"]}},
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
          "reportingEmpCode": 1, "partnerEmpCode": 1, "percentage": 1, "score": 1, "maxScore": 1}
@@ -817,8 +818,9 @@ async def admin_pending(current_user: str = Depends(get_current_user)):
 @router.get("/admin/approved")
 async def admin_approved(current_user: str = Depends(get_current_user)):
     _require_admin(current_user)
+    period  = _get_current_period()
     records = list(appraisal_collection.find(
-        {"status": "PnD_approved"},
+        {"period": period, "status": "PnD_approved"},
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1,
          "tlPercentage": 1, "pndPercentage": 1,
@@ -830,8 +832,9 @@ async def admin_approved(current_user: str = Depends(get_current_user)):
 @router.get("/admin/rejected")
 async def admin_rejected(current_user: str = Depends(get_current_user)):
     _require_admin(current_user)
+    period  = _get_current_period()
     records = list(appraisal_collection.find(
-        {"status": {"$in": ["TL_rejected", "PnD_rejected"]}},
+        {"period": period, "status": {"$in": ["TL_rejected", "PnD_rejected"]}},
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
          "reportingEmpCode": 1, "partnerEmpCode": 1, "percentage": 1, "score": 1, "maxScore": 1}
@@ -844,29 +847,19 @@ async def admin_rejected(current_user: str = Depends(get_current_user)):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/analysis")
-async def get_analysis(
-    current_user: str = Depends(get_current_user),
-    period: Optional[str] = None,
-):
+async def get_analysis(current_user: str = Depends(get_current_user)):
     role = _resolve_role(current_user)
     if role not in ("admin", "partner"):
         raise HTTPException(403, "Admin or Partner access required")
 
-    # Admin: if no period specified, query ALL periods (no period filter)
-    # Partner: same — all periods unless specified
-    # Either role can pass ?period=2025-26 to filter to a specific year
-    query_approved: dict = {"status": "PnD_approved"}
-    query_all: dict = {}
+    period = _get_current_period()
 
-    if period:
-        query_approved["period"] = period
-        query_all["period"]      = period
-
+    # Filter by partner if PnD
+    query = {"period": period, "status": "PnD_approved"}
     if role == "partner":
-        query_approved["partnerEmpCode"] = current_user.upper()
-        query_all["partnerEmpCode"]      = current_user.upper()
+        query["partnerEmpCode"] = current_user.upper()
 
-    records = list(appraisal_collection.find(query_approved, {
+    records = list(appraisal_collection.find(query, {
         "_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "partnerEmpCode": 1, "partnerEmpName": 1,
         "selfPercentage": 1, "tlPercentage": 1, "pndPercentage": 1,
@@ -910,7 +903,7 @@ async def get_analysis(
                     "employeeId":   r["employeeId"],
                     "employeeName": r.get("employeeName", ""),
                     "designation":  r.get("designation", ""),
-                    "selfPct":      r.get("selfPercentage") or r.get("percentage"),
+                    "selfPct":      r.get("selfPercentage"),
                     "tlPct":        r.get("tlPercentage"),
                     "pndPct":       r.get("pndPercentage"),
                 }
@@ -948,8 +941,12 @@ async def get_analysis(
             })
     inflation_sorted = sorted(inflation, key=lambda x: abs(x["delta"]), reverse=True)[:10]
 
-    # 6. Pipeline counts — ALL records (not just approved)
-    all_records = list(appraisal_collection.find(query_all, {
+    # 6. Pipeline counts — ALL records this period (not just approved)
+    all_period_query = {"period": period}
+    if role == "partner":
+        all_period_query["partnerEmpCode"] = current_user.upper()
+
+    all_records = list(appraisal_collection.find(all_period_query, {
         "_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "reportingEmpCode": 1, "reportingEmpName": 1,
         "partnerEmpCode": 1, "partnerEmpName": 1,

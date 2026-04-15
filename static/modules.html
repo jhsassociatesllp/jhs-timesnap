@@ -8,541 +8,249 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   <style>
-    /* ── Same CSS variables as timesheet/styles.css ── */
-    :root {
-      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --secondary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-      --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-      --dark-bg: #2c3e50;
-      --light-bg: #f8f9fa;
-      --text-dark: #2c3e50;
-      --text-light: #7f8c8d;
-      --border-color: #e1e8ed;
-      --shadow-light: 0 4px 6px rgba(0,0,0,0.1);
-      --shadow-medium: 0 10px 25px rgba(0,0,0,0.15);
-      --shadow-heavy: 0 20px 40px rgba(0,0,0,0.2);
-      --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    :root{
+      --pg:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      --sg:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text-dark:#2c3e50;--text-light:#7f8c8d;
+      --border:#e1e8ed;--sh-sm:0 4px 6px rgba(0,0,0,.1);
+      --sh-md:0 10px 25px rgba(0,0,0,.15);--sh-lg:0 20px 40px rgba(0,0,0,.2);
+      --tr:all .3s cubic-bezier(.4,0,.2,1);
     }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:100vh;display:flex;flex-direction:column;color:var(--text-dark);line-height:1.6}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-md);position:sticky;top:0;z-index:100}
+    .navbar-brand{font-size:1.1rem;font-weight:700;color:white;display:flex;align-items:center;gap:.55rem}
+    .navbar-brand i{color:#a78bfa;font-size:1rem}
+    .navbar-right{display:flex;align-items:center;gap:.9rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .logout-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr)}
+    .logout-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.38);color:white}
 
-    body {
-      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--primary-gradient);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      color: var(--text-dark);
-      line-height: 1.6;
-    }
+    .page-wrapper{flex:1;display:flex;justify-content:center;padding:2rem}
+    .container{width:100%;max-width:1100px;background:white;border-radius:20px;box-shadow:var(--sh-lg);overflow:hidden;animation:fadeInUp .6s ease-out}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
-    /* ─────────────────────────────────────────
-       NAVBAR  — pixel-perfect match to timesheet
-    ───────────────────────────────────────── */
-    .navbar {
-      background: var(--dark-bg);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: var(--shadow-medium);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
+    .header{background:var(--pg);color:white;padding:3rem 2rem;text-align:center;position:relative;overflow:hidden;border-bottom-left-radius:20px;border-bottom-right-radius:20px}
+    .header::before{content:'';position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10"><defs><pattern id="g" width="100" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="10" fill="url(%23g)"/></svg>');opacity:.1}
+    .header h1{margin:0;font-size:3rem;font-weight:700;position:relative;z-index:1;text-shadow:2px 2px 8px rgba(0,0,0,.3);letter-spacing:2px;text-transform:uppercase}
+    .header p{margin:.6rem 0 0;opacity:.9;font-size:1.1rem;position:relative;z-index:1;font-weight:300}
 
-    .navbar-brand {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: white;
-      letter-spacing: 0.3px;
-      display: flex;
-      align-items: center;
-      gap: 0.55rem;
-    }
-    .navbar-brand i { color: #a78bfa; font-size: 1rem; }
+    .body-content{padding:2.5rem 3rem 3rem}
+    .section-label{font-size:.82rem;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:1.5rem;display:flex;align-items:center;gap:.5rem}
+    .cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.8rem}
 
-    .navbar-right {
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-    }
+    .module-card{background:var(--light);border-radius:15px;border-left:5px solid #667eea;padding:2rem;text-decoration:none;display:flex;flex-direction:column;gap:1rem;box-shadow:var(--sh-sm);transition:var(--tr);color:var(--text-dark)}
+    .module-card.clickable:hover{transform:translateY(-5px);box-shadow:var(--sh-md)}
+    .module-card.locked{opacity:.72;cursor:default}
+    .card-ts{border-left-color:#667eea}
+    .card-ap{border-left-color:#11998e}
+    .card-qa{border-left-color:#e67e22}
 
-    .emp-badge {
-      color: rgba(255,255,255,0.6);
-      font-size: 0.82rem;
-      font-weight: 500;
-      padding: 0.28rem 0.75rem;
-      background: rgba(255,255,255,0.07);
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.1);
-    }
+    .card-top{display:flex;align-items:center;justify-content:space-between}
+    .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
+    .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
 
-    .logout-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.18);
-      color: rgba(255,255,255,0.65);
-      padding: 0.45rem 1rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-family: 'Inter', sans-serif;
-      font-weight: 500;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-    .logout-btn:hover {
-      background: rgba(255,255,255,0.09);
-      border-color: rgba(255,255,255,0.38);
-      color: white;
-    }
+    .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
+    .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
 
-    /* ─────────────────────────────────────────
-       PAGE WRAPPER & CONTAINER — same as timesheet
-    ───────────────────────────────────────── */
-    .page-wrapper {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 2rem;
-    }
+    .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
+    .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
+    .card-features{display:flex;flex-wrap:wrap;gap:.45rem}
+    .chip{font-size:.73rem;font-weight:500;padding:.22rem .65rem;border-radius:20px;background:white;border:1px solid var(--border);color:var(--text-light);display:flex;align-items:center;gap:.3rem}
+    .card-footer{margin-top:.25rem;padding-top:1.1rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .card-footer-label{font-size:.78rem;color:var(--text-light);font-weight:500}
 
-    .container {
-      width: 100%;
-      max-width: 1000px;
-      background: white;
-      border-radius: 20px;
-      box-shadow: var(--shadow-heavy);
-      overflow: hidden;
-      animation: fadeInUp 0.6s ease-out;
-    }
+    .card-btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.4rem;border:none;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr);text-decoration:none;box-shadow:var(--sh-sm)}
+    .card-ts .card-btn{background:var(--pg);color:white}
+    .card-ap .card-btn{background:var(--sg);color:white}
+    .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
+    .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
+    .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
+    .clickable .card-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
 
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    .info-strip{margin-top:2rem;padding:1.4rem 1.8rem;background:var(--light);border-radius:15px;border-left:5px solid #3498db;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:.9rem;font-size:.9rem;color:var(--text-light)}
+    .info-strip i{font-size:1.15rem;color:#3498db;flex-shrink:0}
+    .info-strip strong{color:var(--text-dark)}
 
-    /* ─────────────────────────────────────────
-       HEADER — identical to timesheet .header
-    ───────────────────────────────────────── */
-    .header {
-      background: var(--primary-gradient);
-      color: white;
-      padding: 3rem 2rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-      border-bottom-left-radius: 20px;
-      border-bottom-right-radius: 20px;
-    }
+    .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
 
-    .header::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10"><defs><pattern id="g" width="100" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="10" fill="url(%23g)"/></svg>');
-      opacity: 0.1;
-      animation: grainMove 5s infinite linear;
-    }
-
-    @keyframes grainMove {
-      0%   { transform: translate(0,0); }
-      100% { transform: translate(10px,10px); }
-    }
-
-    .header h1 {
-      margin: 0;
-      font-size: 3rem;
-      font-weight: 700;
-      position: relative;
-      z-index: 1;
-      text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .header p {
-      margin: 0.6rem 0 0;
-      opacity: 0.9;
-      font-size: 1.1rem;
-      position: relative;
-      z-index: 1;
-      font-weight: 300;
-    }
-
-    /* ─────────────────────────────────────────
-       BODY CONTENT
-    ───────────────────────────────────────── */
-    .body-content {
-      padding: 2.5rem 3rem 3rem;
-    }
-
-    .section-label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    /* ─────────────────────────────────────────
-       MODULE CARDS — styled like timesheet sections
-    ───────────────────────────────────────── */
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.8rem;
-    }
-
-    .module-card {
-      background: var(--light-bg);
-      border-radius: 15px;
-      border-left: 5px solid #667eea;
-      padding: 2rem;
-      text-decoration: none;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      box-shadow: var(--shadow-light);
-      transition: var(--transition);
-      color: var(--text-dark);
-    }
-
-    .module-card:hover {
-      transform: translateY(-5px);
-      box-shadow: var(--shadow-medium);
-    }
-
-    /* card accent colours */
-    .card-ts { border-left-color: #667eea; }
-    .card-ap { border-left-color: #11998e; opacity: 0.78; }
-    .card-ap:hover { transform: none; box-shadow: var(--shadow-light); cursor: default; }
-
-    /* top row */
-    .card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .card-icon {
-      width: 50px;
-      height: 50px;
-      border-radius: 13px;
-      display: grid;
-      place-items: center;
-      font-size: 1.35rem;
-    }
-
-    .card-ts .card-icon { background: rgba(102,126,234,0.12); color: #667eea; }
-    .card-ap .card-icon { background: rgba(17,153,142,0.12);  color: #11998e; }
-
-    .card-tag {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 0.28rem 0.75rem;
-      border-radius: 20px;
-    }
-
-    .card-ts .card-tag { background: rgba(102,126,234,0.12); color: #667eea; }
-    .card-ap .card-tag { background: rgba(17,153,142,0.12);  color: #11998e; }
-
-    /* titles & desc */
-    .card-title {
-      font-size: 1.45rem;
-      font-weight: 700;
-      color: var(--text-dark);
-      margin: 0;
-    }
-
-    .card-desc {
-      font-size: 0.92rem;
-      color: var(--text-light);
-      line-height: 1.65;
-      margin: 0;
-      flex: 1;
-    }
-
-    /* feature chips */
-    .card-features {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-    }
-
-    .chip {
-      font-size: 0.73rem;
-      font-weight: 500;
-      padding: 0.22rem 0.65rem;
-      border-radius: 20px;
-      background: white;
-      border: 1px solid var(--border-color);
-      color: var(--text-light);
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    /* card footer */
-    .card-footer {
-      margin-top: 0.25rem;
-      padding-top: 1.1rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .card-footer-label {
-      font-size: 0.78rem;
-      color: var(--text-light);
-      font-weight: 500;
-    }
-
-    /* Open button — same as .export-btn */
-    .card-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.65rem 1.4rem;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      transition: var(--transition);
-      text-decoration: none;
-      box-shadow: var(--shadow-light);
-    }
-
-    .card-ts .card-btn {
-      background: var(--primary-gradient);
-      color: white;
-    }
-    .card-ts .card-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-medium);
-    }
-
-    .card-ap .card-btn {
-      background: white;
-      color: var(--text-light);
-      border: 1px solid var(--border-color);
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
-    /* ─────────────────────────────────────────
-       INFO STRIP — same style as .employee-info
-    ───────────────────────────────────────── */
-    .info-strip {
-      margin-top: 2rem;
-      padding: 1.4rem 1.8rem;
-      background: var(--light-bg);
-      border-radius: 15px;
-      border-left: 5px solid #3498db;
-      box-shadow: var(--shadow-light);
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-      font-size: 0.9rem;
-      color: var(--text-light);
-    }
-
-    .info-strip i {
-      font-size: 1.15rem;
-      color: #3498db;
-      flex-shrink: 0;
-    }
-
-    .info-strip strong { color: var(--text-dark); }
-
-    /* ─────────────────────────────────────────
-       RESPONSIVE
-    ───────────────────────────────────────── */
-    @media (max-width: 768px) {
-      .navbar        { padding: 1rem; }
-      .page-wrapper  { padding: 1rem; }
-      .body-content  { padding: 1.5rem; }
-      .header        { padding: 2rem 1rem; }
-      .header h1     { font-size: 2rem; letter-spacing: 1px; }
-      .cards-grid    { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 480px) {
-      .header h1  { font-size: 1.6rem; }
-      .body-content { padding: 1.2rem; }
+    @media(max-width:768px){
+      .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
+      .header{padding:2rem 1rem}.header h1{font-size:2rem;letter-spacing:1px}.cards-grid{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="navbar-brand">
-      <i class="fas fa-th-large"></i>
-      JHS Timesnap
-    </div>
-    <div class="navbar-right">
-      <span class="emp-badge" id="empBadge"></span>
-      <button class="logout-btn" onclick="handleLogout()">
-        <i class="fas fa-sign-out-alt"></i> Logout
-      </button>
-    </div>
-  </nav>
+  <!-- Show a brief loading state while we check roles -->
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i> Loading your workspace…
+  </div>
 
-  <div class="page-wrapper">
-    <div class="container">
-
-      <!-- Header -->
-      <div class="header">
-        <h1><i class="fas fa-th-large"></i> JHS PLATFORM</h1>
-        <p>Select a module to get started</p>
+  <div id="main-content" style="display:none;flex-direction:column;min-height:100vh">
+    <nav class="navbar">
+      <div class="navbar-brand"><i class="fas fa-th-large"></i> JHS Timesnap</div>
+      <div class="navbar-right">
+        <span class="emp-badge" id="empBadge"></span>
+        <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
+    </nav>
 
-      <!-- Body -->
-      <div class="body-content">
+    <div class="page-wrapper">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-th-large"></i> JHS PLATFORM</h1>
+          <p>Select a module to get started</p>
+        </div>
 
-        <p class="section-label">
-          <i class="fas fa-cubes"></i> Available Modules
-        </p>
+        <div class="body-content">
+          <p class="section-label"><i class="fas fa-cubes"></i> Available Modules</p>
 
-        <div class="cards-grid">
-
-          <!-- Timesheet -->
-          <a href="/timesheet" class="module-card card-ts">
-            <div class="card-top">
-              <div class="card-icon"><i class="fas fa-stopwatch"></i></div>
-              <span class="card-tag">Active</span>
-            </div>
-            <h2 class="card-title">Timesheet</h2>
-            <p class="card-desc">Log daily hours, track project activity, manage weekly periods, and submit for manager approval.</p>
-            <div class="card-features">
-              <span class="chip"><i class="fas fa-clock"></i> Time Tracking</span>
-              <span class="chip"><i class="fas fa-check-circle"></i> Approvals</span>
-              <span class="chip"><i class="fas fa-history"></i> History</span>
-              <span class="chip"><i class="fas fa-file-excel"></i> Export</span>
-            </div>
-            <div class="card-footer">
-              <span class="card-footer-label">Time tracking &amp; approvals</span>
-              <span class="card-btn">
-                Open &nbsp;<i class="fas fa-arrow-right"></i>
-              </span>
-            </div>
-          </a>
-
-          <!-- Appraisal — eligibility checked dynamically via API -->
-          <div class="module-card card-ap" id="appraisalCard">
-            <div class="card-top">
-              <div class="card-icon"><i class="fas fa-chart-line"></i></div>
-              <span class="card-tag" id="appraisalTag">Checking…</span>
-            </div>
-            <h2 class="card-title">KRA</h2>
-            <p class="card-desc">Complete performance reviews, set goals, share self-assessments, and track career milestones.</p>
-            <div class="card-features">
-              <span class="chip"><i class="fas fa-bullseye"></i> Goal Setting</span>
-              <span class="chip"><i class="fas fa-user-check"></i> Self Assessment</span>
-              <span class="chip"><i class="fas fa-medal"></i> Ratings</span>
-              <span class="chip"><i class="fas fa-road"></i> Milestones</span>
-            </div>
-            <div class="card-footer">
-              <span class="card-footer-label" id="appraisalReason">Checking eligibility…</span>
-              <span class="card-btn" id="appraisalBtn" style="cursor:not-allowed;opacity:.6">
-                <i class="fas fa-lock"></i> &nbsp;Locked
-              </span>
-            </div>
+          <div class="cards-grid" id="cards-grid">
+            <!-- injected by JS -->
           </div>
 
+          <div class="info-strip">
+            <i class="fas fa-info-circle"></i>
+            <span>Logged in as <strong id="empName">—</strong>. Module visibility is determined by your role and eligibility.</span>
+          </div>
         </div>
-
-        <!-- Info strip -->
-        <div class="info-strip">
-          <i class="fas fa-info-circle"></i>
-          <span>Logged in as <strong id="empName">—</strong>. Click a module above to open your workspace. The KRA module will be available in an upcoming release.</span>
-        </div>
-
       </div>
     </div>
   </div>
 
   <script>
-    const empId = localStorage.getItem('loggedInEmployeeId') || '';
-    const token = localStorage.getItem('access_token') || '';
+    const empId  = localStorage.getItem('loggedInEmployeeId') || '';
+    const token  = localStorage.getItem('access_token')       || '';
 
-    if (!token) window.location.href = '/static/login.html';
+    if (!token) { window.location.href = '/login'; }
 
-    const badge   = document.getElementById('empBadge');
-    const empName = document.getElementById('empName');
-    if (empId) { badge.textContent = empId; empName.textContent = empId; }
+    document.getElementById('empBadge').textContent = empId;
+    document.getElementById('empName').textContent  = empId;
 
     function handleLogout() {
       localStorage.clear(); sessionStorage.clear();
-      window.location.href = '/static/login.html';
+      window.location.href = '/login';
     }
 
-    // ── Check appraisal eligibility and update the card dynamically ──
-    async function checkAppraisalEligibility() {
-      if (!empId || !token) return;
+    // ── Card templates ──
+    const CARD_TS = `
+      <a href="/timesheet" class="module-card card-ts clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-stopwatch"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Timesheet</h2>
+        <p class="card-desc">Log daily hours, track project activity, manage weekly periods, and submit for manager approval.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-clock"></i> Time Tracking</span>
+          <span class="chip"><i class="fas fa-check-circle"></i> Approvals</span>
+          <span class="chip"><i class="fas fa-history"></i> History</span>
+          <span class="chip"><i class="fas fa-file-excel"></i> Export</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Time tracking &amp; approvals</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    function buildAppraisalCard(eligible, reason) {
+      const isLocked = !eligible;
+      return `
+        <div class="module-card card-ap ${eligible ? 'clickable' : 'locked'}" ${eligible ? 'onclick="window.location.href=\'/appraisal\'"' : ''}>
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+            <span class="card-tag" style="${eligible ? '' : 'background:rgba(127,140,141,.12);color:#7f8c8d'}">${eligible ? 'Active' : 'Locked'}</span>
+          </div>
+          <h2 class="card-title">KRA</h2>
+          <p class="card-desc">Complete performance reviews, set goals, share self-assessments, and track career milestones.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-bullseye"></i> Goal Setting</span>
+            <span class="chip"><i class="fas fa-user-check"></i> Self Assessment</span>
+            <span class="chip"><i class="fas fa-medal"></i> Ratings</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${reason || ''}</span>
+            <span class="card-btn ${isLocked ? 'locked-btn' : ''}">${eligible ? 'Open &nbsp;<i class="fas fa-arrow-right"></i>' : '<i class="fas fa-lock"></i> &nbsp;Locked'}</span>
+          </div>
+        </div>`;
+    }
+
+    function buildQACard(isAdmin, isQaOnly) {
+      const roleLabel = isAdmin ? 'Admin — all audits visible' : isQaOnly ? 'Dashboard & History access' : 'User — your audits only';
+      const tagText   = isAdmin || isQaOnly ? 'Admin' : 'Active';
+      const tagStyle  = isAdmin || isQaOnly ? 'background:rgba(102,126,234,.15);color:#667eea' : 'background:rgba(230,126,34,.12);color:#e67e22';
+      return `
+        <a href="/quality-audit" class="module-card card-qa clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-clipboard-check"></i></div>
+            <span class="card-tag" style="${tagStyle}">${tagText}</span>
+          </div>
+          <h2 class="card-title">Quality Audit</h2>
+          <p class="card-desc">Conduct structured quality audits — planning, execution, reporting, QC &amp; optimization — section by section.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-list-check"></i> Checklist</span>
+            <span class="chip"><i class="fas fa-save"></i> Draft &amp; Submit</span>
+            <span class="chip"><i class="fas fa-history"></i> History</span>
+            <span class="chip"><i class="fas fa-chart-bar"></i> Dashboard</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${roleLabel}</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
+    // ── Main init ──
+    async function initModules() {
+      let qaAccess  = null;
+      let apprAccess = null;
+
+      // Check QA access
       try {
-        const res = await fetch(`/appraisal/eligibility/${empId}`, {
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
+        const res  = await fetch('/quality-audit/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) qaAccess = await res.json();
+      } catch(e) {}
 
-        const card      = document.getElementById('appraisalCard');
-        const btn       = document.getElementById('appraisalBtn');
-        const tagEl     = document.getElementById('appraisalTag');
-        const reasonEl  = document.getElementById('appraisalReason');
-
-        if (data.eligible) {
-          // ── Unlock card ──
-          card.style.opacity  = '1';
-          card.style.cursor   = 'pointer';
-          card.onclick        = () => window.location.href = '/appraisal';
-          card.classList.remove('card-ap');
-          card.classList.add('card-ap-active');
-
-          tagEl.textContent         = 'Active';
-          tagEl.style.background    = 'rgba(17,153,142,0.15)';
-          tagEl.style.color         = '#11998e';
-          tagEl.style.borderColor   = 'rgba(17,153,142,0.35)';
-
-          btn.innerHTML       = 'Open &nbsp;<i class="fas fa-arrow-right"></i>';
-          btn.style.background   = 'linear-gradient(135deg,#11998e 0%,#38ef7d 100%)';
-          btn.style.color        = 'white';
-          btn.style.cursor       = 'pointer';
-          btn.style.opacity      = '1';
-          btn.style.boxShadow    = '0 4px 6px rgba(0,0,0,0.1)';
-          btn.onclick = (e) => { e.stopPropagation(); window.location.href = '/appraisal'; };
-
-          if (reasonEl) reasonEl.textContent = data.reason;
-        } else {
-          // ── Keep locked — show reason ──
-          tagEl.textContent       = 'Locked';
-          tagEl.style.background  = 'rgba(127,140,141,0.12)';
-          tagEl.style.color       = '#7f8c8d';
-          if (reasonEl) reasonEl.textContent = data.reason || 'Not eligible yet.';
-        }
-      } catch (err) {
-        console.warn('Could not check KRA eligibility:', err);
-        const tagEl    = document.getElementById('appraisalTag');
-        const reasonEl = document.getElementById('appraisalReason');
-        if (tagEl)    tagEl.textContent    = 'Unavailable';
-        if (reasonEl) reasonEl.textContent = 'Could not check eligibility.';
+      // If QA-only user — redirect immediately to QA, skip module selector
+      if (qaAccess?.is_qa_only) {
+        window.location.href = '/quality-audit';
+        return;
       }
+
+      // Check appraisal eligibility
+      try {
+        const res  = await fetch(`/appraisal/eligibility/${empId}`, {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) apprAccess = await res.json();
+      } catch(e) {}
+
+      // Build cards
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = '';
+
+      // Timesheet — always shown
+      grid.innerHTML += CARD_TS;
+
+      // KRA
+      grid.innerHTML += buildAppraisalCard(apprAccess?.eligible || false, apprAccess?.reason || '');
+
+      // Quality Audit — only if user has access
+      if (qaAccess?.has_access) {
+        grid.innerHTML += buildQACard(qaAccess.is_admin, qaAccess.is_qa_only);
+      }
+
+      // Show page
+      document.getElementById('loading-screen').style.display = 'none';
+      const mc = document.getElementById('main-content');
+      mc.style.display = 'flex';
     }
 
-    checkAppraisalEligibility();
+    initModules();
   </script>
 </body>
 </html>
