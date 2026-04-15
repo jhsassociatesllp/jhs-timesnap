@@ -56,6 +56,7 @@ def _get_access_doc():
 
 def _email_from_emp(emp_id: str) -> str:
     emp = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()})
+    print(emp)
     if emp:
         return (emp.get("EMail") or emp.get("JHS Email") or "").lower().strip()
     return ""
