@@ -39,7 +39,7 @@ from backend.auth import (
     oauth2_scheme,
 )
 from backend.timesheet.router import router as timesheet_router
-from backend.appraisal.router  import router as appraisal_router
+from backend.appraisal.router2  import router as appraisal_router
 
 # ── admin router (keep existing admin.py) ────────────────────────────────────
 from backend.timesheet.timesheet_admin import admin_router   # your existing admin.py
