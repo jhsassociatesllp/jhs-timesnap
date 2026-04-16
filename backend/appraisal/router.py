@@ -137,7 +137,6 @@ def _get_current_period() -> str:
     # return f"{today.year - 1}-{str(today.year)[2:]}"
     return period
 
-
 def _check_eligibility(emp_id: str) -> dict:
     emp = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()})
     if not emp:
