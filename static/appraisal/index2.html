@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KRA — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+  <link rel="stylesheet" href="/static/appraisal/styles.css"/>
+  <style>
+    /* ── Approval-specific styles ─────────────────────────────────────────── */
+    .role-badge{display:inline-block;padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-left:.5rem}
+    .role-employee{background:#e3f2fd;color:#1565c0}
+    .role-tl      {background:#e8f5e9;color:#2e7d32}
+    .role-partner {background:#fff3e0;color:#e65100}
+    .role-admin   {background:#fce4ec;color:#ad1457}
+
+    /* approval tables */
+    .approval-table-wrap{overflow-x:auto;margin-top:1rem}
+    .approval-table{width:100%;border-collapse:collapse;font-size:.9rem}
+    .approval-table th{background:#1f3864;color:#fff;padding:.75rem 1rem;text-align:left;white-space:nowrap}
+    .approval-table td{padding:.7rem 1rem;border-bottom:1px solid #e8ecf4;vertical-align:middle}
+    .approval-table tr:hover td{background:#f5f8ff}
+    .emp-code-link{color:#1565c0;font-weight:600;cursor:pointer;text-decoration:underline}
+    .emp-code-link:hover{color:#764ba2}
+
+    .btn-approve{background:#27ae60;color:#fff;border:none;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;transition:all .2s}
+    .btn-approve:hover{background:#1e8449}
+    .btn-reject {background:#e74c3c;color:#fff;border:none;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;transition:all .2s;margin-left:.4rem}
+    .btn-reject:hover{background:#c0392b}
+    .btn-view   {background:#667eea;color:#fff;border:none;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;transition:all .2s;margin-left:.4rem}
+    .btn-view:hover{background:#5a6fd6}
+
+    .pct-pill{display:inline-block;padding:.2rem .6rem;border-radius:12px;font-weight:600;font-size:.82rem}
+    .pct-high  {background:#d4edda;color:#155724}
+    .pct-mid   {background:#fff3cd;color:#856404}
+    .pct-low   {background:#f8d7da;color:#721c24}
+
+    /* section tabs within approval */
+    .sub-tabs{display:flex;gap:.5rem;margin-bottom:1.2rem;flex-wrap:wrap}
+    .sub-tab{padding:.45rem 1.2rem;border-radius:20px;cursor:pointer;font-size:.85rem;font-weight:500;border:2px solid #e0e6f0;background:#fff;color:#555;transition:all .2s}
+    .sub-tab.active{background:#1f3864;color:#fff;border-color:#1f3864}
+
+    /* ── Modal ──────────────────────────────────────────────────────────────── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:none;justify-content:center;align-items:flex-start;padding:2rem 1rem;overflow-y:auto}
+    .modal-overlay.open{display:flex}
+    .modal-box{background:#fff;border-radius:16px;width:100%;max-width:780px;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:fadeInUp .3s ease}
+    .modal-header{padding:1.2rem 1.5rem;background:#1f3864;color:#fff;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center}
+    .modal-header h3{font-size:1.05rem;font-weight:600;margin:0}
+    .modal-close{background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1}
+    .modal-body{padding:1.5rem;max-height:70vh;overflow-y:auto}
+    .modal-footer{padding:1rem 1.5rem;border-top:1px solid #e8ecf4;display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap}
+
+    /* question cards in modal */
+    .q-card{background:#f8faff;border:1px solid #e0e6f4;border-radius:10px;padding:1rem 1.2rem;margin-bottom:.9rem}
+    .q-section-hdr{font-size:.75rem;text-transform:uppercase;letter-spacing:.6px;color:#888;font-weight:600;margin-bottom:.8rem;padding-bottom:.4rem;border-bottom:1px solid #e8ecf4}
+    .q-label{font-size:.9rem;color:#2c3e50;margin-bottom:.5rem;font-weight:500}
+    .q-hint {font-size:.78rem;color:#999;margin-bottom:.4rem}
+    .q-response{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+    .q-self-val{font-size:.82rem;color:#666;background:#efefef;padding:.2rem .6rem;border-radius:8px}
+    .q-tl-val  {font-size:.82rem;color:#155724;background:#d4edda;padding:.2rem .6rem;border-radius:8px}
+    .q-pnd-val {font-size:.82rem;color:#e65100;background:#fff3e0;padding:.2rem .6rem;border-radius:8px}
+
+    /* editable input in modal */
+    .q-edit-rating{display:flex;gap:.4rem}
+    .star-btn{background:none;border:none;font-size:1.4rem;cursor:pointer;color:#ccc;transition:color .15s;padding:0}
+    .star-btn.lit{color:#f39c12}
+    .q-edit-number input{width:80px;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem}
+    .q-edit-text textarea{width:100%;padding:.5rem;border:1px solid #ccc;border-radius:8px;font-size:.85rem;resize:vertical}
+    .q-edit-yesno select,.q-edit-yn-num select{padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem}
+
+    .score-compare-strip{display:flex;gap:1rem;flex-wrap:wrap;background:#f0f4ff;border-radius:10px;padding:.9rem 1rem;margin-bottom:1rem;font-size:.85rem}
+    .score-compare-strip span{display:flex;align-items:center;gap:.4rem}
+    .score-compare-strip strong{font-weight:700}
+
+    /* analysis page */
+    .analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.2rem;margin-bottom:1.5rem}
+    .stat-card{background:#fff;border-radius:12px;padding:1.2rem 1.4rem;box-shadow:0 2px 8px rgba(0,0,0,.08);border-left:4px solid #667eea}
+    .stat-card h4{font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:.3rem}
+    .stat-card .stat-val{font-size:2rem;font-weight:700;color:#1f3864}
+    .stat-card .stat-sub{font-size:.8rem;color:#aaa;margin-top:.2rem}
+    .top5-table{width:100%;border-collapse:collapse;font-size:.88rem}
+    .top5-table th{background:#eef2ff;color:#1f3864;padding:.6rem 1rem;text-align:left}
+    .top5-table td{padding:.55rem 1rem;border-bottom:1px solid #f0f0f0}
+    .partner-section{margin-bottom:1.5rem}
+    .partner-title{font-size:1rem;font-weight:600;color:#1f3864;margin-bottom:.6rem;padding-bottom:.3rem;border-bottom:2px solid #e0e6f4}
+
+    .variance-bar{display:inline-block;height:10px;border-radius:5px;min-width:4px;vertical-align:middle}
+    .variance-pos{background:#27ae60}
+    .variance-neg{background:#e74c3c}
+
+    .empty-state{text-align:center;padding:3rem 1rem;color:#aaa}
+    .empty-state i{font-size:2.5rem;margin-bottom:.8rem;display:block}
+
+    .remarks-input{width:100%;padding:.5rem .75rem;border:1px solid #ccc;border-radius:8px;font-size:.88rem;margin-top:.5rem;resize:vertical}
+    
+    /* pending sections for PnD */
+    .section-divider{font-size:.9rem;font-weight:700;color:#1f3864;background:#eef2ff;padding:.5rem 1rem;border-radius:8px;margin:1rem 0 .5rem;display:flex;align-items:center;gap:.5rem}
+    .count-badge{background:#1f3864;color:#fff;font-size:.75rem;padding:.15rem .5rem;border-radius:10px;font-weight:600}
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="hamburger" onclick="toggleNav()"><i class="fas fa-bars"></i></div>
+  <div class="nav-menu" id="navMenu">
+    <!-- populated by JS based on role -->
+  </div>
+</nav>
+
+<div class="container">
+  <div class="header">
+    <h1><i class="fas fa-chart-line"></i> JHS KRA <span id="roleBadge" class="role-badge"></span></h1>
+    <p id="headerSub">Annual Performance Review</p>
+  </div>
+
+  <!-- Tab content areas -->
+  <div id="tabContents"></div>
+</div>
+
+<!-- Loading bar -->
+<div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+
+<!-- Popup -->
+<div class="popup" id="popup">
+  <p id="popupMsg"></p>
+  <button class="popup-close" onclick="closePopup()">&times;</button>
+</div>
+
+<!-- Logout confirm -->
+<div class="exit-confirmation" id="logoutConfirm">
+  <p>Do you want to logout?</p>
+  <button class="confirm-btn" onclick="doLogout()">Yes</button>
+  <button class="cancel-btn"  onclick="document.getElementById('logoutConfirm').style.display='none'">No</button>
+</div>
+
+<!-- KRA Modal -->
+<div class="modal-overlay" id="kraModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitle">KRA Review</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script src="/static/appraisal/script.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// APPROVAL SYSTEM  — inlined in index.html
+// ════════════════════════════════════════════════════════════════════════════
+
+const API  = "";
+const EID  = localStorage.getItem("loggedInEmployeeId") || "";
+const TOK  = localStorage.getItem("access_token") || "";
+
+if (!TOK) window.location.href = "/static/login.html";
+
+const H = () => ({ "Content-Type":"application/json", Authorization:`Bearer ${TOK}` });
+
+let _role     = "employee";
+let _period   = "";
+let _modalRecord = null;   // currently open record
+let _editMode = false;     // whether modal is in edit mode
+let _editedAnswers = {};   // edited answers in modal
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  showLoading("Initialising…");
+  try {
+    const sv = await fetch(`${API}/verify_session`, { method:"POST", headers:H() });
+    if (!sv.ok) throw new Error("Session invalid");
+
+    const [rr, pr] = await Promise.all([
+      fetch(`${API}/appraisal/my_role`,    { headers:H() }),
+      fetch(`${API}/appraisal/period`,     { headers:H() }),
+    ]);
+    const rd = await rr.json();
+    const pd = await pr.json();
+
+    _role   = rd.role   || "employee";
+    _period = pd.period || "";
+
+    document.getElementById("headerSub").textContent =
+      `Annual Performance Review — ${_period}`;
+
+    _renderRoleBadge();
+    _buildNav();
+    _buildTabContents();
+
+  } catch(e) {
+    console.error(e);
+    showPopup("Session error — please login again.", true);
+    setTimeout(() => window.location.href="/static/login.html", 2000);
+  } finally {
+    hideLoading();
+  }
+});
+
+function _renderRoleBadge() {
+  const el = document.getElementById("roleBadge");
+  const map = { employee:"Employee", tl:"TL / Manager", partner:"Partner & Director", admin:"Admin" };
+  const cls = { employee:"role-employee", tl:"role-tl", partner:"role-partner", admin:"role-admin" };
+  el.textContent  = map[_role] || _role;
+  el.className    = `role-badge ${cls[_role] || ""}`;
+}
+
+// ── Nav builder ───────────────────────────────────────────────────────────────
+function _buildNav() {
+  const menu = document.getElementById("navMenu");
+  const links = [];
+
+  if (_role === "employee") {
+    links.push(
+      `<a href="#" onclick="showSection('form')"    id="nt_form"    class="active"><i class="fas fa-file-alt"></i> Form</a>`,
+      `<a href="#" onclick="showSection('history')" id="nt_history"             ><i class="fas fa-history"></i> History</a>`,
+      `<a href="#" onclick="showSection('status')"  id="nt_status"              ><i class="fas fa-info-circle"></i> Status</a>`,
+    );
+  } else if (_role === "tl") {
+    links.push(
+      `<a href="#" onclick="showSection('tl_pending')"  id="nt_tl_pending"  class="active"><i class="fas fa-clock"></i> Pending</a>`,
+      `<a href="#" onclick="showSection('tl_approved')" id="nt_tl_approved"              ><i class="fas fa-check-circle"></i> Approved</a>`,
+      `<a href="#" onclick="showSection('tl_rejected')" id="nt_tl_rejected"              ><i class="fas fa-times-circle"></i> Rejected</a>`,
+    );
+  } else if (_role === "partner") {
+    links.push(
+      `<a href="#" onclick="showSection('pnd_pending')"  id="nt_pnd_pending"  class="active"><i class="fas fa-clock"></i> Pending</a>`,
+      `<a href="#" onclick="showSection('pnd_approved')" id="nt_pnd_approved"              ><i class="fas fa-check-circle"></i> Approved</a>`,
+      `<a href="#" onclick="showSection('pnd_rejected')" id="nt_pnd_rejected"              ><i class="fas fa-times-circle"></i> Rejected</a>`,
+      `<a href="#" onclick="showSection('analysis')"     id="nt_analysis"                  ><i class="fas fa-chart-bar"></i> Analysis</a>`,
+    );
+  } else if (_role === "admin") {
+    links.push(
+      `<a href="#" onclick="showSection('analysis')"      id="nt_analysis"      class="active"><i class="fas fa-chart-bar"></i> Analysis</a>`,
+      `<a href="#" onclick="showSection('admin_pending')" id="nt_admin_pending"              ><i class="fas fa-clock"></i> Pending</a>`,
+      `<a href="#" onclick="showSection('admin_approved')"id="nt_admin_approved"             ><i class="fas fa-check-circle"></i> Approved</a>`,
+      `<a href="#" onclick="showSection('admin_rejected')"id="nt_admin_rejected"             ><i class="fas fa-times-circle"></i> Rejected</a>`,
+    );
+  }
+
+  links.push(
+    `<a href="/modules"><i class="fas fa-th-large"></i> Modules</a>`,
+    `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
+  );
+  menu.innerHTML = links.join("");
+}
+
+// ── Tab containers ────────────────────────────────────────────────────────────
+function _buildTabContents() {
+  const c = document.getElementById("tabContents");
+  const sections = [];
+
+  if (_role === "employee") {
+    sections.push(
+      `<div class="tab-content active" id="sec_form">
+         <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
+           <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
+           <strong style="font-size:1.3rem;margin-bottom:.5rem;">KRA Form has been closed</strong>
+           <p style="font-size:.95rem;color:#7d5a00;">The KRA submission window is currently closed. Please check back later or contact HR.</p>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_history" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-history"></i> Past KRA</p>
+           <div id="historyContent"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_status" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-info-circle"></i> Current Period Status</p>
+           <div id="statusContent"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+    );
+  }
+
+  // TL tabs
+  if (_role === "tl") {
+    sections.push(
+      `<div class="tab-content active" id="sec_tl_pending">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-clock"></i> Pending Approvals</p>
+           <div id="tl_pending_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_tl_approved" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-check-circle"></i> Approved</p>
+           <div id="tl_approved_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_tl_rejected" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-times-circle"></i> Rejected</p>
+           <div id="tl_rejected_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+    );
+  }
+
+  // PnD tabs
+  if (_role === "partner") {
+    sections.push(
+      `<div class="tab-content active" id="sec_pnd_pending">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-clock"></i> Pending Approvals</p>
+           <div id="pnd_pending_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_pnd_approved" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-check-circle"></i> Approved</p>
+           <div id="pnd_approved_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_pnd_rejected" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-times-circle"></i> Rejected</p>
+           <div id="pnd_rejected_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_analysis" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-chart-bar"></i> Analysis</p>
+           <div id="analysis_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+    );
+  }
+
+  // Admin tabs
+  if (_role === "admin") {
+    sections.push(
+      `<div class="tab-content active" id="sec_analysis">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-chart-bar"></i> Analysis</p>
+           <div id="analysis_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_admin_pending" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-clock"></i> All Pending</p>
+           <div id="admin_pending_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_admin_approved" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-check-circle"></i> All Approved</p>
+           <div id="admin_approved_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+      `<div class="tab-content" id="sec_admin_rejected" style="display:none">
+         <div class="body-content">
+           <p class="section-label"><i class="fas fa-times-circle"></i> All Rejected</p>
+           <div id="admin_rejected_content"><p class="empty-msg">Loading…</p></div>
+         </div>
+       </div>`,
+    );
+  }
+
+  c.innerHTML = sections.join("\n");
+
+  // Load initial section
+  const firstSection = {
+    employee: "form", tl: "tl_pending",
+    partner: "pnd_pending", admin: "analysis"
+  }[_role];
+  _loadSection(firstSection);
+}
+
+// ── Section switching ─────────────────────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll(".tab-content").forEach(el => {
+    el.style.display = "none";
+    el.classList.remove("active");
+  });
+  document.querySelectorAll(".nav-menu a").forEach(a => a.classList.remove("active"));
+  const sec = document.getElementById("sec_" + name);
+  if (sec) { sec.style.display = "block"; sec.classList.add("active"); }
+  const nt = document.getElementById("nt_" + name);
+  if (nt) nt.classList.add("active");
+  document.getElementById("navMenu")?.classList.remove("active");
+  _loadSection(name);
+}
+
+const _loaded = new Set();
+async function _loadSection(name) {
+  if (_loaded.has(name) && name !== "analysis") return; // cache most sections
+  _loaded.add(name);
+  switch(name) {
+    case "tl_pending":  await loadTLPending();  break;
+    case "tl_approved": await loadTLApproved(); break;
+    case "tl_rejected": await loadTLRejected(); break;
+    case "pnd_pending":  await loadPNDPending();  break;
+    case "pnd_approved": await loadPNDApproved(); break;
+    case "pnd_rejected": await loadPNDRejected(); break;
+    case "admin_pending":  await loadAdminPending();  break;
+    case "admin_approved": await loadAdminApproved(); break;
+    case "admin_rejected": await loadAdminRejected(); break;
+    case "analysis":     await loadAnalysis();  break;
+    case "history":      loadHistory();         break;
+    case "status":       loadStatus();          break;
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _pctPill(v) {
+  if (v == null) return "—";
+  const cls = v >= 75 ? "pct-high" : v >= 50 ? "pct-mid" : "pct-low";
+  return `<span class="pct-pill ${cls}">${v}%</span>`;
+}
+function _statusLabel(s) {
+  const map = {
+    submitted:"Submitted", draft:"Draft",
+    TL_approved:"TL Approved", TL_rejected:"TL Rejected",
+    PnD_approved:"PnD Approved", PnD_rejected:"PnD Rejected",
+  };
+  return map[s] || s;
+}
+function _fmt(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+}
+
+// ── TL — Pending ──────────────────────────────────────────────────────────────
+async function loadTLPending() {
+  const el = document.getElementById("tl_pending_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/tl/pending`, { headers:H() });
+    const d = await r.json();
+    if (!d.data?.length) { el.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i>No pending approvals</div>`; return; }
+    el.innerHTML = _buildApprovalTable(d.data, "tl_pending");
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+async function loadTLApproved() {
+  const el = document.getElementById("tl_approved_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/tl/approved`, { headers:H() });
+    const d = await r.json();
+    if (!d.data?.length) { el.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle"></i>No approved records</div>`; return; }
+    el.innerHTML = _buildApprovalTable(d.data, "tl_approved");
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+async function loadTLRejected() {
+  const el = document.getElementById("tl_rejected_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/tl/rejected`, { headers:H() });
+    const d = await r.json();
+    if (!d.data?.length) { el.innerHTML = `<div class="empty-state"><i class="fas fa-times-circle"></i>No rejected records</div>`; return; }
+    el.innerHTML = _buildApprovalTable(d.data, "tl_rejected");
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+function _buildApprovalTable(rows, context) {
+  const showTLPct  = context !== "tl_pending";
+  const showPNDPct = ["pnd_approved","pnd_rejected","admin_approved","admin_rejected"].includes(context);
+
+  let html = `<div class="approval-table-wrap"><table class="approval-table">
+    <thead><tr>
+      <th>#</th>
+      <th>Emp Code</th>
+      <th>Name</th>
+      <th>Designation</th>
+      <th>Self %</th>
+      ${showTLPct  ? "<th>TL %</th>" : ""}
+      ${showPNDPct ? "<th>PnD %</th>" : ""}
+      <th>Status</th>
+      <th>Updated</th>
+      <th>Actions</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((r, i) => {
+    const actions = _buildActions(r, context);
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><span class="emp-code-link" onclick="openModal('${r.id}','${context}')">${r.employeeId}</span></td>
+      <td>${r.employeeName || "—"}</td>
+      <td>${r.designation || "—"}</td>
+      <td>${_pctPill(r.selfPercentage)}</td>
+      ${showTLPct  ? `<td>${_pctPill(r.tlPercentage)}</td>` : ""}
+      ${showPNDPct ? `<td>${_pctPill(r.pndPercentage)}</td>` : ""}
+      <td><small>${_statusLabel(r.status)}</small></td>
+      <td><small>${_fmt(r.updatedAt)}</small></td>
+      <td>${actions}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function _buildActions(r, context) {
+  const id = r.id;
+  if (context === "tl_pending") {
+    return `<button class="btn-approve" onclick="tlAction('${id}','approve')">Approve</button>
+            <button class="btn-reject"  onclick="tlAction('${id}','reject')">Reject</button>`;
+  }
+  if (context === "tl_approved") {
+    return `<button class="btn-view"   onclick="openModal('${id}','${context}')">View</button>
+            <button class="btn-reject" onclick="tlAction('${id}','reject')">Reject</button>`;
+  }
+  if (context === "tl_rejected") {
+    return `<button class="btn-approve" onclick="openModal('${id}','${context}_edit')">Review & Approve</button>`;
+  }
+  if (context === "pnd_pending_emp" || context === "pnd_pending_tl") {
+    return `<button class="btn-approve" onclick="openModal('${id}','pnd_edit')">Review & Approve</button>
+            <button class="btn-reject"  onclick="pndAction('${id}','reject')">Reject</button>`;
+  }
+  if (context === "pnd_approved") {
+    return `<button class="btn-view"   onclick="openModal('${id}','pnd_view')">View</button>
+            <button class="btn-reject" onclick="pndAction('${id}','reject')">Reject</button>`;
+  }
+  if (context === "pnd_rejected") {
+    return `<button class="btn-approve" onclick="openModal('${id}','pnd_edit')">Review & Approve</button>`;
+  }
+  if (context === "admin_pending") {
+    return `<button class="btn-view" onclick="openModal('${id}','admin_view')">View</button>`;
+  }
+  if (context === "admin_approved" || context === "admin_rejected") {
+    return `<button class="btn-view" onclick="openModal('${id}','admin_view')">View</button>`;
+  }
+  return "";
+}
+
+// ── Quick TL action (no edit) ─────────────────────────────────────────────────
+async function tlAction(recordId, action) {
+  if (!confirm(`${action === "approve" ? "Approve" : "Reject"} this KRA?`)) return;
+  try {
+    showLoading(`${action === "approve" ? "Approving" : "Rejecting"}…`);
+    const r = await fetch(`${API}/appraisal/tl/action/${recordId}`, {
+      method:"POST", headers:H(),
+      body: JSON.stringify({ action, tl_responses: null, remarks: "" })
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+    showPopup(d.message);
+    _loaded.delete("tl_pending"); _loaded.delete("tl_approved"); _loaded.delete("tl_rejected");
+    const sec = document.querySelector(".tab-content.active");
+    if (sec) { const name = sec.id.replace("sec_",""); _loadSection(name); }
+  } catch(e) { showPopup(e.message, true); }
+  finally { hideLoading(); }
+}
+
+async function pndAction(recordId, action, responses) {
+  if (!confirm(`${action === "approve" ? "Approve" : "Reject"} this KRA?`)) return;
+  try {
+    showLoading(`Processing…`);
+    const body = { action };
+    if (responses) body.pnd_responses = responses;
+    const r = await fetch(`${API}/appraisal/pnd/action/${recordId}`, {
+      method:"POST", headers:H(), body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+    showPopup(d.message);
+    _loaded.delete("pnd_pending"); _loaded.delete("pnd_approved"); _loaded.delete("pnd_rejected");
+    const sec = document.querySelector(".tab-content.active");
+    if (sec) { const name = sec.id.replace("sec_",""); _loadSection(name); }
+    closeModal();
+  } catch(e) { showPopup(e.message, true); }
+  finally { hideLoading(); }
+}
+
+// ── PnD sections ──────────────────────────────────────────────────────────────
+async function loadPNDPending() {
+  const el = document.getElementById("pnd_pending_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/pnd/pending`, { headers:H() });
+    const d = await r.json();
+    let html = "";
+    // TL/Manager section
+    html += `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
+    if (d.tls?.length) html += _buildApprovalTable(d.tls, "pnd_pending_tl");
+    else html += `<div class="empty-state" style="padding:1.5rem"><i class="fas fa-inbox"></i> No TL appraisals pending</div>`;
+    // Employee section
+    html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
+    if (d.employees?.length) html += _buildApprovalTable(d.employees, "pnd_pending_emp");
+    else html += `<div class="empty-state" style="padding:1.5rem"><i class="fas fa-inbox"></i> No employee appraisals pending (waiting for TL approvals)</div>`;
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+async function loadPNDApproved() {
+  const el = document.getElementById("pnd_approved_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/pnd/approved`, { headers:H() });
+    const d = await r.json();
+    let html = "";
+    html += `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
+    if (d.tls?.length) html += _buildApprovalTable(d.tls, "pnd_approved");
+    else html += `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
+    if (d.employees?.length) html += _buildApprovalTable(d.employees, "pnd_approved");
+    else html += `<div class="empty-state" style="padding:1rem">No records</div>`;
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+async function loadPNDRejected() {
+  const el = document.getElementById("pnd_rejected_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/pnd/rejected`, { headers:H() });
+    const d = await r.json();
+    let html = "";
+    html += `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
+    if (d.tls?.length) html += _buildApprovalTable(d.tls, "pnd_rejected");
+    else html += `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
+    if (d.employees?.length) html += _buildApprovalTable(d.employees, "pnd_rejected");
+    else html += `<div class="empty-state" style="padding:1rem">No records</div>`;
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
+}
+
+// ── Admin sections ────────────────────────────────────────────────────────────
+async function loadAdminPending() {
+  const el = document.getElementById("admin_pending_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/admin/pending`, { headers:H() });
+    const d = await r.json();
+    el.innerHTML = d.data?.length ? _buildApprovalTable(d.data,"admin_pending")
+      : `<div class="empty-state"><i class="fas fa-inbox"></i>No pending records</div>`;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed.</p>`; }
+}
+
+async function loadAdminApproved() {
+  const el = document.getElementById("admin_approved_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/admin/approved`, { headers:H() });
+    const d = await r.json();
+    el.innerHTML = d.data?.length ? _buildApprovalTable(d.data,"admin_approved")
+      : `<div class="empty-state"><i class="fas fa-check-circle"></i>No approved records</div>`;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed.</p>`; }
+}
+
+async function loadAdminRejected() {
+  const el = document.getElementById("admin_rejected_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/admin/rejected`, { headers:H() });
+    const d = await r.json();
+    el.innerHTML = d.data?.length ? _buildApprovalTable(d.data,"admin_rejected")
+      : `<div class="empty-state"><i class="fas fa-times-circle"></i>No rejected records</div>`;
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed.</p>`; }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+async function openModal(recordId, context) {
+  showLoading("Loading KRA…");
+  try {
+    const endpoint = (context.startsWith("pnd") || context === "admin_view")
+      ? `${API}/appraisal/pnd/record/${recordId}`
+      : `${API}/appraisal/tl/record/${recordId}`;
+    const r = await fetch(endpoint, { headers:H() });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+
+    _modalRecord  = d.data;
+    _editMode     = ["tl_pending","tl_rejected_edit","pnd_edit"].includes(context);
+    _editedAnswers = {};
+
+    // Pre-fill edited answers from last TL/PnD review if editing
+    if (_editMode) {
+      const base = context.startsWith("pnd")
+        ? (_modalRecord.pnd_responses || _modalRecord.tl_responses || _modalRecord.answers || {})
+        : (_modalRecord.tl_responses  || _modalRecord.answers || {});
+      _editedAnswers = { ...base };
+    }
+
+    document.getElementById("modalTitle").textContent =
+      `${_modalRecord.employeeName || _modalRecord.employeeId} — KRA Review`;
+
+    _renderModalBody(context);
+    _renderModalFooter(context, recordId);
+
+    document.getElementById("kraModal").classList.add("open");
+  } catch(e) { showPopup(e.message, true); }
+  finally { hideLoading(); }
+}
+
+function closeModal() {
+  document.getElementById("kraModal").classList.remove("open");
+  _modalRecord = null;
+  _editedAnswers = {};
+}
+
+function _renderModalBody(context) {
+  const rec       = _modalRecord;
+  const questions = rec.questions;
+  const allQs     = [...(questions.common || []), ...(questions.role || [])];
+  const selfAns   = rec.answers      || {};
+  const tlAns     = rec.tl_responses || {};
+  const pndAns    = rec.pnd_responses|| {};
+
+  const canEdit  = _editMode;
+  const isPnd    = context.startsWith("pnd");
+
+  let html = "";
+
+  // Score strip
+  html += `<div class="score-compare-strip">
+    <span><i class="fas fa-user" style="color:#667eea"></i> <strong>Self:</strong> ${rec.selfPercentage ?? "—"}%</span>`;
+  if (rec.tlPercentage  != null) html += `<span><i class="fas fa-user-tie" style="color:#27ae60"></i> <strong>TL:</strong> ${rec.tlPercentage}%</span>`;
+  if (rec.pndPercentage != null) html += `<span><i class="fas fa-crown"    style="color:#e65100"></i> <strong>PnD:</strong> ${rec.pndPercentage}%</span>`;
+  html += `</div>`;
+
+  // Remarks box if editing
+  if (canEdit) {
+    html += `<div style="margin-bottom:1rem">
+      <label style="font-size:.85rem;font-weight:600;color:#555">Remarks (optional)</label>
+      <textarea id="modalRemarks" class="remarks-input" rows="2" placeholder="Add remarks…"></textarea>
+    </div>`;
+  }
+
+  // Group by section
+  const sections = {};
+  allQs.forEach(q => {
+    const s = q.section || "General";
+    if (!sections[s]) sections[s] = [];
+    sections[s].push(q);
+  });
+
+  Object.entries(sections).forEach(([sec, qs]) => {
+    html += `<div class="q-section-hdr">${sec}</div>`;
+    qs.forEach(q => {
+      const selfVal = selfAns[q.id];
+      const tlVal   = tlAns[q.id];
+      const pndVal  = pndAns[q.id];
+      // working value = what we're editing from
+      const workVal = canEdit
+        ? (isPnd ? (pndVal ?? tlVal ?? selfVal) : (tlVal ?? selfVal))
+        : selfVal;
+
+      html += `<div class="q-card" id="qcard_${q.id}">`;
+      html += `<div class="q-label">${q.question}</div>`;
+      html += `<div class="q-hint">${q.response_hint || ""}</div>`;
+      html += `<div class="q-response">`;
+
+      // Always show self answer
+      html += `<span class="q-self-val">👤 Self: ${_displayVal(q, selfVal)}</span>`;
+      // Show TL answer if available and not same context
+      if (tlVal != null && !context.startsWith("tl_pending")) {
+        html += `<span class="q-tl-val">🏷 TL: ${_displayVal(q, tlVal)}</span>`;
+      }
+      // Show PnD answer if available
+      if (pndVal != null && isPnd && !_editMode) {
+        html += `<span class="q-pnd-val">👑 PnD: ${_displayVal(q, pndVal)}</span>`;
+      }
+
+      if (canEdit) {
+        html += _buildEditInput(q, workVal);
+      }
+
+      html += `</div></div>`;
+    });
+  });
+
+  document.getElementById("modalBody").innerHTML = html;
+
+  // Attach star listeners
+  if (canEdit) {
+    allQs.filter(q => q.type === "rating").forEach(q => {
+      const init = parseInt(_editedAnswers[q.id]) || 0;
+      _updateStars(q.id, init);
+    });
+    // Attach number/text listeners
+    allQs.filter(q => q.type === "number").forEach(q => {
+      const inp = document.getElementById(`edit_${q.id}`);
+      if (inp) inp.value = _editedAnswers[q.id] ?? "";
+    });
+  }
+}
+
+function _displayVal(q, val) {
+  if (val == null || val === "") return "—";
+  if (q.type === "rating") return `${val}/5 ★`;
+  return String(val);
+}
+
+function _buildEditInput(q, currentVal) {
+  const qid = q.id;
+  if (q.type === "rating") {
+    let stars = "";
+    for (let i=1;i<=5;i++) {
+      stars += `<button class="star-btn" id="star_${qid}_${i}" onclick="setStar('${qid}',${i})">★</button>`;
+    }
+    return `<div class="q-edit-rating" id="stars_${qid}">${stars}</div>`;
+  }
+  if (q.type === "number") {
+    return `<div class="q-edit-number">
+      <input type="number" id="edit_${qid}" min="0" value="${currentVal??""}"
+             onchange="_editedAnswers['${qid}']=this.value" style="width:90px;padding:.35rem .6rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem"/>
+    </div>`;
+  }
+  if (q.type === "yes_no") {
+    return `<div class="q-edit-yesno">
+      <select id="edit_${qid}" onchange="_editedAnswers['${qid}']=this.value" style="padding:.35rem .6rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem">
+        <option value="">—</option>
+        <option value="Yes" ${currentVal==="Yes"?"selected":""}>Yes</option>
+        <option value="No"  ${currentVal==="No"?"selected":""}>No</option>
+      </select>
+    </div>`;
+  }
+  if (q.type === "yes_no_number") {
+    const parts = String(currentVal||"").split("|");
+    const yn = parts[0] || "";
+    const num = parts[1] || "";
+    return `<div class="q-edit-yn-num" style="display:flex;gap:.5rem;align-items:center">
+      <select id="edit_yn_${qid}" onchange="updateYNNum('${qid}')" style="padding:.35rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem">
+        <option value="">—</option>
+        <option value="Yes" ${yn==="Yes"?"selected":""}>Yes</option>
+        <option value="No"  ${yn==="No"?"selected":""}>No</option>
+      </select>
+      <input type="number" id="edit_num_${qid}" min="0" value="${num}"
+             onchange="updateYNNum('${qid}')" style="width:70px;padding:.35rem;border:1px solid #ccc;border-radius:8px;font-size:.9rem"/>
+    </div>`;
+  }
+  // text / textarea
+  return `<div class="q-edit-text" style="width:100%">
+    <textarea id="edit_${qid}" rows="2" style="width:100%;padding:.4rem;border:1px solid #ccc;border-radius:8px;font-size:.85rem;resize:vertical"
+              onchange="_editedAnswers['${qid}']=this.value">${currentVal||""}</textarea>
+  </div>`;
+}
+
+function setStar(qid, val) {
+  _editedAnswers[qid] = val;
+  _updateStars(qid, val);
+}
+
+function _updateStars(qid, val) {
+  for (let i=1;i<=5;i++) {
+    const s = document.getElementById(`star_${qid}_${i}`);
+    if (s) s.classList.toggle("lit", i <= val);
+  }
+}
+
+function updateYNNum(qid) {
+  const yn  = document.getElementById(`edit_yn_${qid}`)?.value  || "";
+  const num = document.getElementById(`edit_num_${qid}`)?.value || "";
+  _editedAnswers[qid] = `${yn}|${num}`;
+}
+
+function _renderModalFooter(context, recordId) {
+  const footer = document.getElementById("modalFooter");
+  let html = `<button onclick="closeModal()" style="padding:.5rem 1.2rem;border:1px solid #ccc;border-radius:8px;cursor:pointer;background:#fff">Close</button>`;
+
+  if (context === "tl_pending") {
+    html += `<button class="btn-reject"  onclick="modalTLAction('${recordId}','reject')">Reject</button>`;
+    html += `<button class="btn-approve" onclick="modalTLAction('${recordId}','approve')">Save & Approve</button>`;
+  }
+  if (context === "tl_rejected_edit") {
+    html += `<button class="btn-approve" onclick="modalTLAction('${recordId}','approve')">Save & Approve</button>`;
+  }
+  if (context === "pnd_edit") {
+    html += `<button class="btn-reject"  onclick="modalPNDAction('${recordId}','reject')">Reject</button>`;
+    html += `<button class="btn-approve" onclick="modalPNDAction('${recordId}','approve')">Save & Approve</button>`;
+  }
+  if (context === "pnd_approved" || context === "pnd_view") {
+    html += `<button class="btn-reject" onclick="pndAction('${recordId}','reject')">Move to Rejected</button>`;
+  }
+  if (context === "tl_approved") {
+    html += `<button class="btn-reject" onclick="tlAction('${recordId}','reject');closeModal()">Move to Rejected</button>`;
+  }
+
+  footer.innerHTML = html;
+}
+
+async function modalTLAction(recordId, action) {
+  const remarks = document.getElementById("modalRemarks")?.value || "";
+  try {
+    showLoading("Saving…");
+    const r = await fetch(`${API}/appraisal/tl/action/${recordId}`, {
+      method:"POST", headers:H(),
+      body: JSON.stringify({ action, tl_responses: _editedAnswers, remarks })
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+    showPopup(d.message);
+    _loaded.delete("tl_pending"); _loaded.delete("tl_approved"); _loaded.delete("tl_rejected");
+    closeModal();
+    const sec = document.querySelector(".tab-content.active");
+    if (sec) _loadSection(sec.id.replace("sec_",""));
+  } catch(e) { showPopup(e.message, true); }
+  finally { hideLoading(); }
+}
+
+async function modalPNDAction(recordId, action) {
+  const remarks = document.getElementById("modalRemarks")?.value || "";
+  try {
+    showLoading("Saving…");
+    const r = await fetch(`${API}/appraisal/pnd/action/${recordId}`, {
+      method:"POST", headers:H(),
+      body: JSON.stringify({ action, pnd_responses: _editedAnswers, remarks })
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+    showPopup(d.message);
+    _loaded.delete("pnd_pending"); _loaded.delete("pnd_approved"); _loaded.delete("pnd_rejected");
+    closeModal();
+    const sec = document.querySelector(".tab-content.active");
+    if (sec) _loadSection(sec.id.replace("sec_",""));
+  } catch(e) { showPopup(e.message, true); }
+  finally { hideLoading(); }
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+async function loadAnalysis() {
+  const el = document.getElementById("analysis_content");
+  el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Loading…</p>`;
+  try {
+    const r = await fetch(`${API}/appraisal/analysis`, { headers:H() });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || "Failed");
+    el.innerHTML = _buildAnalysisHTML(d);
+  } catch(e) { el.innerHTML = `<p class="empty-msg">Failed to load analysis: ${e.message}</p>`; }
+}
+
+function _buildAnalysisHTML(d) {
+  const avgS  = d.avgScores?.self  ?? "—";
+  const avgTL = d.avgScores?.tl    ?? "—";
+  const avgP  = d.avgScores?.pnd   ?? "—";
+
+  let html = ``;
+
+  // Stat cards
+  html += `<div class="analysis-grid">
+    <div class="stat-card" style="border-left-color:#667eea">
+      <h4>Total Approved</h4>
+      <div class="stat-val">${d.totalApproved}</div>
+      <div class="stat-sub">KRAs finalised — ${d.period}</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#3498db">
+      <h4>Avg Self Score</h4>
+      <div class="stat-val">${avgS}%</div>
+      <div class="stat-sub">Employee self-assessment</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#27ae60">
+      <h4>Avg TL Score</h4>
+      <div class="stat-val">${avgTL}%</div>
+      <div class="stat-sub">After TL review</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#e65100">
+      <h4>Avg PnD Score</h4>
+      <div class="stat-val">${avgP}%</div>
+      <div class="stat-sub">Final approved score</div>
+    </div>
+  </div>`;
+
+  // Score progression bar
+  html += `<div style="background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem">
+    <h3 style="font-size:1rem;color:#1f3864;margin-bottom:1rem">📊 Score Progression (Avg)</h3>
+    ${_progressBar("Self Assessment", avgS, "#667eea")}
+    ${_progressBar("TL Review",        avgTL, "#27ae60")}
+    ${_progressBar("PnD Final",        avgP,  "#e65100")}
+  </div>`;
+
+  // Overall Top 5
+  html += `<div style="background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem">
+    <h3 style="font-size:1rem;color:#1f3864;margin-bottom:1rem">🏆 Overall Top 5 Employees</h3>
+    ${_top5Table(d.top5Overall)}
+  </div>`;
+
+  // Per-partner top 5
+  if (d.top5ByPartner && Object.keys(d.top5ByPartner).length) {
+    html += `<div style="background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem">
+      <h3 style="font-size:1rem;color:#1f3864;margin-bottom:1rem">🏅 Top 5 by Partner</h3>`;
+    for (const [pk, pdata] of Object.entries(d.top5ByPartner)) {
+      html += `<div class="partner-section">
+        <div class="partner-title"><i class="fas fa-crown" style="color:#e65100"></i> ${pdata.partnerName} (${pk})</div>
+        ${_top5Table(pdata.top5)}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Score variance
+  if (d.scoreVariance?.length) {
+    html += `<div style="background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem">
+      <h3 style="font-size:1rem;color:#1f3864;margin-bottom:1rem">📉 Biggest Score Changes (Self → PnD)</h3>
+      <div class="approval-table-wrap">
+        <table class="approval-table">
+          <thead><tr><th>#</th><th>Employee</th><th>Self %</th><th>PnD %</th><th>Change</th><th>Visual</th></tr></thead>
+          <tbody>`;
+    d.scoreVariance.forEach((v,i) => {
+      const pos = v.delta >= 0;
+      const bar = `<span class="variance-bar ${pos?"variance-pos":"variance-neg"}" style="width:${Math.min(Math.abs(v.delta)*2,100)}px"></span>`;
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><strong>${v.employeeName}</strong><br><small style="color:#aaa">${v.employeeId}</small></td>
+        <td>${_pctPill(v.selfPct)}</td>
+        <td>${_pctPill(v.pndPct)}</td>
+        <td style="font-weight:700;color:${pos?"#27ae60":"#e74c3c"}">${pos?"+":""}${v.delta}%</td>
+        <td>${bar}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+
+  // Designation breakdown
+  if (d.designationBreakdown && Object.keys(d.designationBreakdown).length) {
+    html += `<div style="background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:1.5rem">
+      <h3 style="font-size:1rem;color:#1f3864;margin-bottom:1rem">👥 Designation Breakdown</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:.6rem">`;
+    for (const [desig, cnt] of Object.entries(d.designationBreakdown)) {
+      html += `<span style="background:#eef2ff;color:#1f3864;padding:.3rem .8rem;border-radius:20px;font-size:.82rem;font-weight:600">${desig} <strong style="background:#1f3864;color:#fff;padding:.1rem .4rem;border-radius:10px;margin-left:.3rem">${cnt}</strong></span>`;
+    }
+    html += `</div></div>`;
+  }
+
+  return html;
+}
+
+function _progressBar(label, pct, color) {
+  const val = typeof pct === "number" ? pct : 0;
+  return `<div style="margin-bottom:.8rem">
+    <div style="display:flex;justify-content:space-between;font-size:.83rem;color:#555;margin-bottom:.3rem">
+      <span>${label}</span><strong>${pct}%</strong>
+    </div>
+    <div style="background:#f0f0f0;border-radius:8px;height:10px">
+      <div style="width:${val}%;background:${color};height:10px;border-radius:8px;transition:width .5s"></div>
+    </div>
+  </div>`;
+}
+
+function _top5Table(rows) {
+  if (!rows?.length) return `<p style="color:#aaa;font-size:.85rem">No data</p>`;
+  let html = `<table class="top5-table"><thead><tr><th>#</th><th>Employee</th><th>Designation</th><th>Self %</th><th>TL %</th><th>PnD %</th></tr></thead><tbody>`;
+  rows.forEach((r,i) => {
+    const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+    html += `<tr>
+      <td>${medal || i+1}</td>
+      <td><strong>${r.employeeName}</strong><br><small style="color:#aaa">${r.employeeId}</small></td>
+      <td><small>${r.designation||"—"}</small></td>
+      <td>${_pctPill(r.selfPct)}</td>
+      <td>${_pctPill(r.tlPct)}</td>
+      <td>${_pctPill(r.pndPct)}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+// Close modal on overlay click
+document.getElementById("kraModal").addEventListener("click", function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+</body>
+</html>

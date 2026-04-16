@@ -16,3 +16,11 @@ class AppraisalEligibilityResponse(BaseModel):
     reason:       str
     doj:          Optional[str] = None
     one_year_date: Optional[str] = None
+ 
+ 
+class AppraisalReviewRequest(BaseModel):
+    action: str                               # "approve" | "reject"
+    tl_responses: Optional[Dict[str, Any]] = None
+    pnd_responses: Optional[Dict[str, Any]] = None
+    remarks: Optional[str] = None
+ 
