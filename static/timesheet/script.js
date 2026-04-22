@@ -2171,7 +2171,6 @@ function updateModalHours() {
   }
 }
 
-
 /* Manager employee details modal (opens timeline and feedback) */
 async function openEmployeeDetails(employeeId) {
   console.log("🔹 Opening employee timesheet for:", employeeId);
