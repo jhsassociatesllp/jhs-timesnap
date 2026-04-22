@@ -782,7 +782,6 @@ function generateWeekOptions(start, end) {
     current = new Date(weekEnd);
     current.setDate(current.getDate() + 1);
   }
-
   return weeks;
 }
 
