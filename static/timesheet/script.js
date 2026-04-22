@@ -771,7 +771,7 @@ function generateWeekOptions(start, end) {
   current.setDate(current.getDate() + 1);
 
   // 🟢 3️⃣ Add full Mon–Sun weeks
-  while (current < end) {
+  while (current <= end) {
     const weekStart = new Date(current);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
