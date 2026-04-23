@@ -1539,52 +1539,52 @@ function calculateHours(row) {
 }
 
 
-// function validateTimes(rowOrModal, isModal = false) {
-//   try {
-//     if (!rowOrModal) return true;
-//     let startEl, endEl;
+function validateTimes(rowOrModal, isModal = false) {
+  try {
+    if (!rowOrModal) return true;
+    let startEl, endEl;
 
-//     if (isModal) {
-//       // For modal, we have both and project times - validate via modal ids
-//       // modal project start/end ids: modalInput3 & modalInput4
-//       const mPS = document.getElementById("modalInput3");
-//       const mPE = document.getElementById("modalInput4");
+    if (isModal) {
+      // For modal, we have both and project times - validate via modal ids
+      // modal project start/end ids: modalInput3 & modalInput4
+      const mPS = document.getElementById("modalInput3");
+      const mPE = document.getElementById("modalInput4");
 
-//       // check project start/end
-//       if (mPS && mPE && mPS.value && mPE.value) {
-//         const [sh, sm] = mPS.value.split(":").map(Number);
-//         const [eh, em] = mPE.value.split(":").map(Number);
-//         let s = sh * 60 + sm, e = eh * 60 + em;
-//         if (e <= s) {
-//           mPE.classList.add("validation-error");
-//           showPopup("Project End Time must be later than Project Start Time", true);
-//           return false;
-//         } else mPE.classList.remove("validation-error");
-//       }
+      // check project start/end
+      if (mPS && mPE && mPS.value && mPE.value) {
+        const [sh, sm] = mPS.value.split(":").map(Number);
+        const [eh, em] = mPE.value.split(":").map(Number);
+        let s = sh * 60 + sm, e = eh * 60 + em;
+        if (e <= s) {
+          mPE.classList.add("validation-error");
+          showPopup("Project End Time must be later than Project Start Time", true);
+          return false;
+        } else mPE.classList.remove("validation-error");
+      }
 
-//     } else {
-//       // row validation - validate project times
-//       const projStart = rowOrModal.querySelector(".project-start");
-//       const projEnd = rowOrModal.querySelector(".project-end");
+    } else {
+      // row validation - validate project times
+      const projStart = rowOrModal.querySelector(".project-start");
+      const projEnd = rowOrModal.querySelector(".project-end");
 
-//       if (projStart && projEnd && projStart.value && projEnd.value) {
-//         const [sh, sm] = projStart.value.split(":").map(Number);
-//         const [eh, em] = projEnd.value.split(":").map(Number);
-//         let s = sh * 60 + sm, e = eh * 60 + em;
-//         if (e <= s) {
-//           projEnd.classList.add("validation-error");
-//           showPopup("Project End Time must be later than Project Start Time", true);
-//           return false;
-//         } else projEnd.classList.remove("validation-error");
-//       }
+      if (projStart && projEnd && projStart.value && projEnd.value) {
+        const [sh, sm] = projStart.value.split(":").map(Number);
+        const [eh, em] = projEnd.value.split(":").map(Number);
+        let s = sh * 60 + sm, e = eh * 60 + em;
+        if (e <= s) {
+          projEnd.classList.add("validation-error");
+          showPopup("Project End Time must be later than Project Start Time", true);
+          return false;
+        } else projEnd.classList.remove("validation-error");
+      }
 
-//     }
-//     return true;
-//   } catch (err) {
-//     console.warn("validateTimes error", err);
-//     return true;
-//   }
-// }
+    }
+    return true;
+  } catch (err) {
+    console.warn("validateTimes error", err);
+    return true;
+  }
+}
 
 function validateDate(input) {
     if (!input || !input.value) {
