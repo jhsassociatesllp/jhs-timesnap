@@ -1538,7 +1538,6 @@ function calculateHours(row) {
   updateSummary();
 }
 
-
 function validateTimes(rowOrModal, isModal = false) {
   try {
     if (!rowOrModal) return true;
