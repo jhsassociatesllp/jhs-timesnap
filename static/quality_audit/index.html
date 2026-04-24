@@ -567,7 +567,7 @@ async function init() {
 function buildTabs() {
   const bar  = document.getElementById('tabs-bar');
   const tabs = IS_QA_ONLY
-    ? [['dashboard','fa-chart-bar','Dashboard'],['history','fa-history','History']]
+    ? [['form','fa-edit','Audit Form'],['history','fa-history','History']]
     : IS_ADMIN
       ? [['form','fa-edit','Audit Form'],['history','fa-history','History'],['dashboard','fa-chart-bar','Dashboard']]
       : [['form','fa-edit','Audit Form'],['history','fa-history','History']];

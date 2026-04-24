@@ -32,6 +32,7 @@ rejected_collection           = db["Rejected"]
 
 # ── admin collections ─────────────────────────────────────────────────────────
 admin_details_collection      = db["admin_details"]
+appraisal_admin_collection = appraisal_db["Admin"]
 forgot_password_otps_collection = db["forgot_password_otps"]
 
 # ── appraisal collections (add when ready) ────────────────────────────────────

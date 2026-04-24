@@ -893,7 +893,7 @@ async function initWeekOptions() {
     };
     window.weekOptions = generateWeekOptions(start, end);
     weekOptionsInitialized = true;
-  }
+  } 
 }
 
 // Refresh function — update weekOptions only if admin changed payroll window

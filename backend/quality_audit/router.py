@@ -69,8 +69,10 @@ def _check_qa_access(current_user: str):
     is_admin   = email in admins
     is_user    = email in users
     is_qa_only = email in QA_ONLY_EMAILS
-    if not (is_admin or is_user):
-        raise HTTPException(403, "Access denied: not in Quality Audit user list")
+    # if not (is_admin or is_user):
+    #     raise HTTPException(403, "Access denied: not in Quality Audit user list")
+    if not is_admin:
+        raise HTTPException(403, "Dashboard restricted to admins")
     return email, is_admin, is_qa_only
 
 
