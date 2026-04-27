@@ -69,10 +69,8 @@ def _check_qa_access(current_user: str):
     is_admin   = email in admins
     is_user    = email in users
     is_qa_only = email in QA_ONLY_EMAILS
-    # if not (is_admin or is_user):
-    #     raise HTTPException(403, "Access denied: not in Quality Audit user list")
-    if not is_admin:
-        raise HTTPException(403, "Dashboard restricted to admins")
+    if not (is_admin or is_user):
+        raise HTTPException(403, "Access denied: not in Quality Audit user list")
     return email, is_admin, is_qa_only
 
 
@@ -164,8 +162,12 @@ async def get_dropdowns(current_user: str = Depends(get_current_user)):
 @router.post("/save-draft")
 async def save_draft(payload: AuditPayload, current_user: str = Depends(get_current_user)):
     email, is_admin, is_qa_only = _check_qa_access(current_user)
-    if is_qa_only:
-        raise HTTPException(403, "Dashboard-only access")
+    # if is_qa_only:
+    #     raise HTTPException(403, "Dashboard-only access")
+    
+    # In dashboard_kpis and dashboard_stats:
+    if not is_admin:   # ← must be this, NOT (is_admin or is_qa_only)
+        raise HTTPException(403, "Dashboard restricted to admins")
     doc = payload.dict()
     doc.update({"saved_by": current_user, "saved_email": email,
                 "saved_at": datetime.utcnow(), "status": "draft"})
@@ -188,8 +190,12 @@ async def load_draft(current_user: str = Depends(get_current_user)):
 @router.post("/submit")
 async def submit_audit(payload: AuditPayload, current_user: str = Depends(get_current_user)):
     email, is_admin, is_qa_only = _check_qa_access(current_user)
-    if is_qa_only:
-        raise HTTPException(403, "Dashboard-only access")
+    # if is_qa_only:
+    #     raise HTTPException(403, "Dashboard-only access")
+    
+    # In dashboard_kpis and dashboard_stats:
+    if not is_admin:   # ← must be this, NOT (is_admin or is_qa_only)
+        raise HTTPException(403, "Dashboard restricted to admins")
     doc = payload.dict()
     doc.update({"submitted_by": current_user, "submitted_email": email,
                 "submitted_at": datetime.utcnow(), "status": "submitted"})

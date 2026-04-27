@@ -545,6 +545,7 @@ let SECTIONS = JSON.parse(JSON.stringify(BASE_SECTIONS));
 /* ════════════════════════════════════════════════════════════════
    INIT
 ════════════════════════════════════════════════════════════════ */
+// AFTER
 async function init() {
   try {
     const d = await (await apiFetch('/quality-audit/access-check')).json();
@@ -552,16 +553,13 @@ async function init() {
     IS_QA_ONLY = d.is_qa_only  || false;
   } catch(e) {}
   buildTabs();
-  if (!IS_QA_ONLY) {
-    document.getElementById('nav-modules').style.display = '';
-    buildSections();
-    await loadDropdowns();
-    await loadDraft();
-    recalcScore();
-    switchTab('form');
-  } else {
-    switchTab('dashboard');
-  }
+  // ALL users (including QA_ONLY) get the form tab — build sections for everyone
+  document.getElementById('nav-modules').style.display = '';
+  buildSections();
+  await loadDropdowns();
+  await loadDraft();
+  recalcScore();
+  switchTab('form');
 }
 
 function buildTabs() {
