@@ -184,7 +184,6 @@ async def load_draft(current_user: str = Depends(get_current_user)):
     doc["_id"] = str(doc["_id"])
     return {"draft": doc}
 
-
 # ─── submit ───────────────────────────────────────────────────────────────────
 
 @router.post("/submit")
