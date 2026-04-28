@@ -60,7 +60,6 @@ def _email_from_emp(emp_id: str) -> str:
         return (emp.get("EMail") or emp.get("JHS Email") or "").lower().strip()
     return ""
 
-
 def _check_qa_access(current_user: str):
     email  = _email_from_emp(current_user)
     doc    = _get_access_doc()
