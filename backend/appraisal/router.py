@@ -1158,7 +1158,6 @@ async def get_analysis(current_user: str = Depends(get_current_user)):
         "pndWise":              pnd_wise,
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Analysis — KRA detail for employee modal (admin/partner access)
 # ─────────────────────────────────────────────────────────────────────────────
