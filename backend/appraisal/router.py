@@ -655,14 +655,25 @@ def _pnd_pending_employees(partner_id: str, p: str):
     return [_serialize(r) for r in records]
 
 
+# def _pnd_pending_tls(partner_id: str, p: str):
+#     tl_codes = _tls_under_partner(partner_id)
+#     records = list(appraisal_collection.find({
+#         "employeeId": {"$in": tl_codes},
+#         "period":     p,
+#         "status":     "submitted",
+#     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
+#         "status": 1, "updatedAt": 1, "selfPercentage": 1, "percentage": 1, "score": 1, "maxScore": 1}))
+#     return [_serialize(r) for r in records]
+
 def _pnd_pending_tls(partner_id: str, p: str):
     tl_codes = _tls_under_partner(partner_id)
     records = list(appraisal_collection.find({
         "employeeId": {"$in": tl_codes},
         "period":     p,
-        "status":     "submitted",
+        "status":     {"$in": ["submitted", "TL_approved"]},  # ← add TL_approved
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
-        "status": 1, "updatedAt": 1, "selfPercentage": 1, "percentage": 1, "score": 1, "maxScore": 1}))
+        "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
+        "percentage": 1, "score": 1, "maxScore": 1}))
     return [_serialize(r) for r in records]
 
 
@@ -886,8 +897,11 @@ async def get_analysis(current_user: str = Depends(get_current_user)):
     is_admin = _is_admin(current_user)
 
     # Access check: must be partner, admin, or admin+partner
-    if role not in ("partner", "admin") and not is_admin:
-        raise HTTPException(403, "Admin or Partner access required")
+    # if role not in ("partner", "admin") and not is_admin:
+    #     raise HTTPException(403, "Admin or Partner access required")
+    
+    if not is_admin and role != "admin":
+        raise HTTPException(403, "Admin access required for Analysis")
 
     p = _get_current_period()
 

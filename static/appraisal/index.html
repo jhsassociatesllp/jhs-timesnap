@@ -346,7 +346,7 @@ function _buildNav() {
 
   // ── Analysis tab ──
   // Shown for: partner (always), admin (always), AND admin+partner
-  if (_role === "partner" || _role === "admin" || _isAdmin) {
+  if (_isAdmin) {
     links.push(
       `<a href="#" onclick="showSection('analysis')" id="nt_analysis"><i class="fas fa-chart-bar"></i> Analysis</a>`,
     );
@@ -408,7 +408,7 @@ function _buildTabContents() {
   }
 
   // Analysis section — for partner, admin, or isAdmin
-  if (_role === "partner" || _role === "admin" || _isAdmin) {
+  if (_isAdmin) {
     secs.push(
       `<div class="tab-content" id="sec_analysis" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-chart-bar"></i> Analysis</p><div id="analysis_content"></div></div></div>`,
     );
