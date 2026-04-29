@@ -602,18 +602,56 @@ async def tl_action(
 # Routes — Partner / Director (PnD)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# def _pnd_pending_employees(partner_id: str, p: str):
+#     emps     = _employees_under_partner(partner_id)
+#     emp_ids  = [e["EmpID"].upper() for e in emps]
+#     tl_codes = set(e.get("ReportingEmpCode", "").upper() for e in emps if e.get("ReportingEmpCode"))
+#     emp_ids_excl_tls = [eid for eid in emp_ids if eid not in tl_codes]
+#     records = list(appraisal_collection.find({
+#         "employeeId": {"$in": emp_ids_excl_tls},
+#         "period":     p,
+#         "status":     "TL_approved",
+#     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
+#         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
+#         "percentage": 1, "score": 1, "maxScore": 1}))
+#     return [_serialize(r) for r in records]
+
 def _pnd_pending_employees(partner_id: str, p: str):
     emps     = _employees_under_partner(partner_id)
     emp_ids  = [e["EmpID"].upper() for e in emps]
-    tl_codes = set(e.get("ReportingEmpCode", "").upper() for e in emps if e.get("ReportingEmpCode"))
+    tl_codes = set(
+        e.get("ReportingEmpCode", "").upper()
+        for e in emps if e.get("ReportingEmpCode")
+    )
     emp_ids_excl_tls = [eid for eid in emp_ids if eid not in tl_codes]
-    records = list(appraisal_collection.find({
-        "employeeId": {"$in": emp_ids_excl_tls},
-        "period":     p,
-        "status":     "TL_approved",
-    }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
+
+    # Employees whose TL IS the partner themselves — no separate TL step needed
+    direct_ids = [
+        e["EmpID"].upper() for e in emps
+        if e.get("ReportingEmpCode", "").upper() == partner_id.strip().upper()
+        and e["EmpID"].upper() not in tl_codes
+    ]
+    # Everyone else must pass through TL approval first
+    indirect_ids = [eid for eid in emp_ids_excl_tls if eid not in direct_ids]
+
+    projection = {
+        "_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
-        "percentage": 1, "score": 1, "maxScore": 1}))
+        "percentage": 1, "score": 1, "maxScore": 1,
+    }
+
+    records = []
+    if direct_ids:
+        records += list(appraisal_collection.find(
+            {"employeeId": {"$in": direct_ids}, "period": p, "status": "submitted"},
+            projection
+        ))
+    if indirect_ids:
+        records += list(appraisal_collection.find(
+            {"employeeId": {"$in": indirect_ids}, "period": p, "status": "TL_approved"},
+            projection
+        ))
+
     return [_serialize(r) for r in records]
 
 
@@ -775,6 +813,12 @@ async def pnd_action(
         update["pndMaxScore"]   = record.get("tlMaxScore")   or record.get("selfMaxScore")   or record.get("maxScore")
         update["pndPercentage"] = record.get("tlPercentage") or record.get("selfPercentage") or record.get("percentage")
 
+    # ← ADD HERE: mirror self→tl fields when TL == Partner (record arrived as "submitted")
+    if record["status"] == "submitted" and not data.pnd_responses:
+        update.setdefault("tlScore",      record.get("selfScore")      or record.get("score"))
+        update.setdefault("tlMaxScore",   record.get("selfMaxScore")   or record.get("maxScore"))
+        update.setdefault("tlPercentage", record.get("selfPercentage") or record.get("percentage"))
+        
     if data.remarks:
         update["pndRemarks"] = data.remarks
 
