@@ -825,7 +825,6 @@ async def pnd_action(
     appraisal_collection.update_one({"_id": oid}, {"$set": update})
     return {"success": True, "message": f"Record {new_status}", "status": new_status}
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes — Admin only
 # ─────────────────────────────────────────────────────────────────────────────
