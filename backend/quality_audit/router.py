@@ -155,7 +155,6 @@ async def get_dropdowns(current_user: str = Depends(get_current_user)):
 
     return {"managers": managers, "pnds": sorted(list(pnd_set))}
 
-
 # ─── save draft ───────────────────────────────────────────────────────────────
 
 @router.post("/save-draft")
