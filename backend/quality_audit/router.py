@@ -149,8 +149,8 @@ async def get_dropdowns(current_user: str = Depends(get_current_user)):
         v = (doc.get("PnD") or "").strip()
         if v: pnd_set.add(v)
     if not pnd_set:
-        for doc in employee_details_collection.find({"PartnerName": {"$exists": True, "$ne": ""}}, {"PartnerName": 1, "_id": 0}):
-            v = (doc.get("PartnerName") or "").strip()
+        for doc in employee_details_collection.find({"Partner": {"$exists": True, "$ne": ""}}, {"Partner": 1, "_id": 0}):
+            v = (doc.get("Partner") or "").strip()
             if v: pnd_set.add(v)
 
     return {"managers": managers, "pnds": sorted(list(pnd_set))}
