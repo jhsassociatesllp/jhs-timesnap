@@ -120,6 +120,42 @@ class AuditPayload(BaseModel):
     ideal_score:  Optional[float] = 0
     scaled_total: Optional[float] = 0
 
+# ─── update audit ────────────────────────────────────────────────────────────
+
+class AuditUpdatePayload(BaseModel):
+    section_a:    List[Dict[str, Any]] = []
+    section_b:    List[Dict[str, Any]] = []
+    section_c:    List[Dict[str, Any]] = []
+    section_d:    List[Dict[str, Any]] = []
+    section_e:    List[Dict[str, Any]] = []
+    total_score:  Optional[float] = None
+    ideal_score:  Optional[float] = None
+    scaled_total: Optional[float] = None
+
+
+@router.put("/audit/{audit_id}")
+async def update_audit(
+    audit_id: str,
+    payload:  AuditUpdatePayload,
+    current_user: str = Depends(get_current_user),
+):
+    email, is_admin, is_qa_only = _check_qa_access(current_user)
+    if not (is_admin or is_qa_only):
+        raise HTTPException(403, "Access denied")
+    try:
+        oid = ObjectId(audit_id)
+    except Exception:
+        raise HTTPException(400, "Invalid audit ID")
+
+    if not qa_audit_collection.find_one({"_id": oid}, {"_id": 1}):
+        raise HTTPException(404, "Audit not found")
+
+    fields = {k: v for k, v in payload.dict().items() if v is not None}
+    fields["updated_by"] = current_user
+    fields["updated_at"] = datetime.utcnow()
+
+    qa_audit_collection.update_one({"_id": oid}, {"$set": fields})
+    return {"success": True, "message": "Audit updated successfully"}
 
 # ─── access check ─────────────────────────────────────────────────────────────
 
