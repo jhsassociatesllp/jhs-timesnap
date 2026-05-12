@@ -33,6 +33,7 @@ from backend.quality_audit.db import (
     qa_temp_collection,
 )
 
+
 router = APIRouter(prefix="/quality-audit", tags=["Quality Audit"])
 
 QA_ONLY_EMAILS = {"bhupen.s@jhsassociates.in"}
