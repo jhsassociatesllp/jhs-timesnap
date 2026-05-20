@@ -157,8 +157,9 @@ def verify_token(token: str):
 #     return {"message": f"PAR status updated to {new_status}", "par_status": new_status}
 
 
-from fastapi import FastAPI, HTTPException, status, Request, Body
+from fastapi import FastAPI, HTTPException, status, Request, Body, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -173,16 +174,19 @@ load_dotenv()
 # ---------------- JWT CONFIG ----------------
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey123")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # ---------------- PASSWORD HASHER ----------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# frontend_path = os.path.join(os.path.dirname(__file__), "static")
 frontend_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../static")
 )
 admin_router = APIRouter()
+
+# ── Import shared auth so all endpoints use the same token validation ──
+from backend.auth import get_current_user
+from backend.database import module_admin_collection
 
 # ---------------- MODELS ----------------
 class AdminLoginRequest(BaseModel):
@@ -193,39 +197,38 @@ class AdminRegisterRequest(BaseModel):
     userid: str
     password: str
 
+class ParStatusRequest(BaseModel):
+    new_status: str
 
-#---------------- JWT FUNCTIONS ----------------
+class PayrollRequest(BaseModel):
+    start_date: str
+    end_date: str
+
+class AnalysisRequest(BaseModel):
+    pass  # no body needed — auth via header
+
+
+#---------------- JWT FUNCTIONS (kept for admin-login only) ----------------
 def create_access_token(data: dict, expires_delta: timedelta = None):
-    """JWT create kare, 1 ghante ke liye valid."""
     to_encode = data.copy()
     expire_dt = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    # timestamp integer me convert
     to_encode.update({"exp": int(expire_dt.timestamp())})
     token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    print(f"🕒 Token created for {data.get('sub')} | Expires at: {expire_dt.isoformat()}")
     return token
 
 
-
-def verify_token(token: str):
-    """JWT verify kare aur userid return kare."""
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    token = token.strip()
-    if token.startswith('"') and token.endswith('"'):
-        token = token[1:-1]
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        userid = payload.get("sub") or payload.get("userid")
-        if not userid:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        return userid
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Session expired. Please login again.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+def _require_admin_access(current_user: str):
+    """Check that the logged-in user has timesheet module admin access."""
+    empid = current_user.strip().upper()
+    doc = module_admin_collection.find_one({"empid": empid})
+    if not doc:
+        doc = module_admin_collection.find_one({"empid": {"$regex": f"^{empid}$", "$options": "i"}})
+    if not doc or "timesheet" not in doc.get("modules", []):
+        # Also allow legacy admin_details users
+        legacy = admin_details_collection.find_one({"userid": empid})
+        if not legacy:
+            raise HTTPException(status_code=403, detail="Admin access required")
+    return empid
 
 
 # ---------------- ROUTES ----------------
@@ -341,44 +344,22 @@ async def admin_dashboard():
 #     return {"message": f"PAR status updated to {new_status}"}
 
 @admin_router.post("/update-par-status")
-async def update_par_status(request: Request):
-    """Globally update PAR status"""
-    data = await request.json()
-    token = data.get("token")
-    new_status = data.get("new_status")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    # Verify token for security but ignore specific userid when updating
-    verify_token(token)
-
-    if new_status not in ["enable", "disable"]:
+async def update_par_status(
+    payload: ParStatusRequest,
+    current_user: str = Depends(get_current_user)
+):
+    _require_admin_access(current_user)
+    if payload.new_status not in ["enable", "disable"]:
         raise HTTPException(status_code=400, detail="Invalid status")
+    admin_details_collection.update_one({}, {"$set": {"par_status": payload.new_status}}, upsert=True)
+    return {"message": f"PAR status updated to {payload.new_status}"}
 
-    # ✅ Update single global record
-    admin_details_collection.update_one({}, {"$set": {"par_status": new_status}}, upsert=True)
-
-    return {"message": f"PAR status updated to {new_status}"}
 
 @admin_router.post("/get-par-status")
-async def get_par_status(request: Request):
-    """Fetch current PAR status (Protected with JWT token)"""
-    data = await request.json()
-    token = data.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    userid = verify_token(token)  # ✅ validate JWT
-
-    # Fetch from MongoDB
-    admin = admin_details_collection.find_one({"userid": userid})
-    if not admin:
-        raise HTTPException(status_code=404, detail="Admin not found")
-
-    par_status = admin.get("par_status", "disable")
-
+async def get_par_status(current_user: str = Depends(get_current_user)):
+    _require_admin_access(current_user)
+    admin = admin_details_collection.find_one({}, {"par_status": 1})
+    par_status = admin.get("par_status", "disable") if admin else "disable"
     return {"par_status": par_status}
 
 
@@ -496,63 +477,25 @@ async def get_par_current_status():
 
 
 @admin_router.post("/update-payroll-status")
-async def update_payroll_status(request: Request):
-    """Update payroll start & end dates"""
-    data = await request.json()
-    token = data.get("token")
-    start_date = data.get("start_date")
-    end_date = data.get("end_date")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    userid = verify_token(token)
-
-    admin = admin_details_collection.find_one({"userid": userid})
-    if not admin:
-        raise HTTPException(status_code=404, detail="Admin not found")
-
-    # ✅ Store payroll details as nested object
-    payroll_data = {
-        "status": "Active",
-        "start_date": start_date,
-        "end_date": end_date
-    }
-
-    admin_details_collection.update_one(
-        {"userid": userid},
-        {"$set": {"payroll_status": payroll_data}}
-    )
-
+async def update_payroll_status(
+    payload: PayrollRequest,
+    current_user: str = Depends(get_current_user)
+):
+    _require_admin_access(current_user)
+    payroll_data = {"status": "Active", "start_date": payload.start_date, "end_date": payload.end_date}
+    admin_details_collection.update_one({}, {"$set": {"payroll_status": payroll_data}}, upsert=True)
     return {"message": "Payroll updated successfully", "payroll_status": payroll_data}
 
 
 @admin_router.post("/get-payroll-status")
-async def get_payroll_status(request: Request):
-    """Fetch current payroll status and dates"""
-    data = await request.json()
-    token = data.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    userid = verify_token(token)
-
-    admin = admin_details_collection.find_one({"userid": userid})
-    if not admin:
-        raise HTTPException(status_code=404, detail="Admin not found")
-
-    payroll = admin.get("payroll_status", {})
-
-    # ✅ Extract nested info (safe defaults)
-    status = payroll.get("status", "Inactive")
-    start_date = payroll.get("start_date", "")
-    end_date = payroll.get("end_date", "")
-
+async def get_payroll_status(current_user: str = Depends(get_current_user)):
+    _require_admin_access(current_user)
+    admin = admin_details_collection.find_one({}, {"payroll_status": 1})
+    payroll = (admin or {}).get("payroll_status", {})
     return {
-        "payroll_status": status,
-        "start_date": start_date,
-        "end_date": end_date
+        "payroll_status": payroll.get("status", "Inactive"),
+        "start_date": payroll.get("start_date", ""),
+        "end_date": payroll.get("end_date", "")
     }
 
 @admin_router.get("/get-current-payroll")
@@ -623,22 +566,12 @@ async def get_current_payroll():
 
 
 @admin_router.post("/admin/analysis-stats")
-async def admin_analysis_stats(request: Request):
-    """
-    Admin Analytics:
-    - Total Employees
-    - Total Filled Employees
-    - Total Not Filled Employees
-    - Reporting Manager-wise filled / not-filled with employee details
-    """
-    data = await request.json()
-    token = data.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    # ✅ Validate admin token
-    userid = verify_token(token)
+async def admin_analysis_stats(
+    request: Request,
+    current_user: str = Depends(get_current_user)
+):
+    _require_admin_access(current_user)
+    data = await request.json()  # body may be empty, that's fine
 
     # 1️⃣ Load all employees (code, name, manager mapping)
     employees = list(employee_details_collection.find({}, {"_id": 0}))
@@ -1069,20 +1002,12 @@ async def admin_analysis_stats(request: Request):
 #     }
 
 @admin_router.post("/admin/init-par-cycle")
-async def init_par_cycle(request: Request):
-    """
-    Initialize a new PAR cycle:
-    - Clears Pending, Approved, Rejected collections
-    - Only employees who FILLED THE TIMESHEET are included
-    - Group under their respective reporting managers
-    """
-    data = await request.json()
-    token = data.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    verify_token(token)
+async def init_par_cycle(
+    request: Request,
+    current_user: str = Depends(get_current_user)
+):
+    _require_admin_access(current_user)
+    data = await request.json()  # body may be empty
 
     # 1️⃣ Clear previous cycle
     pending_collection.delete_many({})
@@ -1148,19 +1073,12 @@ async def init_par_cycle(request: Request):
     }
 
 @admin_router.post("/admin/par-stats")
-async def admin_par_stats(request: Request):
-    """
-    PAR Stats:
-    - Total Employees = ONLY those who filled the timesheet (from Pending/Approved/Rejected)
-    - Pending / Approved / Rejected computed correctly
-    """
-    data = await request.json()
-    token = data.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    verify_token(token)
+async def admin_par_stats(
+    request: Request,
+    current_user: str = Depends(get_current_user)
+):
+    _require_admin_access(current_user)
+    data = await request.json()  # body may be empty
 
     # ---------- Load employees & manager mapping ----------
     employees = list(employee_details_collection.find({}, {"_id": 0}))

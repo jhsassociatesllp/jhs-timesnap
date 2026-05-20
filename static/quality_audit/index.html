@@ -1508,6 +1508,7 @@
     <div class="navbar-brand"><i class="fas fa-clipboard-check"></i> Quality Audit</div>
     <div class="navbar-right">
       <span class="emp-badge" id="empBadge"></span>
+      <a href="/control-panel" class="nav-btn" id="nav-cp" style="display:none"><i class="fas fa-cogs"></i> Control Panel</a>
       <a href="/modules" class="nav-btn" id="nav-modules" style="display:none"><i class="fas fa-th-large"></i>
         Modules</a>
       <button class="nav-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -1869,6 +1870,7 @@
     document.getElementById('empBadge').textContent = empId;
 
     let IS_ADMIN = false, IS_QA_ONLY = false;
+    const _CP_ADMIN = sessionStorage.getItem('cp_admin') === '1' && sessionStorage.getItem('admin_mode') === 'quality_audit';
     let allManagers = [], allPnds = [];
 
     // Dashboard state
@@ -1965,20 +1967,34 @@
       buildTabs();
       // ALL users (including QA_ONLY) get the form tab — build sections for everyone
       document.getElementById('nav-modules').style.display = '';
+      if (_CP_ADMIN) {
+        document.getElementById('nav-cp').style.display = '';
+        document.getElementById('nav-modules').style.display = 'none';
+      }
       buildSections();
       await loadDropdowns();
       await loadDraft();
       recalcScore();
-      switchTab('form');
+      if (_CP_ADMIN) {
+        switchTab('dashboard');
+      } else {
+        switchTab('form');
+      }
     }
 
     function buildTabs() {
       const bar = document.getElementById('tabs-bar');
-      const tabs = IS_QA_ONLY
-        ? [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History']]
-        : IS_ADMIN
-          ? [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History'], ['dashboard', 'fa-chart-bar', 'Dashboard']]
-          : [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History']];
+      let tabs;
+      if (_CP_ADMIN) {
+        // Control Panel admin: Dashboard only
+        tabs = [['dashboard', 'fa-chart-bar', 'Dashboard']];
+      } else if (IS_QA_ONLY) {
+        tabs = [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History']];
+      } else if (IS_ADMIN) {
+        tabs = [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History'], ['dashboard', 'fa-chart-bar', 'Dashboard']];
+      } else {
+        tabs = [['form', 'fa-edit', 'Audit Form'], ['history', 'fa-history', 'History']];
+      }
       bar.innerHTML = tabs.map(([id, icon, label]) =>
         `<button class="tab" id="tab-btn-${id}" onclick="switchTab('${id}',this)"><i class="fas ${icon}"></i> ${label}</button>`
       ).join('');

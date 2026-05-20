@@ -249,6 +249,7 @@ let _isAdmin = false;       // true if user is in admin list (regardless of natu
 let _period  = "";
 let _modalRecord = null, _editMode = false, _editedAnswers = {};
 const _loaded = new Set();
+const _CP_ADMIN = sessionStorage.getItem('cp_admin') === '1' && sessionStorage.getItem('admin_mode') === 'kra';
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
@@ -315,6 +316,17 @@ function _buildNav() {
   const menu  = document.getElementById("navMenu");
   const links = [];
 
+  // ── Control Panel admin: Analysis only ──
+  if (_CP_ADMIN) {
+    links.push(
+      `<a href="#" onclick="showSection('analysis')" id="nt_analysis"><i class="fas fa-chart-bar"></i> Analysis</a>`,
+      `<a href="/control-panel"><i class="fas fa-cogs"></i> Control Panel</a>`,
+      `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
+    );
+    menu.innerHTML = links.join("");
+    return;
+  }
+
   // ── Own KRA tabs (Form / History / Status) ──
   // Show for: employee, tl, pure admin, AND admin+partner (senior partner)
   const showOwnKRA = (_role !== "partner") || _isAdmin;
@@ -344,8 +356,7 @@ function _buildNav() {
     );
   }
 
-  // ── Analysis tab ──
-  // Shown for: partner (always), admin (always), AND admin+partner
+  // ── Analysis tab — only for admins, NOT shown to regular users ──
   if (_isAdmin) {
     links.push(
       `<a href="#" onclick="showSection('analysis')" id="nt_analysis"><i class="fas fa-chart-bar"></i> Analysis</a>`,
@@ -372,6 +383,16 @@ function _buildNav() {
 function _buildTabContents() {
   const c    = document.getElementById("tabContents");
   const secs = [];
+
+  // ── Control Panel admin: Analysis only ──
+  if (_CP_ADMIN) {
+    secs.push(
+      `<div class="tab-content" id="sec_analysis"><div class="body-content"><p class="section-label"><i class="fas fa-chart-bar"></i> Analysis</p><div id="analysis_content"></div></div></div>`,
+    );
+    c.innerHTML = secs.join("\n");
+    showSection('analysis');
+    return;
+  }
 
   // Own KRA sections — same condition as nav
   const showOwnKRA = (_role !== "partner") || _isAdmin;
@@ -407,8 +428,8 @@ function _buildTabContents() {
     );
   }
 
-  // Analysis section — for partner, admin, or isAdmin
-  if (_isAdmin) {
+  // Analysis section — only for isAdmin, only when NOT in CP admin mode (CP handled above)
+  if (_isAdmin && !_CP_ADMIN) {
     secs.push(
       `<div class="tab-content" id="sec_analysis" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-chart-bar"></i> Analysis</p><div id="analysis_content"></div></div></div>`,
     );

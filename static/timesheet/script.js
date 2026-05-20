@@ -182,6 +182,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // Baaki sab initialization yaha hoga...
 });
 
+// ── Global payroll cycle state ────────────────────────────────────────────────
+let _availableCycles = [];       // all cycles user can fill
+let _selectedCycle   = null;     // currently selected cycle object
+let _submittedCycles = {};       // { cycle_id: true/false }
+
 document.addEventListener("DOMContentLoaded", async () => {
   const token = localStorage.getItem("access_token");
   if (!token) {
@@ -189,13 +194,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // ✅ Step 1: Verify session
+  // Step 1: Verify session
   try {
-    console.log(`API URL: ${API_URL}`)
-    const res = await fetch(`${API_URL}/verify_session`, {
-      method: "POST",
-      headers: getHeaders(),
-    });
+    const res = await fetch(`${API_URL}/verify_session`, { method: "POST", headers: getHeaders() });
     if (!res.ok) throw new Error("Session invalid");
   } catch {
     localStorage.removeItem("access_token");
@@ -208,19 +209,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   try {
     employeeData = await safeFetchJson("/employees");
-    clientData = await safeFetchJson("/clients");
-
-    // ✅ NEW: Load employee projects
+    clientData   = await safeFetchJson("/clients");
     await loadEmployeeProjects();
 
-    // ✅ Step 2: initialize week options BEFORE creating UI
-    await initWeekOptions();
+    // Load available payroll cycles
+    await loadAvailableCycles();
 
-    // ✅ Step 3: populate employee data + week sections
+    // Populate employee info
     populateEmployeeInfo();
-    addWeekSection();
 
-    // ✅ Step 4: show correct role
+    // Build week sections for the selected cycle
+    if (_selectedCycle) {
+      // loadDraftForCycle will handle building sections from saved data
+      // If no draft exists, add one empty section
+      await loadDraftForCycle(_selectedCycle.id);
+      // If draft loaded nothing (no saved data), ensure at least one section exists
+      if (!document.querySelector('.timesheet-section')) {
+        addWeekSection();
+      }
+    } else {
+      addWeekSection();
+    }
+
     await checkUserRole();
     showSection("timesheet");
   } catch (err) {
@@ -230,6 +240,354 @@ document.addEventListener("DOMContentLoaded", async () => {
     hideLoading();
   }
 });
+
+
+// ── Load available payroll cycles and populate the dropdown ──────────────────
+async function loadAvailableCycles() {
+  try {
+    const res = await fetch(`${API_URL}/available-payroll-cycles`, { headers: getHeaders() });
+    if (!res.ok) throw new Error("Failed to fetch cycles");
+    const data = await res.json();
+    _availableCycles = data.cycles || [];
+  } catch(e) {
+    console.error("Error loading cycles:", e);
+    _availableCycles = [];
+  }
+
+  // Also load submission status
+  try {
+    const res2 = await fetch(`${API_URL}/timesheet/submission-status/${loggedInEmployeeId}`, { headers: getHeaders() });
+    if (res2.ok) {
+      const d = await res2.json();
+      _submittedCycles = d.status || {};
+    }
+  } catch(e) {}
+
+  const wrap   = document.getElementById("payrollCycleSelectorWrap");
+  const noBanner = document.getElementById("noCyclesBanner");
+  const sel    = document.getElementById("payrollCycleSelect");
+
+  if (!_availableCycles.length) {
+    if (wrap) wrap.style.display = "none";
+    if (noBanner) noBanner.style.display = "block";
+    window._payrollLocked = true;
+    return;
+  }
+
+  if (noBanner) noBanner.style.display = "none";
+  if (wrap) wrap.style.display = "block";
+
+  // Populate dropdown
+  sel.innerHTML = '<option value="">-- Select a payroll cycle --</option>';
+  _availableCycles.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    const submitted = _submittedCycles[c.id]?.submitted ? " ✅ Submitted" : "";
+    const locked    = c.locked ? " 🔒 Deadline passed" : "";
+    opt.textContent = `${c.cycle_label}${submitted}${locked}`;
+    opt.disabled    = c.locked;
+    sel.appendChild(opt);
+  });
+
+  // Auto-select first non-locked, non-submitted cycle
+  const autoSelect = _availableCycles.find(c => !c.locked && !_submittedCycles[c.id]?.submitted);
+  if (autoSelect) {
+    sel.value = autoSelect.id;
+    _selectedCycle = autoSelect;
+    _updateCycleUI(autoSelect);
+    _buildWeekOptionsForCycle(autoSelect);
+    // Draft will be loaded after addWeekSection in the init flow
+    window._pendingDraftCycleId = autoSelect.id;
+  } else if (_availableCycles.length === 1) {
+    sel.value = _availableCycles[0].id;
+    _selectedCycle = _availableCycles[0];
+    _updateCycleUI(_availableCycles[0]);
+    _buildWeekOptionsForCycle(_availableCycles[0]);
+    window._pendingDraftCycleId = _availableCycles[0].id;
+  }
+}
+
+function onCycleChange() {
+  const sel = document.getElementById("payrollCycleSelect");
+  const id  = sel.value;
+  if (!id) { _selectedCycle = null; return; }
+  const cycle = _availableCycles.find(c => c.id === id);
+  if (!cycle) return;
+  _selectedCycle = cycle;
+  _updateCycleUI(cycle);
+  _buildWeekOptionsForCycle(cycle);
+  // Rebuild week sections with new options
+  document.querySelectorAll('.timesheet-section').forEach(s => s.remove());
+  sectionCount = 0;
+  weekOptionsInitialized = false;
+  addWeekSection();
+  // Load saved draft for this cycle
+  loadDraftForCycle(cycle.id);
+}
+
+function _updateCycleUI(cycle) {
+  const info   = document.getElementById("cycleDeadlineInfo");
+  const banner = document.getElementById("cycleLockBanner");
+  if (info) info.textContent = `Deadline: ${cycle.deadline_date} at ${cycle.deadline_time} IST`;
+  if (banner) banner.style.display = cycle.locked ? "block" : "none";
+  window._payrollLocked = cycle.locked;
+
+  // Store the lunch/travel visibility flag globally
+  window._showLunchTravel = cycle.show_lunch_travel !== false; // default true
+
+  // Toggle modal fields
+  _applyLunchTravelVisibility();
+
+  // Disable submit if locked or already submitted
+  const submitted = _submittedCycles[cycle.id]?.submitted;
+  const submitBtn = document.getElementById("submitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = cycle.locked || submitted;
+    submitBtn.title    = submitted ? "Already submitted" : cycle.locked ? "Deadline passed" : "";
+  }
+}
+
+function _applyLunchTravelVisibility() {
+  const show = window._showLunchTravel !== false;
+
+  // Modal fields (modalLabel13/14 and their inputs)
+  ['13','14'].forEach(n => {
+    const label = document.getElementById(`modalLabel${n}`);
+    const input = document.getElementById(`modalInput${n}`);
+    if (label) label.closest('div').style.display = show ? '' : 'none';
+    else if (input) input.closest('div').style.display = show ? '' : 'none';
+  });
+
+  // Table columns — header and cells in all existing sections
+  _toggleTableLunchTravel(show);
+}
+
+function _toggleTableLunchTravel(show) {
+  const display = show ? '' : 'none';
+  // All table headers named Lunch Time / Travel Time
+  document.querySelectorAll('.timesheet-table thead th').forEach(th => {
+    const txt = th.textContent.trim();
+    if (txt === 'Lunch Time' || txt === 'Travel Time') th.style.display = display;
+  });
+  // All cells with those classes
+  document.querySelectorAll('.col-lunch-time, .col-travel-time').forEach(td => {
+    td.style.display = display;
+  });
+}
+
+function _buildWeekOptionsForCycle(cycle) {
+  const start = new Date(cycle.start_date);
+  const end   = new Date(cycle.end_date);
+  window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+  window.weekOptions = generateWeekOptions(start, end);
+  weekOptionsInitialized = true;
+  window._activeCycle = cycle;
+  window._payrollLocked = cycle.locked;
+  // Update existing week dropdowns
+  document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
+    const prev = select.value;
+    select.innerHTML = "";
+    window.weekOptions.forEach(week => {
+      const o = document.createElement("option");
+      o.value = week.value; o.textContent = week.text;
+      select.appendChild(o);
+    });
+    if (prev && Array.from(select.options).find(o => o.value === prev)) select.value = prev;
+  });
+}
+
+async function initWeekOptions() {
+  // Now handled by loadAvailableCycles → _buildWeekOptionsForCycle
+  if (weekOptionsInitialized) return;
+  if (_selectedCycle) {
+    _buildWeekOptionsForCycle(_selectedCycle);
+    return;
+  }
+  // Fallback
+  const { start, end } = getPayrollWindow();
+  window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
+  window.weekOptions = generateWeekOptions(start, end);
+  weekOptionsInitialized = true;
+}
+
+// ── Load saved draft and restore rows ────────────────────────────────────────
+async function loadDraftForCycle(cycleId) {
+  if (!cycleId || !loggedInEmployeeId) return;
+  try {
+    const res = await fetch(
+      `${API_URL}/timesheet/draft/${loggedInEmployeeId}?cycle_id=${cycleId}`,
+      { headers: getHeaders() }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.draft || !data.draft.Data || !data.draft.Data.length) return;
+
+    // Clear existing sections and rebuild from draft
+    document.querySelectorAll('.timesheet-section').forEach(s => s.remove());
+    sectionCount = 0;
+
+    let restoredCount = 0;
+    for (const weekObj of data.draft.Data) {
+      for (const [weekPeriod, entries] of Object.entries(weekObj)) {
+        if (!entries || !entries.length) continue;
+        addWeekSection();
+        const secId = `section_${sectionCount}`;
+        const sec   = document.getElementById(secId);
+        if (!sec) continue;
+
+        // Set the week period dropdown
+        const weekSel = sec.querySelector('.week-period select');
+        if (weekSel) {
+          const match = Array.from(weekSel.options).find(o => o.value === weekPeriod);
+          if (match) weekSel.value = weekPeriod;
+        }
+
+        // Remove the auto-added empty row
+        const tbody = sec.querySelector('tbody');
+        if (tbody) tbody.innerHTML = '';
+
+        // Restore each saved entry with green background
+        for (const entry of entries) {
+          _restoreDraftRow(secId, entry, true);
+          restoredCount++;
+        }
+        updateRowNumbers(`timesheetBody_${sectionCount}`);
+      }
+    }
+
+    // Restore feedback/metadata
+    const meta = data.draft.metadata || {};
+    ['hits','misses','feedback_hr','feedback_it','feedback_crm','feedback_others'].forEach(f => {
+      const el = document.getElementById(f);
+      if (el && meta[f]) el.value = meta[f];
+    });
+
+    updateSummary();
+    // Silently restore — no popup needed, green rows are the visual indicator
+  } catch(e) {
+    console.error('loadDraftForCycle error:', e);
+  }
+}
+
+function _restoreDraftRow(sectionId, entry, isSaved = false) {
+  const sectionNum = sectionId.split('_')[1];
+  const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
+  if (!tbody) return;
+
+  const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
+  const selectedWeek = window.weekOptions?.find(w => w.value === weekSelect?.value);
+  const weekStartISO = selectedWeek ? new Date(selectedWeek.start).toISOString().split('T')[0] : entry.date || '';
+  const weekEndISO   = selectedWeek ? new Date(selectedWeek.end).toISOString().split('T')[0]   : entry.date || '';
+
+  const rowIndex = tbody.querySelectorAll('tr').length + 1;
+  const tr = document.createElement('tr');
+  if (isSaved) {
+    tr.style.background = 'linear-gradient(90deg,#f0fdf4,#dcfce7)';
+    tr.dataset.saved = '1';
+    tr.dataset.entryId = entry.id || '';
+  }
+
+  tr.innerHTML = `
+    <td class="col-sno">${rowIndex}</td>
+    <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
+    <td class="col-action">
+      <button class="copy-btn" onclick="copyRow(this)">Copy</button>
+      <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
+    </td>
+    <td class="col-date form-input">
+      <input type="date" class="date-field form-input" value="${entry.date || weekStartISO}"
+        min="${weekStartISO}" max="${weekEndISO}"
+        onchange="validateDate(this); updateSummary()">
+    </td>
+    <td class="col-location">
+      <select class="location-select form-input" onchange="updateSummary()">
+        <option value="Office"${entry.location==='Office'?' selected':''}>Office</option>
+        <option value="Client Site"${entry.location==='Client Site'?' selected':''}>Client Site</option>
+        <option value="Work From Home"${entry.location==='Work From Home'?' selected':''}>Work From Home</option>
+        <option value="Field Work"${entry.location==='Field Work'?' selected':''}>Field Work</option>
+      </select>
+    </td>
+    <td class="col-project-start"><input type="time" class="project-start form-input" value="${entry.projectStartTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+    <td class="col-project-end"><input type="time" class="project-end form-input" value="${entry.projectEndTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
+    <td class="col-client"></td>
+    <td class="col-project"></td>
+    <td class="col-project-code"></td>
+    <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" value="${entry.reportingManagerEntry||''}" placeholder="Enter Reporting Manager"></td>
+    <td class="col-activity" style="min-width:200px;"><input type="text" class="activity-field form-input" value="${entry.activity||''}" placeholder="Enter Activity" oninput="updateSummary()"></td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" value="${entry.projectHours||''}" readonly></td>
+    <td class="col-billable">
+      <select class="billable-select form-input" onchange="updateSummary()">
+        <option value="Yes"${entry.billable==='Yes'?' selected':''}>Billable</option>
+        <option value="No"${entry.billable==='No'?' selected':''}>Non-Billable</option>
+      </select>
+    </td>
+    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
+      <select class="lunch-time-select form-input">
+        <option value="">None</option>
+        <option value="15 min"${entry.lunchTime==='15 min'?' selected':''}>15 min</option>
+        <option value="30 min"${entry.lunchTime==='30 min'?' selected':''}>30 min</option>
+        <option value="45 min"${entry.lunchTime==='45 min'?' selected':''}>45 min</option>
+        <option value="1 hr"${entry.lunchTime==='1 hr'?' selected':''}>1 hr</option>
+        <option value="1.5 hr"${entry.lunchTime==='1.5 hr'?' selected':''}>1.5 hr</option>
+        <option value="2 hr"${entry.lunchTime==='2 hr'?' selected':''}>2 hr</option>
+      </select>
+    </td>
+    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
+      <select class="travel-time-select form-input">
+        <option value="">None</option>
+        <option value="15 min"${entry.travelTime==='15 min'?' selected':''}>15 min</option>
+        <option value="30 min"${entry.travelTime==='30 min'?' selected':''}>30 min</option>
+        <option value="45 min"${entry.travelTime==='45 min'?' selected':''}>45 min</option>
+        <option value="1 hr"${entry.travelTime==='1 hr'?' selected':''}>1 hr</option>
+        <option value="1.5 hr"${entry.travelTime==='1.5 hr'?' selected':''}>1.5 hr</option>
+        <option value="2 hr"${entry.travelTime==='2 hr'?' selected':''}>2 hr</option>
+        <option value="2.5 hr"${entry.travelTime==='2.5 hr'?' selected':''}>2.5 hr</option>
+        <option value="3 hr"${entry.travelTime==='3 hr'?' selected':''}>3 hr</option>
+      </select>
+    </td>
+    <td class="col-remarks"><input type="text" class="remarks-field form-input" value="${entry.remarks||''}" placeholder="Additional notes"></td>
+    <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
+  `;
+
+  tbody.appendChild(tr);
+  setupSmartDropdowns(tr);
+
+  // Restore client/project/code after smart dropdowns are set up
+  if (entry.client) {
+    const clientCell = tr.querySelector('.col-client');
+    const clientSel  = clientCell?.querySelector('select');
+    if (clientSel) {
+      clientSel.value = entry.client;
+      if (clientSel.value !== entry.client) {
+        // Not in dropdown — switch to text input
+        clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${entry.client}">`;
+      }
+    } else {
+      const inp = clientCell?.querySelector('input');
+      if (inp) inp.value = entry.client;
+    }
+  }
+  if (entry.project) {
+    const projCell = tr.querySelector('.col-project');
+    const projSel  = projCell?.querySelector('select');
+    if (projSel) {
+      projSel.value = entry.project;
+      if (projSel.value !== entry.project) {
+        projCell.innerHTML = `<input type="text" class="project-field form-input" value="${entry.project}">`;
+      }
+    } else {
+      const inp = projCell?.querySelector('input');
+      if (inp) inp.value = entry.project;
+    }
+  }
+  if (entry.projectCode) {
+    const codeCell = tr.querySelector('.col-project-code');
+    const codeInp  = codeCell?.querySelector('input');
+    if (codeInp) codeInp.value = entry.projectCode;
+  }
+
+  updateSummary();
+}
 
 
 function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
@@ -845,56 +1203,7 @@ window._currentPayrollWindow = null; // { start: ISO, end: ISO }
 //   }
 // }
 
-async function initWeekOptions() {
-  // Prevent multiple calls
-  if (weekOptionsInitialized) {
-    console.log("Week options already initialized, skipping");
-    return;
-  }
-  
-  try {
-    const res = await fetch("/get-par-current-status", { 
-      headers: getHeaders() 
-    });
-    const data = await res.json();
-
-    let start, end;
-    if (data && data.start && data.end) {
-      start = new Date(data.start);
-      end = new Date(data.end);
-      window._currentPayrollWindow = { 
-        start: start.toISOString(), 
-        end: end.toISOString() 
-      };
-    } else {
-      const fallback = getPayrollWindow();
-      start = fallback.start;
-      end = fallback.end;
-      window._currentPayrollWindow = { 
-        start: start.toISOString(), 
-        end: end.toISOString() 
-      };
-    }
-
-    window.weekOptions = generateWeekOptions(start, end);
-    weekOptionsInitialized = true; // Mark as initialized
-    
-    console.log(`✅ Payroll Period: ${start.toDateString()} → ${end.toDateString()}`);
-    
-    // Start polling ONLY AFTER initial load
-    startPayrollPolling();
-    
-  } catch (err) {
-    console.error("❌ Error fetching payroll window:", err);
-    const { start, end } = getPayrollWindow();
-    window._currentPayrollWindow = { 
-      start: start.toISOString(), 
-      end: end.toISOString() 
-    };
-    window.weekOptions = generateWeekOptions(start, end);
-    weekOptionsInitialized = true;
-  } 
-}
+// initWeekOptions is now defined above in the init block
 
 // Refresh function — update weekOptions only if admin changed payroll window
 // async function refreshPayrollWeeks() {
@@ -949,34 +1258,29 @@ async function initWeekOptions() {
 //   }
 // }
 
-// Update refreshPayrollWeeks to avoid unnecessary updates
 async function refreshPayrollWeeks() {
   try {
-    const res = await fetch("/get-par-current-status", { 
-      headers: getHeaders() 
-    });
-    
-    if (!res.ok) {
-      console.warn("refreshPayrollWeeks: server returned", res.status);
+    const res = await fetch("/active-payroll-cycle", { headers: getHeaders() });
+    if (!res.ok) { console.warn("refreshPayrollWeeks: server returned", res.status); return; }
+    const data = await res.json();
+
+    // Check if locked state changed
+    if (data.locked && !window._payrollLocked) {
+      window._payrollLocked = true;
+      window._payrollLockReason = "The submission deadline has passed. Timesheet is now locked.";
+      showPopup("⏰ Submission deadline has passed. Timesheet is now locked.", true);
       return;
     }
-    
-    const data = await res.json();
-    let startISO = data && data.start ? (new Date(data.start)).toISOString() : null;
-    let endISO = data && data.end ? (new Date(data.end)).toISOString() : null;
 
-    if (!startISO || !endISO) {
-      const local = getPayrollWindow();
-      startISO = local.start.toISOString();
-      endISO = local.end.toISOString();
-    }
+    if (!data.found || data.locked) return;
 
+    const startISO = new Date(data.start_date).toISOString();
+    const endISO   = new Date(data.end_date).toISOString();
     const newWindowHash = startISO + "|" + endISO;
-    const oldWindow = window._currentPayrollWindow 
-      ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end) 
+    const oldWindow = window._currentPayrollWindow
+      ? (window._currentPayrollWindow.start + "|" + window._currentPayrollWindow.end)
       : null;
 
-    // ✅ Only update if actually changed
     if (oldWindow === newWindowHash) {
       console.log("✅ Payroll window unchanged, skipping update");
       return;
@@ -984,9 +1288,11 @@ async function refreshPayrollWeeks() {
 
     console.log("🔄 Payroll window changed — updating week dropdowns");
     window._currentPayrollWindow = { start: startISO, end: endISO };
-    
+    window._activeCycle = data;
+    window._payrollLocked = false;
+
     const start = new Date(startISO);
-    const end = new Date(endISO);
+    const end   = new Date(endISO);
     window.weekOptions = generateWeekOptions(start, end);
 
     document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
@@ -998,7 +1304,6 @@ async function refreshPayrollWeeks() {
         o.textContent = week.text;
         select.appendChild(o);
       });
-      
       if (prevVal) {
         const found = Array.from(select.options).find(opt => opt.value === prevVal);
         if (found) select.value = prevVal;
@@ -1006,7 +1311,6 @@ async function refreshPayrollWeeks() {
     });
 
     showPopup("Payroll weeks updated by admin");
-    
   } catch (err) {
     console.error("❌ Error refreshing payroll weeks:", err);
   }
@@ -1089,6 +1393,7 @@ if (window.weekOptions && window.weekOptions.length > 0) {
   // Table skeleton
   const tableWrapper = document.createElement("div");
   tableWrapper.className = "table-responsive";
+  const showLT = window._showLunchTravel !== false;
   tableWrapper.innerHTML = `
     <table class="timesheet-table">
       <thead>
@@ -1096,7 +1401,10 @@ if (window.weekOptions && window.weekOptions.length > 0) {
           <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th>
           <th>Project Start</th><th>Project End</th><th>Client</th><th>Project</th>
           <th>Project Code</th><th>Reporting Manager</th><th>Activity</th>
-          <th>Project Hours</th><th>Billable</th><th>Remarks</th><th>Delete</th>
+          <th>Project Hours</th><th>Billable</th>
+          <th style="display:${showLT?'':'none'}">Lunch Time</th>
+          <th style="display:${showLT?'':'none'}">Travel Time</th>
+          <th>Remarks</th><th>Delete</th>
         </tr>
       </thead>
       <tbody id="timesheetBody_${sectionCount}"></tbody>
@@ -1109,6 +1417,7 @@ if (window.weekOptions && window.weekOptions.length > 0) {
   btnDiv.className = "button-container";
   btnDiv.innerHTML = `
     <button class="add-row-btn" onclick="addRow('${sectionId}')">+ Add New Entry</button>
+    <button class="save-week-btn" onclick="saveWeekDraft('${sectionId}')" style="background:linear-gradient(135deg,#5d5fef,#7c3aed);color:#fff;border:none;padding:.55rem 1.3rem;border-radius:9px;font-size:.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.4rem;margin-left:.5rem;"><i class="fas fa-save"></i> Save Week</button>
   `;
   section.appendChild(btnDiv);
 
@@ -1268,6 +1577,30 @@ function addRow(sectionId, specificDate = null) {
       <select class="billable-select form-input" onchange="updateSummary()">
         <option value="Yes">Billable</option>
         <option value="No">Non-Billable</option>
+      </select>
+    </td>
+    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
+      <select class="lunch-time-select form-input">
+        <option value="">None</option>
+        <option value="15 min">15 min</option>
+        <option value="30 min">30 min</option>
+        <option value="45 min">45 min</option>
+        <option value="1 hr">1 hr</option>
+        <option value="1.5 hr">1.5 hr</option>
+        <option value="2 hr">2 hr</option>
+      </select>
+    </td>
+    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
+      <select class="travel-time-select form-input">
+        <option value="">None</option>
+        <option value="15 min">15 min</option>
+        <option value="30 min">30 min</option>
+        <option value="45 min">45 min</option>
+        <option value="1 hr">1 hr</option>
+        <option value="1.5 hr">1.5 hr</option>
+        <option value="2 hr">2 hr</option>
+        <option value="2.5 hr">2.5 hr</option>
+        <option value="3 hr">3 hr</option>
       </select>
     </td>
     <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
@@ -1939,6 +2272,11 @@ function openModal(button) {
   document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
   document.getElementById("modalInput10").value = currentRow.querySelector(".project-hours-field")?.value || "";
   document.getElementById("modalInput11").value = currentRow.querySelector(".billable-select")?.value || "";
+  // Lunch & Travel Time
+  const lunchSel = document.getElementById("modalInput13");
+  if (lunchSel) lunchSel.value = currentRow.querySelector(".lunch-time-select")?.value || "";
+  const travelSel = document.getElementById("modalInput14");
+  if (travelSel) travelSel.value = currentRow.querySelector(".travel-time-select")?.value || "";
   document.getElementById("modalInput12").value = currentRow.querySelector(".remarks-field")?.value || "";
 
   updateModalHours();
@@ -2106,25 +2444,61 @@ function saveModalEntry() {
   const projectEnd = currentRow.querySelector(".project-end");
   if (projectEnd) projectEnd.value = document.getElementById("modalInput4").value;
 
-  // ✅ Get values from smart dropdown containers
+  // ── Client ──────────────────────────────────────────────────────────────────
   const clientContainer = document.getElementById("modalClientContainer");
-  const clientValue = clientContainer?.querySelector("select")?.value || 
-                       clientContainer?.querySelector("input")?.value || "";
-  
-  const projectContainer = document.getElementById("modalProjectContainer");
-  const projectValue = projectContainer?.querySelector("select")?.value || 
-                        projectContainer?.querySelector("input")?.value || "";
+  const clientValue = (clientContainer?.querySelector("select")?.value ||
+                       clientContainer?.querySelector("input")?.value || "").trim();
 
-  
+  const clientCell = currentRow.querySelector(".col-client");
+  if (clientCell) {
+    const existingSel = clientCell.querySelector("select");
+    const existingInp = clientCell.querySelector("input");
+    if (existingSel) {
+      // Try to set the dropdown; if value not in options, replace with input
+      existingSel.value = clientValue;
+      if (existingSel.value !== clientValue && clientValue) {
+        clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${clientValue}">`;
+      }
+    } else if (existingInp) {
+      existingInp.value = clientValue;
+    } else {
+      // Cell is empty — create input
+      clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${clientValue}">`;
+    }
+  }
+
+  // ── Project ──────────────────────────────────────────────────────────────────
+  const projectContainer = document.getElementById("modalProjectContainer");
+  const projectValue = (projectContainer?.querySelector("select")?.value ||
+                        projectContainer?.querySelector("input")?.value || "").trim();
+
+  const projectCell = currentRow.querySelector(".col-project");
+  if (projectCell) {
+    const existingSel = projectCell.querySelector("select");
+    const existingInp = projectCell.querySelector("input");
+    if (existingSel) {
+      existingSel.value = projectValue;
+      if (existingSel.value !== projectValue && projectValue) {
+        projectCell.innerHTML = `<input type="text" class="project-field form-input" value="${projectValue}">`;
+      }
+    } else if (existingInp) {
+      existingInp.value = projectValue;
+    } else {
+      projectCell.innerHTML = `<input type="text" class="project-field form-input" value="${projectValue}">`;
+    }
+  }
+
+  // ── Project Code ─────────────────────────────────────────────────────────────
   const projectCodeInput = document.getElementById("modalProjectCodeInput");
   const projectCodeValue = projectCodeInput?.value || "";
-  
-  // Set values using helper function
-  setFieldValue(currentRow, ".col-client", clientValue);
-  setFieldValue(currentRow, ".col-project", projectValue);
-  setFieldValue(currentRow, ".col-project-code", projectCodeValue);
+  const codeCell = currentRow.querySelector(".col-project-code");
+  if (codeCell) {
+    const codeInp = codeCell.querySelector("input");
+    if (codeInp) codeInp.value = projectCodeValue;
+    else codeCell.innerHTML = `<input type="text" class="project-code form-input" value="${projectCodeValue}" readonly style="background:#f0f0f0;">`;
+  }
 
-  // Other fields
+  // ── Other fields ─────────────────────────────────────────────────────────────
   const reportingManager = currentRow.querySelector(".reporting-manager-field");
   if (reportingManager) reportingManager.value = document.getElementById("modalInput8").value;
 
@@ -2136,6 +2510,12 @@ function saveModalEntry() {
 
   const billable = currentRow.querySelector(".billable-select");
   if (billable) billable.value = document.getElementById("modalInput11").value;
+
+  // Lunch & Travel Time
+  const lunchSel = currentRow.querySelector(".lunch-time-select");
+  if (lunchSel) lunchSel.value = document.getElementById("modalInput13")?.value || "";
+  const travelSel = currentRow.querySelector(".travel-time-select");
+  if (travelSel) travelSel.value = document.getElementById("modalInput14")?.value || "";
 
   const remarks = currentRow.querySelector(".remarks-field");
   if (remarks) remarks.value = document.getElementById("modalInput12").value;
@@ -2318,148 +2698,219 @@ function closeModalAndRestore() {
 async function loadHistory(){
           try {
             showLoading("Fetching History...");
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, {
-                headers: getHeaders()
-            });
+            // Refresh submission status
+            try {
+              const sr = await fetch(`${API_URL}/timesheet/submission-status/${loggedInEmployeeId}`, { headers: getHeaders() });
+              if (sr.ok) { const sd = await sr.json(); _submittedCycles = sd.status || {}; }
+            } catch(e) {}
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch history');
-            }
+            const response = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, { headers: getHeaders() });
+            if (!response.ok) throw new Error('Failed to fetch history');
 
             const data = await response.json();
-            historyEntries = Array.isArray(data.Data) ? data.Data : [];
-            console.log('API Response:', data); // Debug log to check structure
+            const payrolls = data.payrolls || [];
+            historyEntries = []; // reset flat list
+
             const historyContent = document.getElementById('historyContent');
             historyContent.innerHTML = '';
 
-            // Update summary hours in history section
-            const totalHoursElement = document.querySelector('.history-summary .total-hours .value');
-            const billableHoursElement = document.querySelector('.history-summary .billable-hours .value');
-            const nonBillableHoursElement = document.querySelector('.history-summary .non-billable-hours .value');
-
-            if (totalHoursElement && billableHoursElement && nonBillableHoursElement) {
-                totalHoursElement.textContent = (data.totalHours || 0).toFixed(2);
-                billableHoursElement.textContent = (data.totalBillableHours || 0).toFixed(2);
-                nonBillableHoursElement.textContent = (data.totalNonBillableHours || 0).toFixed(2);
-
-                if (!data.totalHours && data.Data && Array.isArray(data.Data)) {
-                    const summary = data.Data.reduce(
-                        (acc, entry) => {
-                            const hours = parseFloat(entry.projectHours) || 0;
-                            acc.totalHours += hours;
-                            if (entry.billable === 'Yes') {
-                                acc.totalBillableHours += hours;
-                            } else if (entry.billable === 'No') {
-                                acc.totalNonBillableHours += hours;
-                            }
-                            return acc;
-                        },
-                        { totalHours: 0, totalBillableHours: 0, totalNonBillableHours: 0 }
-                    );
-                    totalHoursElement.textContent = summary.totalHours.toFixed(2);
-                    billableHoursElement.textContent = summary.totalBillableHours.toFixed(2);
-                    nonBillableHoursElement.textContent = summary.totalNonBillableHours.toFixed(2);
-                }
-            }
-
-            if (!data.Data || data.Data.length === 0) {
-                historyContent.innerHTML = '<p>No timesheet entries found.</p>';
+            if (!payrolls.length) {
+                historyContent.innerHTML = '<p style="padding:2rem;color:#888;">No timesheet entries found.</p>';
                 hideLoading();
                 return;
             }
 
-            const groupedByWeek = {};
-            data.Data.forEach(entry => {
-                const week = entry.weekPeriod || 'No Week';
-                if (!groupedByWeek[week]) {
-                    groupedByWeek[week] = [];
-                }
-                groupedByWeek[week].push(entry);
+            // ── Build payroll filter dropdown ──────────────────────────────────
+            const filterWrap = document.createElement('div');
+            filterWrap.style.cssText = 'margin-bottom:1.5rem;padding:1rem 1.5rem;background:#f0f4ff;border-radius:12px;border:2px solid #c5cef9;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;';
+            filterWrap.innerHTML = `
+              <label style="font-weight:700;font-size:.9rem;color:#5d5fef;white-space:nowrap;"><i class="fas fa-calendar-alt"></i> Filter by Payroll:</label>
+              <select id="historyPayrollFilter" style="padding:.6rem 1rem;border:2px solid #c5cef9;border-radius:9px;font-size:.9rem;font-family:inherit;background:#fff;color:#2c3e50;font-weight:600;min-width:220px;" onchange="filterHistoryByPayroll()">
+                <option value="all">All Payrolls</option>
+                ${payrolls.map(p => `<option value="${p.cycle_id}">${p.cycle_label}${p.submitted ? ' ✅' : ' (draft)'}</option>`).join('')}
+              </select>
+              <div id="historyPayrollSummary" style="font-size:.85rem;color:#475569;margin-left:auto;"></div>
+            `;
+            historyContent.appendChild(filterWrap);
+
+            // Container for payroll sections
+            const payrollsContainer = document.createElement('div');
+            payrollsContainer.id = 'historyPayrollsContainer';
+            historyContent.appendChild(payrollsContainer);
+
+            // Store payrolls globally for filter
+            window._historyPayrolls = payrolls;
+
+            // Flatten for export compatibility
+            payrolls.forEach(p => {
+              p.weeks.forEach(w => {
+                w.entries.forEach(e => historyEntries.push(e));
+              });
             });
 
-            Object.keys(groupedByWeek).forEach((week, index) => {
-                const weekDiv = document.createElement('div');
-                weekDiv.className = 'history-week';
-                weekDiv.innerHTML = `<h3>Week Period: ${week}</h3>`;
+            // Render all payrolls initially
+            _renderHistoryPayrolls(payrolls);
 
-                const tableWrapper = document.createElement('div');
-                tableWrapper.className = 'table-responsive';
-                const table = document.createElement('table');
-                table.className = 'timesheet-table history-table';
-                table.innerHTML = `
-                    <thead>
-                        <tr>
-                            <th class="col-narrow col-sno">S.No</th>
-                            <th class="col-narrow col-action">Action</th>
-                            <th class="col-medium col-date">Date</th>
-                            <th class="col-wide col-location">Location of Work</th>
-                            <th class="col-medium col-project-start">Project Start Time</th>
-                            <th class="col-medium col-project-end">Project End Time</th>
-                            <th class="col-wide col-client">Client</th>
-                            <th class="col-wide col-project">Project</th>
-                            <th class="col-project col-project-code">Project Code</th>
-                            <th class="col-wide col-reporting-manager">Reporting Manager</th>
-                            <th class="col-wide col-activity">Activity</th>
-                            <th class="col-narrow col-project-hours">Project Hours</th>
-                            <th class="col-medium col-billable">Billable</th>
-                            <th class="col-wide col-remarks">Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                `;
-                const tbody = table.querySelector('tbody');
-
-                
-
-                groupedByWeek[week].forEach((entry, rowIndex) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="col-sno">${rowIndex + 1}</td>
-                    <td class="col-action" style="min-width: 120px;">
-                        <button class="action-btn edit-btn" onclick="editHistoryRow(this, '${entry.id}')"><i class="fas fa-edit"></i> Edit</button>
-                        <button class="action-btn delete-btn" onclick="deleteHistoryRow(this, '${entry.id}')"><i class="fas fa-trash"></i> Delete</button>
-                    </td>
-                    <td class="col-date">${entry.date || ''}</td>
-                    <td class="col-location">${entry.location || ''}</td>
-                    <td class="col-project-start">${entry.projectStartTime || ''}</td>
-                    <td class="col-project-end">${entry.projectEndTime || ''}</td>
-                    <td class="col-client">${entry.client || ''}</td>
-                    <td class="col-project">${entry.project || ''}</td>
-                    <td class="col-project-code">${entry.projectCode || ''}</td>
-                    <td class="col-reporting-manager">${entry.reportingManagerEntry || ''}</td>
-                    <td class="col-activity">${entry.activity || ''}</td>
-                    <td class="col-project-hours">${entry.projectHours || ''}</td>
-                    <td class="col-billable">${entry.billable || ''}</td>
-                    <td class="col-remarks">${entry.remarks || ''}</td>
-                `;
-                tbody.appendChild(row);
-            });
-
-                tableWrapper.appendChild(table);
-                weekDiv.appendChild(tableWrapper);
-                historyContent.appendChild(weekDiv);
-
-                const feedbackDiv = document.createElement('div');
-                feedbackDiv.className = 'history-feedback';
-                feedbackDiv.innerHTML = `
-                    <h4>Feedback for Week: ${week}</h4>
-                    <div class="feedback-item"><strong>3 HITS:</strong> ${groupedByWeek[week][0].hits || ''}</div>
-                    <div class="feedback-item"><strong>3 MISSES:</strong> ${groupedByWeek[week][0].misses || ''}</div>
-                    <div class="feedback-item"><strong>FEEDBACK FOR HR:</strong> ${groupedByWeek[week][0].feedback_hr || ''}</div>
-                    <div class="feedback-item"><strong>FEEDBACK FOR IT:</strong> ${groupedByWeek[week][0].feedback_it || ''}</div>
-                    <div class="feedback-item"><strong>FEEDBACK FOR CRM:</strong> ${groupedByWeek[week][0].feedback_crm || ''}</div>
-                    <div class="feedback-item"><strong>FEEDBACK FOR OTHERS:</strong> ${groupedByWeek[week][0].feedback_others || ''}</div>
-                `;
-                historyContent.appendChild(feedbackDiv);
-            });
+            // Update overall summary
+            _updateHistorySummary(payrolls);
 
             hideLoading();
-        } catch (error) {
+          } catch (error) {
             console.error('Error fetching history:', error);
             hideLoading();
-            // showPopup('Failed to load history: ' + error.message, true);
-        }
+          }
+}
+
+function filterHistoryByPayroll() {
+  const sel = document.getElementById('historyPayrollFilter');
+  const cycleId = sel?.value || 'all';
+  const payrolls = window._historyPayrolls || [];
+  const filtered = cycleId === 'all' ? payrolls : payrolls.filter(p => p.cycle_id === cycleId);
+  _renderHistoryPayrolls(filtered);
+  _updateHistorySummary(filtered);
+}
+
+function _updateHistorySummary(payrolls) {
+  let total = 0, billable = 0, nonBillable = 0;
+  payrolls.forEach(p => {
+    total      += p.totalHours || 0;
+    billable   += p.totalBillableHours || 0;
+    nonBillable += p.totalNonBillableHours || 0;
+  });
+
+  // Update the summary cards
+  const th = document.querySelector('.history-summary .total-hours .value');
+  const bh = document.querySelector('.history-summary .billable-hours .value');
+  const nb = document.querySelector('.history-summary .non-billable-hours .value');
+  if (th) th.textContent = total.toFixed(2);
+  if (bh) bh.textContent = billable.toFixed(2);
+  if (nb) nb.textContent = nonBillable.toFixed(2);
+
+  const summary = document.getElementById('historyPayrollSummary');
+  if (summary) summary.textContent = `${total.toFixed(1)} hrs total | ${billable.toFixed(1)} billable`;
+}
+
+function _renderHistoryPayrolls(payrolls) {
+  const container = document.getElementById('historyPayrollsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!payrolls.length) {
+    container.innerHTML = '<p style="padding:2rem;color:#888;">No entries for selected payroll.</p>';
+    return;
+  }
+
+  payrolls.forEach(payroll => {
+    // Payroll header card
+    const payrollDiv = document.createElement('div');
+    payrollDiv.style.cssText = 'margin-bottom:2rem;border:2px solid #e1e8ed;border-radius:14px;overflow:hidden;';
+
+    const statusColor = payroll.submitted ? '#10b981' : '#f59e0b';
+    const statusLabel = payroll.submitted ? '✅ Submitted' : '⏳ Draft';
+    payrollDiv.innerHTML = `
+      <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div style="font-weight:700;font-size:1rem;"><i class="fas fa-calendar-alt"></i> ${payroll.cycle_label}</div>
+        <div style="display:flex;gap:1.5rem;align-items:center;font-size:.85rem;">
+          <span><i class="fas fa-clock"></i> ${(payroll.totalHours||0).toFixed(1)} hrs</span>
+          <span><i class="fas fa-dollar-sign"></i> ${(payroll.totalBillableHours||0).toFixed(1)} billable</span>
+          <span style="background:${statusColor};color:#fff;padding:.2rem .7rem;border-radius:20px;font-weight:700;font-size:.78rem;">${statusLabel}</span>
+        </div>
+      </div>
+    `;
+
+    // Render each week
+    payroll.weeks.forEach(week => {
+      const weekDiv = document.createElement('div');
+      weekDiv.style.cssText = 'padding:1rem 1.5rem 0;';
+      weekDiv.innerHTML = `<h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.9rem;font-weight:700;"><i class="fas fa-calendar-week"></i> Week: ${week.week_period}</h4>`;
+
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = 'table-responsive';
+      const table = document.createElement('table');
+      table.className = 'timesheet-table history-table';
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th class="col-narrow">S.No</th>
+            <th class="col-narrow">Action</th>
+            <th class="col-medium">Date</th>
+            <th class="col-wide">Location</th>
+            <th class="col-medium">Start</th>
+            <th class="col-medium">End</th>
+            <th class="col-wide">Client</th>
+            <th class="col-wide">Project</th>
+            <th class="col-medium">Project Code</th>
+            <th class="col-wide">Reporting Manager</th>
+            <th class="col-wide">Activity</th>
+            <th class="col-narrow">Hours</th>
+            <th class="col-medium">Billable</th>
+            <th class="col-medium">Lunch Time</th>
+            <th class="col-medium">Travel Time</th>
+            <th class="col-wide">Remarks</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector('tbody');
+
+      week.entries.forEach((entry, rowIndex) => {
+        const isSubmitted = payroll.submitted;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${rowIndex + 1}</td>
+          <td style="min-width:120px;">
+            ${isSubmitted
+              ? '<span style="font-size:.78rem;color:#10b981;font-weight:600;"><i class="fas fa-lock"></i> Submitted</span>'
+              : `<button class="action-btn edit-btn" onclick="editHistoryRow(this,'${entry.id}')"><i class="fas fa-edit"></i> Edit</button>
+                 <button class="action-btn delete-btn" onclick="deleteHistoryRow(this,'${entry.id}')"><i class="fas fa-trash"></i> Delete</button>`
+            }
+          </td>
+          <td>${entry.date||''}</td>
+          <td>${entry.location||''}</td>
+          <td>${entry.projectStartTime||''}</td>
+          <td>${entry.projectEndTime||''}</td>
+          <td>${entry.client||''}</td>
+          <td>${entry.project||''}</td>
+          <td>${entry.projectCode||''}</td>
+          <td>${entry.reportingManagerEntry||''}</td>
+          <td>${entry.activity||''}</td>
+          <td>${entry.projectHours||''}</td>
+          <td>${entry.billable||''}</td>
+          <td>${entry.lunchTime||''}</td>
+          <td>${entry.travelTime||''}</td>
+          <td>${entry.remarks||''}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      tableWrapper.appendChild(table);
+      weekDiv.appendChild(tableWrapper);
+
+      // Feedback for this payroll (show once per payroll, after last week)
+      payrollDiv.appendChild(weekDiv);
+    });
+
+    // Feedback section
+    const meta = payroll.metadata || {};
+    if (meta.hits || meta.misses || meta.feedback_hr || meta.feedback_it || meta.feedback_crm || meta.feedback_others) {
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.style.cssText = 'padding:1rem 1.5rem 1.5rem;background:#fafbfc;border-top:1px solid #e1e8ed;';
+      feedbackDiv.innerHTML = `
+        <h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.88rem;font-weight:700;"><i class="fas fa-comment-alt"></i> Feedback</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.5rem;font-size:.83rem;">
+          ${meta.hits ? `<div><strong>3 HITS:</strong> ${meta.hits}</div>` : ''}
+          ${meta.misses ? `<div><strong>3 MISSES:</strong> ${meta.misses}</div>` : ''}
+          ${meta.feedback_hr ? `<div><strong>HR:</strong> ${meta.feedback_hr}</div>` : ''}
+          ${meta.feedback_it ? `<div><strong>IT:</strong> ${meta.feedback_it}</div>` : ''}
+          ${meta.feedback_crm ? `<div><strong>CRM:</strong> ${meta.feedback_crm}</div>` : ''}
+          ${meta.feedback_others ? `<div><strong>Others:</strong> ${meta.feedback_others}</div>` : ''}
+        </div>
+      `;
+      payrollDiv.appendChild(feedbackDiv);
+    }
+
+    container.appendChild(payrollDiv);
+  });
 }
 
 /* Edit / Delete history entry */
@@ -2638,6 +3089,191 @@ function deleteHistoryRow(button, entryId) {
 }
 
 
+// ── Collect entries from one week section ─────────────────────────────────────
+function _collectWeekEntries(section) {
+  const rows = section.querySelectorAll('tbody tr');
+  const entries = [];
+  rows.forEach(row => {
+    const date            = row.querySelector('.date-field')?.value || '';
+    const location        = row.querySelector('.location-select')?.value || '';
+    const projectStart    = row.querySelector('.project-start')?.value || '';
+    const projectEnd      = row.querySelector('.project-end')?.value || '';
+    const client          = getFieldValue(row, '.col-client') || '';
+    const project         = getFieldValue(row, '.col-project') || '';
+    const projectCode     = getFieldValue(row, '.col-project-code') || '';
+    const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || '';
+    const activity        = row.querySelector('.activity-field')?.value || '';
+    const projectHours    = row.querySelector('.project-hours-field')?.value || '0';
+    const billable        = row.querySelector('.billable-select')?.value || 'No';
+    const remarks         = row.querySelector('.remarks-field')?.value || '';
+    const lunchTime       = row.querySelector('.lunch-time-select')?.value || '';
+    const travelTime      = row.querySelector('.travel-time-select')?.value || '';
+    if (!date) return;
+    entries.push({
+      date, location,
+      projectStartTime: projectStart,
+      projectEndTime:   projectEnd,
+      client, project, projectCode,
+      reportingManagerEntry: reportingMgr,
+      activity, projectHours, billable, remarks,
+      lunchTime, travelTime,
+    });
+  });
+  return entries;
+}
+
+function _collectMetadata() {
+  return {
+    employeeName:     document.getElementById('employeeName')?.value || '',
+    designation:      document.getElementById('designation')?.value || '',
+    gender:           document.getElementById('gender')?.value || '',
+    partner:          document.getElementById('partner')?.value || '',
+    reportingManager: document.getElementById('reportingManager')?.value || '',
+    hits:             document.getElementById('hits')?.value || '',
+    misses:           document.getElementById('misses')?.value || '',
+    feedback_hr:      document.getElementById('feedback_hr')?.value || '',
+    feedback_it:      document.getElementById('feedback_it')?.value || '',
+    feedback_crm:     document.getElementById('feedback_crm')?.value || '',
+    feedback_others:  document.getElementById('feedback_others')?.value || '',
+  };
+}
+
+// ── Save a single week section as draft ──────────────────────────────────────
+async function saveWeekDraft(sectionId) {
+  if (!_selectedCycle) {
+    showPopup('Please select a payroll cycle first.', true);
+    return;
+  }
+  if (_selectedCycle.locked) {
+    showPopup('Submission deadline has passed for this cycle.', true);
+    return;
+  }
+  if (_submittedCycles[_selectedCycle.id]?.submitted) {
+    showPopup('You have already submitted this cycle. No further edits allowed.', true);
+    return;
+  }
+
+  const section = document.getElementById(sectionId);
+  if (!section) { showPopup('Section not found.', true); return; }
+
+  const weekSelect = section.querySelector('.week-period select');
+  const weekPeriod = weekSelect?.value || '';
+  if (!weekPeriod) { showPopup('Please select a week period first.', true); return; }
+
+  const entries = _collectWeekEntries(section);
+  if (!entries.length) { showPopup('No entries to save in this week.', true); return; }
+
+  // Validate mandatory fields
+  const errors = [];
+  entries.forEach((e, i) => {
+    const mandatory = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
+    mandatory.forEach(f => {
+      if (!e[f] || e[f].trim() === '') errors.push(`Row ${i+1}: ${f} is required`);
+    });
+  });
+  if (errors.length) { showPopup(errors.slice(0, 5).join('\n'), true); return; }
+
+  showLoading('Saving week draft...');
+  try {
+    const res = await fetch(`${API_URL}/timesheet/save-draft`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        cycle_id:    _selectedCycle.id,
+        cycle_label: _selectedCycle.cycle_label,
+        week_period: weekPeriod,
+        entries:     entries,
+        metadata:    _collectMetadata(),
+      }),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (res.ok && data.success) {
+      showPopup(`✅ Week "${weekPeriod}" saved as draft!`);
+      // Highlight all rows in this section green to show they are saved
+      const tbody = section.querySelector('tbody');
+      if (tbody) {
+        tbody.querySelectorAll('tr').forEach(row => {
+          row.style.background = 'linear-gradient(90deg,#f0fdf4,#dcfce7)';
+          row.dataset.saved = '1';
+        });
+      }
+      // Brief button feedback
+      const btn = section.querySelector('.save-week-btn');
+      if (btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+      }
+    } else {
+      showPopup(data.detail || data.message || 'Failed to save draft.', true);
+    }
+  } catch(err) {
+    hideLoading();
+    console.error('saveWeekDraft error:', err);
+    showPopup('Network error saving draft.', true);
+  }
+}
+
+// ── Submit confirmation popup ─────────────────────────────────────────────────
+function confirmSubmit() {
+  if (!_selectedCycle) {
+    showPopup('Please select a payroll cycle first.', true);
+    return;
+  }
+  if (_selectedCycle.locked) {
+    showPopup('Submission deadline has passed for this cycle.', true);
+    return;
+  }
+  if (_submittedCycles[_selectedCycle.id]?.submitted) {
+    showPopup('You have already submitted this cycle.', true);
+    return;
+  }
+  const popup = document.getElementById('submitConfirmPopup');
+  if (popup) popup.style.display = 'flex';
+}
+
+// ── Final submit ──────────────────────────────────────────────────────────────
+async function doSubmitTimesheet() {
+  const popup = document.getElementById('submitConfirmPopup');
+  if (popup) popup.style.display = 'none';
+
+  if (!_selectedCycle) { showPopup('No cycle selected.', true); return; }
+
+  showLoading('Submitting timesheet...');
+  try {
+    const res = await fetch(`${API_URL}/timesheet/submit`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        cycle_id:    _selectedCycle.id,
+        cycle_label: _selectedCycle.cycle_label,
+        metadata:    _collectMetadata(),
+      }),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (res.ok && data.success) {
+      // Mark as submitted locally
+      _submittedCycles[_selectedCycle.id] = { submitted: true };
+      showPopup('🎉 Timesheet submitted successfully! You can view it in History.');
+      // Disable submit button
+      const btn = document.getElementById('submitBtn');
+      if (btn) { btn.disabled = true; btn.title = 'Already submitted'; }
+      // Refresh cycle dropdown to show submitted status
+      await loadAvailableCycles();
+      setTimeout(() => clearTimesheet(true), 2000);
+    } else {
+      showPopup(data.detail || data.message || 'Submission failed.', true);
+    }
+  } catch(err) {
+    hideLoading();
+    console.error('doSubmitTimesheet error:', err);
+    showPopup('Network error during submission.', true);
+  }
+}
+
+
 async function saveDataToMongo() {
   console.log("Starting saveDataToMongo");
   showLoading("Saving data...");
@@ -2680,6 +3316,8 @@ async function saveDataToMongo() {
       const projectHours = row.querySelector('.project-hours-field')?.value;
       const billable = row.querySelector('.billable-select')?.value;
       const remarks = row.querySelector('.remarks-field')?.value;
+      const lunchTime = row.querySelector('.lunch-time-select')?.value || '';
+      const travelTime = row.querySelector('.travel-time-select')?.value || '';
 
       // Mandatory field check
       const mandatory = { 
@@ -2720,6 +3358,8 @@ async function saveDataToMongo() {
         projectHours: projectHours || "0",
         billable,
         remarks,
+        lunchTime,
+        travelTime,
         hits: document.getElementById('hits')?.value || '',
         misses: document.getElementById('misses')?.value || '',
         feedback_hr: document.getElementById('feedback_hr')?.value || '',
@@ -3078,84 +3718,44 @@ function exportTimesheetToExcel() {
     const employeeInfo = getEmployeeInfoForExport();
     const wb = XLSX.utils.book_new();
 
-    // Columns (same order as history)
     const columns = [
-        "employeeId",
-        "employeeName",
-        "designation",
-        "gender",
-        "partner",
-        "reportingManager",
-        "weekPeriod",
-        "date",
-        "location",
-        "projectStartTime",
-        "projectEndTime",
-        "client",
-        "project",
-        "projectCode",
-        "reportingManagerEntry",
-        "activity",
-        "projectHours",
-        "billable",
-        "remarks",
-        "hits",
-        "misses",
-        "feedback_hr",
-        "feedback_it",
-        "feedback_crm",
-        "feedback_others"
+        "employeeId","employeeName","designation","gender","partner","reportingManager",
+        "weekPeriod","date","location","projectStartTime","projectEndTime",
+        "client","project","projectCode","reportingManagerEntry","activity",
+        "projectHours","billable","lunchTime","travelTime","remarks",
+        "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others"
     ];
 
-    // Pretty Headers (same as history)
     const headersPretty = [
-        "Employee ID",
-        "Employee Name",
-        "Designation",
-        "Gender",
-        "Partner",
-        "Reporting Manager",
-        "Week Period",
-        "Date",
-        "Location of Work",
-        "Project Start Time",
-        "Project End Time",
-        "Client",
-        "Project",
-        "Project Code",
-        "Reporting Manager Entry",
-        "Activity",
-        "Project Hours",
-        "Billable",
-        "Remarks",
-        "3 HITS",
-        "3 MISSES",
-        "Feedback for HR",
-        "Feedback for IT",
-        "Feedback for CRM",
-        "Feedback for Others"
+        "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
+        "Week Period","Date","Location of Work","Project Start Time","Project End Time",
+        "Client","Project","Project Code","Reporting Manager Entry","Activity",
+        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others"
     ];
 
     let cleanedRows = [];
-
     const sections = document.querySelectorAll(".timesheet-section");
 
     sections.forEach((section) => {
-        const weekPeriod =
-            section.querySelector(".week-period select")?.value || "";
-
+        const weekPeriod = section.querySelector(".week-period select")?.value || "";
         const rows = section.querySelectorAll("tbody tr");
 
         rows.forEach((row) => {
-            const inputs = row.querySelectorAll("input, select");
-
-            // Detect empty row (same logic as history)
-            const date = inputs[0]?.value?.trim() || "";
-            const project = inputs[5]?.value?.trim() || "";
-            const client =
-                inputs[4]?.value ||
-                inputs[4]?.querySelector("option:checked")?.value ||
-                "";
+            const date            = row.querySelector('.date-field')?.value?.trim() || "";
+            const location        = row.querySelector('.location-select')?.value || "";
+            const projectStart    = row.querySelector('.project-start')?.value || "";
+            const projectEnd      = row.querySelector('.project-end')?.value || "";
+            const client          = getFieldValue(row, '.col-client') || "";
+            const project         = getFieldValue(row, '.col-project') || "";
+            const projectCode     = getFieldValue(row, '.col-project-code') || "";
+            const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || "";
+            const activity        = row.querySelector('.activity-field')?.value || "";
+            const projectHours    = row.querySelector('.project-hours-field')?.value || "";
+            const billable        = row.querySelector('.billable-select')?.value || "";
+            const lunchTime       = row.querySelector('.lunch-time-select')?.value || "";
+            const travelTime      = row.querySelector('.travel-time-select')?.value || "";
+            const remarks         = row.querySelector('.remarks-field')?.value || "";
 
             if (!date && !project && !client) return;
 
@@ -3166,48 +3766,29 @@ function exportTimesheetToExcel() {
                 gender: employeeInfo["Gender"],
                 partner: employeeInfo["Partner"],
                 reportingManager: employeeInfo["Reporting Manager"],
-                weekPeriod: weekPeriod,
-                date,
-                location:
-                    inputs[1]?.value ||
-                    inputs[1]?.querySelector("option:checked")?.value ||
-                    "",
-                projectStartTime: inputs[2]?.value || "",
-                projectEndTime: inputs[3]?.value || "",
-                client: client,
-                project: project,
-                projectCode: inputs[6]?.value || "",
-                reportingManagerEntry: inputs[7]?.value || "",
-                activity: inputs[8]?.value || "",
-                projectHours: inputs[9]?.value || "",
-                billable: inputs[10]?.value || "",
-                remarks: inputs[11]?.value || "",
-                hits: document.getElementById("hits").value || "",
-                misses: document.getElementById("misses").value || "",
-                feedback_hr: document.getElementById("feedback_hr").value || "",
-                feedback_it: document.getElementById("feedback_it").value || "",
-                feedback_crm: document.getElementById("feedback_crm").value || "",
-                feedback_others:
-                    document.getElementById("feedback_others").value || ""
+                weekPeriod, date, location,
+                projectStartTime: projectStart,
+                projectEndTime: projectEnd,
+                client, project, projectCode,
+                reportingManagerEntry: reportingMgr,
+                activity, projectHours, billable, lunchTime, travelTime, remarks,
+                hits: document.getElementById("hits")?.value || "",
+                misses: document.getElementById("misses")?.value || "",
+                feedback_hr: document.getElementById("feedback_hr")?.value || "",
+                feedback_it: document.getElementById("feedback_it")?.value || "",
+                feedback_crm: document.getElementById("feedback_crm")?.value || "",
+                feedback_others: document.getElementById("feedback_others")?.value || ""
             });
         });
     });
 
-    if (cleanedRows.length === 0) {
-        showPopup("No valid data to export!", true);
-        return;
-    }
+    if (cleanedRows.length === 0) { showPopup("No valid data to export!", true); return; }
 
     const ws = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
     XLSX.utils.sheet_add_aoa(ws, [headersPretty], { origin: "A1" });
-
-    const fileName = `Timesheet_${employeeInfo["Employee ID"]}_${new Date()
-        .toISOString()
-        .split("T")[0]}.xlsx`;
-
+    const fileName = `Timesheet_${employeeInfo["Employee ID"]}_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.utils.book_append_sheet(wb, ws, "Timesheet");
     XLSX.writeFile(wb, fileName);
-
     showPopup("Timesheet exported successfully!");
 }
 
@@ -3218,71 +3799,24 @@ function exportHistoryToExcel() {
         return;
     }
 
-    // Columns WITHOUT S.No
     const columns = [
-        "employeeId",
-        "employeeName",
-        "designation",
-        "gender",
-        "partner",
-        "reportingManager",
-        "weekPeriod",
-        "date",
-        "location",
-        "projectStartTime",
-        "projectEndTime",
-        "client",
-        "project",
-        "projectCode",
-        "reportingManagerEntry",
-        "activity",
-        "projectHours",
-        "billable",
-        "remarks",
-        "hits",
-        "misses",
-        "feedback_hr",
-        "feedback_it",
-        "feedback_crm",
-        "feedback_others",
-        "totalHours",
-        "totalBillableHours",
-        "totalNonBillableHours"
+        "employeeId","employeeName","designation","gender","partner","reportingManager",
+        "weekPeriod","date","location","projectStartTime","projectEndTime",
+        "client","project","projectCode","reportingManagerEntry","activity",
+        "projectHours","billable","lunchTime","travelTime","remarks",
+        "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others",
+        "totalHours","totalBillableHours","totalNonBillableHours"
     ];
 
-    // Header labels WITHOUT S.No
     const headersPretty = [
-        "Employee ID",
-        "Employee Name",
-        "Designation",
-        "Gender",
-        "Partner",
-        "Reporting Manager",
-        "Week Period",
-        "Date",
-        "Location of Work",
-        "Project Start Time",
-        "Project End Time",
-        "Client",
-        "Project",
-        "Project Code",
-        "Reporting Manager Entry",
-        "Activity",
-        "Project Hours",
-        "Billable",
-        "Remarks",
-        "3 HITS",
-        "3 MISSES",
-        "Feedback for HR",
-        "Feedback for IT",
-        "Feedback for CRM",
-        "Feedback for Others",
-        "Total Hours",
-        "Total Billable Hours",
-        "Total Non Billable Hours"
+        "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
+        "Week Period","Date","Location of Work","Project Start Time","Project End Time",
+        "Client","Project","Project Code","Reporting Manager Entry","Activity",
+        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others",
+        "Total Hours","Total Billable Hours","Total Non Billable Hours"
     ];
 
-    // Prepare cleaned rows WITHOUT S.No
     const cleanedRows = historyEntries.map((row) => ({
         employeeId: row.employeeId || "",
         employeeName: row.employeeName || "",
@@ -3302,6 +3836,8 @@ function exportHistoryToExcel() {
         activity: row.activity || "",
         projectHours: row.projectHours || "",
         billable: row.billable || "",
+        lunchTime: row.lunchTime || "",
+        travelTime: row.travelTime || "",
         remarks: row.remarks || "",
         hits: row.hits || "",
         misses: row.misses || "",
@@ -3314,21 +3850,12 @@ function exportHistoryToExcel() {
         totalNonBillableHours: row.totalNonBillableHours || ""
     }));
 
-    // Convert rows → sheet
     const worksheet = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
-
-    // Insert Pretty Headers
     XLSX.utils.sheet_add_aoa(worksheet, [headersPretty], { origin: "A1" });
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "History");
-
-    const fileName = `History_${loggedInEmployeeId}_${new Date()
-        .toISOString()
-        .split("T")[0]}.xlsx`;
-
+    const fileName = `History_${loggedInEmployeeId}_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-
     showPopup("History exported successfully!");
 }
 
@@ -3336,16 +3863,12 @@ function exportHistoryToExcel() {
 // ✅ Updated checkUserRole function (final version)
 async function checkUserRole() {
   try {
-    console.log("🔎 Running checkUserRole()");
-
-    // Step 1️⃣ - Get logged in user ID
     if (!loggedInEmployeeId) {
-      console.warn("No loggedInEmployeeId found, hiding manager buttons by default");
       document.querySelectorAll(".manager-only").forEach(btn => btn.style.display = "none");
       return;
     }
 
-    // Step 2️⃣ - Check if current user is a reporting manager
+    // Check if current user is a reporting manager
     const resMgr = await fetch(`${API_URL}/check_reporting_manager/${loggedInEmployeeId}`, {
       headers: getHeaders(),
     });
@@ -3354,51 +3877,15 @@ async function checkUserRole() {
     if (resMgr.ok) {
       const js = await resMgr.json();
       isManager = !!js.isManager;
-      console.log("✅ Reporting manager check:", isManager);
-    } else {
-      console.warn("Reporting manager API returned", resMgr.status);
     }
 
-    // Step 3️⃣ - Check Admin's global PAR status
-    let parDisabled = false;
-    try {
-      const token = localStorage.getItem("access_token");
-      console.log("🔍 Fetching PAR status from:", `${API_URL}/get-par-current-status`);
-
-      const parRes = await fetch(`${API_URL}/get-par-current-status`, {
-        method: "GET",
-        headers: getHeaders()
-        // body: JSON.stringify({ token }),
-      });
-
-      if (parRes.ok) {
-        const pjson = await parRes.json();
-        console.log("✅ PAR API Response:", pjson);
-        const parStatus = pjson.par_status || "disable";
-        parDisabled = parStatus === "disable";
-      } else {
-        console.warn("⚠️ PAR status API error:", parRes.status);
-      }
-    } catch (e) {
-      console.error("🔥 PAR status fetch failed:", e);
-    }
-
-    // Step 4️⃣ - Final decision for showing/hiding manager buttons
-    const managerButtons = document.querySelectorAll(".manager-only");
-    managerButtons.forEach(btn => {
-      if (isManager && !parDisabled) {
-        btn.style.display = "inline-block";
-      } else {
-        btn.style.display = "none";
-      }
+    // Show manager buttons if user is a TL — no PAR check needed
+    document.querySelectorAll(".manager-only").forEach(btn => {
+      btn.style.display = isManager ? "inline-block" : "none";
     });
 
-    if (!isManager) console.log("ℹ️ User is not a manager - manager buttons hidden.");
-    else if (parDisabled) console.log("ℹ️ PAR is disabled - hiding manager buttons even though user is manager.");
-    else console.log("ℹ️ Manager buttons visible.");
-
   } catch (err) {
-    console.error("🔥 Error checking role or PAR status:", err);
+    console.error("Error checking role:", err);
     document.querySelectorAll(".manager-only").forEach(btn => btn.style.display = "none");
   }
 }
@@ -4151,9 +4638,11 @@ async function handleExcelUpload(event) {
               projectHours: calculatedHours.toString(),
 
               billable: toStr(row['Billable']) || '',
+              lunchTime: toStr(row['Lunch Time']) || '',
+              travelTime: toStr(row['Travel Time']) || '',
               remarks: toStr(row['Remarks']) || '',
-              hits: toStr(row['3 Hits']) || '',
-              misses: toStr(row['3 Misses']) || '',
+              hits: toStr(row['3 Hits']) || toStr(row['3 HITS']) || '',
+              misses: toStr(row['3 Misses']) || toStr(row['3 MISSES']) || '',
               feedback_hr: toStr(row['Feedback for HR']) || '',
               feedback_it: toStr(row['Feedback for IT']) || '',
               feedback_crm: toStr(row['Feedback for CRM']) || '',

@@ -416,8 +416,8 @@ tr:hover td {
             <div class="nav-item" data-section="upload">
                 <i class="fas fa-cloud-upload-alt"></i> Upload Data
             </div>
-            <div class="nav-item" id="logoutBtn" style="margin-top: auto; color: #ef4444;">
-                <i class="fas fa-sign-out-alt"></i> Logout
+            <div class="nav-item" id="backCpBtn" style="display:none; color:#a78bfa;" onclick="window.location.href='/control-panel'">
+                <i class="fas fa-arrow-left"></i> Control Panel
             </div>
         </div>
     </div>
@@ -477,22 +477,65 @@ tr:hover td {
 
         <!-- Payroll Section -->
         <div id="payrollSection" class="section" style="display:none;">
-            <div class="card">
-                <h2><i class="fas fa-calendar-check"></i> Current Payroll Period</h2>
-                <div class="status-display" id="payrollStatus" style="background:#ecfdf5; color:#10b981;">
-                    Loading...
-                </div>
-                
-                <div style="margin-top: 1.5rem;">
-                    <label style="font-weight:600; color:var(--gray-800);">Select Payroll Month</label>
-                    <input type="month" id="payrollMonth" />
-                </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button class="btn btn-primary" id="savePayrollBtn">
-                        <i class="fas fa-save"></i> Save Payroll Period
-                    </button>
+            <!-- Add / Edit Cycle Form -->
+            <div class="card">
+                <h2><i class="fas fa-plus-circle"></i> <span id="cycleFormTitle">Add Payroll Cycle</span></h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1rem;">
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Cycle Label</label>
+                        <input type="text" id="cycleLabel" placeholder="e.g. Apr-May 2025" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;" />
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Status</label>
+                        <select id="cycleStatus" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;">
+                            <option value="upcoming">Upcoming</option>
+                            <option value="live">Live (users can fill)</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Cycle Start Date</label>
+                        <input type="date" id="cycleStart" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;" />
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Cycle End Date</label>
+                        <input type="date" id="cycleEnd" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;" />
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Submission Deadline Date</label>
+                        <input type="date" id="cycleDeadlineDate" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;" />
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);">Deadline Time (IST, 24h)</label>
+                        <input type="time" id="cycleDeadlineTime" value="18:30" style="width:100%;padding:.75rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;margin-top:.4rem;" />
+                    </div>
+                    <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem 0;">
+                        <input type="checkbox" id="cycleShowLunchTravel" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);" />
+                        <label for="cycleShowLunchTravel" style="font-weight:600;font-size:.9rem;color:var(--gray-600);cursor:pointer;">Show Lunch Time &amp; Travel Time fields for this cycle</label>
+                    </div>
                 </div>
+                <div style="margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="saveCycleBtn"><i class="fas fa-save"></i> Save Cycle</button>
+                    <button class="btn" id="cancelEditBtn" style="display:none;background:var(--gray-200);color:var(--gray-800);" onclick="cancelCycleEdit()"><i class="fas fa-times"></i> Cancel</button>
+                </div>
+            </div>
+
+            <!-- Cycles Table -->
+            <div class="card table-card" style="margin-top:1.5rem;">
+                <h2><i class="fas fa-list"></i> All Payroll Cycles</h2>
+                <table id="cyclesTable" style="margin-top:1rem;">
+                    <thead>
+                        <tr>
+                            <th>Label</th>
+                            <th>Cycle Period</th>
+                            <th>Deadline</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
 
@@ -596,6 +639,37 @@ let pendingStatus = null;
 let managerStatsCache = [];
 let parStatsCache = [];
 
+// ── All admin API calls use Authorization: Bearer header (same as rest of app) ──
+const _cpAdmin = sessionStorage.getItem('cp_admin') === '1';
+const _adminToken = localStorage.getItem('access_token') || '';
+
+function _getAdminToken() { return _adminToken; }
+
+async function adminFetch(url, bodyObj) {
+    const token = _adminToken;
+    return fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(bodyObj || {})
+    });
+}
+
+async function adminGet(url) {
+    return fetch(url, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${_adminToken}` }
+    });
+}
+
+// Show "Back to Control Panel" link if came from CP
+if (_cpAdmin) {
+    const backBtn = document.getElementById('backCpBtn');
+    if (backBtn) backBtn.style.display = 'flex';
+}
+
 
 function showToast(msg) {
     toast.textContent = msg;
@@ -606,18 +680,14 @@ function showToast(msg) {
 // Navigation
 document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', function() {
-        if (this.id === 'logoutBtn') {
-            localStorage.clear();
-            window.location.href = "/admin-logout";
-            return;
-        }
+        if (this.id === 'backCpBtn') return; // handled by onclick
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         this.classList.add('active');
         document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
         const sec = this.getAttribute('data-section') + 'Section';
         document.getElementById(sec).style.display = 'block';
         document.getElementById('pageTitle').textContent = this.textContent.trim() + " Panel";
-        if (sec === 'payrollSection') fetchPayrollStatus();
+        if (sec === 'payrollSection') loadPayrollCycles();
         if (sec === 'analysisSection') fetchAnalysisStats();
         if (sec === 'parSection') fetchParStats();
 
@@ -625,57 +695,36 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 async function initializeParCycle() {
-    const token = localStorage.getItem("admin_token");
+    const token = _getAdminToken();
     if (!token) return showToast("Session expired!");
-
     try {
-        const res = await fetch("/admin/init-par-cycle", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ token })
-        });
-
+        const res = await adminFetch("/admin/init-par-cycle", {});
         const data = await res.json();
-
-        if (res.ok && data.success) {
-            showToast("PAR Initialized Successfully!");
-            fetchParStats(); // refresh table
-        } else {
-            showToast(data.detail || "Initialization failed");
-        }
-    } catch (err) {
-        console.error(err);
-        showToast("Server error while initializing PAR");
-    }
+        if (res.ok && data.success) { showToast("PAR Initialized Successfully!"); fetchParStats(); }
+        else showToast(data.detail || "Initialization failed");
+    } catch (err) { showToast("Server error while initializing PAR"); }
 }
 
-
-
-
-// PAR & Payroll functions – 100% same as before (only minor UI tweaks)
 async function fetchParStatus() {
-    const token = localStorage.getItem("admin_token");
+    const token = _getAdminToken();
     if (!token) return showToast("Session expired!");
-
     try {
-        const res = await fetch(`/get-par-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token}) });
+        const res = await adminFetch('/get-par-status', {});
         const data = await res.json();
         if (res.ok) {
-            document.getElementById("statusText").innerHTML = data.par_status === "enable" 
-                ? "Enabled <span style='color:#10b981'>Active</span>" 
+            document.getElementById("statusText").innerHTML = data.par_status === "enable"
+                ? "Enabled <span style='color:#10b981'>Active</span>"
                 : "Disabled <span style='color:#ef4444'>Inactive</span>";
         }
     } catch(err) { showToast("Failed to load status"); }
 }
 
 async function updateParStatus(status) {
-    const token = localStorage.getItem("admin_token");
+    const token = _getAdminToken();
     try {
-        const res = await fetch(`/update-par-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token, new_status: status}) });
-        if (res.ok) {
-            showToast(`PAR ${status}d successfully!`);
-            fetchParStatus();
-        } else showToast("Update failed");
+        const res = await adminFetch('/update-par-status', { new_status: status });
+        if (res.ok) { showToast(`PAR ${status}d successfully!`); fetchParStatus(); }
+        else showToast("Update failed");
     } catch(err) { showToast("Server error"); }
 }
 
@@ -710,54 +759,160 @@ function getMonthRange(s, e) {
 }
 
 async function fetchPayrollStatus() {
-    const token = localStorage.getItem("admin_token");
-    try {
-        const res = await fetch(`/get-payroll-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token}) });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById("payrollStatus").textContent = getMonthRange(data.start_date, data.end_date);
-            if (data.start_date) {
-                const d = new Date(data.start_date);
-                document.getElementById("payrollMonth").value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-            }
-        }
-    } catch(err) { console.error(err); }
+    // Now handled by loadPayrollCycles
+    loadPayrollCycles();
 }
 
-document.getElementById("savePayrollBtn").onclick = async () => {
-    const val = document.getElementById("payrollMonth").value;
-    if (!val) return showToast("Please select a month!");
+document.getElementById("savePayrollBtn")?.remove(); // no longer needed
 
-    const [y, m] = val.split("-");
-    const selMonth = parseInt(m);
-    const startMonth = selMonth === 1 ? 12 : selMonth - 1;
-    const startYear = selMonth === 1 ? parseInt(y) - 1 : parseInt(y);
-    const start = `${startYear}-${String(startMonth).padStart(2,"0")}-21`;
-    const end = `${y}-${m}-20`;
+// ── Payroll Cycle Management ──────────────────────────────────────────────────
+let _editingCycleId = null;
 
-    const token = localStorage.getItem("admin_token");
-    try {
-        const res = await fetch(`/update-payroll-status`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token, start_date: start, end_date: end}) });
-        if (res.ok) {
-            showToast("Payroll updated successfully!");
-            document.getElementById("payrollStatus").textContent = getMonthRange(start, end);
-        } else showToast("Failed to update");
-    } catch(err) { showToast("Server error"); }
+const STATUS_COLORS = {
+    live:     { bg: '#dcfce7', color: '#16a34a', label: '🟢 Live' },
+    upcoming: { bg: '#fef9c3', color: '#ca8a04', label: '🟡 Upcoming' },
+    closed:   { bg: '#fee2e2', color: '#dc2626', label: '🔴 Closed' },
 };
 
-async function fetchAnalysisStats() {
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-        showToast("Session expired! Please login again.");
+async function loadPayrollCycles() {
+    try {
+        const res = await adminGet('/payroll-cycles');
+        if (!res.ok) { showToast('Failed to load cycles'); return; }
+        const data = await res.json();
+        renderCyclesTable(data.cycles || []);
+    } catch(e) { showToast('Error loading cycles'); }
+}
+
+function renderCyclesTable(cycles) {
+    const tbody = document.querySelector('#cyclesTable tbody');
+    tbody.innerHTML = '';
+    if (!cycles.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:2rem;">No cycles yet. Add one above.</td></tr>';
         return;
     }
+    cycles.forEach(c => {
+        const sc = STATUS_COLORS[c.status] || STATUS_COLORS.closed;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${c.cycle_label}</strong></td>
+            <td>${c.start_date} → ${c.end_date}</td>
+            <td>${c.deadline_date} at ${c.deadline_time} IST</td>
+            <td><span style="background:${sc.bg};color:${sc.color};padding:.25rem .75rem;border-radius:20px;font-size:.82rem;font-weight:700;">${sc.label}</span></td>
+            <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="btn btn-primary" style="padding:.4rem .9rem;font-size:.82rem;min-width:auto;" onclick="editCycle('${c.id}')"><i class="fas fa-edit"></i> Edit</button>
+                ${c.status !== 'live' ? `<button class="btn btn-success" style="padding:.4rem .9rem;font-size:.82rem;min-width:auto;" onclick="makeLive('${c.id}')"><i class="fas fa-play"></i> Make Live</button>` : ''}
+                <button class="btn btn-danger" style="padding:.4rem .9rem;font-size:.82rem;min-width:auto;" onclick="deleteCycle('${c.id}')"><i class="fas fa-trash"></i></button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+document.getElementById('saveCycleBtn').onclick = async () => {
+    const label    = document.getElementById('cycleLabel').value.trim();
+    const start    = document.getElementById('cycleStart').value;
+    const end      = document.getElementById('cycleEnd').value;
+    const dDate    = document.getElementById('cycleDeadlineDate').value;
+    const dTime    = document.getElementById('cycleDeadlineTime').value;
+    const status   = document.getElementById('cycleStatus').value;
+
+    if (!label || !start || !end || !dDate || !dTime) {
+        showToast('Please fill all fields'); return;
+    }
+
+    const body = { cycle_label: label, start_date: start, end_date: end,
+                   deadline_date: dDate, deadline_time: dTime, status,
+                   show_lunch_travel: document.getElementById('cycleShowLunchTravel')?.checked !== false };
 
     try {
-        const res = await fetch("/admin/analysis-stats", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ token })
+        let res;
+        if (_editingCycleId) {
+            res = await fetch(`/payroll-cycles/${_editingCycleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_adminToken}` },
+                body: JSON.stringify(body)
+            });
+        } else {
+            res = await adminFetch('/payroll-cycles', body);
+        }
+        if (res.ok) {
+            showToast(_editingCycleId ? 'Cycle updated!' : 'Cycle added!');
+            cancelCycleEdit();
+            loadPayrollCycles();
+        } else {
+            const d = await res.json();
+            showToast(d.detail || 'Failed to save');
+        }
+    } catch(e) { showToast('Server error'); }
+};
+
+async function editCycle(id) {
+    try {
+        const res = await adminGet('/payroll-cycles');
+        const data = await res.json();
+        const c = (data.cycles || []).find(x => x.id === id);
+        if (!c) return;
+        _editingCycleId = id;
+        document.getElementById('cycleLabel').value        = c.cycle_label;
+        document.getElementById('cycleStart').value        = c.start_date;
+        document.getElementById('cycleEnd').value          = c.end_date;
+        document.getElementById('cycleDeadlineDate').value = c.deadline_date;
+        document.getElementById('cycleDeadlineTime').value = c.deadline_time;
+        document.getElementById('cycleStatus').value       = c.status;
+        document.getElementById('cycleFormTitle').textContent = 'Edit Payroll Cycle';
+        document.getElementById('cancelEditBtn').style.display = '';
+        document.getElementById('cycleLabel').scrollIntoView({ behavior: 'smooth' });
+    } catch(e) { showToast('Error loading cycle'); }
+}
+
+async function makeLive(id) {
+    try {
+        const res = await adminGet('/payroll-cycles');
+        const data = await res.json();
+        const c = (data.cycles || []).find(x => x.id === id);
+        if (!c) return;
+        const body = {
+            cycle_label: c.cycle_label, start_date: c.start_date, end_date: c.end_date,
+            deadline_date: c.deadline_date, deadline_time: c.deadline_time, status: 'live'
+        };
+        const r = await fetch(`/payroll-cycles/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_adminToken}` },
+            body: JSON.stringify(body)
         });
+        if (r.ok) { showToast('Cycle is now Live! (Other live cycles remain active)'); loadPayrollCycles(); }
+        else showToast('Failed');
+    } catch(e) { showToast('Error'); }
+}
+
+async function deleteCycle(id) {
+    if (!confirm('Delete this cycle?')) return;
+    try {
+        const res = await fetch(`/payroll-cycles/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${_adminToken}` }
+        });
+        if (res.ok) { showToast('Deleted'); loadPayrollCycles(); }
+        else showToast('Failed to delete');
+    } catch(e) { showToast('Error'); }
+}
+
+function cancelCycleEdit() {
+    _editingCycleId = null;
+    document.getElementById('cycleLabel').value        = '';
+    document.getElementById('cycleStart').value        = '';
+    document.getElementById('cycleEnd').value          = '';
+    document.getElementById('cycleDeadlineDate').value = '';
+    document.getElementById('cycleDeadlineTime').value = '18:30';
+    document.getElementById('cycleStatus').value       = 'upcoming';
+    document.getElementById('cycleFormTitle').textContent = 'Add Payroll Cycle';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+}
+
+async function fetchAnalysisStats() {
+    const token = _getAdminToken();
+    if (!token) { showToast("Session expired! Please login again."); return; }
+    try {
+        const res = await adminFetch('/admin/analysis-stats', {});
 
         const data = await res.json();
         if (!res.ok || !data.success) {
@@ -804,18 +959,10 @@ async function fetchAnalysisStats() {
 }
 
 async function fetchParStats() {
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-        showToast("Session expired! Please login again.");
-        return;
-    }
-
+    const token = _getAdminToken();
+    if (!token) { showToast("Session expired! Please login again."); return; }
     try {
-        const res = await fetch("/admin/par-stats", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ token })
-        });
+        const res = await adminFetch('/admin/par-stats', {});
 
         const data = await res.json();
         if (!res.ok || !data.success) {
@@ -1030,7 +1177,7 @@ document.getElementById("downloadAnalysisBtn").onclick = exportAnalysisToExcel;
 // Load on start
 window.onload = () => {
     fetchParStatus();
-    fetchPayrollStatus();
+    loadPayrollCycles();
     fetchParStats();
 };
 </script>

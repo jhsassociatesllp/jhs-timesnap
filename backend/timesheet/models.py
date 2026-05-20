@@ -23,6 +23,8 @@ class TimesheetEntry(BaseModel):
     projectHours: Optional[str] = None
     billable: Optional[str] = None
     remarks: Optional[str] = None
+    lunchTime: Optional[str] = None
+    travelTime: Optional[str] = None
     hits: Optional[str] = None
     misses: Optional[str] = None
     feedback_hr: Optional[str] = None
@@ -44,6 +46,8 @@ class UpdateTimesheetRequest(BaseModel):
     projectHours: Optional[str] = None
     billable: Optional[str] = None
     remarks: Optional[str] = None
+    lunchTime: Optional[str] = None
+    travelTime: Optional[str] = None
 
 
 class ApproveRejectRequest(BaseModel):

@@ -28,6 +28,9 @@ from backend.database import (
     users_collection,
     admin_details_collection,
     forgot_password_otps_collection,
+    module_admin_collection,
+    payroll_cycles_collection,
+    timesheet_temp_collection,
 )
 from backend.auth import (
     create_access_token,
@@ -113,6 +116,10 @@ async def dashboard_page():
 @app.get("/forgot-password", response_class=FileResponse)
 async def forgot_password_page():
     return FileResponse(os.path.join(static_root, "forgot_password.html"))
+
+@app.get("/control-panel", response_class=FileResponse)
+async def control_panel_page():
+    return FileResponse(os.path.join(static_root, "control_panel.html"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -375,9 +382,587 @@ async def get_par_current_status(current_user: str = Depends(get_current_user)):
         "end":   admin.get("payroll_end"),
     }
 
+@app.get("/get-module-access")
+async def get_module_access(current_user: str = Depends(get_current_user)):
+    empid = current_user.strip().upper()
+    print(f"[ModuleAccess] Looking up empid: '{empid}' (len={len(empid)})")
+    doc = module_admin_collection.find_one({"empid": empid})
+    print(f"[ModuleAccess] Found doc: {doc}")
+    if not doc:
+        # Also try case-insensitive search to help debug
+        doc_ci = module_admin_collection.find_one({"empid": {"$regex": f"^{empid}$", "$options": "i"}})
+        print(f"[ModuleAccess] Case-insensitive fallback: {doc_ci}")
+        if doc_ci:
+            modules = doc_ci.get("modules", [])
+            print(f"[ModuleAccess] Using case-insensitive match, modules: {modules}")
+            return {"modules": modules, "is_admin": len(modules) > 0}
+        return {"modules": [], "is_admin": False}
+    modules = doc.get("modules", [])
+    print(f"[ModuleAccess] Returning modules: {modules}")
+    return {"modules": modules, "is_admin": len(modules) > 0}
+
+
+class ModuleAccessRequest(BaseModel):
+    empid: str
+    modules: list
+
+
+@app.post("/set-module-access")
+async def set_module_access(
+    request: ModuleAccessRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Set module admin access for a user.
+    Only callable by users who themselves have all-module access (super admin).
+    modules: list of strings from ["timesheet", "quality_audit", "kra"]
+    """
+    # Check caller is a super admin (has all 3 modules)
+    caller_doc = module_admin_collection.find_one({"empid": current_user.strip().upper()})
+    caller_modules = caller_doc.get("modules", []) if caller_doc else []
+    if set(["timesheet", "quality_audit", "kra"]) != set(caller_modules):
+        raise HTTPException(403, "Only super admins can assign module access")
+
+    valid = {"timesheet", "quality_audit", "kra"}
+    modules = [m for m in request.modules if m in valid]
+    empid = request.empid.strip().upper()
+
+    module_admin_collection.update_one(
+        {"empid": empid},
+        {"$set": {"empid": empid, "modules": modules}},
+        upsert=True,
+    )
+    return {"success": True, "empid": empid, "modules": modules}
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Payroll Cycle Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PayrollCycleRequest(BaseModel):
+    cycle_label: str          # e.g. "Apr-May 2025"
+    start_date: str           # "2025-04-21"
+    end_date: str             # "2025-05-20"
+    deadline_date: str        # "2025-05-23"
+    deadline_time: str        # "18:30"  (24h IST)
+    status: str               # "live" | "upcoming" | "closed"
+    show_lunch_travel: bool = True  # False = hide Lunch Time & Travel Time fields
+
+
+def _cycle_to_dict(doc: dict) -> dict:
+    doc["id"] = str(doc.pop("_id"))
+    if isinstance(doc.get("created_at"), datetime):
+        doc["created_at"] = doc["created_at"].isoformat()
+    # Ensure show_lunch_travel has a default
+    doc.setdefault("show_lunch_travel", True)
+    return doc
+
+
+def _is_timesheet_admin(empid: str) -> bool:
+    doc = module_admin_collection.find_one({"empid": empid.strip().upper()})
+    if not doc:
+        doc = module_admin_collection.find_one(
+            {"empid": {"$regex": f"^{empid.strip().upper()}$", "$options": "i"}}
+        )
+    if doc and "timesheet" in doc.get("modules", []):
+        return True
+    # Also allow legacy admin_details users
+    return bool(admin_details_collection.find_one({"userid": empid.strip().upper()}))
+
+
+@app.get("/payroll-cycles")
+async def list_payroll_cycles(current_user: str = Depends(get_current_user)):
+    """Admin: list all payroll cycles."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    cycles = list(payroll_cycles_collection.find({}).sort("start_date", -1))
+    return {"cycles": [_cycle_to_dict(c) for c in cycles]}
+
+
+@app.post("/payroll-cycles")
+async def create_payroll_cycle(
+    req: PayrollCycleRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin: create a new payroll cycle. Multiple cycles can be live simultaneously."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    if req.status not in ("live", "upcoming", "closed"):
+        raise HTTPException(400, "status must be live, upcoming, or closed")
+    doc = {
+        "cycle_label": req.cycle_label,
+        "start_date": req.start_date,
+        "end_date": req.end_date,
+        "deadline_date": req.deadline_date,
+        "deadline_time": req.deadline_time,
+        "status": req.status,
+        "show_lunch_travel": req.show_lunch_travel,
+        "created_at": datetime.utcnow(),
+        "created_by": current_user,
+    }
+    result = payroll_cycles_collection.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    doc["created_at"] = doc["created_at"].isoformat()
+    return {"success": True, "cycle": doc}
+
+
+@app.put("/payroll-cycles/{cycle_id}")
+async def update_payroll_cycle(
+    cycle_id: str,
+    req: PayrollCycleRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin: update a payroll cycle. Multiple cycles can be live simultaneously."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    if req.status not in ("live", "upcoming", "closed"):
+        raise HTTPException(400, "status must be live, upcoming, or closed")
+    try:
+        from bson import ObjectId
+        oid = ObjectId(cycle_id)
+    except Exception:
+        raise HTTPException(400, "Invalid cycle ID")
+    payroll_cycles_collection.update_one(
+        {"_id": oid},
+        {"$set": {
+            "cycle_label": req.cycle_label,
+            "start_date": req.start_date,
+            "end_date": req.end_date,
+            "deadline_date": req.deadline_date,
+            "deadline_time": req.deadline_time,
+            "status": req.status,
+            "show_lunch_travel": req.show_lunch_travel,
+            "updated_at": datetime.utcnow(),
+            "updated_by": current_user,
+        }}
+    )
+    return {"success": True}
+
+@app.delete("/payroll-cycles/{cycle_id}")
+async def delete_payroll_cycle(
+    cycle_id: str,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin: delete a payroll cycle."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    try:
+        from bson import ObjectId
+        oid = ObjectId(cycle_id)
+    except Exception:
+        raise HTTPException(400, "Invalid cycle ID")
+    payroll_cycles_collection.delete_one({"_id": oid})
+    return {"success": True}
+
+
+@app.get("/active-payroll-cycle")
+async def get_active_payroll_cycle(current_user: str = Depends(get_current_user)):
+    """
+    Returns the currently live payroll cycle for users.
+    Also checks if the deadline has passed — if so, returns locked=True.
+    Falls back to the old payroll_status logic if no cycles exist.
+    """
+    from pytz import timezone as tz
+    import pytz
+
+    cycle = payroll_cycles_collection.find_one({"status": "live"})
+
+    if not cycle:
+        # Fallback: use old admin_details payroll_status
+        admin = admin_details_collection.find_one({}, {"payroll_status": 1, "par_status": 1})
+        if admin and admin.get("payroll_status"):
+            p = admin["payroll_status"]
+            return {
+                "found": True,
+                "cycle_label": "Current Payroll",
+                "start_date": p.get("start_date"),
+                "end_date": p.get("end_date"),
+                "deadline_date": None,
+                "deadline_time": None,
+                "locked": False,
+                "par_status": admin.get("par_status", "disable"),
+            }
+        return {"found": False, "locked": True, "par_status": "disable"}
+
+    # Check deadline
+    locked = False
+    try:
+        ist = pytz.timezone("Asia/Kolkata")
+        deadline_str = f"{cycle['deadline_date']} {cycle['deadline_time']}"
+        deadline_naive = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
+        deadline_ist = ist.localize(deadline_naive)
+        now_ist = datetime.now(ist)
+        locked = now_ist > deadline_ist
+    except Exception:
+        locked = False
+
+    # Also check PAR status
+    admin = admin_details_collection.find_one({}, {"par_status": 1})
+    par_status = admin.get("par_status", "disable") if admin else "disable"
+
+    return {
+        "found": True,
+        "id": str(cycle["_id"]),
+        "cycle_label": cycle.get("cycle_label", ""),
+        "start_date": cycle.get("start_date"),
+        "end_date": cycle.get("end_date"),
+        "deadline_date": cycle.get("deadline_date"),
+        "deadline_time": cycle.get("deadline_time"),
+        "locked": locked,
+        "par_status": par_status,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Active Payroll Cycles for users (live + upcoming that have started)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/available-payroll-cycles")
+async def get_available_payroll_cycles(current_user: str = Depends(get_current_user)):
+    """
+    Returns all cycles a user can currently fill:
+    - 'live' cycles always shown
+    - 'upcoming' cycles shown only if today >= their start_date
+    Each cycle includes locked status based on deadline.
+    """
+    import pytz
+    from datetime import date as date_type
+
+    today_str = datetime.now(pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d")
+    ist = pytz.timezone("Asia/Kolkata")
+    now_ist = datetime.now(ist)
+
+    cycles = list(payroll_cycles_collection.find(
+        {"status": {"$in": ["live", "upcoming"]}},
+        sort=[("start_date", 1)]
+    ))
+
+    result = []
+    for c in cycles:
+        # Upcoming: only show if start_date <= today
+        if c["status"] == "upcoming" and c.get("start_date", "9999") > today_str:
+            continue
+
+        locked = False
+        try:
+            deadline_str = f"{c['deadline_date']} {c['deadline_time']}"
+            deadline_naive = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
+            deadline_ist = ist.localize(deadline_naive)
+            locked = now_ist > deadline_ist
+        except Exception:
+            locked = False
+
+        result.append({
+            "id": str(c["_id"]),
+            "cycle_label": c.get("cycle_label", ""),
+            "start_date": c.get("start_date"),
+            "end_date": c.get("end_date"),
+            "deadline_date": c.get("deadline_date"),
+            "deadline_time": c.get("deadline_time"),
+            "status": c.get("status"),
+            "locked": locked,
+            "show_lunch_travel": c.get("show_lunch_travel", True),
+        })
+
+    return {"cycles": result}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Timesheet Draft (Temp) & Submit
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DraftSaveRequest(BaseModel):
+    cycle_id: str
+    cycle_label: str
+    week_period: str
+    entries: list
+    metadata: Optional[dict] = None   # empName, designation, etc.
+
+
+class TimesheetSubmitRequest(BaseModel):
+    cycle_id: str
+    cycle_label: str
+    metadata: Optional[dict] = None
+
+
+@app.post("/timesheet/save-draft")
+async def save_timesheet_draft(
+    req: DraftSaveRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Save one week period's entries to the temp collection (draft)."""
+    from bson import ObjectId as ObjId
+    now_iso = datetime.utcnow().isoformat()
+
+    # Validate cycle exists and is not locked
+    try:
+        cycle_doc = payroll_cycles_collection.find_one({"_id": ObjId(req.cycle_id)})
+    except Exception:
+        raise HTTPException(400, "Invalid cycle ID")
+    if not cycle_doc:
+        raise HTTPException(404, "Cycle not found")
+
+    # Check deadline
+    import pytz
+    ist = pytz.timezone("Asia/Kolkata")
+    try:
+        dl = datetime.strptime(f"{cycle_doc['deadline_date']} {cycle_doc['deadline_time']}", "%Y-%m-%d %H:%M")
+        if datetime.now(ist) > ist.localize(dl):
+            raise HTTPException(403, "Submission deadline has passed for this cycle")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # Find or create temp doc for this employee+cycle
+    temp_doc = timesheet_temp_collection.find_one({
+        "employeeId": current_user,
+        "cycle_id": req.cycle_id,
+    })
+
+    if temp_doc and temp_doc.get("submitted"):
+        raise HTTPException(403, "Timesheet already submitted for this cycle")
+
+    # Build entries with IDs
+    new_entries = []
+    for e in req.entries:
+        entry = dict(e)
+        entry["id"] = entry.get("id") or str(ObjId())
+        entry["updated_time"] = now_iso
+        if not entry.get("created_time"):
+            entry["created_time"] = now_iso
+        new_entries.append(entry)
+
+    if temp_doc:
+        # Replace this week's data in the existing draft
+        existing_data = temp_doc.get("Data", [])
+        # Remove old entries for this week period
+        updated_data = [wk for wk in existing_data if req.week_period not in wk]
+        if new_entries:
+            updated_data.append({req.week_period: new_entries})
+        timesheet_temp_collection.update_one(
+            {"_id": temp_doc["_id"]},
+            {"$set": {
+                "Data": updated_data,
+                "updated_time": now_iso,
+                "metadata": req.metadata or temp_doc.get("metadata", {}),
+            }}
+        )
+    else:
+        doc = {
+            "employeeId": current_user,
+            "cycle_id": req.cycle_id,
+            "cycle_label": req.cycle_label,
+            "Data": [{req.week_period: new_entries}] if new_entries else [],
+            "submitted": False,
+            "created_time": now_iso,
+            "updated_time": now_iso,
+            "metadata": req.metadata or {},
+        }
+        timesheet_temp_collection.insert_one(doc)
+
+    return {"success": True, "message": f"Week '{req.week_period}' saved as draft"}
+
+
+@app.get("/timesheet/draft/{employee_id}")
+async def get_timesheet_draft(
+    employee_id: str,
+    cycle_id: str,
+    current_user: str = Depends(get_current_user),
+):
+    """Load draft for a specific employee + cycle."""
+    if employee_id.upper() != current_user.upper():
+        raise HTTPException(403, "Unauthorized")
+
+    doc = timesheet_temp_collection.find_one({
+        "employeeId": current_user,
+        "cycle_id": cycle_id,
+    })
+    if not doc:
+        return {"draft": None, "submitted": False}
+
+    doc["_id"] = str(doc["_id"])
+    return {"draft": doc, "submitted": doc.get("submitted", False)}
+
+
+@app.get("/timesheet/submission-status/{employee_id}")
+async def get_submission_status(
+    employee_id: str,
+    current_user: str = Depends(get_current_user),
+):
+    """Returns submission status for all cycles for this employee."""
+    if employee_id.upper() != current_user.upper():
+        raise HTTPException(403, "Unauthorized")
+
+    docs = list(timesheet_temp_collection.find(
+        {"employeeId": current_user},
+        {"cycle_id": 1, "cycle_label": 1, "submitted": 1, "updated_time": 1}
+    ))
+    result = {}
+    for d in docs:
+        result[d["cycle_id"]] = {
+            "submitted": d.get("submitted", False),
+            "cycle_label": d.get("cycle_label", ""),
+            "updated_time": d.get("updated_time", ""),
+        }
+    return {"status": result}
+
+
+@app.post("/timesheet/submit")
+async def submit_timesheet(
+    req: TimesheetSubmitRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Final submit: move data from Timesheet_temp → Timesheet_data.
+    Marks the temp doc as submitted (locked from further edits).
+    """
+    from bson import ObjectId as ObjId
+    import hashlib, json as _json
+
+    now_iso = datetime.utcnow().isoformat()
+
+    temp_doc = timesheet_temp_collection.find_one({
+        "employeeId": current_user,
+        "cycle_id": req.cycle_id,
+    })
+    if not temp_doc:
+        raise HTTPException(404, "No draft found for this cycle")
+    if temp_doc.get("submitted"):
+        raise HTTPException(400, "Already submitted")
+
+    # Check deadline
+    import pytz
+    ist = pytz.timezone("Asia/Kolkata")
+    try:
+        cycle_doc = payroll_cycles_collection.find_one({"_id": ObjId(req.cycle_id)})
+        if cycle_doc:
+            dl = datetime.strptime(
+                f"{cycle_doc['deadline_date']} {cycle_doc['deadline_time']}", "%Y-%m-%d %H:%M"
+            )
+            if datetime.now(ist) > ist.localize(dl):
+                raise HTTPException(403, "Submission deadline has passed")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    meta = temp_doc.get("metadata", {})
+    emp_id = current_user
+
+    def _hash(entry):
+        key = {k: entry.get(k, "") for k in [
+            "date", "location", "projectStartTime", "projectEndTime",
+            "client", "project", "projectCode", "reportingManagerEntry",
+            "activity", "projectHours", "billable", "remarks",
+            "lunchTime", "travelTime",
+        ]}
+        return hashlib.sha256(_json.dumps(key, sort_keys=True).encode()).hexdigest()
+
+    # Load existing main doc
+    from backend.database import timesheets_collection, pending_collection, approved_collection, rejected_collection
+    existing_doc = timesheets_collection.find_one({"employeeId": emp_id})
+    existing_data = existing_doc.get("Data", []) if existing_doc else []
+
+    existing_hashes = set()
+    for wk in existing_data:
+        for _, wk_entries in wk.items():
+            for entry in wk_entries:
+                existing_hashes.add(_hash(entry))
+
+    # Merge temp data into main
+    merged = existing_data.copy()
+    added = 0
+    for wk_obj in temp_doc.get("Data", []):
+        for week_name, entries in wk_obj.items():
+            filtered = []
+            for e in entries:
+                h = _hash(e)
+                if h not in existing_hashes:
+                    filtered.append(e)
+                    existing_hashes.add(h)
+                    added += 1
+            if not filtered:
+                continue
+            found = False
+            for ex_wk in merged:
+                if week_name in ex_wk:
+                    ex_wk[week_name].extend(filtered)
+                    found = True
+                    break
+            if not found:
+                merged.append({week_name: filtered})
+
+    # Recalc totals
+    total = billable_hrs = non_billable_hrs = 0.0
+    for wk in merged:
+        for _, wk_entries in wk.items():
+            for e in wk_entries:
+                try:
+                    hrs = float(e.get("projectHours", 0))
+                except Exception:
+                    hrs = 0.0
+                total += hrs
+                if e.get("billable") == "Yes":
+                    billable_hrs += hrs
+                elif e.get("billable") == "No":
+                    non_billable_hrs += hrs
+
+    payload = {
+        "employeeId": emp_id,
+        "employeeName": meta.get("employeeName", ""),
+        "designation": meta.get("designation", ""),
+        "gender": meta.get("gender", ""),
+        "partner": meta.get("partner", ""),
+        "reportingManager": meta.get("reportingManager", ""),
+        "Data": merged,
+        "hits": meta.get("hits", ""),
+        "misses": meta.get("misses", ""),
+        "feedback_hr": meta.get("feedback_hr", ""),
+        "feedback_it": meta.get("feedback_it", ""),
+        "feedback_crm": meta.get("feedback_crm", ""),
+        "feedback_others": meta.get("feedback_others", ""),
+        "updated_time": now_iso,
+        "totalHours": round(total, 2),
+        "totalBillableHours": round(billable_hrs, 2),
+        "totalNonBillableHours": round(non_billable_hrs, 2),
+        "cycle_id": req.cycle_id,
+        "cycle_label": req.cycle_label,
+        "submitted_at": now_iso,
+    }
+
+    if existing_doc:
+        timesheets_collection.update_one({"employeeId": emp_id}, {"$set": payload})
+    else:
+        payload["created_time"] = now_iso
+        timesheets_collection.insert_one(payload)
+
+    # Mark temp as submitted
+    timesheet_temp_collection.update_one(
+        {"_id": temp_doc["_id"]},
+        {"$set": {"submitted": True, "submitted_at": now_iso}}
+    )
+
+    # Update Pending collection
+    try:
+        emp_doc = employee_details_collection.find_one({"EmpID": emp_id})
+        if emp_doc:
+            mgr_code = emp_doc.get("ReportingEmpCode", "").strip().upper()
+            mgr_name = emp_doc.get("ReportingEmpName", "Unknown")
+            if mgr_code:
+                approved_collection.update_one({"ReportingEmpCode": mgr_code}, {"$pull": {"EmployeesCodes": emp_id}})
+                rejected_collection.update_one({"ReportingEmpCode": mgr_code}, {"$pull": {"EmployeesCodes": emp_id}})
+                from backend.timesheet.router import add_or_create
+                add_or_create(pending_collection, mgr_code, mgr_name, emp_id)
+    except Exception as e:
+        print(f"Error updating Pending: {e}")
+
+    return {"success": True, "message": "Timesheet submitted successfully", "added": added}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -385,13 +970,13 @@ async def health_check():
 # ─────────────────────────────────────────────────────────────────────────────
 
 from backend.timesheet.router import (
-    save_timesheets, get_timesheets, update_timesheet, delete_timesheet,
     get_employees, get_clients, get_employee_projects, check_reporting_manager,
     get_employee_timesheet_for_manager, get_pending, get_approved, get_rejected,
     approve_timesheet, reject_timesheet, approve_all,
+    get_timesheets, update_timesheet, delete_timesheet,
 )
 
-app.add_api_route("/save_timesheets",                          save_timesheets,                    methods=["POST"])
+# Legacy save — redirect to new draft endpoint (kept for Excel upload compatibility)
 app.add_api_route("/timesheets/{employee_id}",                  get_timesheets,                     methods=["GET"])
 app.add_api_route("/update_timesheet/{employee_id}/{entry_id}", update_timesheet,                   methods=["PUT"])
 app.add_api_route("/delete_timesheet/{employee_id}/{entry_id}", delete_timesheet,                   methods=["DELETE"])

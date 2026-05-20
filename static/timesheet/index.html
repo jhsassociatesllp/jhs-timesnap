@@ -59,6 +59,17 @@
           <div class="form-group"><label>Reporting Manager</label><input type="text" id="reportingManager" /></div>
         </div>
 
+        <!-- Payroll Cycle Selector -->
+        <div id="payrollCycleSelectorWrap" style="margin:1rem 0 1.5rem;padding:1.2rem 1.5rem;background:#f0f4ff;border-radius:12px;border:2px solid #c5cef9;display:none;text-align:center;">
+          <label style="font-weight:700;font-size:.95rem;color:#5d5fef;display:block;margin-bottom:.8rem;"><i class="fas fa-calendar-alt"></i> Select Payroll Cycle</label>
+          <select id="payrollCycleSelect" style="width:100%;max-width:340px;padding:.75rem 1.1rem;border:2px solid #c5cef9;border-radius:9px;font-size:1rem;font-family:inherit;background:#fff;color:#2c3e50;font-weight:600;display:inline-block;" onchange="onCycleChange()">
+            <option value="">-- Select a payroll cycle --</option>
+          </select>
+          <div id="cycleDeadlineInfo" style="margin-top:.5rem;font-size:.82rem;color:#7f8c8d;"></div>
+          <div id="cycleLockBanner" style="display:none;margin-top:.6rem;padding:.5rem 1rem;background:#fee2e2;color:#dc2626;border-radius:8px;font-weight:600;font-size:.85rem;"><i class="fas fa-lock"></i> This cycle's submission deadline has passed. You cannot save or submit.</div>
+        </div>
+        <div id="noCyclesBanner" style="display:none;margin:1rem 0 1.5rem;padding:1rem 1.5rem;background:#fef9c3;border-radius:12px;border:2px solid #fde047;color:#854d0e;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> No active payroll cycle available. Please contact admin.</div>
+
         <div id="timesheetSections"></div>
 
         <button class="add-week-btn" onclick="addWeekSection()">
@@ -83,12 +94,25 @@
         <div class="export-section">
           <h3><i class="fas fa-download"></i> Export Timesheet</h3>
           <button class="export-btn" onclick="exportTimesheetToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
-          <button id="submitBtn" class="export-btn" onclick="saveDataToMongo()"><i class="fas fa-save"></i> Submit &amp; Save</button>
+          <button id="submitBtn" class="export-btn" onclick="confirmSubmit()"><i class="fas fa-paper-plane"></i> Submit Timesheet</button>
           <button class="clear-btn" onclick="clearTimesheet()"><i class="fas fa-eraser"></i> Clear</button>
           <button class="export-btn" onclick="document.getElementById('excelUploadInput').click()">
             <i class="fas fa-upload"></i> Upload Excel
           </button>
           <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)" />
+        </div>
+      </div>
+
+      <!-- Submit Confirmation Popup -->
+      <div id="submitConfirmPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:2rem 2.5rem;max-width:420px;width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.2);">
+          <div style="font-size:2.5rem;margin-bottom:1rem;">⚠️</div>
+          <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:.75rem;color:#1e293b;">Submit Timesheet?</h3>
+          <p style="font-size:.9rem;color:#475569;margin-bottom:1.5rem;line-height:1.6;">Once submitted, you <strong>will not be able to edit</strong> your timesheet entries. Please review everything before confirming.</p>
+          <div style="display:flex;gap:1rem;justify-content:center;">
+            <button onclick="doSubmitTimesheet()" style="background:#10b981;color:#fff;border:none;padding:.75rem 1.8rem;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;">Yes, Submit</button>
+            <button onclick="document.getElementById('submitConfirmPopup').style.display='none'" style="background:#f1f5f9;color:#475569;border:none;padding:.75rem 1.5rem;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;">Cancel</button>
+          </div>
         </div>
       </div>
 
@@ -182,6 +206,30 @@
           <select id="modalInput11" class="form-input" onchange="updateModalHours()">
             <option value="Yes">Billable</option>
             <option value="No">Non-Billable</option>
+          </select>
+        </div>
+        <div><label id="modalLabel13">Lunch Time Taken</label>
+          <select id="modalInput13" class="form-input">
+            <option value="">None</option>
+            <option value="15 min">15 min</option>
+            <option value="30 min">30 min</option>
+            <option value="45 min">45 min</option>
+            <option value="1 hr">1 hr</option>
+            <option value="1.5 hr">1.5 hr</option>
+            <option value="2 hr">2 hr</option>
+          </select>
+        </div>
+        <div><label id="modalLabel14">Travel Time Taken</label>
+          <select id="modalInput14" class="form-input">
+            <option value="">None</option>
+            <option value="15 min">15 min</option>
+            <option value="30 min">30 min</option>
+            <option value="45 min">45 min</option>
+            <option value="1 hr">1 hr</option>
+            <option value="1.5 hr">1.5 hr</option>
+            <option value="2 hr">2 hr</option>
+            <option value="2.5 hr">2.5 hr</option>
+            <option value="3 hr">3 hr</option>
           </select>
         </div>
         <div><label id="modalLabel12">Remarks</label><input type="text" id="modalInput12" class="form-input" placeholder="Additional notes" onchange="updateModalHours()" /></div>

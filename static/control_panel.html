@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JHS — Control Panel</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    :root{
+      --pg:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      --sg:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);
+      --og:linear-gradient(135deg,#f39c12 0%,#e67e22 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text-dark:#2c3e50;--text-light:#7f8c8d;
+      --border:#e1e8ed;--sh-sm:0 4px 6px rgba(0,0,0,.1);
+      --sh-md:0 10px 25px rgba(0,0,0,.15);--sh-lg:0 20px 40px rgba(0,0,0,.2);
+      --tr:all .3s cubic-bezier(.4,0,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--og);min-height:100vh;display:flex;flex-direction:column;color:var(--text-dark);line-height:1.6}
+
+    /* ── Navbar ── */
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-md);position:sticky;top:0;z-index:100}
+    .navbar-brand{font-size:1.1rem;font-weight:700;color:white;display:flex;align-items:center;gap:.55rem}
+    .navbar-brand i{color:#fbbf24;font-size:1rem}
+    .navbar-right{display:flex;align-items:center;gap:.9rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .nav-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr);text-decoration:none}
+    .nav-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.38);color:white}
+    .nav-btn.modules{background:rgba(102,126,234,.2);border-color:rgba(102,126,234,.5);color:#a78bfa}
+    .nav-btn.modules:hover{background:rgba(102,126,234,.35);color:white}
+
+    /* ── Page ── */
+    .page-wrapper{flex:1;display:flex;justify-content:center;padding:2rem}
+    .container{width:100%;max-width:1100px;background:white;border-radius:20px;box-shadow:var(--sh-lg);overflow:hidden;animation:fadeInUp .6s ease-out}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+    .header{background:var(--og);color:white;padding:3rem 2rem;text-align:center;position:relative;overflow:hidden;border-bottom-left-radius:20px;border-bottom-right-radius:20px}
+    .header::before{content:'';position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10"><defs><pattern id="g" width="100" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="10" fill="url(%23g)"/></svg>');opacity:.1}
+    .header h1{margin:0;font-size:2.6rem;font-weight:700;position:relative;z-index:1;text-shadow:2px 2px 8px rgba(0,0,0,.3);letter-spacing:2px;text-transform:uppercase}
+    .header p{margin:.6rem 0 0;opacity:.9;font-size:1.05rem;position:relative;z-index:1;font-weight:300}
+    .admin-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;margin-top:.8rem;position:relative;z-index:1}
+
+    /* ── Body ── */
+    .body-content{padding:2.5rem 3rem 3rem}
+    .section-label{font-size:.82rem;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:1.5rem;display:flex;align-items:center;gap:.5rem}
+    .cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.8rem}
+
+    /* ── Module cards ── */
+    .module-card{background:var(--light);border-radius:15px;padding:2rem;display:flex;flex-direction:column;gap:1rem;box-shadow:var(--sh-sm);transition:var(--tr);cursor:pointer;border-left:5px solid #667eea}
+    .module-card:hover{transform:translateY(-5px);box-shadow:var(--sh-md)}
+    .card-ts{border-left-color:#667eea}
+    .card-ap{border-left-color:#11998e}
+    .card-qa{border-left-color:#e67e22}
+
+    .card-top{display:flex;align-items:center;justify-content:space-between}
+    .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
+    .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
+
+    .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
+    .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
+
+    .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
+    .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
+    .card-features{display:flex;flex-wrap:wrap;gap:.45rem}
+    .chip{font-size:.73rem;font-weight:500;padding:.22rem .65rem;border-radius:20px;background:white;border:1px solid var(--border);color:var(--text-light);display:flex;align-items:center;gap:.3rem}
+    .card-footer{margin-top:.25rem;padding-top:1.1rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .card-footer-label{font-size:.78rem;color:var(--text-light);font-weight:500}
+
+    .card-btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.4rem;border:none;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr);text-decoration:none;box-shadow:var(--sh-sm)}
+    .card-ts .card-btn{background:var(--pg);color:white}
+    .card-ap .card-btn{background:var(--sg);color:white}
+    .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
+    .module-card:hover .card-btn{transform:translateY(-2px);box-shadow:var(--sh-md)}
+
+    /* ── Info strip ── */
+    .info-strip{margin-top:2rem;padding:1.4rem 1.8rem;background:var(--light);border-radius:15px;border-left:5px solid #f39c12;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:.9rem;font-size:.9rem;color:var(--text-light)}
+    .info-strip i{font-size:1.15rem;color:#f39c12;flex-shrink:0}
+    .info-strip strong{color:var(--text-dark)}
+
+    /* ── Loader ── */
+    .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
+
+    /* ── No access ── */
+    .no-access{text-align:center;padding:3rem 2rem;color:var(--text-light)}
+    .no-access i{font-size:3rem;margin-bottom:1rem;display:block;opacity:.35}
+    .no-access h3{font-size:1.2rem;color:var(--text-dark);margin-bottom:.5rem}
+
+    @media(max-width:768px){
+      .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
+      .header{padding:2rem 1rem}.header h1{font-size:1.8rem;letter-spacing:1px}.cards-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i> Loading Control Panel…
+  </div>
+
+  <div id="main-content" style="display:none;flex-direction:column;min-height:100vh">
+    <nav class="navbar">
+      <div class="navbar-brand"><i class="fas fa-cogs"></i> JHS Control Panel</div>
+      <div class="navbar-right">
+        <span class="emp-badge" id="empBadge"></span>
+        <a href="/modules" class="nav-btn modules"><i class="fas fa-th-large"></i>Switch to User Panel</a>
+        <button class="nav-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </nav>
+
+    <div class="page-wrapper">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-cogs"></i> CONTROL PANEL</h1>
+          <p>Admin management hub — select a module to manage</p>
+          <div class="admin-badge"><i class="fas fa-shield-alt"></i> Admin Access</div>
+        </div>
+
+        <div class="body-content">
+          <p class="section-label"><i class="fas fa-cubes"></i> Your Admin Modules</p>
+
+          <div class="cards-grid" id="cards-grid">
+            <!-- injected by JS -->
+          </div>
+
+          <div class="info-strip">
+            <i class="fas fa-info-circle"></i>
+            <span>Logged in as <strong id="empName">—</strong>. You have admin access to the modules shown above.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const empId = localStorage.getItem('loggedInEmployeeId') || '';
+    const token = localStorage.getItem('access_token') || '';
+
+    if (!token) { window.location.href = '/login'; }
+
+    document.getElementById('empBadge').textContent = empId;
+    document.getElementById('empName').textContent  = empId;
+
+    function handleLogout() {
+      localStorage.clear(); sessionStorage.clear();
+      window.location.href = '/login';
+    }
+
+    // ── Card builders ──────────────────────────────────────────────────────
+
+    function buildTimesheetAdminCard() {
+      return `
+        <div class="module-card card-ts" onclick="goToTimesheetAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-stopwatch"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Timesheet</h2>
+          <p class="card-desc">Manage PAR cycles, payroll periods, view analysis stats, and oversee all employee timesheet submissions.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-power-off"></i> PAR Control</span>
+            <span class="chip"><i class="fas fa-calendar"></i> Payroll Period</span>
+            <span class="chip"><i class="fas fa-chart-bar"></i> Analysis</span>
+            <span class="chip"><i class="fas fa-cloud-upload-alt"></i> Upload Data</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Full admin control</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
+    function buildQAAdminCard() {
+      return `
+        <div class="module-card card-qa" onclick="goToQAAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-clipboard-check"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Quality Audit</h2>
+          <p class="card-desc">Access the full Quality Audit dashboard — submit audits, view history, and analyse performance across all TLs and clients.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-chart-bar"></i> Dashboard</span>
+            <span class="chip"><i class="fas fa-list-check"></i> Submit Audit</span>
+            <span class="chip"><i class="fas fa-history"></i> History</span>
+            <span class="chip"><i class="fas fa-file-excel"></i> Export</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Full audit access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
+    function buildKRAAdminCard() {
+      return `
+        <div class="module-card card-ap" onclick="goToKRAAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">KRA</h2>
+          <p class="card-desc">Oversee all KRA appraisals — view company-wide analysis, manage approval workflows, and track performance across all employees.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-chart-pie"></i> Analysis</span>
+            <span class="chip"><i class="fas fa-users"></i> All Employees</span>
+            <span class="chip"><i class="fas fa-check-double"></i> Approvals</span>
+            <span class="chip"><i class="fas fa-medal"></i> Ratings</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Full KRA admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
+    // ── Navigation ─────────────────────────────────────────────────────────
+
+    function goToTimesheetAdmin() {
+      // User is already authenticated via regular token — go straight to admin dashboard
+      // Set a flag so dashboard.html uses the regular access_token instead of admin_token
+      sessionStorage.setItem('admin_mode', 'timesheet');
+      sessionStorage.setItem('cp_admin', '1');
+      window.location.href = '/admin-dashboard';
+    }
+
+    function goToQAAdmin() {
+      sessionStorage.setItem('admin_mode', 'quality_audit');
+      sessionStorage.setItem('cp_admin', '1');
+      window.location.href = '/quality-audit';
+    }
+
+    function goToKRAAdmin() {
+      sessionStorage.setItem('admin_mode', 'kra');
+      sessionStorage.setItem('cp_admin', '1');
+      window.location.href = '/appraisal';
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+
+    async function initControlPanel() {
+      let moduleAccess = null;
+
+      try {
+        const res = await fetch('/get-module-access', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) moduleAccess = await res.json();
+      } catch(e) {}
+
+      // If no admin access at all, redirect back to modules
+      if (!moduleAccess || !moduleAccess.is_admin) {
+        window.location.href = '/modules';
+        return;
+      }
+
+      const modules = moduleAccess.modules || [];
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = '';
+
+      if (modules.includes('timesheet')) {
+        grid.innerHTML += buildTimesheetAdminCard();
+      }
+      if (modules.includes('quality_audit')) {
+        grid.innerHTML += buildQAAdminCard();
+      }
+      if (modules.includes('kra')) {
+        grid.innerHTML += buildKRAAdminCard();
+      }
+
+      if (grid.innerHTML === '') {
+        grid.innerHTML = `
+          <div class="no-access" style="grid-column:1/-1">
+            <i class="fas fa-lock"></i>
+            <h3>No admin modules assigned</h3>
+            <p>Contact your system administrator to get module access.</p>
+          </div>`;
+      }
+
+      document.getElementById('loading-screen').style.display = 'none';
+      const mc = document.getElementById('main-content');
+      mc.style.display = 'flex';
+    }
+
+    initControlPanel();
+  </script>
+</body>
+</html>

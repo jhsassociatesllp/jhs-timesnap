@@ -35,5 +35,28 @@ admin_details_collection      = db["admin_details"]
 appraisal_admin_collection = appraisal_db["Admin"]
 forgot_password_otps_collection = db["forgot_password_otps"]
 
+# ── module admin access collection ───────────────────────────────────────────
+# Document shape: { "empid": "JHS001", "modules": ["timesheet", "quality_audit", "kra"] }
+module_admin_collection       = db["module_admin_access"]
+
 # ── appraisal collections (add when ready) ────────────────────────────────────
 appraisal_collection          = appraisal_db["Appraisal_data"]
+
+# ── payroll cycles collection ─────────────────────────────────────────────────
+# Document shape:
+# {
+#   "cycle_label": "Apr-May 2025",
+#   "start_date": "2025-04-21",
+#   "end_date": "2025-05-20",
+#   "deadline_date": "2025-05-23",
+#   "deadline_time": "18:30",          # 24h format, IST
+#   "status": "live" | "upcoming" | "closed",
+#   "created_at": datetime
+# }
+payroll_cycles_collection     = db["payroll_cycles"]
+
+# ── timesheet temp (draft) collection ────────────────────────────────────────
+# One doc per employee per cycle:
+# { employeeId, cycle_id, cycle_label, Data: [{weekPeriod: [entries]}],
+#   submitted: false, metadata: {empName, designation, ...} }
+timesheet_temp_collection     = db["Timesheet_temp"]

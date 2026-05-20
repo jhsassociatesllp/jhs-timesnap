@@ -79,6 +79,25 @@
 
     .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
 
+    /* Control Panel button */
+    .cp-btn{display:flex;align-items:center;gap:.45rem;background:linear-gradient(135deg,#f39c12,#e67e22);border:none;color:white;padding:.48rem 1.1rem;border-radius:8px;font-size:.84rem;font-family:inherit;font-weight:600;cursor:pointer;transition:var(--tr);box-shadow:0 2px 8px rgba(230,126,34,.35)}
+    .cp-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(230,126,34,.45)}
+
+    /* Switch popup */
+    .cp-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:none;align-items:center;justify-content:center;padding:1rem}
+    .cp-modal-backdrop.open{display:flex}
+    .cp-modal{background:white;border-radius:18px;width:100%;max-width:420px;box-shadow:0 30px 60px rgba(0,0,0,.3);overflow:hidden;animation:fadeInUp .3s ease-out}
+    .cp-modal-head{background:linear-gradient(135deg,#f39c12,#e67e22);color:white;padding:1.4rem 1.8rem;text-align:center}
+    .cp-modal-head i{font-size:2rem;margin-bottom:.5rem;display:block}
+    .cp-modal-head h3{font-size:1.15rem;font-weight:700;margin:0}
+    .cp-modal-body{padding:1.5rem 1.8rem;text-align:center;color:var(--text-dark)}
+    .cp-modal-body p{font-size:.95rem;color:var(--text-light);line-height:1.6;margin-bottom:1.4rem}
+    .cp-modal-actions{display:flex;gap:.75rem;justify-content:center}
+    .cp-btn-confirm{background:linear-gradient(135deg,#f39c12,#e67e22);color:white;border:none;padding:.65rem 1.6rem;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .cp-btn-confirm:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(230,126,34,.4)}
+    .cp-btn-cancel{background:white;color:var(--text-light);border:1px solid var(--border);padding:.65rem 1.4rem;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .cp-btn-cancel:hover{background:var(--light);color:var(--text-dark)}
+
     @media(max-width:768px){
       .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
       .header{padding:2rem 1rem}.header h1{font-size:2rem;letter-spacing:1px}.cards-grid{grid-template-columns:1fr}
@@ -97,6 +116,7 @@
       <div class="navbar-brand"><i class="fas fa-th-large"></i> JHS Timesnap</div>
       <div class="navbar-right">
         <span class="emp-badge" id="empBadge"></span>
+        <button class="cp-btn" id="cpBtn" style="display:none" onclick="openCpModal()"><i class="fas fa-cogs"></i> Switch to Control Panel</button>
         <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
     </nav>
@@ -124,6 +144,23 @@
     </div>
   </div>
 
+  <!-- Control Panel Switch Popup -->
+  <div class="cp-modal-backdrop" id="cpModalBackdrop">
+    <div class="cp-modal">
+      <div class="cp-modal-head">
+        <i class="fas fa-cogs"></i>
+        <h3>Switch to Control Panel</h3>
+      </div>
+      <div class="cp-modal-body">
+        <p>You are about to switch to the <strong>Admin Control Panel</strong>. This gives you access to administrative tools for your assigned modules.</p>
+        <div class="cp-modal-actions">
+          <button class="cp-btn-confirm" onclick="goToControlPanel()"><i class="fas fa-arrow-right"></i> &nbsp;Switch Now</button>
+          <button class="cp-btn-cancel" onclick="closeCpModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const empId  = localStorage.getItem('loggedInEmployeeId') || '';
     const token  = localStorage.getItem('access_token')       || '';
@@ -137,6 +174,21 @@
       localStorage.clear(); sessionStorage.clear();
       window.location.href = '/login';
     }
+
+    // ── Control Panel modal ──
+    function openCpModal() {
+      document.getElementById('cpModalBackdrop').classList.add('open');
+    }
+    function closeCpModal() {
+      document.getElementById('cpModalBackdrop').classList.remove('open');
+    }
+    function goToControlPanel() {
+      window.location.href = '/control-panel';
+    }
+    // Close on backdrop click
+    document.getElementById('cpModalBackdrop').addEventListener('click', function(e) {
+      if (e.target === this) closeCpModal();
+    });
 
     // ── Card templates ──
     const CARD_TS = `
@@ -210,6 +262,25 @@
     async function initModules() {
       let qaAccess  = null;
       let apprAccess = null;
+      let moduleAccess = null;
+
+      // Check module admin access (for Control Panel button)
+      try {
+        const res = await fetch('/get-module-access', {headers:{'Authorization':`Bearer ${token}`}});
+        console.log('[ModuleAccess] status:', res.status);
+        const data = await res.json();
+        console.log('[ModuleAccess] response:', JSON.stringify(data));
+        if (res.ok) moduleAccess = data;
+      } catch(e) {
+        console.error('[ModuleAccess] fetch error:', e);
+      }
+
+      console.log('[ModuleAccess] is_admin:', moduleAccess?.is_admin, '| modules:', moduleAccess?.modules);
+
+      // Show Control Panel button if user has any admin module access
+      if (moduleAccess?.is_admin) {
+        document.getElementById('cpBtn').style.display = 'flex';
+      }
 
       // Check QA access
       try {
