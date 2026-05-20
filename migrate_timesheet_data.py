@@ -116,7 +116,6 @@ timesheets_col = db["Timesheet_data2"]
 backup_col     = db["Timesheet_data_backup"]
 cycles_col     = db["payroll_cycles"]
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def recalc_payroll_totals(weeks: list) -> tuple:
