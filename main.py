@@ -229,6 +229,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         "expires_in":    ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     }
 
+
 @app.post("/verify_session")
 async def verify_session(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     token       = credentials.credentials
