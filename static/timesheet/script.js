@@ -4534,7 +4534,7 @@ async function handleExcelUpload(event) {
                 return;
             }
 
-            // ✅ Required columns to validate
+            // ✅ Required columns to validate (Lunch Time & Travel Time are optional)
             const requiredColumns = [
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
                 'Reporting Manager', 'Week Period', 'Date', 'Location of Work',

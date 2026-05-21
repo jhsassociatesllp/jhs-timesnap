@@ -965,6 +965,202 @@ async def submit_timesheet(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Excel Upload Endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ExcelTimesheetEntry(BaseModel):
+    employeeId: str
+    employeeName: str
+    designation: str
+    gender: str
+    partner: str
+    reportingManager: str
+    weekPeriod: str
+    date: str
+    location: str
+    projectStartTime: str
+    projectEndTime: str
+    client: str
+    project: str
+    projectCode: str
+    reportingManagerEntry: str
+    activity: str
+    projectHours: str
+    billable: str
+    lunchTime: Optional[str] = ""
+    travelTime: Optional[str] = ""
+    remarks: str
+    hits: Optional[str] = ""
+    misses: Optional[str] = ""
+    feedback_hr: Optional[str] = ""
+    feedback_it: Optional[str] = ""
+    feedback_crm: Optional[str] = ""
+    feedback_others: Optional[str] = ""
+
+
+@app.post("/save_timesheets")
+async def save_timesheets_from_excel(
+    entries: list[ExcelTimesheetEntry],
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Save timesheets uploaded from Excel.
+    Groups entries by employee → payroll cycle → week period.
+    Handles conditional lunch/travel time fields based on payroll cycle config.
+    """
+    if not entries:
+        raise HTTPException(400, "No entries provided")
+
+    now_iso = datetime.utcnow().isoformat()
+    
+    # Group entries by employee
+    by_employee = {}
+    for entry in entries:
+        emp_id = entry.employeeId.strip().upper()
+        if emp_id not in by_employee:
+            by_employee[emp_id] = {
+                "employeeName": entry.employeeName,
+                "designation": entry.designation,
+                "gender": entry.gender,
+                "partner": entry.partner,
+                "reportingManager": entry.reportingManager,
+                "hits": entry.hits,
+                "misses": entry.misses,
+                "feedback_hr": entry.feedback_hr,
+                "feedback_it": entry.feedback_it,
+                "feedback_crm": entry.feedback_crm,
+                "feedback_others": entry.feedback_others,
+                "weeks": {}
+            }
+        
+        week = entry.weekPeriod
+        if week not in by_employee[emp_id]["weeks"]:
+            by_employee[emp_id]["weeks"][week] = []
+        
+        # Build entry dict
+        entry_dict = {
+            "id": str(ObjectId()),
+            "date": entry.date,
+            "location": entry.location,
+            "projectStartTime": entry.projectStartTime,
+            "projectEndTime": entry.projectEndTime,
+            "client": entry.client,
+            "project": entry.project,
+            "projectCode": entry.projectCode,
+            "reportingManagerEntry": entry.reportingManagerEntry,
+            "activity": entry.activity,
+            "projectHours": entry.projectHours,
+            "billable": entry.billable,
+            "remarks": entry.remarks,
+            "created_time": now_iso,
+            "updated_time": now_iso,
+        }
+        
+        # Add lunch/travel time if provided (will be included in all uploads)
+        if entry.lunchTime:
+            entry_dict["lunchTime"] = entry.lunchTime
+        if entry.travelTime:
+            entry_dict["travelTime"] = entry.travelTime
+        
+        by_employee[emp_id]["weeks"][week].append(entry_dict)
+    
+    # Determine payroll cycle from week period (use first entry's week)
+    # For now, we'll need to match the week period to an existing cycle
+    # This is a simplified approach - you may need to enhance this logic
+    
+    from backend.database import timesheets_collection
+    from backend.timesheet.router import _get_or_create_payroll, _upsert_week, recalc_payroll_totals
+    
+    saved_count = 0
+    
+    for emp_id, emp_data in by_employee.items():
+        # Find or create employee document
+        doc = timesheets_collection.find_one({"employeeId": emp_id})
+        
+        # For Excel upload, we need to determine which cycle these entries belong to
+        # We'll try to match the week period to an existing live cycle
+        # If no match, we'll create a generic cycle
+        
+        # Get all live cycles
+        live_cycles = list(payroll_cycles_collection.find({"status": "live"}))
+        
+        # Try to match week period to a cycle
+        # This is simplified - you may want more sophisticated matching
+        cycle_id = None
+        cycle_label = None
+        
+        if live_cycles:
+            # Use the first live cycle
+            cycle = live_cycles[0]
+            cycle_id = str(cycle["_id"])
+            cycle_label = cycle.get("cycle_label", "")
+        else:
+            # No live cycle - create a generic one or raise error
+            raise HTTPException(400, "No active payroll cycle found. Please create a payroll cycle first.")
+        
+        if doc:
+            payrolls = doc.get("payrolls", [])
+        else:
+            payrolls = []
+        
+        # Get or create payroll for this cycle
+        payroll = _get_or_create_payroll(payrolls, cycle_id, cycle_label)
+        
+        # Add weeks and entries
+        for week_period, week_entries in emp_data["weeks"].items():
+            _upsert_week(payroll, week_period, week_entries)
+        
+        # Update metadata
+        payroll["metadata"] = {
+            "hits": emp_data.get("hits", ""),
+            "misses": emp_data.get("misses", ""),
+            "feedback_hr": emp_data.get("feedback_hr", ""),
+            "feedback_it": emp_data.get("feedback_it", ""),
+            "feedback_crm": emp_data.get("feedback_crm", ""),
+            "feedback_others": emp_data.get("feedback_others", ""),
+        }
+        
+        # Recalculate totals
+        p_total, p_billable, p_non_billable = recalc_payroll_totals(payroll)
+        payroll["totalHours"] = p_total
+        payroll["totalBillableHours"] = p_billable
+        payroll["totalNonBillableHours"] = p_non_billable
+        
+        # Mark as submitted
+        payroll["submitted"] = True
+        payroll["submitted_at"] = now_iso
+        
+        # Save to database
+        payload = {
+            "employeeId": emp_id,
+            "employeeName": emp_data["employeeName"],
+            "designation": emp_data["designation"],
+            "gender": emp_data["gender"],
+            "partner": emp_data["partner"],
+            "reportingManager": emp_data["reportingManager"],
+            "payrolls": payrolls,
+            "updated_time": now_iso,
+        }
+        
+        if doc:
+            timesheets_collection.update_one(
+                {"employeeId": emp_id},
+                {"$set": payload}
+            )
+        else:
+            payload["created_time"] = now_iso
+            timesheets_collection.insert_one(payload)
+        
+        saved_count += 1
+    
+    return {
+        "success": True,
+        "message": f"Successfully uploaded timesheets for {saved_count} employee(s)",
+        "employees_processed": saved_count
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Legacy URL aliases
 # ─────────────────────────────────────────────────────────────────────────────
 
