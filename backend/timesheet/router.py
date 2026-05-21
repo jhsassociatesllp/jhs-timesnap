@@ -171,8 +171,6 @@ async def save_draft(
     if doc:
         payrolls = doc.get("payrolls", [])
         payroll = _get_or_create_payroll(payrolls, cycle_id, cycle_label)
-        if payroll.get("submitted"):
-            raise HTTPException(403, "Timesheet already submitted for this cycle")
         _upsert_week(payroll, week_period, new_entries)
         if metadata:
             payroll["metadata"] = metadata
@@ -268,8 +266,6 @@ async def submit_timesheet(
             break
     if not temp_payroll:
         raise HTTPException(404, "No draft found for this cycle")
-    if temp_payroll.get("submitted"):
-        raise HTTPException(400, "Already submitted")
 
     emp_id = current_user
     meta = temp_payroll.get("metadata") or metadata or {}
@@ -401,6 +397,10 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
             "totalNonBillableHours": 0,
         }
 
+    # Fetch payroll cycles to get show_lunch_travel flag
+    from backend.database import payroll_cycles_collection
+    from bson import ObjectId as BsonObjectId
+    
     payrolls_out = []
     for p in doc.get("payrolls", []):
         weeks_out = []
@@ -437,6 +437,15 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
         if not p.get("totalHours"):
             p_total, p_billable, p_non_billable = recalc_payroll_totals(p)
 
+        # Fetch show_lunch_travel flag from payroll_cycles collection
+        show_lunch_travel = True  # default
+        try:
+            cycle_doc = payroll_cycles_collection.find_one({"_id": BsonObjectId(p["cycle_id"])})
+            if cycle_doc:
+                show_lunch_travel = cycle_doc.get("show_lunch_travel", True)
+        except Exception as e:
+            print(f"Error fetching cycle config: {e}")
+
         payrolls_out.append({
             "cycle_id": p["cycle_id"],
             "cycle_label": p.get("cycle_label", ""),
@@ -446,6 +455,7 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
             "totalHours": p_total,
             "totalBillableHours": p_billable,
             "totalNonBillableHours": p_non_billable,
+            "show_lunch_travel": show_lunch_travel,
             "weeks": weeks_out,
         })
 

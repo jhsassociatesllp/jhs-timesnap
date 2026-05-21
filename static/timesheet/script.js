@@ -289,8 +289,8 @@ async function loadAvailableCycles() {
     sel.appendChild(opt);
   });
 
-  // Auto-select first non-locked, non-submitted cycle
-  const autoSelect = _availableCycles.find(c => !c.locked && !_submittedCycles[c.id]?.submitted);
+  // Auto-select first non-locked cycle (allow multiple submissions)
+  const autoSelect = _availableCycles.find(c => !c.locked);
   if (autoSelect) {
     sel.value = autoSelect.id;
     _selectedCycle = autoSelect;
@@ -338,12 +338,11 @@ function _updateCycleUI(cycle) {
   // Toggle modal fields
   _applyLunchTravelVisibility();
 
-  // Disable submit if locked or already submitted
-  const submitted = _submittedCycles[cycle.id]?.submitted;
+  // Disable submit only if locked (allow multiple submissions)
   const submitBtn = document.getElementById("submitBtn");
   if (submitBtn) {
-    submitBtn.disabled = cycle.locked || submitted;
-    submitBtn.title    = submitted ? "Already submitted" : cycle.locked ? "Deadline passed" : "";
+    submitBtn.disabled = cycle.locked;
+    submitBtn.title    = cycle.locked ? "Deadline passed" : "";
   }
 }
 
@@ -2807,6 +2806,10 @@ function _renderHistoryPayrolls(payrolls) {
 
     const statusColor = payroll.submitted ? '#10b981' : '#f59e0b';
     const statusLabel = payroll.submitted ? '✅ Submitted' : '⏳ Draft';
+    
+    // Check if this payroll should show lunch/travel columns
+    const showLunchTravel = payroll.show_lunch_travel !== false; // default true
+    
     payrollDiv.innerHTML = `
       <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
         <div style="font-weight:700;font-size:1rem;"><i class="fas fa-calendar-alt"></i> ${payroll.cycle_label}</div>
@@ -2844,8 +2847,8 @@ function _renderHistoryPayrolls(payrolls) {
             <th class="col-wide">Activity</th>
             <th class="col-narrow">Hours</th>
             <th class="col-medium">Billable</th>
-            <th class="col-medium">Lunch Time</th>
-            <th class="col-medium">Travel Time</th>
+            ${showLunchTravel ? '<th class="col-medium">Lunch Time</th>' : ''}
+            ${showLunchTravel ? '<th class="col-medium">Travel Time</th>' : ''}
             <th class="col-wide">Remarks</th>
           </tr>
         </thead>
@@ -2876,8 +2879,8 @@ function _renderHistoryPayrolls(payrolls) {
           <td>${entry.activity||''}</td>
           <td>${entry.projectHours||''}</td>
           <td>${entry.billable||''}</td>
-          <td>${entry.lunchTime||''}</td>
-          <td>${entry.travelTime||''}</td>
+          ${showLunchTravel ? `<td>${entry.lunchTime||''}</td>` : ''}
+          ${showLunchTravel ? `<td>${entry.travelTime||''}</td>` : ''}
           <td>${entry.remarks||''}</td>
         `;
         tbody.appendChild(row);
@@ -3148,10 +3151,6 @@ async function saveWeekDraft(sectionId) {
     showPopup('Submission deadline has passed for this cycle.', true);
     return;
   }
-  if (_submittedCycles[_selectedCycle.id]?.submitted) {
-    showPopup('You have already submitted this cycle. No further edits allowed.', true);
-    return;
-  }
 
   const section = document.getElementById(sectionId);
   if (!section) { showPopup('Section not found.', true); return; }
@@ -3225,10 +3224,6 @@ function confirmSubmit() {
     showPopup('Submission deadline has passed for this cycle.', true);
     return;
   }
-  if (_submittedCycles[_selectedCycle.id]?.submitted) {
-    showPopup('You have already submitted this cycle.', true);
-    return;
-  }
   const popup = document.getElementById('submitConfirmPopup');
   if (popup) popup.style.display = 'flex';
 }
@@ -3254,12 +3249,7 @@ async function doSubmitTimesheet() {
     const data = await res.json();
     hideLoading();
     if (res.ok && data.success) {
-      // Mark as submitted locally
-      _submittedCycles[_selectedCycle.id] = { submitted: true };
       showPopup('🎉 Timesheet submitted successfully! You can view it in History.');
-      // Disable submit button
-      const btn = document.getElementById('submitBtn');
-      if (btn) { btn.disabled = true; btn.title = 'Already submitted'; }
       // Refresh cycle dropdown to show submitted status
       await loadAvailableCycles();
       setTimeout(() => clearTimesheet(true), 2000);
