@@ -419,39 +419,43 @@ async function loadDraftForCycle(cycleId) {
     );
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.draft || !data.draft.Data || !data.draft.Data.length) return;
+    
+    // New structure: data.draft is a payroll object with weeks array
+    if (!data.draft || !data.draft.weeks || !data.draft.weeks.length) return;
 
     // Clear existing sections and rebuild from draft
     document.querySelectorAll('.timesheet-section').forEach(s => s.remove());
     sectionCount = 0;
 
     let restoredCount = 0;
-    for (const weekObj of data.draft.Data) {
-      for (const [weekPeriod, entries] of Object.entries(weekObj)) {
-        if (!entries || !entries.length) continue;
-        addWeekSection();
-        const secId = `section_${sectionCount}`;
-        const sec   = document.getElementById(secId);
-        if (!sec) continue;
+    for (const week of data.draft.weeks) {
+      const weekPeriod = week.week_period;
+      const entries = week.entries || [];
+      
+      if (!entries.length) continue;
+      
+      addWeekSection();
+      const secId = `section_${sectionCount}`;
+      const sec   = document.getElementById(secId);
+      if (!sec) continue;
 
-        // Set the week period dropdown
-        const weekSel = sec.querySelector('.week-period select');
-        if (weekSel) {
-          const match = Array.from(weekSel.options).find(o => o.value === weekPeriod);
-          if (match) weekSel.value = weekPeriod;
-        }
-
-        // Remove the auto-added empty row
-        const tbody = sec.querySelector('tbody');
-        if (tbody) tbody.innerHTML = '';
-
-        // Restore each saved entry with green background
-        for (const entry of entries) {
-          _restoreDraftRow(secId, entry, true);
-          restoredCount++;
-        }
-        updateRowNumbers(`timesheetBody_${sectionCount}`);
+      // Set the week period dropdown
+      const weekSel = sec.querySelector('.week-period select');
+      if (weekSel) {
+        const match = Array.from(weekSel.options).find(o => o.value === weekPeriod);
+        if (match) weekSel.value = weekPeriod;
       }
+
+      // Remove the auto-added empty row
+      const tbody = sec.querySelector('tbody');
+      if (tbody) tbody.innerHTML = '';
+
+      // Restore each saved entry with green background
+      for (const entry of entries) {
+        _restoreDraftRow(secId, entry, true);
+        restoredCount++;
+      }
+      updateRowNumbers(`timesheetBody_${sectionCount}`);
     }
 
     // Restore feedback/metadata
@@ -465,6 +469,52 @@ async function loadDraftForCycle(cycleId) {
     // Silently restore — no popup needed, green rows are the visual indicator
   } catch(e) {
     console.error('loadDraftForCycle error:', e);
+  }
+}
+
+// ── Load saved draft for a specific week ─────────────────────────────────────
+async function loadDraftForWeek(sectionId, weekPeriod) {
+  if (!_selectedCycle || !loggedInEmployeeId || !weekPeriod) return;
+  
+  try {
+    const res = await fetch(
+      `${API_URL}/timesheet/draft/${loggedInEmployeeId}?cycle_id=${_selectedCycle.id}`,
+      { headers: getHeaders() }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    
+    // New structure: data.draft is a payroll object with weeks array
+    if (!data.draft || !data.draft.weeks) return;
+    
+    // Find the specific week
+    const week = data.draft.weeks.find(w => w.week_period === weekPeriod);
+    if (!week || !week.entries || !week.entries.length) {
+      // No saved data for this week - clear the table and add one empty row
+      const sectionNum = sectionId.split('_')[1];
+      const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
+      if (tbody) {
+        tbody.innerHTML = '';
+        addRow(sectionId);
+      }
+      return;
+    }
+    
+    // Clear the table
+    const sectionNum = sectionId.split('_')[1];
+    const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    // Restore saved entries with green background
+    for (const entry of week.entries) {
+      _restoreDraftRow(sectionId, entry, true);
+    }
+    
+    updateRowNumbers(`timesheetBody_${sectionNum}`);
+    updateSummary();
+  } catch(e) {
+    console.error('loadDraftForWeek error:', e);
   }
 }
 
@@ -1347,6 +1397,8 @@ function addWeekSection() {
 
 
   select.onchange = () => {
+    // Load saved draft for this specific week when week changes
+    loadDraftForWeek(sectionId, select.value);
     if (typeof updateSummary === "function") updateSummary();
     if (typeof updateExistingRowDates === "function")
       updateExistingRowDates(sectionId);
