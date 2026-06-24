@@ -542,6 +542,119 @@ async def update_payroll_cycle(
     )
     return {"success": True}
 
+class ActiveApprovalPayrollRequest(BaseModel):
+    cycle_id: str  # pass empty string "" to clear (show all live cycles)
+
+
+@app.post("/admin/set-active-approval-payroll")
+async def set_active_approval_payroll(
+    req: ActiveApprovalPayrollRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin: set which payroll cycle TLs/Managers see in approval screens."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+
+    if req.cycle_id:
+        try:
+            from bson import ObjectId
+            oid = ObjectId(req.cycle_id)
+        except Exception:
+            raise HTTPException(400, "Invalid cycle ID")
+        cycle = payroll_cycles_collection.find_one({"_id": oid})
+        if not cycle:
+            raise HTTPException(404, "Cycle not found")
+        admin_details_collection.update_one(
+            {},
+            {"$set": {"active_approval_cycle_id": req.cycle_id, "active_approval_cycle_label": cycle.get("cycle_label", "")}},
+            upsert=True,
+        )
+        return {"success": True, "active_approval_cycle_id": req.cycle_id, "cycle_label": cycle.get("cycle_label", "")}
+    else:
+        # Clear → fall back to all live cycles
+        admin_details_collection.update_one(
+            {},
+            {"$unset": {"active_approval_cycle_id": "", "active_approval_cycle_label": ""}},
+        )
+        return {"success": True, "active_approval_cycle_id": None, "cycle_label": "All Live Cycles"}
+
+
+@app.get("/admin/active-approval-payroll")
+async def get_active_approval_payroll(current_user: str = Depends(get_current_user)):
+    """Admin: get currently selected active approval cycle."""
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    admin = admin_details_collection.find_one({}, {"active_approval_cycle_id": 1, "active_approval_cycle_label": 1})
+    if admin and admin.get("active_approval_cycle_id"):
+        return {
+            "active_approval_cycle_id": admin["active_approval_cycle_id"],
+            "cycle_label": admin.get("active_approval_cycle_label", ""),
+        }
+    return {"active_approval_cycle_id": None, "cycle_label": "All Live Cycles"}
+
+
+@app.post("/admin/bulk-set-cycle-status")
+async def bulk_set_cycle_status(
+    cycle_id: str = Body(...),
+    status: str = Body(...),
+    current_user: str = Depends(get_current_user),
+):
+    """Admin: bulk-set approval_status for ALL submitted payrolls in a cycle.
+    Also moves employees to the Approved/Rejected collection accordingly.
+    """
+    if not _is_timesheet_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    if status not in ("approved", "rejected", "pending"):
+        raise HTTPException(400, "status must be approved, rejected, or pending")
+
+    now_iso = __import__("datetime").datetime.utcnow().isoformat()
+
+    # 1. Update approval_status in Timesheet_data for all employees with this cycle
+    result = timesheets_collection.update_many(
+        {"payrolls": {"$elemMatch": {"cycle_id": cycle_id, "submitted": True}}},
+        {"$set": {
+            "payrolls.$[elem].approval_status": status,
+            "payrolls.$[elem].status_updated_at": now_iso,
+            "payrolls.$[elem].status_updated_by": current_user,
+        }},
+        array_filters=[{"elem.cycle_id": cycle_id, "elem.submitted": True}],
+    )
+
+    # 2. Move employees from Pending/Rejected → Approved in the approval collections
+    if status == "approved":
+        affected_employees = list(timesheets_collection.find(
+            {"payrolls": {"$elemMatch": {"cycle_id": cycle_id, "submitted": True}}},
+            {"employeeId": 1, "_id": 0}
+        ))
+        from backend.database import (
+            pending_collection, approved_collection, rejected_collection,
+            reporting_managers_collection as rm_coll, employee_details_collection,
+        )
+        from backend.timesheet.router import add_or_create
+        for emp_doc in affected_employees:
+            emp_code = emp_doc.get("employeeId", "")
+            if not emp_code:
+                continue
+            # Find reporting manager
+            rm = rm_coll.find_one({"EmployeeCode": emp_code})
+            mgr_code = rm.get("ReportingEmpCode", "") if rm else ""
+            if not mgr_code:
+                continue
+            mgr_doc = employee_details_collection.find_one({"ReportingEmpCode": mgr_code})
+            mgr_name = mgr_doc.get("ReportingEmpName", "") if mgr_doc else ""
+            pending_collection.update_one({"ReportingEmpCode": mgr_code}, {"$pull": {"EmployeesCodes": emp_code}})
+            rejected_collection.update_one({"ReportingEmpCode": mgr_code}, {"$pull": {"EmployeesCodes": emp_code}})
+            add_or_create(approved_collection, mgr_code, mgr_name, emp_code)
+
+    return {
+        "success": True,
+        "updated": result.modified_count,
+        "status": status,
+        "cycle_id": cycle_id,
+        "message": f"{result.modified_count} payroll(s) set to '{status}'",
+    }
+
+
 @app.delete("/payroll-cycles/{cycle_id}")
 async def delete_payroll_cycle(
     cycle_id: str,

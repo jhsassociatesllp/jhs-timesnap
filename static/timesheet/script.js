@@ -2602,8 +2602,8 @@ function updateModalHours() {
 }
 
 /* Manager employee details modal (opens timeline and feedback) */
-async function openEmployeeDetails(employeeId) {
-  console.log("🔹 Opening employee timesheet for:", employeeId);
+async function openEmployeeDetails(employeeId, cycleId) {
+  console.log("🔹 Opening employee timesheet for:", employeeId, "cycle:", cycleId);
 
   const modal = document.getElementById("modalOverlay");
   const modalContent = modal?.querySelector(".modal-content");
@@ -2625,7 +2625,10 @@ async function openEmployeeDetails(employeeId) {
   `;
 
   try {
-    const response = await fetch(`${API_URL}/get_timesheet/${employeeId}`, {
+    const url = cycleId
+      ? `${API_URL}/get_timesheet/${employeeId}?cycle_id=${encodeURIComponent(cycleId)}`
+      : `${API_URL}/get_timesheet/${employeeId}`;
+    const response = await fetch(url, {
       method: "GET",
       headers: getHeaders(),
     });
@@ -2660,6 +2663,7 @@ async function openEmployeeDetails(employeeId) {
           <p><strong>Gender:</strong> ${data.gender || "-"}</p>
           <p><strong>Partner:</strong> ${data.partner || "-"}</p>
           <p><strong>Reporting Manager:</strong> ${data.reporting_manager || "-"}</p>
+          ${data.cycle_label ? `<p style="grid-column:1/-1;"><strong>Payroll Cycle:</strong> <span style="background:#e0e7ff;color:#3730a3;padding:.2rem .7rem;border-radius:8px;font-weight:700;font-size:.88rem;">${data.cycle_label}</span></p>` : ''}
         </div>
       </div>
     `;
@@ -2755,12 +2759,25 @@ async function loadHistory(){
               if (sr.ok) { const sd = await sr.json(); _submittedCycles = sd.status || {}; }
             } catch(e) {}
 
-            const response = await fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, { headers: getHeaders() });
+            // Fetch timesheet history AND approval tracker in parallel
+            const [response, trackerRes] = await Promise.all([
+              fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, { headers: getHeaders() }),
+              fetch(`${API_URL}/timesheet/approval-tracker/${loggedInEmployeeId}`, { headers: getHeaders() }).catch(() => null),
+            ]);
             if (!response.ok) throw new Error('Failed to fetch history');
 
             const data = await response.json();
-            const payrolls = data.payrolls || [];
+            const payrolls = (data.payrolls || []).slice().reverse(); // latest first
             historyEntries = []; // reset flat list
+
+            // Build cycle_id → approval status map
+            window._approvalStatusMap = {};
+            if (trackerRes && trackerRes.ok) {
+              try {
+                const td = await trackerRes.json();
+                (td.statuses || []).forEach(s => { window._approvalStatusMap[s.cycle_id] = s; });
+              } catch (e) {}
+            }
 
             const historyContent = document.getElementById('historyContent');
             historyContent.innerHTML = '';
@@ -2771,7 +2788,7 @@ async function loadHistory(){
                 return;
             }
 
-            // ── Build payroll filter dropdown ──────────────────────────────────
+            // ── Build payroll filter + search bar ─────────────────────────────
             const filterWrap = document.createElement('div');
             filterWrap.style.cssText = 'margin-bottom:1.5rem;padding:1rem 1.5rem;background:#f0f4ff;border-radius:12px;border:2px solid #c5cef9;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;';
             filterWrap.innerHTML = `
@@ -2784,13 +2801,20 @@ async function loadHistory(){
             `;
             historyContent.appendChild(filterWrap);
 
-            // Container for payroll sections
+            // Container for payroll cards
             const payrollsContainer = document.createElement('div');
             payrollsContainer.id = 'historyPayrollsContainer';
             historyContent.appendChild(payrollsContainer);
 
+            // Pagination container
+            const paginationContainer = document.createElement('div');
+            paginationContainer.id = 'historyPagination';
+            paginationContainer.style.cssText = 'display:flex;gap:.5rem;justify-content:center;margin-top:1.5rem;flex-wrap:wrap;';
+            historyContent.appendChild(paginationContainer);
+
             // Store payrolls globally for filter
             window._historyPayrolls = payrolls;
+            window._historyPage = 1;
 
             // Flatten for export compatibility
             payrolls.forEach(p => {
@@ -2817,6 +2841,7 @@ function filterHistoryByPayroll() {
   const cycleId = sel?.value || 'all';
   const payrolls = window._historyPayrolls || [];
   const filtered = cycleId === 'all' ? payrolls : payrolls.filter(p => p.cycle_id === cycleId);
+  window._historyPage = 1; // reset to first page on filter change
   _renderHistoryPayrolls(filtered);
   _updateHistorySummary(filtered);
 }
@@ -2841,39 +2866,139 @@ function _updateHistorySummary(payrolls) {
   if (summary) summary.textContent = `${total.toFixed(1)} hrs total | ${billable.toFixed(1)} billable`;
 }
 
+const HISTORY_PAGE_SIZE = 5;
+
+function _getApprovalStatusBadge(cycleId) {
+  const s = (window._approvalStatusMap || {})[cycleId];
+  if (!s) return '';
+  const cfg = {
+    draft:     { color: '#f59e0b', bg: '#fef3c7', icon: 'fa-pencil-alt',    label: 'Draft'     },
+    pending:   { color: '#3b82f6', bg: '#dbeafe', icon: 'fa-hourglass-half', label: 'Pending Approval' },
+    submitted: { color: '#6366f1', bg: '#e0e7ff', icon: 'fa-paper-plane',   label: 'Submitted' },
+    approved:  { color: '#10b981', bg: '#d1fae5', icon: 'fa-check-circle',  label: 'Approved'  },
+    rejected:  { color: '#ef4444', bg: '#fee2e2', icon: 'fa-times-circle',  label: 'Rejected'  },
+  };
+  const c = cfg[s.status] || cfg.submitted;
+  return `<span style="display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .9rem;border-radius:20px;font-weight:700;font-size:.8rem;background:${c.bg};color:${c.color};">
+    <i class="fas ${c.icon}"></i> ${c.label}
+  </span>`;
+}
+
+function _buildApprovalTimeline(cycleId) {
+  const s = (window._approvalStatusMap || {})[cycleId];
+  if (!s || !s.submitted) return '';
+
+  const fmtDate = iso => {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+    catch { return iso; }
+  };
+
+  const steps = [
+    { done: true,                      icon: 'fa-paper-plane',   color: '#6366f1', label: 'Submitted',       detail: fmtDate(s.submitted_at) },
+    { done: s.status !== 'submitted',  icon: 'fa-hourglass-half',color: s.status === 'rejected' ? '#ef4444' : '#3b82f6', label: s.status === 'rejected' ? 'Rejected by Manager' : s.status === 'approved' ? 'Manager Review' : 'Waiting for Manager', detail: s.status === 'rejected' ? `${fmtDate(s.rejected_at)}${s.rejection_reason ? ' — ' + s.rejection_reason : ''}` : '' },
+    { done: s.status === 'approved',   icon: 'fa-check-circle',  color: '#10b981', label: 'Approved',        detail: s.approved_by_name ? `by ${s.approved_by_name}` : '' },
+  ];
+
+  return `
+    <div style="padding:1rem 1.5rem;background:#f8fafc;border-top:1px solid #e2e8f0;">
+      <div style="font-weight:700;font-size:.85rem;color:#475569;margin-bottom:.9rem;"><i class="fas fa-route"></i> Approval Timeline</div>
+      <div style="display:flex;align-items:flex-start;gap:0;position:relative;overflow-x:auto;padding-bottom:.5rem;">
+        ${steps.map((step, i) => `
+          <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:120px;position:relative;">
+            ${i < steps.length - 1 ? `<div style="position:absolute;top:16px;left:50%;width:100%;height:3px;background:${step.done ? '#10b981' : '#e2e8f0'};z-index:0;"></div>` : ''}
+            <div style="width:34px;height:34px;border-radius:50%;background:${step.done ? step.color : '#e2e8f0'};color:${step.done ? '#fff' : '#94a3b8'};display:flex;align-items:center;justify-content:center;font-size:.9rem;position:relative;z-index:1;box-shadow:0 2px 6px rgba(0,0,0,.1);">
+              <i class="fas ${step.icon}"></i>
+            </div>
+            <div style="margin-top:.5rem;text-align:center;font-size:.78rem;">
+              <div style="font-weight:700;color:${step.done ? step.color : '#94a3b8'};">${step.label}</div>
+              ${step.detail ? `<div style="color:#64748b;margin-top:.15rem;font-size:.72rem;max-width:130px;word-break:break-word;">${step.detail}</div>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function _renderHistoryPayrolls(payrolls) {
   const container = document.getElementById('historyPayrollsContainer');
+  const paginationEl = document.getElementById('historyPagination');
   if (!container) return;
   container.innerHTML = '';
 
   if (!payrolls.length) {
     container.innerHTML = '<p style="padding:2rem;color:#888;">No entries for selected payroll.</p>';
+    if (paginationEl) paginationEl.innerHTML = '';
     return;
   }
 
-  payrolls.forEach(payroll => {
-    // Payroll header card
-    const payrollDiv = document.createElement('div');
-    payrollDiv.style.cssText = 'margin-bottom:2rem;border:2px solid #e1e8ed;border-radius:14px;overflow:hidden;';
+  const page = window._historyPage || 1;
+  const total = payrolls.length;
+  const totalPages = Math.ceil(total / HISTORY_PAGE_SIZE);
+  const start = (page - 1) * HISTORY_PAGE_SIZE;
+  const pageItems = payrolls.slice(start, start + HISTORY_PAGE_SIZE);
 
-    const statusColor = payroll.submitted ? '#10b981' : '#f59e0b';
-    const statusLabel = payroll.submitted ? '✅ Submitted' : '⏳ Draft';
-    
-    // Check if this payroll should show lunch/travel columns
-    const showLunchTravel = payroll.show_lunch_travel !== false; // default true
-    
-    payrollDiv.innerHTML = `
-      <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
-        <div style="font-weight:700;font-size:1rem;"><i class="fas fa-calendar-alt"></i> ${payroll.cycle_label}</div>
-        <div style="display:flex;gap:1.5rem;align-items:center;font-size:.85rem;">
-          <span><i class="fas fa-clock"></i> ${(payroll.totalHours||0).toFixed(1)} hrs</span>
-          <span><i class="fas fa-dollar-sign"></i> ${(payroll.totalBillableHours||0).toFixed(1)} billable</span>
-          <span style="background:${statusColor};color:#fff;padding:.2rem .7rem;border-radius:20px;font-weight:700;font-size:.78rem;">${statusLabel}</span>
+  pageItems.forEach((payroll, cardIdx) => {
+    const showLunchTravel = payroll.show_lunch_travel !== false;
+    const approvalBadge = _getApprovalStatusBadge(payroll.cycle_id);
+    const approvalTimeline = _buildApprovalTimeline(payroll.cycle_id);
+
+    // Count unique working days
+    const allDates = new Set();
+    payroll.weeks.forEach(w => w.entries.forEach(e => { if (e.date) allDates.add(e.date); }));
+    const workingDays = allDates.size;
+
+    // Derive date range from entries
+    const sortedDates = [...allDates].sort();
+    const dateRangeStr = sortedDates.length
+      ? `${sortedDates[0]} — ${sortedDates[sortedDates.length - 1]}`
+      : '—';
+
+    const submittedAt = payroll.submitted_at
+      ? new Date(payroll.submitted_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+      : null;
+
+    const cardId = `historyCard_${start + cardIdx}`;
+    const bodyId = `historyBody_${start + cardIdx}`;
+
+    const card = document.createElement('div');
+    card.className = 'history-payroll-card';
+    card.style.cssText = 'margin-bottom:1.2rem;border:2px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);background:#fff;transition:box-shadow .2s;';
+
+    card.innerHTML = `
+      <!-- Card Summary Header -->
+      <div class="history-card-header" onclick="toggleHistoryCard('${bodyId}','${cardId}')"
+        style="padding:1.1rem 1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#f0f4ff,#f5f0ff);flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:.35rem;flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+            <span style="font-weight:800;font-size:1.05rem;color:#3730a3;"><i class="fas fa-calendar-alt"></i> ${payroll.cycle_label}</span>
+            ${approvalBadge}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:.8rem 1.5rem;font-size:.83rem;color:#475569;margin-top:.1rem;">
+            <span><i class="fas fa-calendar-day" style="color:#6366f1;"></i> ${dateRangeStr}</span>
+            ${submittedAt ? `<span><i class="fas fa-paper-plane" style="color:#10b981;"></i> Submitted ${submittedAt}</span>` : '<span style="color:#f59e0b;"><i class="fas fa-pencil-alt"></i> Draft</span>'}
+            <span><i class="fas fa-briefcase" style="color:#f59e0b;"></i> ${workingDays} working day${workingDays !== 1 ? 's' : ''}</span>
+            <span><i class="fas fa-clock" style="color:#3b82f6;"></i> ${(payroll.totalHours||0).toFixed(1)} hrs total</span>
+            <span><i class="fas fa-dollar-sign" style="color:#10b981;"></i> ${(payroll.totalBillableHours||0).toFixed(1)} billable</span>
+          </div>
         </div>
+        <div id="${cardId}_icon" style="font-size:1.1rem;color:#6366f1;transition:transform .3s;flex-shrink:0;">
+          <i class="fas fa-chevron-down"></i>
+        </div>
+      </div>
+
+      <!-- Card Detail Body (collapsed by default) -->
+      <div id="${bodyId}" style="display:none;">
+        ${approvalTimeline}
+        <div class="history-card-weeks" style="padding:.5rem 0;">
+        </div>
+        <div class="history-card-feedback"></div>
       </div>
     `;
 
-    // Render each week
+    // Build week tables inside the card body
+    const weeksContainer = card.querySelector('.history-card-weeks');
     payroll.weeks.forEach(week => {
       const weekDiv = document.createElement('div');
       weekDiv.style.cssText = 'padding:1rem 1.5rem 0;';
@@ -2907,7 +3032,6 @@ function _renderHistoryPayrolls(payrolls) {
         <tbody></tbody>
       `;
       const tbody = table.querySelector('tbody');
-
       week.entries.forEach((entry, rowIndex) => {
         const isSubmitted = payroll.submitted;
         const row = document.createElement('tr');
@@ -2937,18 +3061,15 @@ function _renderHistoryPayrolls(payrolls) {
         `;
         tbody.appendChild(row);
       });
-
       tableWrapper.appendChild(table);
       weekDiv.appendChild(tableWrapper);
-
-      // Feedback for this payroll (show once per payroll, after last week)
-      payrollDiv.appendChild(weekDiv);
+      weeksContainer.appendChild(weekDiv);
     });
 
-    // Feedback section
+    // Feedback section inside card
     const meta = payroll.metadata || {};
     if (meta.hits || meta.misses || meta.feedback_hr || meta.feedback_it || meta.feedback_crm || meta.feedback_others) {
-      const feedbackDiv = document.createElement('div');
+      const feedbackDiv = card.querySelector('.history-card-feedback');
       feedbackDiv.style.cssText = 'padding:1rem 1.5rem 1.5rem;background:#fafbfc;border-top:1px solid #e1e8ed;';
       feedbackDiv.innerHTML = `
         <h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.88rem;font-weight:700;"><i class="fas fa-comment-alt"></i> Feedback</h4>
@@ -2961,11 +3082,33 @@ function _renderHistoryPayrolls(payrolls) {
           ${meta.feedback_others ? `<div><strong>Others:</strong> ${meta.feedback_others}</div>` : ''}
         </div>
       `;
-      payrollDiv.appendChild(feedbackDiv);
     }
 
-    container.appendChild(payrollDiv);
+    container.appendChild(card);
   });
+
+  // Render pagination
+  if (paginationEl) {
+    paginationEl.innerHTML = '';
+    if (totalPages > 1) {
+      for (let p = 1; p <= totalPages; p++) {
+        const btn = document.createElement('button');
+        btn.textContent = p;
+        btn.style.cssText = `padding:.45rem .9rem;border-radius:8px;border:2px solid ${p === page ? '#5d5fef' : '#e2e8f0'};background:${p === page ? '#5d5fef' : '#fff'};color:${p === page ? '#fff' : '#475569'};font-weight:700;font-size:.88rem;cursor:pointer;`;
+        btn.onclick = (pg => () => { window._historyPage = pg; _renderHistoryPayrolls(payrolls); })(p);
+        paginationEl.appendChild(btn);
+      }
+    }
+  }
+}
+
+function toggleHistoryCard(bodyId, cardId) {
+  const body = document.getElementById(bodyId);
+  const icon = document.getElementById(cardId + '_icon');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (icon) icon.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 /* Edit / Delete history entry */
@@ -3216,11 +3359,15 @@ async function saveWeekDraft(sectionId) {
 
   // Validate mandatory fields
   const errors = [];
+  const requireLunch = window._showLunchTravel !== false;
   entries.forEach((e, i) => {
     const mandatory = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
     mandatory.forEach(f => {
       if (!e[f] || e[f].trim() === '') errors.push(`Row ${i+1}: ${f} is required`);
     });
+    if (requireLunch && (!e.lunchTime || e.lunchTime.trim() === '')) {
+      errors.push(`Row ${i+1}: Lunch Time is required`);
+    }
   });
   if (errors.length) { showPopup(errors.slice(0, 5).join('\n'), true); return; }
 
@@ -3362,11 +3509,11 @@ async function saveDataToMongo() {
       const travelTime = row.querySelector('.travel-time-select')?.value || '';
 
       // Mandatory field check
-      const mandatory = { 
-        date, projectStart, projectEnd, 
-        client, project, projectCode, reportingManager, activity 
+      const mandatory = {
+        date, projectStart, projectEnd,
+        client, project, projectCode, reportingManager, activity
       };
-      
+
       for (const [field, value] of Object.entries(mandatory)) {
         if (!value || value.trim() === '') {
           console.log(`${field}: ${value}`)
@@ -3374,6 +3521,12 @@ async function saveDataToMongo() {
           hasError = true;
           errorMessages.push(`Row ${rowIndex + 1} (Week ${secIndex + 1}): ${field} is required.`);
         }
+      }
+
+      // Lunch Time is mandatory when visible for this cycle
+      if (window._showLunchTravel !== false && (!lunchTime || lunchTime.trim() === '')) {
+        hasError = true;
+        errorMessages.push(`Row ${rowIndex + 1} (Week ${secIndex + 1}): Lunch Time is required.`);
       }
 
       // Only push if date is filled
@@ -3952,7 +4105,7 @@ async function loadApprovedList() {
     tbody.innerHTML = "";
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="3">No approved employees</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4">No approved employees</td></tr>`;
       return;
     }
 
@@ -3960,13 +4113,16 @@ async function loadApprovedList() {
       const emp = item.timesheetData || {};
       const empName = emp.employeeName || "N/A";
       const empId = item.employeeId || emp.employeeId || "N/A";
+      const cycleId = item.cycle_id || "";
+      const cycleLabel = emp.cycle_label || "-";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${empId}</td>
-        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}')">
+        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}','${cycleId}')">
         ${empName}
       </a></td>
+        <td><span style="background:#d1fae5;color:#065f46;padding:.2rem .6rem;border-radius:6px;font-size:.82rem;font-weight:700;">${cycleLabel}</span></td>
         <td>
           <button class="action-btn reject-btn" onclick="rejectEmployee('${empId}')">
             <i class="fas fa-times"></i> Reject
@@ -4004,13 +4160,16 @@ async function loadPendingList() {
       const emp = item.timesheetData || {};
       const empName = emp.employeeName || "N/A";
       const empId = item.employeeId || emp.employeeId || "N/A";
+      const cycleId = item.cycle_id || "";
+      const cycleLabel = emp.cycle_label || "-";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${empId}</td>
-        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}')">
+        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}','${cycleId}')">
         ${empName}
       </a></td>
+        <td><span style="background:#e0e7ff;color:#3730a3;padding:.2rem .6rem;border-radius:6px;font-size:.82rem;font-weight:700;">${cycleLabel}</span></td>
         <td>
           <button type="button" class="action-btn approve-btn">
             <i class="fas fa-check"></i> Approve
@@ -4059,7 +4218,7 @@ async function loadRejectedList() {
     tbody.innerHTML = "";
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="3">No rejected employees</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4">No rejected employees</td></tr>`;
       return;
     }
 
@@ -4067,16 +4226,19 @@ async function loadRejectedList() {
       const emp = item.timesheetData || {};
       const empName = emp.employeeName || "N/A";
       const empId = item.employeeId || emp.employeeId || "N/A";
+      const cycleId = item.cycle_id || "";
+      const cycleLabel = emp.cycle_label || "-";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${empId}</td>
-        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}')">
+        <td><a href="#" class="employee-link" onclick="openEmployeeDetails('${empId}','${cycleId}')">
         ${empName}
       </a></td>
+        <td><span style="background:#fee2e2;color:#991b1b;padding:.2rem .6rem;border-radius:6px;font-size:.82rem;font-weight:700;">${cycleLabel}</span></td>
         <td>
-          <button 
-            class="action-btn approve-btn" 
+          <button
+            class="action-btn approve-btn"
             onclick="approveEmployee('${empId}')">
             <i class="fas fa-check"></i> Approve
           </button>
@@ -4163,6 +4325,10 @@ async function approveEmployee(employeeId) {
 }
 
 async function rejectEmployee(employeeId) {
+  // Show rejection reason dialog
+  const reason = await _promptRejectionReason(employeeId);
+  if (reason === null) return; // user cancelled
+
   try {
     let token =
       localStorage.getItem("access_token") ||
@@ -4179,6 +4345,7 @@ async function rejectEmployee(employeeId) {
     const payload = {
       reporting_emp_code: loggedInEmployeeId,
       employee_code: employeeId,
+      reason: reason,
     };
 
     const res = await fetch(`${API_URL}/reject_timesheet`, {
@@ -4213,6 +4380,38 @@ async function rejectEmployee(employeeId) {
     console.error("rejectEmployee error:", err);
     showPopup("Reject failed", true);
   }
+}
+
+function _promptRejectionReason(employeeId) {
+  return new Promise(resolve => {
+    // Build inline modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;padding:2rem 2.2rem;max-width:440px;width:90%;box-shadow:0 20px 50px rgba(0,0,0,.2);">
+        <div style="font-size:1.8rem;text-align:center;margin-bottom:.8rem;">⚠️</div>
+        <h3 style="font-size:1.1rem;font-weight:700;color:#1e293b;margin-bottom:.5rem;text-align:center;">Reject Timesheet</h3>
+        <p style="font-size:.88rem;color:#64748b;margin-bottom:1.2rem;text-align:center;">Employee: <strong>${employeeId}</strong></p>
+        <label style="font-weight:600;font-size:.9rem;color:#475569;display:block;margin-bottom:.4rem;">Rejection Reason (optional)</label>
+        <textarea id="_rejectReasonInput" rows="3" placeholder="Enter reason for rejection..." style="width:100%;padding:.75rem;border:2px solid #e2e8f0;border-radius:10px;font-size:.95rem;font-family:inherit;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:.8rem;justify-content:center;margin-top:1.2rem;">
+          <button id="_rejectConfirmBtn" style="background:#ef4444;color:#fff;border:none;padding:.75rem 1.8rem;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;">Reject</button>
+          <button id="_rejectCancelBtn" style="background:#f1f5f9;color:#475569;border:none;padding:.75rem 1.5rem;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#_rejectConfirmBtn').onclick = () => {
+      const reason = (overlay.querySelector('#_rejectReasonInput').value || '').trim();
+      document.body.removeChild(overlay);
+      resolve(reason);
+    };
+    overlay.querySelector('#_rejectCancelBtn').onclick = () => {
+      document.body.removeChild(overlay);
+      resolve(null);
+    };
+  });
 }
 
 /* Navigation helper */
@@ -4714,7 +4913,7 @@ async function handleExcelUpload(event) {
             }
 
             const result = await response.json();
-            showPopup('Excel uploaded and saved successfully!');
+            showPopup('Excel uploaded and submitted successfully, You can view in History');
             // setTimeout(() => window.location.reload(), 2000);
 
         } catch (error) {

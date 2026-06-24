@@ -27,7 +27,7 @@ New unified document structure (one doc per employee):
 import hashlib
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status, Body
@@ -156,6 +156,25 @@ async def save_draft(
 ):
     """Save one week's entries as draft (Timesheet_temp). New unified structure."""
     now_iso = datetime.utcnow().isoformat()
+
+    # Validate lunch time if required by this cycle
+    from backend.database import payroll_cycles_collection
+    show_lunch_travel = True
+    try:
+        cycle_doc = payroll_cycles_collection.find_one({"_id": ObjectId(cycle_id)})
+        if cycle_doc:
+            show_lunch_travel = cycle_doc.get("show_lunch_travel", True)
+    except Exception:
+        pass
+
+    if show_lunch_travel:
+        lunch_errors = []
+        for i, entry in enumerate(entries):
+            lt = entry.get("lunchTime", "") or ""
+            if not lt.strip():
+                lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
+        if lunch_errors:
+            raise HTTPException(400, "; ".join(lunch_errors[:5]))
 
     # Assign IDs to entries
     new_entries = []
@@ -604,13 +623,23 @@ async def check_reporting_manager(emp_code: str, current_user: str = Depends(get
 
 
 @router.get("/view/{employee_id}")
-async def get_employee_timesheet_for_manager(employee_id: str):
+async def get_employee_timesheet_for_manager(
+    employee_id: str,
+    cycle_id: Optional[str] = None,
+):
+    """Return employee timesheet for manager view. Optional cycle_id filters to one payroll cycle."""
     doc = timesheets_collection.find_one({"employeeId": employee_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="No timesheet found")
 
     entries = []
+    cycle_label_shown = ""
+    meta = {}
     for p in doc.get("payrolls", []):
+        if cycle_id and p.get("cycle_id") != cycle_id:
+            continue  # skip other cycles when a specific one is requested
+        cycle_label_shown = p.get("cycle_label", "")
+        meta = p.get("metadata", {}) or {}
         for w in p.get("weeks", []):
             for e in w.get("entries", []):
                 entries.append({
@@ -637,6 +666,13 @@ async def get_employee_timesheet_for_manager(employee_id: str):
         "gender": doc.get("gender"),
         "partner": doc.get("partner"),
         "reporting_manager": doc.get("reportingManager"),
+        "cycle_label": cycle_label_shown,
+        "hits": meta.get("hits", ""),
+        "misses": meta.get("misses", ""),
+        "feedback_hr": meta.get("feedback_hr", ""),
+        "feedback_it": meta.get("feedback_it", ""),
+        "feedback_crm": meta.get("feedback_crm", ""),
+        "feedback_others": meta.get("feedback_others", ""),
         "entries": entries,
     }
 
@@ -648,47 +684,81 @@ def _get_current_live_cycle_ids() -> list:
     return [str(c["_id"]) for c in cycles]
 
 
+def _get_approval_cycle_ids() -> list:
+    """Return cycle_ids to use for approval screens.
+
+    If admin has set an active_approval_cycle_id, return only that.
+    Otherwise fall back to all live cycles.
+    """
+    from backend.database import admin_details_collection, payroll_cycles_collection
+    admin = admin_details_collection.find_one({}, {"active_approval_cycle_id": 1})
+    if admin and admin.get("active_approval_cycle_id"):
+        return [admin["active_approval_cycle_id"]]
+    cycles = list(payroll_cycles_collection.find({"status": "live"}, {"_id": 1}))
+    return [str(c["_id"]) for c in cycles]
+
+
+def _find_best_payroll(payrolls: list, preferred_cycle_ids: list) -> dict | None:
+    """Find the most relevant payroll to display for approval screens.
+
+    Priority:
+    1. Submitted payroll matching the active approval cycle
+    2. Any other submitted payroll (handles cross-cycle pending like April-May still awaiting)
+    Returns None only if employee has no submitted payrolls at all.
+    """
+    # Priority 1: active cycle, submitted
+    for p in reversed(payrolls):
+        if p.get("cycle_id") in preferred_cycle_ids and p.get("submitted"):
+            return p
+    # Priority 2: any submitted payroll (most recent first)
+    for p in reversed(payrolls):
+        if p.get("submitted"):
+            return p
+    return None
+
+
 def _get_employees_by_status(reporting_emp_code: str, coll_name: str):
     coll = db[coll_name]
     doc = coll.find_one({"ReportingEmpCode": reporting_emp_code})
     if not doc:
         return {"employees": []}
 
-    live_cycle_ids = _get_current_live_cycle_ids()
+    approval_cycle_ids = _get_approval_cycle_ids()
 
     result = []
     for code in doc.get("EmployeesCodes", []):
         ts = timesheets_collection.find_one({"employeeId": code}, {"_id": 0})
         if not ts:
-            continue
-
-        # Filter: only include employees who have submitted for a currently live cycle
-        has_live_submission = False
-        if live_cycle_ids:
-            for p in ts.get("payrolls", []):
-                if p.get("cycle_id") in live_cycle_ids and p.get("submitted"):
-                    has_live_submission = True
-                    break
-        else:
-            # No live cycles configured — show all (fallback)
-            has_live_submission = True
-
-        if has_live_submission:
-            # Find the live payroll's label for display
-            live_label = ""
-            for p in ts.get("payrolls", []):
-                if p.get("cycle_id") in live_cycle_ids:
-                    live_label = p.get("cycle_label", "")
-                    break
+            # Employee has no timesheet data at all — still include with empty info
             result.append({
                 "employeeId": code,
+                "cycle_id": "",
                 "timesheetData": {
                     "employeeId": code,
-                    "employeeName": ts.get("employeeName", ""),
-                    "designation": ts.get("designation", ""),
-                    "cycle_label": live_label,
+                    "employeeName": "",
+                    "designation": "",
+                    "cycle_label": "No data",
+                    "approval_status": None,
                 }
             })
+            continue
+
+        best = _find_best_payroll(ts.get("payrolls", []), approval_cycle_ids)
+        cycle_label = best.get("cycle_label", "") if best else "Not submitted"
+        cycle_id    = best.get("cycle_id", "") if best else ""
+        approval_status = best.get("approval_status") if best else None
+
+        result.append({
+            "employeeId": code,
+            "cycle_id": cycle_id,
+            "timesheetData": {
+                "employeeId": code,
+                "employeeName": ts.get("employeeName", ""),
+                "designation": ts.get("designation", ""),
+                "cycle_label": cycle_label,
+                "approval_status": approval_status,
+            }
+        })
 
     return {"reporting_manager": reporting_emp_code, "employees": result}
 
@@ -709,6 +779,36 @@ async def get_rejected(reporting_emp_code: str, current_user: str = Depends(get_
     return _get_employees_by_status(reporting_emp_code.strip().upper(), "Rejected")
 
 
+def _set_payroll_approval_status(employee_code: str, status: str, approved_by: str = "", approved_by_name: str = "",
+                                  rejected_at: str = "", reason: str = "", preferred_cycle_ids: list = None):
+    """Write approval_status into the employee's most relevant payroll in Timesheet_data."""
+    ts = timesheets_collection.find_one({"employeeId": employee_code}, {"payrolls": 1})
+    if not ts:
+        return
+    best = _find_best_payroll(ts.get("payrolls", []), preferred_cycle_ids or [])
+    if not best:
+        return
+    now_iso = datetime.utcnow().isoformat()
+    update_fields = {
+        "payrolls.$[elem].approval_status": status,
+        "payrolls.$[elem].status_updated_at": now_iso,
+    }
+    if status == "approved":
+        update_fields["payrolls.$[elem].approved_by"]      = approved_by
+        update_fields["payrolls.$[elem].approved_by_name"] = approved_by_name
+        update_fields["payrolls.$[elem].approved_at"]      = now_iso
+    elif status == "rejected":
+        update_fields["payrolls.$[elem].rejected_by"]      = approved_by
+        update_fields["payrolls.$[elem].rejected_by_name"] = approved_by_name
+        update_fields["payrolls.$[elem].rejected_at"]      = rejected_at or now_iso
+        update_fields["payrolls.$[elem].rejection_reason"] = reason
+    timesheets_collection.update_one(
+        {"employeeId": employee_code},
+        {"$set": update_fields},
+        array_filters=[{"elem.cycle_id": best["cycle_id"]}],
+    )
+
+
 @router.post("/approve")
 async def approve_timesheet(
     reporting_emp_code: str = Body(...),
@@ -722,6 +822,12 @@ async def approve_timesheet(
     mgr_doc = employee_details_collection.find_one({"ReportingEmpCode": mgr})
     mgr_name = mgr_doc.get("ReportingEmpName") if mgr_doc else "Unknown"
     add_or_create(approved_collection, mgr, mgr_name, emp)
+    # Write approval_status into Timesheet_data
+    _set_payroll_approval_status(
+        emp, "approved",
+        approved_by=mgr, approved_by_name=mgr_name,
+        preferred_cycle_ids=_get_approval_cycle_ids(),
+    )
     return {"success": True, "message": f"Employee {emp} approved"}
 
 
@@ -729,15 +835,34 @@ async def approve_timesheet(
 async def reject_timesheet(
     reporting_emp_code: str = Body(...),
     employee_code: str = Body(...),
+    reason: str = Body(default=""),
     current_user: str = Depends(get_current_user),
 ):
     mgr = reporting_emp_code.strip().upper()
     emp = employee_code.strip().upper()
+    now_iso = datetime.utcnow().isoformat()
     pending_collection.update_one({"ReportingEmpCode": mgr}, {"$pull": {"EmployeesCodes": emp}})
     approved_collection.update_one({"ReportingEmpCode": mgr}, {"$pull": {"EmployeesCodes": emp}})
     mgr_doc = employee_details_collection.find_one({"ReportingEmpCode": mgr})
     mgr_name = mgr_doc.get("ReportingEmpName") if mgr_doc else "Unknown"
     add_or_create(rejected_collection, mgr, mgr_name, emp)
+    # Store rejection reason in Rejected collection
+    rejected_collection.update_one(
+        {"ReportingEmpCode": mgr},
+        {"$set": {
+            f"rejection_details.{emp}.reason": reason,
+            f"rejection_details.{emp}.rejected_at": now_iso,
+            f"rejection_details.{emp}.rejected_by": mgr,
+            f"rejection_details.{emp}.rejected_by_name": mgr_name,
+        }},
+    )
+    # Write approval_status into Timesheet_data
+    _set_payroll_approval_status(
+        emp, "rejected",
+        approved_by=mgr, approved_by_name=mgr_name,
+        rejected_at=now_iso, reason=reason,
+        preferred_cycle_ids=_get_approval_cycle_ids(),
+    )
     return {"success": True, "message": f"Employee {emp} rejected"}
 
 
@@ -756,6 +881,69 @@ async def approve_all(data: ApproveAllRequest, current_user: str = Depends(get_c
     rejected_collection.update_one({"ReportingEmpCode": mgr}, {"$pull": {"EmployeesCodes": {"$in": employees}}})
     mgr_doc = employee_details_collection.find_one({"ReportingEmpCode": mgr})
     mgr_name = mgr_doc.get("ReportingEmpName") if mgr_doc else "Unknown"
+    approval_cycle_ids = _get_approval_cycle_ids()
     for emp in employees:
         add_or_create(approved_collection, mgr, mgr_name, emp)
+        _set_payroll_approval_status(
+            emp, "approved",
+            approved_by=mgr, approved_by_name=mgr_name,
+            preferred_cycle_ids=approval_cycle_ids,
+        )
     return {"success": True, "approved": len(employees), "message": f"{len(employees)} employee(s) approved"}
+
+
+@router.get("/approval-tracker/{employee_id}")
+async def get_approval_tracker(employee_id: str, current_user: str = Depends(get_current_user)):
+    """Return per-payroll approval status for an employee.
+
+    Primary source: approval_status stored directly in Timesheet_data payroll.
+    Fallback: check Pending/Approved/Rejected collections for legacy data without stored status.
+    """
+    emp = employee_id.strip().upper()
+    ts = timesheets_collection.find_one({"employeeId": emp}, {"_id": 0, "payrolls": 1})
+    if not ts:
+        return {"statuses": []}
+
+    # Fallback: check collections for employees that pre-date status tracking
+    pending_doc  = pending_collection.find_one({"EmployeesCodes": emp})
+    approved_doc = approved_collection.find_one({"EmployeesCodes": emp})
+    rejected_doc = rejected_collection.find_one({"EmployeesCodes": emp})
+
+    rejection_detail = {}
+    if rejected_doc:
+        rejection_detail = (rejected_doc.get("rejection_details") or {}).get(emp, {})
+
+    statuses = []
+    for p in (ts.get("payrolls") or []):
+        # Prefer approval_status stored on the payroll itself (set by approve/reject/bulk actions)
+        stored_status = p.get("approval_status")
+
+        if not p.get("submitted"):
+            status = "draft"
+        elif stored_status:
+            status = stored_status  # trust the stored value
+        elif approved_doc:
+            status = "approved"
+        elif rejected_doc:
+            status = "rejected"
+        elif pending_doc:
+            status = "pending"
+        else:
+            status = "submitted"
+
+        statuses.append({
+            "cycle_id":         p.get("cycle_id"),
+            "cycle_label":      p.get("cycle_label"),
+            "submitted":        p.get("submitted", False),
+            "submitted_at":     p.get("submitted_at"),
+            "status":           status,
+            "approved_by":      p.get("approved_by", ""),
+            "approved_by_name": p.get("approved_by_name", ""),
+            "approved_at":      p.get("approved_at"),
+            "rejected_by":      p.get("rejected_by", "") or rejection_detail.get("rejected_by", ""),
+            "rejected_by_name": p.get("rejected_by_name", "") or rejection_detail.get("rejected_by_name", ""),
+            "rejected_at":      p.get("rejected_at") or rejection_detail.get("rejected_at"),
+            "rejection_reason": p.get("rejection_reason", "") or rejection_detail.get("reason", ""),
+        })
+
+    return {"statuses": statuses}

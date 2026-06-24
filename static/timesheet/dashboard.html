@@ -413,6 +413,9 @@ tr:hover td {
             <div class="nav-item" data-section="analysis">
                 <i class="fas fa-chart-line"></i> Analysis
             </div>
+            <div class="nav-item" data-section="approvalPayroll">
+                <i class="fas fa-filter"></i> Approval Filter
+            </div>
             <div class="nav-item" data-section="upload">
                 <i class="fas fa-cloud-upload-alt"></i> Upload Data
             </div>
@@ -589,6 +592,64 @@ tr:hover td {
             </div>
         </div>
 
+        <!-- Approval Filter Section -->
+        <div id="approvalPayrollSection" class="section" style="display:none;">
+            <div class="card">
+                <h2><i class="fas fa-filter"></i> Approval Screen Filter</h2>
+                <p style="color:var(--gray-600);margin:.5rem 0 1.5rem;">
+                    Select which payroll cycle TLs and Managers see on their Pending / Approved / Rejected screens.
+                    Leave as <strong>All Live Cycles</strong> to show all active cycles simultaneously.
+                </p>
+
+                <!-- Current Active Cycle Banner -->
+                <div id="activeApprovalBanner" style="padding:1rem 1.4rem;border-radius:12px;background:var(--primary-light);color:var(--primary);font-weight:700;font-size:1.05rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.7rem;">
+                    <i class="fas fa-circle-notch fa-spin"></i> Loading…
+                </div>
+
+                <div style="display:flex;align-items:flex-end;gap:1.2rem;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:240px;">
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);display:block;margin-bottom:.4rem;">Select Active Approval Cycle</label>
+                        <select id="activeApprovalCycleSelect" style="width:100%;padding:.85rem 1rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;font-family:inherit;background:#fff;color:var(--gray-800);">
+                            <option value="">All Live Cycles (default)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="setActiveApprovalCycle()" style="padding:.85rem 2rem;min-width:160px;">
+                        <i class="fas fa-save"></i> Save Selection
+                    </button>
+                </div>
+
+                <p style="margin-top:1.2rem;font-size:.85rem;color:var(--gray-600);">
+                    <i class="fas fa-info-circle"></i>
+                    Selecting a specific cycle will hide submissions from other live cycles in TL/Manager approval screens.
+                    Only the Timesheet Admin can change this setting.
+                </p>
+            </div>
+
+            <!-- Bulk Approve / Close a Cycle -->
+            <div class="card" style="margin-top:1.5rem;">
+                <h2><i class="fas fa-check-double"></i> Bulk Approve / Close a Cycle</h2>
+                <p style="color:var(--gray-600);margin:.5rem 0 1.5rem;">
+                    Mark all submitted timesheets for a specific payroll cycle as <strong>Approved</strong>.
+                    This will move employees from Pending → Approved and update their timesheet records.
+                    Use this to close out previous cycles (e.g., April-May).
+                </p>
+
+                <div style="display:flex;align-items:flex-end;gap:1.2rem;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:240px;">
+                        <label style="font-weight:600;font-size:.9rem;color:var(--gray-600);display:block;margin-bottom:.4rem;">Select Cycle to Bulk-Approve</label>
+                        <select id="bulkApproveCycleSelect" style="width:100%;padding:.85rem 1rem;border:2px solid var(--gray-300);border-radius:10px;font-size:.95rem;font-family:inherit;background:#fff;color:var(--gray-800);">
+                            <option value="">-- Select a cycle --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="bulkApproveCycle()" style="padding:.85rem 2rem;min-width:180px;">
+                        <i class="fas fa-check-double"></i> Bulk Approve All
+                    </button>
+                </div>
+
+                <div id="bulkApproveResult" style="margin-top:1rem;display:none;padding:.75rem 1rem;border-radius:10px;font-weight:600;"></div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -690,6 +751,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
         if (sec === 'payrollSection') loadPayrollCycles();
         if (sec === 'analysisSection') fetchAnalysisStats();
         if (sec === 'parSection') fetchParStats();
+        if (sec === 'approvalPayrollSection') loadApprovalPayrollSection();
 
     });
 });
@@ -1180,6 +1242,120 @@ window.onload = () => {
     loadPayrollCycles();
     fetchParStats();
 };
+
+// ─── Approval Filter Section ────────────────────────────────────────────────
+
+async function loadApprovalPayrollSection() {
+    // Load available cycles into the selector
+    await Promise.all([populateApprovalCycleDropdown(), fetchActiveApprovalCycle()]);
+}
+
+async function populateApprovalCycleDropdown() {
+    const sel = document.getElementById('activeApprovalCycleSelect');
+    const bulkSel = document.getElementById('bulkApproveCycleSelect');
+    try {
+        const res = await adminGet('/payroll-cycles');
+        const data = await res.json();
+        const cycles = Array.isArray(data) ? data : (data.cycles || []);
+        sel.innerHTML = '<option value="">All Live Cycles (default)</option>';
+        if (bulkSel) bulkSel.innerHTML = '<option value="">-- Select a cycle --</option>';
+        cycles.forEach(c => {
+            const id = c._id || c.id || '';
+            const label = `${c.cycle_label || c.label || 'Unknown'} [${c.status || ''}]`;
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = label;
+            sel.appendChild(opt);
+            if (bulkSel) {
+                const opt2 = document.createElement('option');
+                opt2.value = id;
+                opt2.textContent = label;
+                bulkSel.appendChild(opt2);
+            }
+        });
+    } catch (e) {
+        showToast('Failed to load payroll cycles');
+    }
+}
+
+async function fetchActiveApprovalCycle() {
+    const banner = document.getElementById('activeApprovalBanner');
+    try {
+        const res = await adminGet('/admin/active-approval-payroll');
+        const data = await res.json();
+        const sel = document.getElementById('activeApprovalCycleSelect');
+        if (data.active_approval_cycle_id) {
+            sel.value = data.active_approval_cycle_id;
+            banner.innerHTML = `<i class="fas fa-filter"></i> Active Approval Filter: <span style="font-weight:900">${data.cycle_label}</span>`;
+            banner.style.background = '#d1fae5';
+            banner.style.color = '#065f46';
+        } else {
+            sel.value = '';
+            banner.innerHTML = `<i class="fas fa-globe"></i> Showing: <span style="font-weight:900">All Live Cycles</span>`;
+            banner.style.background = 'var(--primary-light)';
+            banner.style.color = 'var(--primary)';
+        }
+    } catch (e) {
+        banner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed to load current setting';
+    }
+}
+
+async function bulkApproveCycle() {
+    const sel = document.getElementById('bulkApproveCycleSelect');
+    const resultDiv = document.getElementById('bulkApproveResult');
+    const cycle_id = sel ? sel.value : '';
+    if (!cycle_id) { showToast('Please select a cycle first'); return; }
+
+    const cycleLabel = sel.options[sel.selectedIndex]?.textContent || cycle_id;
+    if (!confirm(`Bulk-approve ALL submitted timesheets for:\n"${cycleLabel}"\n\nThis will move all Pending employees to Approved. Continue?`)) return;
+
+    try {
+        const res = await fetch('/admin/bulk-set-cycle-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_adminToken}` },
+            body: JSON.stringify({ cycle_id, status: 'approved' })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = '#d1fae5';
+            resultDiv.style.color = '#065f46';
+            resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+            showToast(data.message);
+        } else {
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = '#fee2e2';
+            resultDiv.style.color = '#991b1b';
+            resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${data.detail || 'Failed'}`;
+        }
+    } catch (e) {
+        showToast('Server error during bulk approve');
+    }
+}
+
+async function setActiveApprovalCycle() {
+    const sel = document.getElementById('activeApprovalCycleSelect');
+    const cycle_id = sel.value;
+    try {
+        const res = await fetch('/admin/set-active-approval-payroll', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${_adminToken}`
+            },
+            body: JSON.stringify({ cycle_id })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            showToast(cycle_id ? `Active approval filter set: ${data.cycle_label}` : 'Filter cleared — showing all live cycles');
+            fetchActiveApprovalCycle();
+        } else {
+            showToast(data.detail || 'Failed to save selection');
+        }
+    } catch (e) {
+        showToast('Server error while saving');
+    }
+}
 </script>
 
 

@@ -393,6 +393,11 @@ body{
 .col-project{ width:200px; }
 .col-action{ min-width:120px; }
 
+/* ── History Cards ── */
+.history-payroll-card { transition: box-shadow .2s, transform .15s; }
+.history-payroll-card:hover { box-shadow: 0 6px 24px rgba(93,95,239,.15) !important; transform: translateY(-2px); }
+.history-card-header:hover { background: linear-gradient(135deg,#e8edff,#ede8ff) !important; }
+
 /* ── Responsive ── */
 @media(max-width:1200px){
     .container{ margin:1rem; border-radius:15px; }
