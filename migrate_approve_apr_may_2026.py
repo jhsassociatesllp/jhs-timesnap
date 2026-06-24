@@ -154,6 +154,5 @@ def main():
     print("Pending / Approved / Rejected collections were NOT modified.")
     print("=" * 62)
 
-
 if __name__ == "__main__":
     main()
