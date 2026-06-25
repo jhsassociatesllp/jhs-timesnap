@@ -52,6 +52,34 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+# ── Cache-Control middleware ──────────────────────────────────────────────────
+# Prevents browsers from serving stale JS/CSS/HTML after a deployment.
+# .js / .css  → no-cache (browser must revalidate with server before using)
+# .html / page routes → no-store (never cache; always fetch fresh)
+_NO_CACHE_EXTENSIONS = (".js", ".css")
+_NO_STORE_EXTENSIONS = (".html",)
+_NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
+                         "/quality-audit", "/dashboard", "/forgot-password",
+                         "/control-panel", "/admin-dashboard"}
+
+@app.middleware("http")
+async def cache_control_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+
+    if any(path.endswith(ext) for ext in _NO_CACHE_EXTENSIONS):
+        # Revalidate on every request; 304 allowed (saves bandwidth)
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        response.headers["Pragma"]        = "no-cache"
+
+    elif any(path.endswith(ext) for ext in _NO_STORE_EXTENSIONS) or path in _NO_STORE_PATHS:
+        # Never cache HTML pages at all
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"]        = "no-cache"
+        response.headers["Expires"]       = "0"
+
+    return response
+
 app.include_router(timesheet_router)
 app.include_router(appraisal_router)
 app.include_router(quality_audit_router)   # prefix: /quality-audit
