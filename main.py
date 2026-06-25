@@ -1311,7 +1311,6 @@ from backend.timesheet.router import (
     get_timesheets, update_timesheet, delete_timesheet,
 )
 
-
 # Legacy save — redirect to new draft endpoint (kept for Excel upload compatibility)
 app.add_api_route("/timesheets/{employee_id}",                  get_timesheets,                     methods=["GET"])
 app.add_api_route("/update_timesheet/{employee_id}/{entry_id}", update_timesheet,                   methods=["PUT"])
