@@ -53,11 +53,9 @@ app.add_middleware(
 )
 
 # ── Cache-Control middleware ──────────────────────────────────────────────────
-# Prevents browsers from serving stale JS/CSS/HTML after a deployment.
-# .js / .css  → no-cache (browser must revalidate with server before using)
-# .html / page routes → no-store (never cache; always fetch fresh)
-_NO_CACHE_EXTENSIONS = (".js", ".css")
-_NO_STORE_EXTENSIONS = (".html",)
+# Forces the browser to NEVER store any app file in cache.
+# Every JS, CSS, HTML request always fetches the latest from the server.
+_NO_STORE_EXTENSIONS = (".js", ".css", ".html")
 _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/quality-audit", "/dashboard", "/forgot-password",
                          "/control-panel", "/admin-dashboard"}
@@ -67,14 +65,9 @@ async def cache_control_middleware(request: Request, call_next):
     response = await call_next(request)
     path = request.url.path
 
-    if any(path.endswith(ext) for ext in _NO_CACHE_EXTENSIONS):
-        # Revalidate on every request; 304 allowed (saves bandwidth)
-        response.headers["Cache-Control"] = "no-cache, must-revalidate"
-        response.headers["Pragma"]        = "no-cache"
-
-    elif any(path.endswith(ext) for ext in _NO_STORE_EXTENSIONS) or path in _NO_STORE_PATHS:
-        # Never cache HTML pages at all
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    if (any(path.endswith(ext) for ext in _NO_STORE_EXTENSIONS)
+            or path in _NO_STORE_PATHS):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
 
