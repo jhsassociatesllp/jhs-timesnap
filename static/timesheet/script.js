@@ -29,6 +29,18 @@ let employeeProjects = {
   project_codes: []
 };
 
+// Employees under this partner have no fixed client/project list to pick
+// from, so Client / Project / Project Code are plain typed fields instead
+// of dropdowns, everywhere (table rows, the entry modal, and the downloaded
+// template). Everything else about them works exactly like any other user.
+const FREE_TEXT_PARTNER_CODE = "JHS01";
+window._freeTextClientProject = false;
+
+// Locations that mean "not a working day" — project/time/client fields are
+// optional (but still accepted if filled in) for rows marked with these.
+const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
+const isDayOffLocation = (loc) => DAY_OFF_LOCATIONS.includes((loc || "").trim());
+
 // Ye variable bana de top me
 let weekOptionsReady = false;
 window.weekOptions = [];
@@ -70,14 +82,16 @@ function debounce(func, wait) {
 
 async function loadEmployeeProjects() {
   if (!loggedInEmployeeId) return;
-  
+
   try {
     const res = await fetch(`${API_URL}/get_employee_projects/${loggedInEmployeeId}`, {
       headers: getHeaders()
     });
-    
+
     if (res.ok) {
       employeeProjects = await res.json();
+      window._freeTextClientProject =
+        (employeeProjects.partner_emp_code || "").trim().toUpperCase() === FREE_TEXT_PARTNER_CODE;
       console.log("✅ Employee projects loaded:", employeeProjects);
        console.log("📊 Clients:", employeeProjects.clients);
   console.log("📊 Projects by client:", employeeProjects.projects_by_client);
@@ -87,7 +101,24 @@ async function loadEmployeeProjects() {
   } catch (err) {
     console.error("Error loading employee projects:", err);
   }
+
+  // Needed before any row renders (checkUserRole() runs later, after draft
+  // rows are already restored) so the project-plan status feature — TL-only,
+  // exempting the free-text/JHS01 partner — is ready from the very first row.
+  try {
+    const resMgr = await fetch(`${API_URL}/check_reporting_manager/${loggedInEmployeeId}`, {
+      headers: getHeaders()
+    });
+    window._isTL = resMgr.ok ? !!(await resMgr.json()).isManager : false;
+  } catch (err) {
+    console.error("Error checking TL status:", err);
+    window._isTL = false;
+  }
 }
+
+// TLs must have a valid project plan for their entries before submitting;
+// JHS01 is shared services and is exempt (no fixed projects to plan against).
+const showsProjectPlanStatus = () => !!window._isTL && !window._freeTextClientProject;
 
 // Restore token from sessionStorage if localStorage got cleared
 window.addEventListener("load", () => {
@@ -465,6 +496,15 @@ async function loadDraftForCycle(cycleId) {
       if (el && meta[f]) el.value = meta[f];
     });
 
+    // Restore idle time status, hours, and reason
+    const statusEl = document.getElementById('idle_time_status');
+    if (statusEl) statusEl.value = meta.idle_time_status || 'No';
+    const hoursEl = document.getElementById('idle_time_hours');
+    if (hoursEl) hoursEl.value = meta.idle_time_hours || '';
+    const reasonEl = document.getElementById('idle_time_reason');
+    if (reasonEl) reasonEl.value = meta.idle_time_reason || '';
+    if (typeof toggleIdleTimeFields === 'function') toggleIdleTimeFields();
+
     updateSummary();
     // Silently restore — no popup needed, green rows are the visual indicator
   } catch(e) {
@@ -554,6 +594,9 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
         <option value="Client Site"${entry.location==='Client Site'?' selected':''}>Client Site</option>
         <option value="Work From Home"${entry.location==='Work From Home'?' selected':''}>Work From Home</option>
         <option value="Field Work"${entry.location==='Field Work'?' selected':''}>Field Work</option>
+        <option value="Leave"${entry.location==='Leave'?' selected':''}>Leave</option>
+        <option value="PHY"${entry.location==='PHY'?' selected':''}>PHY</option>
+        <option value="Week Off"${entry.location==='Week Off'?' selected':''}>Week Off</option>
       </select>
     </td>
     <td class="col-project-start"><input type="time" class="project-start form-input" value="${entry.projectStartTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
@@ -574,7 +617,7 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
       <select class="lunch-time-select form-input">
         <option value="">None</option>
         <option value="15 min"${entry.lunchTime==='15 min'?' selected':''}>15 min</option>
-        <option value="30 min"${entry.lunchTime==='30 min'?' selected':''}>30 min</option>
+        <option value="30 min"${(entry.lunchTime || '30 min')==='30 min'?' selected':''}>30 min</option>
         <option value="45 min"${entry.lunchTime==='45 min'?' selected':''}>45 min</option>
         <option value="1 hr"${entry.lunchTime==='1 hr'?' selected':''}>1 hr</option>
         <option value="1.5 hr"${entry.lunchTime==='1.5 hr'?' selected':''}>1.5 hr</option>
@@ -635,14 +678,31 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
     if (codeInp) codeInp.value = entry.projectCode;
   }
 
+  // Covers drafts loaded on page load and rows restored right after an Excel
+  // upload alike — both funnel through this one restore function.
+  showProjectPlanStatus(entry.projectCode || '', { row: tr });
+
   updateSummary();
 }
 
 
 function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
   // type = "client", "project", or "project_code"
+
+  // Free-text partner: skip the dropdown/"Type here" machinery entirely and
+  // hand back a plain input, for both table rows and the modal.
+  if (window._freeTextClientProject && (type === "client" || type === "project")) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = `${type}-field form-input`;
+    input.placeholder = `Enter ${type}`;
+    input.value = currentValue || "";
+    input.addEventListener("input", updateSummary);
+    return input;
+  }
+
   let options = [];
-  
+
   if (type === "client") {
     options = employeeProjects.clients || [];
   } else if (type === "project") {
@@ -676,16 +736,10 @@ function createSmartDropdown(type, container, currentValue = "", currentClient =
     select.appendChild(option);
   });
   
-  // Add "Type here" option only for client and project
-  if (type !== "project_code") {
-    const typeOption = document.createElement("option");
-    typeOption.value = "__TYPE_HERE__";
-    typeOption.textContent = "✏️ Type here (custom entry)";
-    typeOption.style.fontStyle = "italic";
-    typeOption.style.color = "#666";
-    select.appendChild(typeOption);
-  }
-  
+  // Custom "type here" entry has been removed for dropdown-mode users —
+  // Client/Project must always be picked from the list (free-text partner
+  // employees never reach this branch; they get a plain input above).
+
   // Handle selection changes
   // select.addEventListener("change", function() {
   //   const row = this.closest("tr");
@@ -907,149 +961,17 @@ function createSmartDropdown(type, container, currentValue = "", currentClient =
 
   select.addEventListener("change", function() {
     const row = this.closest("tr");
-    
-    if (this.value === "__TYPE_HERE__") {
-        // Replace with input field
-        const input = document.createElement("input");
-        input.type = "text";
-        input.className = `${type}-field form-input`;
-        input.placeholder = `Enter ${type.replace('_', ' ')}`;
-        input.value = currentValue;
-        input.style.width = "calc(100% - 35px)";
-        
-        // Add button to go back to dropdown
-        const backBtn = document.createElement("button");
-        backBtn.className = "back-to-dropdown-btn";
-        backBtn.innerHTML = '<i class="fas fa-list"></i>';
-        backBtn.title = "Back to dropdown";
-        backBtn.type = "button";
-        backBtn.style.marginLeft = "5px";
-        backBtn.style.padding = "6px 10px";
-        backBtn.style.cursor = "pointer";
-        backBtn.onclick = () => {
-            const isModal = container.closest("#modalOverlay") !== null;
-            let clientValue = "";
-            if (type === "project") {
-                if (isModal) {
-                    const clientSelect = document.querySelector("#modalClientContainer select");
-                    clientValue = clientSelect?.value || "";
-                } else {
-                    const row = container.closest("tr");
-                    clientValue = row ? getFieldValue(row, '.col-client') : "";
-                }
-            }
-            const newDropdown = createSmartDropdown(type, container, input.value || "", clientValue);
-            container.innerHTML = "";
-            container.appendChild(newDropdown);
-            
-            // If typed value not in options → auto-trigger type here mode to preserve it
-            const hasOption = Array.from(newDropdown.options).some(opt => opt.value === input.value && opt.value !== "" && opt.value !== "__TYPE_HERE__");
-            if (input.value && !hasOption) {
-                newDropdown.value = "__TYPE_HERE__";
-                const changeEvent = new Event("change");
-                newDropdown.dispatchEvent(changeEvent);
-            }
-            // ────────────────────────────────────────────────
-            // Reset project code field (table OR modal)
-            // ────────────────────────────────────────────────
-            let codeContainer, codeElement;
-            if (isModal) {
-                codeContainer = document.getElementById("modalProjectCodeContainer");
-                codeElement = document.getElementById("modalProjectCodeInput");
-            } else {
-                const row = container.closest("tr");
-                if (row) {
-                    codeContainer = row.querySelector(".col-project-code");
-                    codeElement = codeContainer?.querySelector("input");
-                }
-            }
-            if (codeContainer) {
-                codeContainer.innerHTML = "";
-                const currentProjectVal = newDropdown.value;
-                const inputElem = document.createElement("input");
-                inputElem.type = "text";
-                inputElem.className = "form-input project-code";
-                if (currentProjectVal === "" || currentProjectVal === "__TYPE_HERE__") {
-                    inputElem.placeholder = currentProjectVal === "__TYPE_HERE__" ? "Enter Project Code" : "Auto-filled";
-                    inputElem.readOnly = false;
-                    if (currentProjectVal !== "__TYPE_HERE__") {
-                        inputElem.style.backgroundColor = "#f0f0f0";
-                    }
-                } else {
-                    let projectCode = "";
-                    if (clientValue && employeeProjects.projects_by_client?.[clientValue]) {
-                        const match = employeeProjects.projects_by_client[clientValue]
-                            .find(p => p.project_name === currentProjectVal);
-                        projectCode = match?.project_code || "";
-                    }
-                    inputElem.value = projectCode;
-                    inputElem.readOnly = true;
-                    inputElem.style.backgroundColor = "#f0f0f0";
-                }
-                if (isModal) {
-                    inputElem.id = "modalProjectCodeInput";
-                }
-                codeContainer.appendChild(inputElem);
-            }
-        };
-        
-        container.innerHTML = "";
-        const wrapper = document.createElement("div");
-        wrapper.style.display = "flex";
-        wrapper.style.alignItems = "center";
-        wrapper.style.gap = "5px";
-        wrapper.appendChild(input);
-        wrapper.appendChild(backBtn);
-        container.appendChild(wrapper);
-        
-        input.focus();
-        input.addEventListener("input", updateSummary);
 
-        // ────────────────────────────────────────────────
-        // NEW: Handle project code editable for custom (table OR modal)
-        // ────────────────────────────────────────────────
-        if (type === "project") {
-            const isModal = container.closest("#modalOverlay") !== null;
-            let projectCodeContainer;
-            if (isModal) {
-                projectCodeContainer = document.getElementById("modalProjectCodeContainer");
-            } else if (row) {
-                projectCodeContainer = row.querySelector(".col-project-code");
-            }
-            if (projectCodeContainer) {
-                projectCodeContainer.innerHTML = "";
-                const codeInput = document.createElement("input");
-                codeInput.type = "text";
-                codeInput.className = "project-code form-input";
-                codeInput.placeholder = "Enter Project Code";
-                codeInput.readOnly = false;
-                codeInput.style.backgroundColor = "";
-                if (isModal) codeInput.id = "modalProjectCodeInput";
-                projectCodeContainer.appendChild(codeInput);
-            }
-        }
-    }
     // CLIENT CHANGE: Update project dropdown
-    else if (type === "client" && row) {
+    if (type === "client" && row) {
         const selectedClient = this.value;
         const projectCell = row.querySelector(".col-project");
         const projectCodeCell = row.querySelector(".col-project-code");
         
         // Clear project and project code
         if (projectCell) {
-            const currentProjectInput = projectCell.querySelector("input");
             projectCell.innerHTML = "";
-            if (currentProjectInput) {
-                // Preserve input mode
-                const input = document.createElement("input");
-                input.type = "text";
-                input.className = "project form-input";
-                input.placeholder = "Enter project";
-                projectCell.appendChild(input);
-            } else {
-                // Normal dropdown mode
-                projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
-            }
+            projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
         }
         
         if (projectCodeCell) {
@@ -1104,9 +1026,12 @@ function createSmartDropdown(type, container, currentValue = "", currentClient =
                 } else {
                     projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
                 }            }
+            showProjectPlanStatus(projectData ? projectData.project_code : "", { row });
+        } else {
+            showProjectPlanStatus("", { row });
         }
     }
-}); 
+});
   
   // Trigger summary update on dropdown change
   select.addEventListener("change", updateSummary);
@@ -1614,6 +1539,9 @@ function addRow(sectionId, specificDate = null) {
         <option value="Client Site">Client Site</option>
         <option value="Work From Home">Work From Home</option>
         <option value="Field Work">Field Work</option>
+        <option value="Leave">Leave</option>
+        <option value="PHY">PHY</option>
+        <option value="Week Off">Week Off</option>
       </select>
     </td>
     <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
@@ -1634,7 +1562,7 @@ function addRow(sectionId, specificDate = null) {
       <select class="lunch-time-select form-input">
         <option value="">None</option>
         <option value="15 min">15 min</option>
-        <option value="30 min">30 min</option>
+        <option value="30 min" selected>30 min</option>
         <option value="45 min">45 min</option>
         <option value="1 hr">1 hr</option>
         <option value="1.5 hr">1.5 hr</option>
@@ -1669,6 +1597,72 @@ function addRow(sectionId, specificDate = null) {
   updateRowNumbers(tbody.id);
   updateSummary();
 }
+
+// ── TL project-plan status (Project_Plans collection) ───────────────────────
+// TLs must be able to see, right where they pick a project, whether it has an
+// approved plan and what dates that plan covers. JHS01 is shared services and
+// has no such plans, so this is skipped entirely for them.
+function _fmtPlanDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function _clearProjectPlanRow(row) {
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains('project-meta-row-tl')) next.remove();
+}
+
+function _renderProjectPlanRow(row, data) {
+  _clearProjectPlanRow(row);
+  const metaRow = document.createElement('tr');
+  metaRow.className = 'project-meta-row-tl';
+  const colCount = row.children.length || 1;
+  metaRow.innerHTML = `<td colspan="${colCount}">${_projectPlanStatusHtml(data)}</td>`;
+  row.after(metaRow);
+}
+
+function _renderProjectPlanModal(data) {
+  const el = document.getElementById('modalProjectMetaTL');
+  if (!el) return;
+  if (!data) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = _projectPlanStatusHtml(data);
+  el.style.display = 'block';
+}
+
+function _projectPlanStatusHtml(data) {
+  return data.has_plan
+    ? `<i class="fas fa-check-circle" style="color:#16a34a;"></i> Project plan found: ${_fmtPlanDate(data.start_date)} – ${_fmtPlanDate(data.end_date)}`
+    : `<i class="fas fa-exclamation-triangle" style="color:#dc2626;"></i> No project plan found for this project code`;
+}
+
+// target = { row: <tr> } for a table row, or { modal: true } for the entry modal
+async function showProjectPlanStatus(projectCode, target) {
+  if (!showsProjectPlanStatus()) return;
+
+  const code = (projectCode || '').trim();
+  if (!code) {
+    if (target.row) _clearProjectPlanRow(target.row);
+    else _renderProjectPlanModal(null);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/get_project_plan_status/${encodeURIComponent(code)}`, {
+      headers: getHeaders()
+    });
+    const data = res.ok ? await res.json() : { has_plan: false };
+    if (target.row) _renderProjectPlanRow(target.row, data);
+    else _renderProjectPlanModal(data);
+  } catch (err) {
+    console.error('Error checking project plan status:', err);
+  }
+}
+window.showProjectPlanStatus = showProjectPlanStatus;
 
 function createReadonlyProjectCode(value = "", placeholder = "Auto-filled") {
     const wrapper = document.createElement("div");
@@ -1730,7 +1724,15 @@ function setupSmartDropdowns(row) {
     // projectCodeCell.appendChild(codeInput);
     // In places where you create auto-filled code field:
     projectCodeCell.innerHTML = "";
-    projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+    if (window._freeTextClientProject) {
+      const codeInput = document.createElement("input");
+      codeInput.type = "text";
+      codeInput.className = "project-code form-input";
+      codeInput.placeholder = "Enter Project Code";
+      projectCodeCell.appendChild(codeInput);
+    } else {
+      projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+    }
   }
 }
 
@@ -2106,7 +2108,7 @@ function getFieldValue(row, className) {
   const select = cell.querySelector("select");
   const input = cell.querySelector("input");
   
-  if (select && select.value !== "__TYPE_HERE__") {
+  if (select) {
     return select.value;
   } else if (input) {
     return input.value;
@@ -2232,17 +2234,19 @@ function setFieldValue(row, className, value) {
   if (select) {
     const optionExists = Array.from(select.options).some(opt => opt.value === value);
 
-    if (optionExists) {
-      select.value = value;
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    } else if (value) {
-      select.value = "__TYPE_HERE__";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-      setTimeout(() => {
-        const newInput = cell.querySelector("input");
-        if (newInput) newInput.value = value;
-      }, 0);
+    if (!optionExists && value) {
+      // Dropdown-only mode has no "type here" escape hatch, but a row saved
+      // before a project list changed (or from a former custom entry) still
+      // needs to display its actual value rather than silently going blank
+      // and losing it on the next save — surface it as a selectable option.
+      const legacyOpt = document.createElement("option");
+      legacyOpt.value = value;
+      legacyOpt.textContent = value;
+      select.appendChild(legacyOpt);
     }
+
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
   } else if (input) {
     input.value = value;
   }
@@ -2278,33 +2282,34 @@ function openModal(button) {
     clientContainer.innerHTML = "";
     const clientDropdown = createSmartDropdown("client", clientContainer, clientValue);
     clientContainer.appendChild(clientDropdown);
-    
-    // Add change listener to update project dropdown
-    clientDropdown.addEventListener("change", function() {
-      const selectedClient = this.value;
-      updateModalProjectDropdown(selectedClient, "");
-    });
+
+    // Add change listener to update project dropdown (dropdown mode only —
+    // free-text client/project fields are independent of one another)
+    if (!window._freeTextClientProject) {
+      clientDropdown.addEventListener("change", function() {
+        const selectedClient = this.value;
+        updateModalProjectDropdown(selectedClient, "");
+      });
+    }
   }
-  
+
   // Clear and create project dropdown
   const projectContainer = document.getElementById("modalProjectContainer");
   if (projectContainer) {
     projectContainer.innerHTML = "";
     const projectDropdown = createSmartDropdown("project", projectContainer, projectValue, clientValue);
     projectContainer.appendChild(projectDropdown);
-    
-    // Add change listener to auto-fill project code
-    // projectDropdown.addEventListener("change", function() {
-    //   updateModalProjectCode(clientValue, this.value);
-    // });
-    projectDropdown.addEventListener("change", function() {
-      const currentClient = clientContainer?.querySelector("select")?.value;
-      updateModalProjectCode(currentClient, this.value);
-  }); 
 
+    // Add change listener to auto-fill project code (dropdown mode only)
+    if (!window._freeTextClientProject) {
+      projectDropdown.addEventListener("change", function() {
+        const currentClient = clientContainer?.querySelector("select")?.value;
+        updateModalProjectCode(currentClient, this.value);
+      });
+    }
   }
-  
-  // Clear and create project code field (readonly)
+
+  // Clear and create project code field
   const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
   if (projectCodeContainer) {
     projectCodeContainer.innerHTML = "";
@@ -2313,11 +2318,17 @@ function openModal(button) {
     codeInput.id = "modalProjectCodeInput";
     codeInput.className = "form-input";
     codeInput.value = projectCodeValue;
-    codeInput.readOnly = true;
-    codeInput.style.backgroundColor = "#f0f0f0";
+    if (window._freeTextClientProject) {
+      codeInput.readOnly = false;
+      codeInput.placeholder = "Enter Project Code";
+    } else {
+      codeInput.readOnly = true;
+      codeInput.style.backgroundColor = "#f0f0f0";
+    }
     projectCodeContainer.appendChild(codeInput);
   }
-  
+  showProjectPlanStatus(projectCodeValue, { modal: true });
+
   // Set other fields
   document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
   document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
@@ -2347,6 +2358,7 @@ function openModal(button) {
 
 // Update project dropdown when client changes in modal
 function updateModalProjectDropdown(selectedClient, selectedProject = "") {
+  if (window._freeTextClientProject) return; // free-text fields are independent, nothing to cascade
   const projectContainer = document.getElementById("modalProjectContainer");
   if (!projectContainer) return;
   
@@ -2373,7 +2385,8 @@ function updateModalProjectDropdown(selectedClient, selectedProject = "") {
     codeInput.style.backgroundColor = "#f0f0f0";
     projectCodeContainer.appendChild(codeInput);
   }
-  
+  showProjectPlanStatus("", { modal: true });
+
   // Clear project code when client changes
   // const projectCodeInput = document.getElementById("modalProjectCodeInput");
   // if (projectCodeInput) projectCodeInput.value = "";
@@ -2398,17 +2411,9 @@ function updateModalProjectDropdown(selectedClient, selectedProject = "") {
 // }
 
 function updateModalProjectCode(clientValue, projectValue) {
+  if (window._freeTextClientProject) return; // project code stays freely editable, never auto-locked
   const projectCodeInput = document.getElementById("modalProjectCodeInput");
   if (!projectCodeInput) return;
-
-  // 🟢 Custom project
-  if (projectValue === "__TYPE_HERE__") {
-    projectCodeInput.value = "";
-    projectCodeInput.readOnly = false;
-    projectCodeInput.placeholder = "Enter Project Code";
-    projectCodeInput.style.backgroundColor = "";
-    return;
-  }
 
   // 🟢 Normal project
   if (
@@ -2425,8 +2430,11 @@ function updateModalProjectCode(clientValue, projectValue) {
       projectCodeInput.value = projectData.project_code;
       projectCodeInput.readOnly = true;
       projectCodeInput.style.backgroundColor = "#f0f0f0";
+      showProjectPlanStatus(projectData.project_code, { modal: true });
+      return;
     }
   }
+  showProjectPlanStatus("", { modal: true });
 }
 
 
@@ -2714,6 +2722,13 @@ async function openEmployeeDetails(employeeId, cycleId) {
         <div class="feedback-card" style="border-left:4px solid #9b59b6;"><h3>FEEDBACK FOR IT</h3><p>${data.feedback_it || "-"}</p></div>
         <div class="feedback-card" style="border-left:4px solid #1abc9c;"><h3>FEEDBACK FOR CRM</h3><p>${data.feedback_crm || "-"}</p></div>
         <div class="feedback-card" style="border-left:4px solid #e74c3c;"><h3>FEEDBACK FOR OTHERS</h3><p>${data.feedback_others || "-"}</p></div>
+        <div class="feedback-card" style="border-left:4px solid #f1c40f;">
+          <h3>IDLE TIME</h3>
+          <p>
+            <strong>Idle Time?</strong> ${data.idle_time_status || 'No'}<br>
+            ${data.idle_time_status === 'Yes' ? `<strong>Time:</strong> ${data.idle_time_hours || '-'}<br><strong>Reason:</strong> ${data.idle_time_reason || '-'}` : ''}
+          </p>
+        </div>
       </div>
     `;
 
@@ -3068,11 +3083,11 @@ function _renderHistoryPayrolls(payrolls) {
 
     // Feedback section inside card
     const meta = payroll.metadata || {};
-    if (meta.hits || meta.misses || meta.feedback_hr || meta.feedback_it || meta.feedback_crm || meta.feedback_others) {
+    if (meta.hits || meta.misses || meta.feedback_hr || meta.feedback_it || meta.feedback_crm || meta.feedback_others || meta.idle_time_status === 'Yes') {
       const feedbackDiv = card.querySelector('.history-card-feedback');
       feedbackDiv.style.cssText = 'padding:1rem 1.5rem 1.5rem;background:#fafbfc;border-top:1px solid #e1e8ed;';
       feedbackDiv.innerHTML = `
-        <h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.88rem;font-weight:700;"><i class="fas fa-comment-alt"></i> Feedback</h4>
+        <h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.88rem;font-weight:700;"><i class="fas fa-comment-alt"></i> Feedback & Idle Time</h4>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.5rem;font-size:.83rem;">
           ${meta.hits ? `<div><strong>3 HITS:</strong> ${meta.hits}</div>` : ''}
           ${meta.misses ? `<div><strong>3 MISSES:</strong> ${meta.misses}</div>` : ''}
@@ -3080,6 +3095,8 @@ function _renderHistoryPayrolls(payrolls) {
           ${meta.feedback_it ? `<div><strong>IT:</strong> ${meta.feedback_it}</div>` : ''}
           ${meta.feedback_crm ? `<div><strong>CRM:</strong> ${meta.feedback_crm}</div>` : ''}
           ${meta.feedback_others ? `<div><strong>Others:</strong> ${meta.feedback_others}</div>` : ''}
+          <div><strong>Idle Time?</strong> ${meta.idle_time_status || 'No'}</div>
+          ${meta.idle_time_status === 'Yes' ? `<div><strong>Idle Time (Hrs):</strong> ${meta.idle_time_hours || '-'}</div><div><strong>Idle Reason:</strong> ${meta.idle_time_reason || '-'}</div>` : ''}
         </div>
       `;
     }
@@ -3143,10 +3160,12 @@ function editHistoryRow(button, entryId) {
       const clientDropdown = createSmartDropdown("client", clientContainer, clientValue);
       clientContainer.appendChild(clientDropdown);
 
-      clientDropdown.addEventListener("change", function () {
-          const selectedClient = this.value;
-          updateModalProjectDropdown(selectedClient, "");
-      });
+      if (!window._freeTextClientProject) {
+        clientDropdown.addEventListener("change", function () {
+            const selectedClient = this.value;
+            updateModalProjectDropdown(selectedClient, "");
+        });
+      }
 
       const projectContainer = document.getElementById("modalProjectContainer");
       projectContainer.innerHTML = "";
@@ -3158,10 +3177,12 @@ function editHistoryRow(button, entryId) {
       );
       projectContainer.appendChild(projectDropdown);
 
-      projectDropdown.addEventListener("change", function () {
-          const currentClient = clientContainer?.querySelector("select")?.value;
-          updateModalProjectCode(currentClient, this.value);
-      });
+      if (!window._freeTextClientProject) {
+        projectDropdown.addEventListener("change", function () {
+            const currentClient = clientContainer?.querySelector("select")?.value;
+            updateModalProjectCode(currentClient, this.value);
+        });
+      }
 
       const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
       projectCodeContainer.innerHTML = "";
@@ -3170,10 +3191,16 @@ function editHistoryRow(button, entryId) {
       codeInput.id = "modalProjectCodeInput";
       codeInput.className = "form-input";
       codeInput.value = projectCodeValue;
-      codeInput.readOnly = true;
-      codeInput.style.backgroundColor = "#f0f0f0";
+      if (window._freeTextClientProject) {
+        codeInput.readOnly = false;
+        codeInput.placeholder = "Enter Project Code";
+      } else {
+        codeInput.readOnly = true;
+        codeInput.style.backgroundColor = "#f0f0f0";
+      }
       projectCodeContainer.appendChild(codeInput);
-      
+      showProjectPlanStatus(projectCodeValue, { modal: true });
+
     document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
     document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Activity
     document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Project Hours
@@ -3333,6 +3360,9 @@ function _collectMetadata() {
     feedback_it:      document.getElementById('feedback_it')?.value || '',
     feedback_crm:     document.getElementById('feedback_crm')?.value || '',
     feedback_others:  document.getElementById('feedback_others')?.value || '',
+    idle_time_status: document.getElementById('idle_time_status')?.value || 'No',
+    idle_time_hours:  document.getElementById('idle_time_hours')?.value || '',
+    idle_time_reason: document.getElementById('idle_time_reason')?.value || '',
   };
 }
 
@@ -3361,6 +3391,10 @@ async function saveWeekDraft(sectionId) {
   const errors = [];
   const requireLunch = window._showLunchTravel !== false;
   entries.forEach((e, i) => {
+    // Leave / PHY / Week Off rows aren't working days — don't force project
+    // fields to be filled, but keep whatever the user did fill in.
+    if (isDayOffLocation(e.location)) return;
+
     const mandatory = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
     mandatory.forEach(f => {
       if (!e[f] || e[f].trim() === '') errors.push(`Row ${i+1}: ${f} is required`);
@@ -3423,6 +3457,18 @@ function confirmSubmit() {
     showPopup('Submission deadline has passed for this cycle.', true);
     return;
   }
+
+  // Validate Idle Time: if Yes, both hours and reason are required
+  const idleStatus = document.getElementById('idle_time_status')?.value || 'No';
+  if (idleStatus === 'Yes') {
+    const idleHours = document.getElementById('idle_time_hours')?.value || '';
+    const idleReason = document.getElementById('idle_time_reason')?.value || '';
+    if (!idleHours.trim() || !idleReason.trim()) {
+      showPopup("Since Idle Time is set to 'Yes', both 'Idle Time (Hours / Min)' and 'Reason' fields are required.", true);
+      return;
+    }
+  }
+
   const popup = document.getElementById('submitConfirmPopup');
   if (popup) popup.style.display = 'flex';
 }
@@ -4462,6 +4508,14 @@ function clearTimesheet(auto = false) {
   sectionCount = 0;
   addWeekSection();
   document.querySelectorAll("textarea").forEach((t) => (t.value = ""));
+  // Reset idle time fields
+  const statusEl = document.getElementById('idle_time_status');
+  if (statusEl) statusEl.value = 'No';
+  const hoursEl = document.getElementById('idle_time_hours');
+  if (hoursEl) hoursEl.value = '';
+  const reasonEl = document.getElementById('idle_time_reason');
+  if (reasonEl) reasonEl.value = '';
+  if (typeof toggleIdleTimeFields === 'function') toggleIdleTimeFields();
   updateSummary();
   if (!auto) showPopup("Timesheet cleared");
 }
@@ -4500,6 +4554,14 @@ function showPopup(message, isError = false) {
     popup.style.opacity = "0";
     popup.style.visibility = "hidden";
   }, 3000);
+}
+
+function closePopup() {
+  const popup = document.getElementById("successPopup");
+  if (!popup) return;
+  popup.classList.remove("show");
+  popup.style.opacity = "0";
+  popup.style.visibility = "hidden";
 }
 
 function showExitConfirmation() {
@@ -4887,34 +4949,115 @@ async function handleExcelUpload(event) {
               feedback_hr: toStr(row['Feedback for HR']) || '',
               feedback_it: toStr(row['Feedback for IT']) || '',
               feedback_crm: toStr(row['Feedback for CRM']) || '',
-              feedback_others: toStr(row['Feedback for Others']) || ''
+              feedback_others: toStr(row['Feedback for Others']) || '',
+              idle_time_status: 'No',
+              idle_time_hours: '',
+              idle_time_reason: ''
             };
           });
 
+          // Rows with no Date are unused buffer rows from the template (dropdown/
+          // validation formatting can materialize a cell even when nothing was
+          // typed into it) — they aren't real entries, so drop them here.
+          const realEntries = timesheetData.filter(entry => entry.date && entry.date.trim() !== '');
 
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_URL}/save_timesheets`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(timesheetData)
-            });
-
+          if (realEntries.length === 0) {
             hideLoading();
+            showPopup('No filled-in rows found in this Excel file.', true);
+            return;
+          }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                // throw new Error(errorData.detail || 'Failed to upload Excel data.');
-                const message = Array.isArray(errorData.detail)
-                  ? errorData.detail.map(e => `${e.loc.join('.')} → ${e.msg}`).join('\n')
-                  : errorData.detail;
-
-                throw new Error(message);
-
+          // Same mandatory-field rule the manual "Save Week" flow enforces:
+          // working-day rows must have every project field filled in. Leave /
+          // PHY / Week Off rows are exempt (but whatever is filled stays).
+          {
+            const requireLunch = window._showLunchTravel !== false;
+            const mandatoryFields = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
+            const uploadErrors = [];
+            realEntries.forEach((entry, i) => {
+              if (isDayOffLocation(entry.location)) return;
+              mandatoryFields.forEach(f => {
+                if (!entry[f] || !entry[f].trim()) uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): ${f} is required`);
+              });
+              if (requireLunch && (!entry.lunchTime || !entry.lunchTime.trim())) {
+                uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): Lunch Time is required`);
+              }
+            });
+            if (uploadErrors.length) {
+              hideLoading();
+              showPopup(uploadErrors.slice(0, 5).join('\n'), true);
+              return;
             }
+          }
 
-            const result = await response.json();
-            showPopup('Excel uploaded and submitted successfully, You can view in History');
-            // setTimeout(() => window.location.reload(), 2000);
+          // Every partner except the free-text one (JHS01) must use real Nexus
+          // Quant project codes (they all start with "PL"). Non-working days
+          // ("Leave" / "PHY" / "Week Off") have no project to charge, so they're
+          // exempt from this check.
+          if (!window._freeTextClientProject) {
+            const nonWorkingLocations = ['Leave', 'PHY', 'Week Off'];
+            const badRow = realEntries.find(entry =>
+              !nonWorkingLocations.includes(entry.location) &&
+              !entry.projectCode.trim().toUpperCase().startsWith('PL')
+            );
+            if (badRow) {
+              hideLoading();
+              showPopup(
+                `Invalid project code "${badRow.projectCode || '(blank)'}" on ${badRow.date}. ` +
+                `Projects must be from Nexus Quant only (project code must start with "PL").`,
+                true
+              );
+              return;
+            }
+          }
+
+          // Populate feedback fields from first row. Idle time is filled in the app, not the Excel template.
+          if (timesheetData.length > 0) {
+            const firstRow = jsonData[0];
+            const statusEl = document.getElementById('idle_time_status');
+            if (statusEl) statusEl.value = 'No';
+            const hoursEl = document.getElementById('idle_time_hours');
+            if (hoursEl) hoursEl.value = '';
+            const reasonEl = document.getElementById('idle_time_reason');
+            if (reasonEl) reasonEl.value = '';
+            if (typeof toggleIdleTimeFields === 'function') toggleIdleTimeFields();
+            ['hits','misses','feedback_hr','feedback_it','feedback_crm','feedback_others'].forEach(f => {
+              const el = document.getElementById(f);
+              const pretty = { hits:'3 Hits', misses:'3 Misses', feedback_hr:'Feedback for HR', feedback_it:'Feedback for IT', feedback_crm:'Feedback for CRM', feedback_others:'Feedback for Others' }[f];
+              if (el) el.value = toStr(firstRow[pretty]) || toStr(firstRow[f]) || '';
+            });
+          }
+
+          // Group rows by weekPeriod and save each as draft
+          const groups = {};
+          realEntries.forEach(entry => {
+            const wp = entry.weekPeriod;
+            if (!groups[wp]) groups[wp] = [];
+            groups[wp].push(entry);
+          });
+
+          for (const [wp, entries] of Object.entries(groups)) {
+            const resDraft = await fetch(`${API_URL}/timesheet/save-draft`, {
+              method: 'POST',
+              headers: getHeaders(),
+              body: JSON.stringify({
+                cycle_id:    _selectedCycle.id,
+                cycle_label: _selectedCycle.cycle_label,
+                week_period: wp,
+                entries:     entries,
+                metadata:    _collectMetadata()
+              })
+            });
+            if (!resDraft.ok) {
+              const errJson = await resDraft.json();
+              throw new Error(errJson.detail || `Failed to save draft for week: ${wp}`);
+            }
+          }
+
+          // Load saved drafts onto the screen
+          await loadDraftForCycle(_selectedCycle.id);
+          hideLoading();
+          showPopup('Excel uploaded and saved as drafts! Review your entries, fill in Idle Time if needed, then Submit.');
 
         } catch (error) {
             console.error('Error reading Excel:', error);
@@ -4996,6 +5139,293 @@ function updateApproveAllButtons() {
 
 // Call this after every load of the tables
 // (add it at the end of loadPendingList() and loadRejectedList())
+
+
+// ── Idle Time toggle ─────────────────────────────────────────────────────────
+function toggleIdleTimeFields() {
+  const status = document.getElementById('idle_time_status')?.value || 'No';
+  const hoursWrap = document.getElementById('idle_time_hours_wrapper');
+  const reasonWrap = document.getElementById('idle_time_reason_wrapper');
+  if (hoursWrap && reasonWrap) {
+    if (status === 'Yes') {
+      hoursWrap.style.display = 'block';
+      reasonWrap.style.display = 'block';
+    } else {
+      hoursWrap.style.display = 'none';
+      reasonWrap.style.display = 'none';
+      const hi = document.getElementById('idle_time_hours');
+      if (hi) hi.value = '';
+      const ri = document.getElementById('idle_time_reason');
+      if (ri) ri.value = '';
+    }
+  }
+}
+window.toggleIdleTimeFields = toggleIdleTimeFields;
+
+
+// ── Download Sample Excel Template ───────────────────────────────────────────
+// Uses ExcelJS (not the SheetJS/XLSX community build) because SheetJS's free
+// build silently drops '!dataValidation' on write — the dropdowns never
+// actually made it into the downloaded file. ExcelJS writes real, enforced
+// dropdown validation (errorStyle: 'error' rejects anything typed that isn't
+// in the list), matching the dropdown fields in the timesheet app itself.
+async function downloadSampleTemplate() {
+  if (!_selectedCycle) {
+    showPopup('Please select a payroll cycle first.', true);
+    return;
+  }
+  if (!employeeProjects || !employeeProjects.projects_by_client) {
+    showPopup('Project details are not loaded yet. Please wait and try again.', true);
+    return;
+  }
+  if (typeof ExcelJS === 'undefined') {
+    showPopup('Template generator failed to load. Please refresh the page and try again.', true);
+    return;
+  }
+
+  try {
+    const empId       = document.getElementById('employeeId')?.value || '';
+    const empName     = document.getElementById('employeeName')?.value || '';
+    const designation = document.getElementById('designation')?.value || '';
+    const gender      = document.getElementById('gender')?.value || '';
+    const partner     = document.getElementById('partner')?.value || '';
+    const repManager  = document.getElementById('reportingManager')?.value || '';
+
+    const start = new Date(_selectedCycle.start_date);
+    const end   = new Date(_selectedCycle.end_date);
+    const weeks = generateWeekOptions(start, end);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Timesheet');
+    const metaWS = wb.addWorksheet('MetadataLists', { state: 'hidden' });
+
+    const headers = [
+      'Employee ID','Employee Name','Designation','Gender','Partner','Reporting Manager',
+      'Week Period','Date','Location of Work','Project Start Time','Project End Time',
+      'Client','Project','Project Code','Reporting Manager Entry','Activity',
+      'Project Hours','Billable','Lunch Time','Travel Time','Remarks',
+      '3 Hits','3 Misses','Feedback for HR','Feedback for IT','Feedback for CRM','Feedback for Others'
+    ];
+    const headerRow = ws.addRow(headers);
+    headerRow.font = { bold: true };
+    headerRow.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+    let curr = new Date(start);
+    let lastDateRow = 1;
+
+    while (curr <= end) {
+      const rIdx        = ws.rowCount + 1;
+      const dateStr     = curr.toISOString().split('T')[0];
+      const week        = weeks.find(w => curr >= new Date(w.start) && curr <= new Date(w.end));
+      const weekPeriod  = week ? week.value : '';
+      const hFormula    = `IF(AND(J${rIdx}<>"",K${rIdx}<>""),(K${rIdx}-J${rIdx})*24,"")`;
+
+      ws.addRow([
+        empId, empName, designation, gender, partner, repManager,
+        weekPeriod, dateStr, '', '', '',
+        '', '', '', repManager, '',
+        { formula: hFormula }, 'Yes', '30 min', 'None', '',
+        '', '', '', '', '', ''
+      ]);
+      lastDateRow = ws.rowCount;
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    // Apply hh:mm format to Project Start/End Time columns (J, K)
+    for (let r = 2; r <= lastDateRow; r++) {
+      ws.getCell(`J${r}`).numFmt = 'hh:mm';
+      ws.getCell(`K${r}`).numFmt = 'hh:mm';
+    }
+
+    // ── Build MetadataLists sheet (hidden helper sheet backing the dropdowns) ──
+    const weekPeriodValues = weeks.map(w => w.value);
+    const dateValues = [];
+    let d = new Date(start);
+    while (d <= end) { dateValues.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
+
+    const locations = ['Office','Client Site','Work From Home','Field Work','Leave','PHY','Week Off'];
+    const billable  = ['Yes','No'];
+    const lunch     = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr'];
+    const travel    = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr','2.5 hr','3 hr'];
+    // This partner's employees have no fixed client/project list to pick
+    // from in the app (free-typed fields instead), so the template mirrors
+    // that: no Client/Project/Project Code dropdowns or lookup formula.
+    const freeTextClientProject = window._freeTextClientProject;
+    const clients   = freeTextClientProject ? [] : (employeeProjects.clients || []);
+    // Reporting Manager is a free-text field in the app (no <select>/manager
+    // list exists), so there is nothing to build a dropdown from — keep the
+    // template's "Reporting Manager Entry" column as free text too.
+    const managers  = [repManager].filter(v => v !== '');
+
+    const clientCols = {};
+    const projectCodeLookup = [];
+    clients.forEach(c => {
+      const projs = employeeProjects.projects_by_client[c] || [];
+      clientCols[c] = projs.map(p => p.project_name);
+      projs.forEach(p => projectCodeLookup.push([p.project_name, p.project_code]));
+    });
+
+    const lookupNames = projectCodeLookup.map(p => p[0]);
+    const lookupCodes = projectCodeLookup.map(p => p[1]);
+
+    // Fixed columns A-H, per-client project columns I+, lookup pair at X(23) & Y(24)
+    const maxRows = Math.max(
+      weekPeriodValues.length, dateValues.length, locations.length,
+      billable.length, lunch.length, travel.length, clients.length,
+      managers.length, 1, ...clients.map(c => clientCols[c].length), lookupNames.length
+    );
+
+    metaWS.addRow(['Week Periods','Dates','Locations','Billables','Lunch','Travel','Clients','Managers']);
+    for (let r = 0; r < maxRows; r++) {
+      metaWS.getCell(r + 2, 1).value = weekPeriodValues[r] || '';
+      metaWS.getCell(r + 2, 2).value = dateValues[r]       || '';
+      metaWS.getCell(r + 2, 3).value = locations[r]        || '';
+      metaWS.getCell(r + 2, 4).value = billable[r]         || '';
+      metaWS.getCell(r + 2, 5).value = lunch[r]            || '';
+      metaWS.getCell(r + 2, 6).value = travel[r]           || '';
+      metaWS.getCell(r + 2, 7).value = clients[r]          || '';
+      metaWS.getCell(r + 2, 8).value = managers[r]         || '';
+    }
+    clients.forEach((c, i) => {
+      clientCols[c].forEach((projName, r) => { metaWS.getCell(r + 2, 9 + i).value = projName; });
+    });
+    metaWS.getCell(1, 24).value = 'ProjectName';
+    metaWS.getCell(1, 25).value = 'ProjectCode';
+    lookupNames.forEach((name, r) => { metaWS.getCell(r + 2, 24).value = name; });
+    lookupCodes.forEach((code, r) => { metaWS.getCell(r + 2, 25).value = code; });
+
+    // ── Named ranges for the Client -> Project dependent dropdown ──
+    // (indexed by position rather than a sanitized client name, so client
+    // names with punctuation/special characters still resolve correctly)
+    const colLetter = (n) => { // 1-based column index -> Excel letter
+      let s = '';
+      while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+      return s;
+    };
+    if (!freeTextClientProject) {
+      clients.forEach((c, i) => {
+        const col     = colLetter(9 + i);
+        const numProj = Math.max(clientCols[c].length, 1);
+        wb.definedNames.add(`MetadataLists!$${col}$2:$${col}$${numProj + 1}`, `Client_${i + 1}`);
+      });
+    }
+
+    // ── Data validations (strict: errorStyle 'error' blocks anything not on the list) ──
+    const strictList = (formula1, allowBlank = true) => ({
+      type: 'list',
+      allowBlank,
+      showErrorMessage: true,
+      errorStyle: 'error',
+      errorTitle: 'Invalid entry',
+      error: 'Please choose a value from the dropdown list.',
+      formulae: [formula1]
+    });
+
+    const clientsEnd = Math.max(clients.length + 1, 2);
+    const dvWeek     = strictList(`MetadataLists!$A$2:$A$${weekPeriodValues.length + 1}`);
+    const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
+    const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
+    const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
+    const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
+    const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
+    const dvClient   = freeTextClientProject ? null : strictList(`MetadataLists!$G$2:$G$${clientsEnd}`);
+    // Strict time-of-day validation so Project Start/End Time can only ever
+    // hold an actual time value (rejects plain text, numbers, etc.).
+    const dvTime = {
+      type: 'time', operator: 'between', allowBlank: true,
+      showErrorMessage: true, errorStyle: 'error',
+      errorTitle: 'Invalid time',
+      error: 'Enter a valid time (hh:mm), e.g. 09:30.',
+      formulae: [0, 0.9999884259259259]
+    };
+
+    // bufferRows gives room for a handful of extra manually-added rows beyond
+    // the cycle's actual dates, without ballooning the file with hundreds of
+    // unused (but styled/validated) rows.
+    const bufferRows = lastDateRow + 60;
+    for (let r = 2; r <= bufferRows; r++) {
+      ws.getCell(`G${r}`).dataValidation  = dvWeek;
+      ws.getCell(`H${r}`).dataValidation  = dvDate;
+      ws.getCell(`I${r}`).dataValidation  = dvLocation;
+      ws.getCell(`J${r}`).dataValidation  = dvTime;
+      ws.getCell(`K${r}`).dataValidation  = dvTime;
+      if (dvClient) ws.getCell(`L${r}`).dataValidation = dvClient;
+      // Project's dependent-dropdown formula must reference *this* row's
+      // Client cell explicitly (MATCH(L{r}, ...)) rather than a single
+      // shared "L2" — ExcelJS splits a 500-row range into several XML
+      // <dataValidation> blocks internally, and each block re-anchors its
+      // relative references to its own first row, not row 2. A shared "L2"
+      // formula silently produced wrong (or empty) results for every row
+      // past the first block, which is why Project stopped working partway
+      // down the sheet. A per-row literal formula sidesteps that entirely.
+      if (!freeTextClientProject) {
+        ws.getCell(`M${r}`).dataValidation =
+          strictList(`INDIRECT("Client_"&MATCH(L${r},MetadataLists!$G$2:$G$${clientsEnd},0))`);
+      }
+      ws.getCell(`R${r}`).dataValidation  = dvBillable;
+      ws.getCell(`S${r}`).dataValidation  = dvLunch;
+      ws.getCell(`T${r}`).dataValidation  = dvTravel;
+    }
+
+    // ── VLOOKUP formula for Project Code (Column N) — skipped for the
+    // free-text partner, whose Project Code column is plain typed text ──
+    if (!freeTextClientProject) {
+      const lookupEnd = Math.max(lookupNames.length + 1, 2);
+      for (let r = 2; r <= lastDateRow; r++) {
+        ws.getCell(`N${r}`).value = { formula: `IFERROR(VLOOKUP(M${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),"")` };
+      }
+    }
+
+    // ── Lock Project Code so it can only ever be auto-populated by picking
+    // a Project (not for the free-text partner, who has no fixed project
+    // list to look codes up from) — every other data column stays editable.
+    // Every cell's protection is set explicitly (never left at the default):
+    // ExcelJS appears to share a default style object across untouched cells,
+    // so leaving one column "untouched" let it silently pick up whatever
+    // locked state a neighboring cell happened to set. ──
+    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','AA'];
+    const lockedCols = freeTextClientProject ? [] : ['N'];
+    for (let r = 2; r <= bufferRows; r++) {
+      allDataCols.forEach(col => {
+        ws.getCell(`${col}${r}`).protection = { locked: lockedCols.includes(col) };
+      });
+    }
+    await ws.protect('', {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+      formatCells: false, formatColumns: false, formatRows: false,
+      insertRows: false, insertColumns: false, insertHyperlinks: false,
+      deleteRows: false, deleteColumns: false,
+      sort: false, autoFilter: false, pivotTables: false
+    });
+
+    // Reasonable column widths so the template reads like the app, not a raw dump
+    const widths = [12,18,14,10,14,18,20,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
+    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    const cycleLabel = _selectedCycle.cycle_label.replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName   = `Timesheet_Template_${empId}_${cycleLabel}.xlsx`;
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    showPopup(`Template downloaded: ${fileName}`);
+
+  } catch (err) {
+    console.error('downloadSampleTemplate error:', err);
+    showPopup(`Failed to generate template: ${err.message}`, true);
+  }
+}
+window.downloadSampleTemplate = downloadSampleTemplate;
 
 
 /* End of file */

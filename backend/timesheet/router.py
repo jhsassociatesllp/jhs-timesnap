@@ -26,6 +26,7 @@ New unified document structure (one doc per employee):
 """
 import hashlib
 import json
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -51,6 +52,15 @@ from backend.timesheet.models import (
 )
 
 router = APIRouter(prefix="/timesheet", tags=["Timesheet"])
+
+# Partner whose employees have no fixed client/project list — those fields
+# are free-typed in the app instead of dropdowns, and their project codes
+# aren't required to follow the PL-prefix convention.
+FREE_TEXT_PARTNER_CODE = "JHS01"
+
+# Locations that mean "not a working day" — lunch time / project code aren't
+# applicable for rows marked with these.
+DAY_OFF_LOCATIONS = {"Leave", "PHY", "Week Off"}
 
 
 # ─────────────────────────── helpers ────────────────────────────────────────
@@ -170,11 +180,45 @@ async def save_draft(
     if show_lunch_travel:
         lunch_errors = []
         for i, entry in enumerate(entries):
+            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+                continue  # not a working day — lunch time isn't applicable
             lt = entry.get("lunchTime", "") or ""
             if not lt.strip():
                 lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
         if lunch_errors:
             raise HTTPException(400, "; ".join(lunch_errors[:5]))
+
+    # Mandatory fields for working-day rows — mirrors the frontend's check,
+    # but enforced here too so a bad upload/manual entry can't slip past a
+    # client-side bug (or a direct API call) and land in the draft.
+    mandatory_fields = [
+        "date", "projectStartTime", "projectEndTime", "client", "project",
+        "projectCode", "reportingManagerEntry", "activity",
+    ]
+    field_errors = []
+    for i, entry in enumerate(entries):
+        if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+            continue
+        for field in mandatory_fields:
+            if not (entry.get(field, "") or "").strip():
+                field_errors.append(f"Row {i + 1}: {field} is required")
+    if field_errors:
+        raise HTTPException(400, "; ".join(field_errors[:5]))
+
+    # Non-JHS01 partners must use real Nexus Quant project codes (all start
+    # with "PL"). Day-off rows have no project to charge, so they're exempt.
+    employee = employee_details_collection.find_one({"EmpID": current_user})
+    partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
+    if partner_code != FREE_TEXT_PARTNER_CODE:
+        code_errors = []
+        for i, entry in enumerate(entries):
+            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+                continue
+            code = (entry.get("projectCode", "") or "").strip().upper()
+            if not code.startswith("PL"):
+                code_errors.append(f"Row {i + 1}: project code must start with \"PL\" (Nexus Quant only)")
+        if code_errors:
+            raise HTTPException(400, "; ".join(code_errors[:5]))
 
     # Assign IDs to entries
     new_entries = []
@@ -288,6 +332,45 @@ async def submit_timesheet(
 
     emp_id = current_user
     meta = temp_payroll.get("metadata") or metadata or {}
+
+    # ── TL project-plan gate ──────────────────────────────────────────────
+    # TLs (reporting managers) must have a valid project plan — matching both
+    # the project code AND the entry's date falling inside the plan's task
+    # window — for every working-day entry before they can submit. This never
+    # blocks saving a draft, only the final submit. JHS01 TLs are shared
+    # services and don't create/track projects this way, so they're exempt.
+    is_tl = bool(reporting_managers_collection.find_one({"ReportingEmpCode": emp_id.strip().upper()}))
+    employee = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()}, {"_id": 0, "PartnerEmpCode": 1})
+    partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
+    if is_tl and partner_code != FREE_TEXT_PARTNER_CODE:
+        plan_cache = {}
+        plan_errors = []
+        for week in temp_payroll.get("weeks", []):
+            for entry in week.get("entries", []):
+                location = (entry.get("location", "") or "").strip()
+                if location in DAY_OFF_LOCATIONS:
+                    continue
+                code = (entry.get("projectCode", "") or "").strip().upper()
+                entry_date_str = entry.get("date", "") or ""
+                if code not in plan_cache:
+                    plan_cache[code] = _lookup_project_plan(code)
+                has_plan, plan_start, plan_end = plan_cache[code]
+                if not has_plan:
+                    plan_errors.append(f'{entry_date_str}: no project plan found for code "{code}"')
+                    continue
+                try:
+                    entry_date = datetime.fromisoformat(entry_date_str[:10])
+                except (ValueError, TypeError):
+                    plan_errors.append(f"{entry_date_str}: invalid entry date")
+                    continue
+                if (plan_start and entry_date.date() < plan_start.date()) or (plan_end and entry_date.date() > plan_end.date()):
+                    plan_errors.append(f'{entry_date_str}: outside the project plan window for "{code}"')
+        if plan_errors:
+            raise HTTPException(
+                400,
+                "Cannot submit — some entries have no matching project plan or fall outside its dates: "
+                + "; ".join(plan_errors[:8]),
+            )
 
     # Build entries with dedup
     existing_doc = timesheets_collection.find_one({"employeeId": emp_id})
@@ -443,6 +526,10 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
                     "feedback_it": p.get("metadata", {}).get("feedback_it", ""),
                     "feedback_crm": p.get("metadata", {}).get("feedback_crm", ""),
                     "feedback_others": p.get("metadata", {}).get("feedback_others", ""),
+                    "idle_time": p.get("metadata", {}).get("idle_time", ""),
+                    "idle_time_status": p.get("metadata", {}).get("idle_time_status", ""),
+                    "idle_time_hours": p.get("metadata", {}).get("idle_time_hours", ""),
+                    "idle_time_reason": p.get("metadata", {}).get("idle_time_reason", ""),
                 })
             weeks_out.append({
                 "week_period": w["week_period"],
@@ -592,11 +679,11 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
 
     employee = employee_details_collection.find_one({"EmpID": employee_id})
     if not employee:
-        return {"clients": [], "projects_by_client": {}}
+        return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
     partner_code = employee.get("PartnerEmpCode", "").strip().upper()
     if not partner_code:
-        return {"clients": [], "projects_by_client": {}}
+        return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
     projects = list(db["Projects"].find({"partner_emp_code": partner_code}))
     projects_by_client: dict = {}
@@ -608,18 +695,78 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
             continue
         projects_by_client.setdefault(client, [])
         if not any(x["project_name"] == proj_name for x in projects_by_client[client]):
-            projects_by_client[client].append({"project_name": proj_name, "project_code": proj_code})
+            projects_by_client[client].append({
+                "project_name": proj_name,
+                "project_code": proj_code,
+                "execution_start_date": p.get("execution_start_date", ""),
+                "execution_end_date": p.get("execution_end_date", ""),
+            })
 
     for c in projects_by_client:
         projects_by_client[c].sort(key=lambda x: x["project_name"])
 
-    return {"clients": sorted(projects_by_client.keys()), "projects_by_client": projects_by_client}
+    return {
+        "clients": sorted(projects_by_client.keys()),
+        "projects_by_client": projects_by_client,
+        "partner_emp_code": partner_code,
+    }
 
 
 @router.get("/check-manager/{emp_code}")
 async def check_reporting_manager(emp_code: str, current_user: str = Depends(get_current_user)):
     doc = reporting_managers_collection.find_one({"ReportingEmpCode": emp_code.strip().upper()})
-    return {"isManager": bool(doc)}
+    # Also fetch the employee's PartnerEmpCode so the frontend can detect shared services
+    emp_doc = employee_details_collection.find_one({"EmpID": emp_code.strip().upper()}, {"_id": 0, "PartnerEmpCode": 1})
+    partner_emp_code = (emp_doc.get("PartnerEmpCode", "") if emp_doc else "").strip().upper()
+    return {"isManager": bool(doc), "partnerEmpCode": partner_emp_code}
+
+
+def _lookup_project_plan(project_code: str):
+    """Whether a project plan has been created for this project code (Project_Plans
+    collection — a plan is just its presence there, any tasks at all), and if so
+    the execution window to show/validate against, taken from the Projects
+    collection's execution_start_date/execution_end_date (the project's own
+    planned dates, not the individual tasks' dates). Returns (has_plan, start_date,
+    end_date) — dates as datetime objects, or None when there is no plan/project."""
+    code = (project_code or "").strip().upper()
+    if not code:
+        return False, None, None
+    escaped = re.escape(code)
+    plan_query = {
+        "$or": [
+            {"project_code": {"$regex": f"^{escaped}$", "$options": "i"}},
+            {"project_id": {"$regex": f"^{escaped}$", "$options": "i"}},
+            {"ProjectCode": {"$regex": f"^{escaped}$", "$options": "i"}},
+            {"ProjectId": {"$regex": f"^{escaped}$", "$options": "i"}},
+        ]
+    }
+    has_plan = db["Project_Plans"].find_one(plan_query, {"_id": 1}) is not None
+    if not has_plan:
+        # Legacy/alternate collection name — kept for environments that use it
+        has_plan = db["Project Plans"].find_one(plan_query, {"_id": 1}) is not None
+    if not has_plan:
+        return False, None, None
+
+    project_doc = db["Projects"].find_one(
+        {"project_code": {"$regex": f"^{escaped}$", "$options": "i"}},
+        {"_id": 0, "execution_start_date": 1, "execution_end_date": 1},
+    )
+    start_date = project_doc.get("execution_start_date") if project_doc else None
+    end_date = project_doc.get("execution_end_date") if project_doc else None
+    return True, start_date, end_date
+
+
+@router.get("/project-plan-status/{project_code}")
+async def get_project_plan_status(project_code: str, current_user: str = Depends(get_current_user)):
+    """Check whether a project plan has been created for the given project_code,
+    and if so, its execution window (from the Projects collection)."""
+    has_plan, start_date, end_date = _lookup_project_plan(project_code)
+    return {
+        "project_code": project_code,
+        "has_plan": has_plan,
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+    }
 
 
 @router.get("/view/{employee_id}")
@@ -673,6 +820,10 @@ async def get_employee_timesheet_for_manager(
         "feedback_it": meta.get("feedback_it", ""),
         "feedback_crm": meta.get("feedback_crm", ""),
         "feedback_others": meta.get("feedback_others", ""),
+        "idle_time": meta.get("idle_time", ""),
+        "idle_time_status": meta.get("idle_time_status", ""),
+        "idle_time_hours": meta.get("idle_time_hours", ""),
+        "idle_time_reason": meta.get("idle_time_reason", ""),
         "entries": entries,
     }
 

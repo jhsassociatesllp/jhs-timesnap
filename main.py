@@ -1060,6 +1060,10 @@ async def submit_timesheet(
         "feedback_it": meta.get("feedback_it", ""),
         "feedback_crm": meta.get("feedback_crm", ""),
         "feedback_others": meta.get("feedback_others", ""),
+        "idle_time": meta.get("idle_time", ""),
+        "idle_time_status": meta.get("idle_time_status", ""),
+        "idle_time_hours": meta.get("idle_time_hours", ""),
+        "idle_time_reason": meta.get("idle_time_reason", ""),
         "updated_time": now_iso,
         "totalHours": round(total, 2),
         "totalBillableHours": round(billable_hrs, 2),
@@ -1130,6 +1134,10 @@ class ExcelTimesheetEntry(BaseModel):
     feedback_it: Optional[str] = ""
     feedback_crm: Optional[str] = ""
     feedback_others: Optional[str] = ""
+    idle_time: Optional[str] = ""
+    idle_time_status: Optional[str] = ""
+    idle_time_hours: Optional[str] = ""
+    idle_time_reason: Optional[str] = ""
 
 
 @app.post("/save_timesheets")
@@ -1164,6 +1172,10 @@ async def save_timesheets_from_excel(
                 "feedback_it": entry.feedback_it,
                 "feedback_crm": entry.feedback_crm,
                 "feedback_others": entry.feedback_others,
+                "idle_time": entry.idle_time,
+                "idle_time_status": entry.idle_time_status,
+                "idle_time_hours": entry.idle_time_hours,
+                "idle_time_reason": entry.idle_time_reason,
                 "weeks": {}
             }
         
@@ -1252,6 +1264,10 @@ async def save_timesheets_from_excel(
             "feedback_it": emp_data.get("feedback_it", ""),
             "feedback_crm": emp_data.get("feedback_crm", ""),
             "feedback_others": emp_data.get("feedback_others", ""),
+            "idle_time": emp_data.get("idle_time", ""),
+            "idle_time_status": emp_data.get("idle_time_status", ""),
+            "idle_time_hours": emp_data.get("idle_time_hours", ""),
+            "idle_time_reason": emp_data.get("idle_time_reason", ""),
         }
         
         # Recalculate totals
@@ -1302,6 +1318,7 @@ from backend.timesheet.router import (
     get_employee_timesheet_for_manager, get_pending, get_approved, get_rejected,
     approve_timesheet, reject_timesheet, approve_all,
     get_timesheets, update_timesheet, delete_timesheet,
+    get_project_plan_status,
 )
 
 # Legacy save — redirect to new draft endpoint (kept for Excel upload compatibility)
@@ -1319,3 +1336,4 @@ app.add_api_route("/get_rejected_employees/{reporting_emp_code}", get_rejected, 
 app.add_api_route("/approve_timesheet",                         approve_timesheet,                  methods=["POST"])
 app.add_api_route("/reject_timesheet",                          reject_timesheet,                   methods=["POST"])
 app.add_api_route("/approve_all_timesheets",                    approve_all,                        methods=["POST"])
+app.add_api_route("/get_project_plan_status/{project_code}",    get_project_plan_status,            methods=["GET"])

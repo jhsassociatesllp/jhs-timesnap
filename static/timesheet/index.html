@@ -79,6 +79,28 @@
           <i class="fas fa-plus"></i> Add Week Period
         </button>
 
+        <!-- IDLE TIME SECTION -->
+        <div class="idle-section" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;margin-top:1.5rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <h3 style="margin-top:0;margin-bottom:1rem;color:#1e293b;font-size:1.1rem;font-weight:700;"><i class="fas fa-hourglass-half" style="color:#f59e0b;margin-right:8px;"></i> Idle Time Details</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;align-items:start;">
+            <div>
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Idle Time? <span style="color:#ef4444;">*</span></label>
+              <select id="idle_time_status" class="form-input" style="width:100%;" onchange="toggleIdleTimeFields()">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div id="idle_time_hours_wrapper" style="display:none;">
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Idle Time (Hours / Min) <span style="color:#ef4444;">*</span></label>
+              <input type="text" id="idle_time_hours" class="form-input" placeholder="e.g. 2.5 hours" style="width:100%;">
+            </div>
+            <div id="idle_time_reason_wrapper" style="display:none;">
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Reason <span style="color:#ef4444;">*</span></label>
+              <textarea id="idle_time_reason" class="form-input" placeholder="Enter reason for idle time" rows="2" style="width:100%;"></textarea>
+            </div>
+          </div>
+        </div>
+
         <div class="feedback-section">
           <div class="feedback-item"><label>3 HITS</label><textarea id="hits" rows="3"></textarea></div>
           <div class="feedback-item"><label>3 MISSES</label><textarea id="misses" rows="3"></textarea></div>
@@ -95,12 +117,15 @@
         </div>
 
         <div class="export-section">
-          <h3><i class="fas fa-download"></i> Export Timesheet</h3>
+          <h3><i class="fas fa-download"></i> Export & Upload Timesheet</h3>
           <button class="export-btn" onclick="exportTimesheetToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
           <button id="submitBtn" class="export-btn" onclick="confirmSubmit()"><i class="fas fa-paper-plane"></i> Submit Timesheet</button>
           <button class="clear-btn" onclick="clearTimesheet()"><i class="fas fa-eraser"></i> Clear</button>
           <button class="export-btn" onclick="document.getElementById('excelUploadInput').click()">
             <i class="fas fa-upload"></i> Upload Excel
+          </button>
+          <button class="export-btn" onclick="downloadSampleTemplate()" style="background:#5d5fef;color:#fff;">
+            <i class="fas fa-file-excel"></i> Download Template
           </button>
           <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)" />
         </div>
@@ -195,6 +220,9 @@
             <option value="Client Site">Client Site</option>
             <option value="Work From Home">Work From Home</option>
             <option value="Field Work">Field Work</option>
+            <option value="Leave">Leave</option>
+            <option value="PHY">PHY</option>
+            <option value="Week Off">Week Off</option>
           </select>
         </div>
         <div><label id="modalLabel3">Project Start</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
@@ -202,6 +230,7 @@
         <div><label id="modalLabel5">Client</label><div id="modalClientContainer"></div></div>
         <div><label id="modalLabel6">Project</label><div id="modalProjectContainer"></div></div>
         <div><label id="modalLabel7">Project Code</label><div id="modalProjectCodeContainer"></div></div>
+        <div id="modalProjectMetaTL" style="display:none;"></div>
         <div><label id="modalLabel8">Reporting Manager</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()" /></div>
         <div><label id="modalLabel9">Activity</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()" /></div>
         <div><label id="modalLabel10">Project Hours</label><input type="number" id="modalInput10" class="form-input" readonly /></div>
@@ -248,6 +277,8 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- ExcelJS: used only for the downloadable template, since it (unlike the free SheetJS build) can actually write dropdown data validation into the .xlsx -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <!-- Timesheet-specific script -->
     <script src="/static/timesheet/script.js"></script>
   </body>

@@ -422,3 +422,32 @@ body{
     .form-section,.history-section{ padding:1rem; }
     .add-row-btn,.add-week-btn{ width:100%; padding:1rem; }
 }
+
+/* ── TL Project Meta Row (execution dates + project plan status) ── */
+.project-meta-row-tl td {
+    padding: 4px 12px !important;
+    font-size: 0.8rem;
+    color: #3730a3;
+    background: linear-gradient(90deg, #f0f4ff, #e8eaff);
+    border-top: none !important;
+    border-bottom: 1px solid #c5cef9;
+}
+.project-meta-row-tl {
+    animation: fadeInMeta 0.3s ease;
+}
+@keyframes fadeInMeta {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Modal TL meta section ── */
+#modalProjectMetaTL {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #f0f4ff, #e8eaff);
+    border-radius: 8px;
+    border-left: 3px solid #5d5fef;
+    font-size: 0.85rem;
+    color: #3730a3;
+    animation: fadeInMeta 0.3s ease;
+}

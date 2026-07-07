@@ -31,6 +31,10 @@ class TimesheetEntry(BaseModel):
     feedback_it: Optional[str] = None
     feedback_crm: Optional[str] = None
     feedback_others: Optional[str] = None
+    idle_time: Optional[str] = None
+    idle_time_status: Optional[str] = None
+    idle_time_hours: Optional[str] = None
+    idle_time_reason: Optional[str] = None
 
 
 class UpdateTimesheetRequest(BaseModel):
