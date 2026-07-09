@@ -36,6 +36,21 @@ let employeeProjects = {
 const FREE_TEXT_PARTNER_CODE = "JHS01";
 window._freeTextClientProject = false;
 
+// Shared-services (JHS01) employees pick Project Code from this fixed list
+// instead of typing it freely — Client/Project stay plain typed fields for
+// them, only Project Code becomes a dropdown. "Type Here" swaps the dropdown
+// for a free-text input for anything not on the list.
+const SHARED_SERVICES_PROJECT_CODES = [
+  "SS-HR Team",
+  "SS-Payroll Team",
+  "SS-Accounts & Finance Team",
+  "SS-IT Team",
+  "SS-Automation Team",
+  "SS-CRM Team",
+  "SS-Knowledge Team"
+];
+const SHARED_SERVICES_TYPE_HERE = "Type Here";
+
 // Locations that mean "not a working day" — project/time/client fields are
 // optional (but still accepted if filled in) for rows marked with these.
 const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
@@ -674,8 +689,17 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
   }
   if (entry.projectCode) {
     const codeCell = tr.querySelector('.col-project-code');
-    const codeInp  = codeCell?.querySelector('input');
-    if (codeInp) codeInp.value = entry.projectCode;
+    if (window._freeTextClientProject) {
+      // Rebuild so a preset value shows in the dropdown and a custom value
+      // shows in the "Type Here" input, rather than always the last-rendered mode.
+      if (codeCell) {
+        codeCell.innerHTML = "";
+        codeCell.appendChild(createSharedServicesProjectCode(entry.projectCode));
+      }
+    } else {
+      const codeInp = codeCell?.querySelector('input');
+      if (codeInp) codeInp.value = entry.projectCode;
+    }
   }
 
   // Covers drafts loaded on page load and rows restored right after an Excel
@@ -1694,6 +1718,91 @@ function createReadonlyProjectCode(value = "", placeholder = "Auto-filled") {
     return wrapper;
 }
 
+// Builds the shared-services Project Code field: a dropdown of the fixed
+// SS-team codes plus a "Type Here" option that swaps the dropdown for a
+// free-text input (with a button to switch back). Used for JHS01 employees
+// in the table row and both modal population paths (openModal/editHistoryRow).
+function createSharedServicesProjectCode(currentValue = "", inputId = null) {
+  const wrapper = document.createElement("div");
+  wrapper.style.width = "100%";
+
+  const isCustomValue = !!currentValue && !SHARED_SERVICES_PROJECT_CODES.includes(currentValue);
+
+  function renderSelect(selectValue) {
+    wrapper.innerHTML = "";
+    const select = document.createElement("select");
+    select.className = "project-code form-input smart-dropdown";
+    select.style.width = "100%";
+    if (inputId) select.id = inputId;
+
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Select project code";
+    select.appendChild(defaultOpt);
+
+    SHARED_SERVICES_PROJECT_CODES.forEach(code => {
+      const opt = document.createElement("option");
+      opt.value = code;
+      opt.textContent = code;
+      if (code === selectValue) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    const typeHereOpt = document.createElement("option");
+    typeHereOpt.value = SHARED_SERVICES_TYPE_HERE;
+    typeHereOpt.textContent = SHARED_SERVICES_TYPE_HERE;
+    select.appendChild(typeHereOpt);
+
+    select.addEventListener("change", function () {
+      if (this.value === SHARED_SERVICES_TYPE_HERE) {
+        renderInput("");
+      } else {
+        updateSummary();
+      }
+    });
+
+    wrapper.appendChild(select);
+  }
+
+  function renderInput(inputValue) {
+    wrapper.innerHTML = "";
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "5px";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "project-code form-input";
+    if (inputId) input.id = inputId;
+    input.placeholder = "Enter Project Code";
+    input.value = inputValue || "";
+    input.style.width = "calc(100% - 35px)";
+    input.addEventListener("input", updateSummary);
+
+    const backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.title = "Back to dropdown";
+    backBtn.innerHTML = '<i class="fas fa-list"></i>';
+    backBtn.style.marginLeft = "5px";
+    backBtn.style.padding = "6px 10px";
+    backBtn.style.cursor = "pointer";
+    backBtn.onclick = () => { renderSelect(""); updateSummary(); };
+
+    row.appendChild(input);
+    row.appendChild(backBtn);
+    wrapper.appendChild(row);
+  }
+
+  if (isCustomValue) {
+    renderInput(currentValue);
+  } else {
+    renderSelect(currentValue);
+  }
+
+  return wrapper;
+}
+
 function setupSmartDropdowns(row) {
   const clientCell = row.querySelector(".col-client");
   const projectCell = row.querySelector(".col-project");
@@ -1725,11 +1834,7 @@ function setupSmartDropdowns(row) {
     // In places where you create auto-filled code field:
     projectCodeCell.innerHTML = "";
     if (window._freeTextClientProject) {
-      const codeInput = document.createElement("input");
-      codeInput.type = "text";
-      codeInput.className = "project-code form-input";
-      codeInput.placeholder = "Enter Project Code";
-      projectCodeCell.appendChild(codeInput);
+      projectCodeCell.appendChild(createSharedServicesProjectCode());
     } else {
       projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
     }
@@ -2313,19 +2418,18 @@ function openModal(button) {
   const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
   if (projectCodeContainer) {
     projectCodeContainer.innerHTML = "";
-    const codeInput = document.createElement("input");
-    codeInput.type = "text";
-    codeInput.id = "modalProjectCodeInput";
-    codeInput.className = "form-input";
-    codeInput.value = projectCodeValue;
     if (window._freeTextClientProject) {
-      codeInput.readOnly = false;
-      codeInput.placeholder = "Enter Project Code";
+      projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
     } else {
+      const codeInput = document.createElement("input");
+      codeInput.type = "text";
+      codeInput.id = "modalProjectCodeInput";
+      codeInput.className = "form-input";
+      codeInput.value = projectCodeValue;
       codeInput.readOnly = true;
       codeInput.style.backgroundColor = "#f0f0f0";
+      projectCodeContainer.appendChild(codeInput);
     }
-    projectCodeContainer.appendChild(codeInput);
   }
   showProjectPlanStatus(projectCodeValue, { modal: true });
 
@@ -2552,9 +2656,14 @@ function saveModalEntry() {
   const projectCodeValue = projectCodeInput?.value || "";
   const codeCell = currentRow.querySelector(".col-project-code");
   if (codeCell) {
-    const codeInp = codeCell.querySelector("input");
-    if (codeInp) codeInp.value = projectCodeValue;
-    else codeCell.innerHTML = `<input type="text" class="project-code form-input" value="${projectCodeValue}" readonly style="background:#f0f0f0;">`;
+    if (window._freeTextClientProject) {
+      codeCell.innerHTML = "";
+      codeCell.appendChild(createSharedServicesProjectCode(projectCodeValue));
+    } else {
+      const codeInp = codeCell.querySelector("input");
+      if (codeInp) codeInp.value = projectCodeValue;
+      else codeCell.innerHTML = `<input type="text" class="project-code form-input" value="${projectCodeValue}" readonly style="background:#f0f0f0;">`;
+    }
   }
 
   // ── Other fields ─────────────────────────────────────────────────────────────
@@ -3186,19 +3295,18 @@ function editHistoryRow(button, entryId) {
 
       const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
       projectCodeContainer.innerHTML = "";
-      const codeInput = document.createElement("input");
-      codeInput.type = "text";
-      codeInput.id = "modalProjectCodeInput";
-      codeInput.className = "form-input";
-      codeInput.value = projectCodeValue;
       if (window._freeTextClientProject) {
-        codeInput.readOnly = false;
-        codeInput.placeholder = "Enter Project Code";
+        projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
       } else {
+        const codeInput = document.createElement("input");
+        codeInput.type = "text";
+        codeInput.id = "modalProjectCodeInput";
+        codeInput.className = "form-input";
+        codeInput.value = projectCodeValue;
         codeInput.readOnly = true;
         codeInput.style.backgroundColor = "#f0f0f0";
+        projectCodeContainer.appendChild(codeInput);
       }
-      projectCodeContainer.appendChild(codeInput);
       showProjectPlanStatus(projectCodeValue, { modal: true });
 
     document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
@@ -5295,6 +5403,14 @@ async function downloadSampleTemplate() {
     lookupNames.forEach((name, r) => { metaWS.getCell(r + 2, 24).value = name; });
     lookupCodes.forEach((code, r) => { metaWS.getCell(r + 2, 25).value = code; });
 
+    // Shared-services (free-text partner) Project Code options — the fixed
+    // SS-team list plus "Type Here", mirroring the app's dropdown.
+    const ssProjectCodeOptions = freeTextClientProject
+      ? [...SHARED_SERVICES_PROJECT_CODES, SHARED_SERVICES_TYPE_HERE]
+      : [];
+    metaWS.getCell(1, 27).value = 'SSProjectCodes';
+    ssProjectCodeOptions.forEach((code, r) => { metaWS.getCell(r + 2, 27).value = code; });
+
     // ── Named ranges for the Client -> Project dependent dropdown ──
     // (indexed by position rather than a sanitized client name, so client
     // names with punctuation/special characters still resolve correctly)
@@ -5330,6 +5446,15 @@ async function downloadSampleTemplate() {
     const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
     const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
     const dvClient   = freeTextClientProject ? null : strictList(`MetadataLists!$G$2:$G$${clientsEnd}`);
+    // Non-strict: shows the SS-team list as a dropdown but doesn't reject
+    // typed text, so "Type Here" behaves the same as it does in the app —
+    // pick a preset, or just type over it with anything else.
+    const dvSSProjectCode = freeTextClientProject ? {
+      type: 'list',
+      allowBlank: true,
+      showErrorMessage: false,
+      formulae: [`MetadataLists!$AA$2:$AA$${ssProjectCodeOptions.length + 1}`]
+    } : null;
     // Strict time-of-day validation so Project Start/End Time can only ever
     // hold an actual time value (rejects plain text, numbers, etc.).
     const dvTime = {
@@ -5351,6 +5476,7 @@ async function downloadSampleTemplate() {
       ws.getCell(`J${r}`).dataValidation  = dvTime;
       ws.getCell(`K${r}`).dataValidation  = dvTime;
       if (dvClient) ws.getCell(`L${r}`).dataValidation = dvClient;
+      if (dvSSProjectCode) ws.getCell(`N${r}`).dataValidation = dvSSProjectCode;
       // Project's dependent-dropdown formula must reference *this* row's
       // Client cell explicitly (MATCH(L{r}, ...)) rather than a single
       // shared "L2" — ExcelJS splits a 500-row range into several XML
