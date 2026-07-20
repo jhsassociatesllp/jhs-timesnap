@@ -75,10 +75,6 @@
 
         <div id="timesheetSections"></div>
 
-        <button class="add-week-btn" onclick="addWeekSection()">
-          <i class="fas fa-plus"></i> Add Week Period
-        </button>
-
         <!-- IDLE TIME SECTION -->
         <div class="idle-section" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;margin-top:1.5rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
           <h3 style="margin-top:0;margin-bottom:1rem;color:#1e293b;font-size:1.1rem;font-weight:700;"><i class="fas fa-hourglass-half" style="color:#f59e0b;margin-right:8px;"></i> Idle Time Details</h3>
@@ -214,7 +210,7 @@
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal-content">
         <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()" /></div>
-        <div><label id="modalLabel2">Location</label>
+        <div><label id="modalLabel2">Work</label>
           <select id="modalInput2" class="form-input">
             <option value="Office">Office</option>
             <option value="Client Site">Client Site</option>

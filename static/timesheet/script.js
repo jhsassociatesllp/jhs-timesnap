@@ -4,7 +4,6 @@ console.log("✅ script.js loaded successfully");
 let sectionCount = 0;
 let employeeData = [];
 let clientData = [];
-let weekOptions = [];
 let loggedInEmployeeId = localStorage.getItem("loggedInEmployeeId") || "";
 // const API_URL = "http://localhost:8000";
 const API_URL = "";
@@ -18,9 +17,6 @@ let historyEntries = [];
 let pollingInterval = null;
 // Debounced version of refreshPayrollWeeks
 const debouncedRefreshWeeks = debounce(refreshPayrollWeeks, 1000);
-
-// Update initWeekOptions to only fetch ONCE
-let weekOptionsInitialized = false;
 
 // 1. ADD THIS GLOBAL VARIABLE (after line with historyEntries)
 let employeeProjects = {
@@ -55,10 +51,6 @@ const SHARED_SERVICES_TYPE_HERE = "Type Here";
 // optional (but still accepted if filled in) for rows marked with these.
 const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
 const isDayOffLocation = (loc) => DAY_OFF_LOCATIONS.includes((loc || "").trim());
-
-// Ye variable bana de top me
-let weekOptionsReady = false;
-window.weekOptions = [];
 
 function startPayrollPolling() {
   // Clear any existing interval first
@@ -147,10 +139,6 @@ window.addEventListener("load", () => {
   }
 });
 
-// Ye line backend se data aane ke baad chalana
-weekOptionsReady = true;
-console.log("weekOptions ready! Validation enabled.");
-
 const getHeaders = (requireAuth = true) => {
   const token =
     localStorage.getItem("access_token") ||
@@ -214,20 +202,6 @@ function showError(message) {
   // }, 5000);
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-    // Ye line sabse important hai — weekOptions ko global bana de
-    if (typeof weekOptions !== "undefined" && Array.isArray(weekOptions)) {
-        window.weekOptions = weekOptions;
-        console.log("weekOptions loaded:", window.weekOptions);
-    } else {
-        console.error("weekOptions not found or not array!");
-       // Ye line daal de — bas itna hi kaafi hai
-        window.weekOptions = typeof weekOptions !== "undefined" ? weekOptions : [];
-    }
-
-    // Baaki sab initialization yaha hoga...
-});
-
 // ── Global payroll cycle state ────────────────────────────────────────────────
 let _availableCycles = [];       // all cycles user can fill
 let _selectedCycle   = null;     // currently selected cycle object
@@ -264,17 +238,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Populate employee info
     populateEmployeeInfo();
 
-    // Build week sections for the selected cycle
+    // Build the flat timesheet table for the selected cycle
+    renderTimesheetTable();
     if (_selectedCycle) {
-      // loadDraftForCycle will handle building sections from saved data
-      // If no draft exists, add one empty section
+      populateAllCycleDateRows();
+      // Overlay any saved draft entries on top of the auto-generated rows
       await loadDraftForCycle(_selectedCycle.id);
-      // If draft loaded nothing (no saved data), ensure at least one section exists
-      if (!document.querySelector('.timesheet-section')) {
-        addWeekSection();
-      }
-    } else {
-      addWeekSection();
     }
 
     await checkUserRole();
@@ -341,14 +310,14 @@ async function loadAvailableCycles() {
     sel.value = autoSelect.id;
     _selectedCycle = autoSelect;
     _updateCycleUI(autoSelect);
-    _buildWeekOptionsForCycle(autoSelect);
-    // Draft will be loaded after addWeekSection in the init flow
+    _setCycleWindow(autoSelect);
+    // Draft will be loaded after renderTimesheetTable in the init flow
     window._pendingDraftCycleId = autoSelect.id;
   } else if (_availableCycles.length === 1) {
     sel.value = _availableCycles[0].id;
     _selectedCycle = _availableCycles[0];
     _updateCycleUI(_availableCycles[0]);
-    _buildWeekOptionsForCycle(_availableCycles[0]);
+    _setCycleWindow(_availableCycles[0]);
     window._pendingDraftCycleId = _availableCycles[0].id;
   }
 }
@@ -361,13 +330,10 @@ function onCycleChange() {
   if (!cycle) return;
   _selectedCycle = cycle;
   _updateCycleUI(cycle);
-  _buildWeekOptionsForCycle(cycle);
-  // Rebuild week sections with new options
-  document.querySelectorAll('.timesheet-section').forEach(s => s.remove());
-  sectionCount = 0;
-  weekOptionsInitialized = false;
-  addWeekSection();
-  // Load saved draft for this cycle
+  _setCycleWindow(cycle);
+  renderTimesheetTable();
+  populateAllCycleDateRows();
+  // Load saved draft for this cycle (overlays/merges on top of the auto rows)
   loadDraftForCycle(cycle.id);
 }
 
@@ -420,39 +386,12 @@ function _toggleTableLunchTravel(show) {
   });
 }
 
-function _buildWeekOptionsForCycle(cycle) {
+function _setCycleWindow(cycle) {
   const start = new Date(cycle.start_date);
   const end   = new Date(cycle.end_date);
   window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
-  window.weekOptions = generateWeekOptions(start, end);
-  weekOptionsInitialized = true;
   window._activeCycle = cycle;
   window._payrollLocked = cycle.locked;
-  // Update existing week dropdowns
-  document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-    const prev = select.value;
-    select.innerHTML = "";
-    window.weekOptions.forEach(week => {
-      const o = document.createElement("option");
-      o.value = week.value; o.textContent = week.text;
-      select.appendChild(o);
-    });
-    if (prev && Array.from(select.options).find(o => o.value === prev)) select.value = prev;
-  });
-}
-
-async function initWeekOptions() {
-  // Now handled by loadAvailableCycles → _buildWeekOptionsForCycle
-  if (weekOptionsInitialized) return;
-  if (_selectedCycle) {
-    _buildWeekOptionsForCycle(_selectedCycle);
-    return;
-  }
-  // Fallback
-  const { start, end } = getPayrollWindow();
-  window._currentPayrollWindow = { start: start.toISOString(), end: end.toISOString() };
-  window.weekOptions = generateWeekOptions(start, end);
-  weekOptionsInitialized = true;
 }
 
 // ── Load saved draft and restore rows ────────────────────────────────────────
@@ -465,44 +404,23 @@ async function loadDraftForCycle(cycleId) {
     );
     if (!res.ok) return;
     const data = await res.json();
-    
-    // New structure: data.draft is a payroll object with weeks array
-    if (!data.draft || !data.draft.weeks || !data.draft.weeks.length) return;
 
-    // Clear existing sections and rebuild from draft
-    document.querySelectorAll('.timesheet-section').forEach(s => s.remove());
-    sectionCount = 0;
+    const entries = (data.draft && data.draft.entries) || [];
 
-    let restoredCount = 0;
-    for (const week of data.draft.weeks) {
-      const weekPeriod = week.week_period;
-      const entries = week.entries || [];
-      
-      if (!entries.length) continue;
-      
-      addWeekSection();
-      const secId = `section_${sectionCount}`;
-      const sec   = document.getElementById(secId);
-      if (!sec) continue;
-
-      // Set the week period dropdown
-      const weekSel = sec.querySelector('.week-period select');
-      if (weekSel) {
-        const match = Array.from(weekSel.options).find(o => o.value === weekPeriod);
-        if (match) weekSel.value = weekPeriod;
-      }
-
-      // Remove the auto-added empty row
-      const tbody = sec.querySelector('tbody');
-      if (tbody) tbody.innerHTML = '';
-
-      // Restore each saved entry with green background
+    const tbody = document.getElementById('timesheetBody_1');
+    if (tbody && entries.length) {
+      // Rebuild from the saved draft — flat, one row per saved entry
+      tbody.innerHTML = '';
       for (const entry of entries) {
-        _restoreDraftRow(secId, entry, true);
-        restoredCount++;
+        _restoreDraftRow(TIMESHEET_SECTION_ID, entry, true);
       }
-      updateRowNumbers(`timesheetBody_${sectionCount}`);
+      updateRowNumbers('timesheetBody_1');
     }
+
+    // Fill in any cycle dates the saved draft didn't cover
+    populateAllCycleDateRows();
+
+    if (!data.draft) { updateSummary(); return; }
 
     // Restore feedback/metadata
     const meta = data.draft.metadata || {};
@@ -527,61 +445,14 @@ async function loadDraftForCycle(cycleId) {
   }
 }
 
-// ── Load saved draft for a specific week ─────────────────────────────────────
-async function loadDraftForWeek(sectionId, weekPeriod) {
-  if (!_selectedCycle || !loggedInEmployeeId || !weekPeriod) return;
-  
-  try {
-    const res = await fetch(
-      `${API_URL}/timesheet/draft/${loggedInEmployeeId}?cycle_id=${_selectedCycle.id}`,
-      { headers: getHeaders() }
-    );
-    if (!res.ok) return;
-    const data = await res.json();
-    
-    // New structure: data.draft is a payroll object with weeks array
-    if (!data.draft || !data.draft.weeks) return;
-    
-    // Find the specific week
-    const week = data.draft.weeks.find(w => w.week_period === weekPeriod);
-    if (!week || !week.entries || !week.entries.length) {
-      // No saved data for this week - clear the table and add one empty row
-      const sectionNum = sectionId.split('_')[1];
-      const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
-      if (tbody) {
-        tbody.innerHTML = '';
-        addRow(sectionId);
-      }
-      return;
-    }
-    
-    // Clear the table
-    const sectionNum = sectionId.split('_')[1];
-    const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    // Restore saved entries with green background
-    for (const entry of week.entries) {
-      _restoreDraftRow(sectionId, entry, true);
-    }
-    
-    updateRowNumbers(`timesheetBody_${sectionNum}`);
-    updateSummary();
-  } catch(e) {
-    console.error('loadDraftForWeek error:', e);
-  }
-}
-
 function _restoreDraftRow(sectionId, entry, isSaved = false) {
   const sectionNum = sectionId.split('_')[1];
   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
   if (!tbody) return;
 
-  const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
-  const selectedWeek = window.weekOptions?.find(w => w.value === weekSelect?.value);
-  const weekStartISO = selectedWeek ? new Date(selectedWeek.start).toISOString().split('T')[0] : entry.date || '';
-  const weekEndISO   = selectedWeek ? new Date(selectedWeek.end).toISOString().split('T')[0]   : entry.date || '';
+  const win = window._currentPayrollWindow;
+  const minDate = win ? new Date(win.start).toISOString().split('T')[0] : (entry.date || '');
+  const maxDate = win ? new Date(win.end).toISOString().split('T')[0]   : (entry.date || '');
 
   const rowIndex = tbody.querySelectorAll('tr').length + 1;
   const tr = document.createElement('tr');
@@ -595,12 +466,13 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
     <td class="col-sno">${rowIndex}</td>
     <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
     <td class="col-action">
+      <button class="add-entry-btn" onclick="addEntryForRow(this)" title="Add another entry for this date"><i class="fas fa-plus"></i></button>
       <button class="copy-btn" onclick="copyRow(this)">Copy</button>
       <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
     </td>
     <td class="col-date form-input">
-      <input type="date" class="date-field form-input" value="${entry.date || weekStartISO}"
-        min="${weekStartISO}" max="${weekEndISO}"
+      <input type="date" class="date-field form-input" value="${entry.date || minDate}"
+        min="${minDate}" max="${maxDate}"
         onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
@@ -659,46 +531,49 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
   tbody.appendChild(tr);
   setupSmartDropdowns(tr);
 
-  // Restore client/project/code after smart dropdowns are set up
+  // Restore client/project/code after smart dropdowns are set up. Client and
+  // Project (dropdown mode) are always plain <input> elements now (the
+  // searchable combo), so restoring is just setting .value directly —
+  // there's no "not a valid option" fallback needed, the combo only
+  // validates on blur, not on programmatic assignment.
+  const isOtherClient = !window._freeTextClientProject && (entry.client || '').trim() === 'Other';
   if (entry.client) {
-    const clientCell = tr.querySelector('.col-client');
-    const clientSel  = clientCell?.querySelector('select');
-    if (clientSel) {
-      clientSel.value = entry.client;
-      if (clientSel.value !== entry.client) {
-        // Not in dropdown — switch to text input
-        clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${entry.client}">`;
-      }
-    } else {
-      const inp = clientCell?.querySelector('input');
-      if (inp) inp.value = entry.client;
-    }
+    const inp = tr.querySelector('.col-client')?.querySelector('input');
+    if (inp) inp.value = entry.client;
   }
-  if (entry.project) {
-    const projCell = tr.querySelector('.col-project');
-    const projSel  = projCell?.querySelector('select');
-    if (projSel) {
-      projSel.value = entry.project;
-      if (projSel.value !== entry.project) {
-        projCell.innerHTML = `<input type="text" class="project-field form-input" value="${entry.project}">`;
+  if (isOtherClient) {
+    // "Other" client — Project is free text, Project Code is a fixed "Other"
+    _applyRowClientCascade(tr, 'Other');
+    const projInp = tr.querySelector('.col-project')?.querySelector('input');
+    if (projInp) projInp.value = entry.project || '';
+  } else {
+    if (entry.project) {
+      const projCell = tr.querySelector('.col-project');
+      if (projCell && !window._freeTextClientProject) {
+        // Rebuild filtered by the restored client so the combo's suggestion
+        // list matches that client (the cell's combo was created empty by
+        // setupSmartDropdowns, before the client was known).
+        projCell.innerHTML = '';
+        const projField = createSmartDropdown('project', projCell, entry.project, entry.client);
+        projCell.appendChild(projField);
+      } else {
+        const inp = projCell?.querySelector('input');
+        if (inp) inp.value = entry.project;
       }
-    } else {
-      const inp = projCell?.querySelector('input');
-      if (inp) inp.value = entry.project;
     }
-  }
-  if (entry.projectCode) {
-    const codeCell = tr.querySelector('.col-project-code');
-    if (window._freeTextClientProject) {
-      // Rebuild so a preset value shows in the dropdown and a custom value
-      // shows in the "Type Here" input, rather than always the last-rendered mode.
-      if (codeCell) {
-        codeCell.innerHTML = "";
-        codeCell.appendChild(createSharedServicesProjectCode(entry.projectCode));
+    if (entry.projectCode) {
+      const codeCell = tr.querySelector('.col-project-code');
+      if (window._freeTextClientProject) {
+        // Rebuild so a preset value shows in the dropdown and a custom value
+        // shows in the "Type Here" input, rather than always the last-rendered mode.
+        if (codeCell) {
+          codeCell.innerHTML = "";
+          codeCell.appendChild(createSharedServicesProjectCode(entry.projectCode));
+        }
+      } else {
+        const codeInp = codeCell?.querySelector('input');
+        if (codeInp) codeInp.value = entry.projectCode;
       }
-    } else {
-      const codeInp = codeCell?.querySelector('input');
-      if (codeInp) codeInp.value = entry.projectCode;
     }
   }
 
@@ -709,6 +584,151 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
   updateSummary();
 }
 
+
+// A searchable, single-select combobox: a plain text input backed by a
+// floating, filterable suggestion list. Used anywhere Client/Project used to
+// be a plain <select> — the option lists can run to 100+ entries (company-
+// wide clients, or 30-40 projects for a big client), so a type-ahead is
+// needed. The root element returned IS the input itself (no wrapper), so
+// every existing `cell.querySelector('input')` fallback (getFieldValue,
+// setFieldValue, saveModalEntry, _restoreDraftRow, etc.) keeps working
+// unchanged — callers never need to know this isn't a plain input.
+function createSearchableCombo(type, options, currentValue = "") {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = `${type}-field form-input combo-input`;
+  input.placeholder = `Search ${type.replace('_', ' ')}...`;
+  input.autocomplete = "off";
+  input.value = currentValue || "";
+
+  // Appended to <body> (not the cell) and positioned with `fixed` coords so
+  // it's never clipped by the table's horizontal scroll wrapper or the
+  // modal's own scroll region — both of which an absolutely-positioned
+  // descendant would be subject to.
+  const list = document.createElement("div");
+  list.className = "combo-suggestions";
+  list.style.cssText =
+    "display:none;position:fixed;z-index:3000;background:#fff;border:1px solid #ccc;" +
+    "border-radius:8px;max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);";
+  document.body.appendChild(list);
+
+  let lastValid = currentValue || "";
+  let highlighted = -1;
+  let scrollHandler = null;
+
+  function positionList() {
+    const r = input.getBoundingClientRect();
+    list.style.left = r.left + "px";
+    list.style.top = (r.bottom + 2) + "px";
+    list.style.width = r.width + "px";
+  }
+
+  function closeList() {
+    list.style.display = "none";
+    if (scrollHandler) {
+      window.removeEventListener("scroll", scrollHandler, true);
+      scrollHandler = null;
+    }
+  }
+
+  // Scrolling the page/table should keep the list anchored under the input
+  // (smooth, follows along) rather than yanking it away — the previous
+  // behavior closed the list on ANY scroll, including scrolling inside the
+  // suggestion list itself, which made a long list impossible to scroll
+  // through. Only close it if the input has scrolled fully out of view.
+  function onScroll(e) {
+    if (list.contains(e.target)) return; // scrolling the list itself — leave it open
+    if (list.style.display === "none") return;
+    const r = input.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      closeList();
+    } else {
+      positionList();
+    }
+  }
+
+  function highlightRow(items) {
+    items.forEach((it, i) => { it.style.background = i === highlighted ? "#eef2ff" : ""; });
+  }
+
+  function renderList() {
+    const q = input.value.trim().toLowerCase();
+    const matches = (q ? options.filter(o => o.toLowerCase().includes(q)) : options).slice(0, 200);
+    list.innerHTML = "";
+    highlighted = -1;
+    if (!matches.length) { closeList(); return; }
+    matches.forEach(opt => {
+      const item = document.createElement("div");
+      item.className = "combo-option";
+      item.textContent = opt;
+      item.style.cssText = "padding:7px 12px;cursor:pointer;font-size:.9rem;";
+      item.addEventListener("mouseenter", () => {
+        highlighted = Array.from(list.children).indexOf(item);
+        highlightRow(Array.from(list.children));
+      });
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // fires before blur — keeps focus so blur-revert doesn't race it
+        commit(opt);
+      });
+      list.appendChild(item);
+    });
+    positionList();
+    list.style.display = "block";
+    if (!scrollHandler) {
+      scrollHandler = onScroll;
+      window.addEventListener("scroll", scrollHandler, true);
+    }
+  }
+
+  function commit(value) {
+    input.value = value;
+    lastValid = value;
+    closeList();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  input.addEventListener("focus", renderList);
+  input.addEventListener("input", renderList);
+  input.addEventListener("keydown", (e) => {
+    const items = Array.from(list.children);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (list.style.display === "none") { renderList(); return; }
+      highlighted = Math.min(highlighted + 1, items.length - 1);
+      highlightRow(items);
+      items[highlighted]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      highlighted = Math.max(highlighted - 1, 0);
+      highlightRow(items);
+      items[highlighted]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlighted >= 0 && items[highlighted]) {
+        commit(items[highlighted].textContent);
+      } else if (options.includes(input.value)) {
+        commit(input.value);
+      }
+    } else if (e.key === "Escape") {
+      closeList();
+      input.blur();
+    }
+  });
+  input.addEventListener("blur", () => {
+    // Small delay so a suggestion's mousedown handler runs before we decide
+    // whether the typed text is valid.
+    setTimeout(() => {
+      closeList();
+      if (!options.includes(input.value)) {
+        input.value = lastValid;
+      } else {
+        lastValid = input.value;
+      }
+    }, 150);
+  });
+
+  return input;
+}
 
 function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
   // type = "client", "project", or "project_code"
@@ -740,327 +760,20 @@ function createSmartDropdown(type, container, currentValue = "", currentClient =
     // Project codes are auto-filled, so we don't need options
     options = [];
   }
-  
-  const select = document.createElement("select");
-  select.className = `${type}-field form-input smart-dropdown`;
-  select.style.width = "100%";
-  
-  // Add default option
-  const defaultOpt = document.createElement("option");
-  defaultOpt.value = "";
-  defaultOpt.textContent = `Select ${type.replace('_', ' ')}`;
-  select.appendChild(defaultOpt);
-  
-  // Add filtered options
-  options.forEach(opt => {
-    const option = document.createElement("option");
-    option.value = opt;
-    option.textContent = opt;
-    if (opt === currentValue) option.selected = true;
-    select.appendChild(option);
-  });
-  
-  // Custom "type here" entry has been removed for dropdown-mode users —
-  // Client/Project must always be picked from the list (free-text partner
-  // employees never reach this branch; they get a plain input above).
 
-  // Handle selection changes
-  // select.addEventListener("change", function() {
-  //   const row = this.closest("tr");
-    
-  //   if (this.value === "__TYPE_HERE__") {
-  //     // Replace with input field
-  //     const input = document.createElement("input");
-  //     input.type = "text";
-  //     input.className = `${type}-field form-input`;
-  //     input.placeholder = `Enter ${type.replace('_', ' ')}`;
-  //     input.value = currentValue;
-  //     input.style.width = "calc(100% - 35px)";
-      
-  //     // Add button to go back to dropdown
-  //     const backBtn = document.createElement("button");
-  //     backBtn.className = "back-to-dropdown-btn";
-  //     backBtn.innerHTML = '<i class="fas fa-list"></i>';
-  //     backBtn.title = "Back to dropdown";
-  //     backBtn.type = "button";
-  //     backBtn.style.marginLeft = "5px";
-  //     backBtn.style.padding = "6px 10px";
-  //     backBtn.style.cursor = "pointer";
-  //     // backBtn.onclick = () => {
-  //     //   const clientValue = type === "project" ? getFieldValue(row, '.col-client') : "";
-  //     //   const newDropdown = createSmartDropdown(type, container, input.value, clientValue);
-  //     //   container.innerHTML = "";
-  //     //   container.appendChild(newDropdown);
-  //     // };
+  // "Other" — lets a dropdown-mode employee log time against something not
+  // in their assigned client list. Selecting it switches Project to free
+  // text and Project Code to a fixed "Other" (handled by the change
+  // listener in setupSmartDropdowns/_applyRowClientCascade for rows, and by
+  // updateModalProjectDropdown for the modal).
+  if (type === "client") {
+    options = [...options, "Other"];
+  }
 
-  //    backBtn.onclick = () => {
-  //     const isModal = container.closest("#modalOverlay") !== null;
-  //     let clientValue = "";
-
-  //     if (type === "project") {
-  //         if (isModal) {
-  //             const clientSelect = document.querySelector("#modalClientContainer select");
-  //             clientValue = clientSelect?.value || "";
-  //         } else {
-  //             const row = container.closest("tr");
-  //             clientValue = row ? getFieldValue(row, '.col-client') : "";
-  //         }
-  //     }
-
-  //     const newDropdown = createSmartDropdown(type, container, input.value || "", clientValue);
-  //     container.innerHTML = "";
-  //     container.appendChild(newDropdown);
-
-  //     // ────────────────────────────────────────────────
-  //     // Reset project code field (table OR modal)
-  //     // ────────────────────────────────────────────────
-  //     let codeContainer, codeElement;
-
-  //     if (isModal) {
-  //         codeContainer = document.getElementById("modalProjectCodeContainer");
-  //         codeElement = document.getElementById("modalProjectCodeInput");
-  //     } else {
-  //         const row = container.closest("tr");
-  //         if (row) {
-  //             codeContainer = row.querySelector(".col-project-code");
-  //             codeElement = codeContainer?.querySelector("input");
-  //         }
-  //     }
-
-  //     if (codeContainer) {
-  //         codeContainer.innerHTML = "";
-
-  //         const currentProjectVal = newDropdown.value;
-
-  //         const inputElem = document.createElement("input");
-  //         inputElem.type = "text";
-  //         inputElem.className = "form-input project-code";
-
-  //         if (currentProjectVal === "" || currentProjectVal === "__TYPE_HERE__") {
-  //             inputElem.placeholder = currentProjectVal === "__TYPE_HERE__" ? "Enter Project Code" : "Auto-filled";
-  //             inputElem.readOnly = false;
-  //             if (currentProjectVal !== "__TYPE_HERE__") {
-  //                 inputElem.style.backgroundColor = "#f0f0f0";
-  //             }
-  //         } else {
-  //             let projectCode = "";
-  //             if (clientValue && employeeProjects.projects_by_client?.[clientValue]) {
-  //                 const match = employeeProjects.projects_by_client[clientValue]
-  //                     .find(p => p.project_name === currentProjectVal);
-  //                 projectCode = match?.project_code || "";
-  //             }
-  //             inputElem.value = projectCode;
-  //             inputElem.readOnly = true;
-  //             inputElem.style.backgroundColor = "#f0f0f0";
-  //         }
-
-  //         if (isModal) {
-  //             inputElem.id = "modalProjectCodeInput";
-  //         }
-
-  //         codeContainer.appendChild(inputElem);
-  //     }
-  // };
-      
-  //     container.innerHTML = "";
-  //     const wrapper = document.createElement("div");
-  //     wrapper.style.display = "flex";
-  //     wrapper.style.alignItems = "center";
-  //     wrapper.style.gap = "5px";
-  //     wrapper.appendChild(input);
-  //     wrapper.appendChild(backBtn);
-  //     container.appendChild(wrapper);
-      
-  //     input.focus();
-  //     input.addEventListener("input", updateSummary);
-  //   } 
-  //   // CLIENT CHANGE: Update project dropdown
-  //   else if (type === "client" && row) {
-  //     const selectedClient = this.value;
-  //     const projectCell = row.querySelector(".col-project");
-  //     const projectCodeCell = row.querySelector(".col-project-code");
-      
-  //     // Clear project and project code
-  //     if (projectCell) {
-  //       // projectCell.innerHTML = "";
-  //       // projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
-  //       const currentProjectInput = projectCell.querySelector("input");
-
-  //       projectCell.innerHTML = "";
-
-  //       if (currentProjectInput) {
-  //         // Preserve input mode
-  //         const input = document.createElement("input");
-  //         input.type = "text";
-  //         input.className = "project form-input";
-  //         input.placeholder = "Enter project";
-  //         projectCell.appendChild(input);
-  //       } else {
-  //         // Normal dropdown mode
-  //         projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
-  //       }
-
-  //     }
-      
-  //     if (projectCodeCell) {
-  //       projectCodeCell.innerHTML = "";
-  //       const codeInput = document.createElement("input");
-  //       codeInput.type = "text";
-  //       codeInput.className = "project-code form-input";
-  //       codeInput.placeholder = "Auto-filled";
-  //       codeInput.readOnly = true;
-  //       codeInput.style.backgroundColor = "#f0f0f0";
-  //       projectCodeCell.appendChild(codeInput);
-  //     }
-  //   }
-  //   // PROJECT CHANGE: Auto-fill project code
-  //   // else if (type === "project" && row) {
-  //   //   const selectedProject = this.value;
-  //   //   const clientValue = getFieldValue(row, '.col-client');
-      
-  //   //   if (clientValue && employeeProjects.projects_by_client && employeeProjects.projects_by_client[clientValue]) {
-  //   //     const projectData = employeeProjects.projects_by_client[clientValue].find(
-  //   //       p => p.project_name === selectedProject
-  //   //     );
-        
-  //   //     if (projectData) {
-  //   //       const projectCodeCell = row.querySelector(".col-project-code");
-  //   //       if (projectCodeCell) {
-  //   //         projectCodeCell.innerHTML = "";
-  //   //         const codeInput = document.createElement("input");
-  //   //         codeInput.type = "text";
-  //   //         codeInput.className = "project-code form-input";
-  //   //         codeInput.value = projectData.project_code;
-  //   //         codeInput.readOnly = true;
-  //   //         codeInput.style.backgroundColor = "#f0f0f0";
-  //   //         projectCodeCell.appendChild(codeInput);
-  //   //       }
-  //   //     }
-  //   //   }
-  //   // }
-  //   else if (type === "project" && row) {
-  //     const selectedProject = this.value;
-  //     const clientValue = getFieldValue(row, '.col-client');
-  //     const projectCodeCell = row.querySelector(".col-project-code");
-
-  //     if (!projectCodeCell) return;
-
-  //     projectCodeCell.innerHTML = "";
-
-  //     // 🟢 If project is custom
-  //     if (selectedProject === "__TYPE_HERE__") {
-  //       const codeInput = document.createElement("input");
-  //       codeInput.type = "text";
-  //       codeInput.className = "project-code form-input";
-  //       codeInput.placeholder = "Enter Project Code";
-  //       codeInput.readOnly = false;
-  //       projectCodeCell.appendChild(codeInput);
-  //       return;
-  //     }
-
-  //     // 🟢 If project is normal (from dropdown)
-  //     if (
-  //       clientValue &&
-  //       employeeProjects.projects_by_client &&
-  //       employeeProjects.projects_by_client[clientValue]
-  //     ) {
-  //       const projectData =
-  //         employeeProjects.projects_by_client[clientValue].find(
-  //           p => p.project_name === selectedProject
-  //         );
-
-  //       if (projectData) {
-  //         const codeInput = document.createElement("input");
-  //         codeInput.type = "text";
-  //         codeInput.className = "project-code form-input";
-  //         codeInput.value = projectData.project_code;
-  //         codeInput.readOnly = true;
-  //         codeInput.style.backgroundColor = "#f0f0f0";
-  //         projectCodeCell.appendChild(codeInput);
-  //       }
-  //     }
-  //   }
-
-  // });
-
-  select.addEventListener("change", function() {
-    const row = this.closest("tr");
-
-    // CLIENT CHANGE: Update project dropdown
-    if (type === "client" && row) {
-        const selectedClient = this.value;
-        const projectCell = row.querySelector(".col-project");
-        const projectCodeCell = row.querySelector(".col-project-code");
-        
-        // Clear project and project code
-        if (projectCell) {
-            projectCell.innerHTML = "";
-            projectCell.appendChild(createSmartDropdown("project", projectCell, "", selectedClient));
-        }
-        
-        if (projectCodeCell) {
-            // projectCodeCell.innerHTML = "";
-            // const codeInput = document.createElement("input");
-            // codeInput.type = "text";
-            // codeInput.className = "project-code form-input";
-            // codeInput.placeholder = "Auto-filled";
-            // codeInput.readOnly = true;
-            // codeInput.style.backgroundColor = "#f0f0f0";
-            // projectCodeCell.appendChild(codeInput);
-            // In places where you create auto-filled code field:
-            projectCodeCell.innerHTML = "";
-            projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
-            // if (projectData) {
-            //     projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
-            // } else {
-            //     projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
-            // }        
-          }
-    }
-    // PROJECT CHANGE: Auto-fill project code (only for non-custom selections)
-    else if (type === "project" && row) {
-        const selectedProject = this.value;
-        const clientValue = getFieldValue(row, '.col-client');
-        const projectCodeCell = row.querySelector(".col-project-code");
-        if (!projectCodeCell) return;
-        projectCodeCell.innerHTML = "";
-        // 🟢 If project is normal (from dropdown)
-        if (
-            clientValue &&
-            employeeProjects.projects_by_client &&
-            employeeProjects.projects_by_client[clientValue]
-        ) {
-            const projectData =
-                employeeProjects.projects_by_client[clientValue].find(
-                    p => p.project_name === selectedProject
-                );
-            if (projectData) {
-                // const codeInput = document.createElement("input");
-                // codeInput.type = "text";
-                // codeInput.className = "project-code form-input";
-                // codeInput.value = projectData.project_code;
-                // codeInput.readOnly = true;
-                // codeInput.style.backgroundColor = "#f0f0f0";
-                // projectCodeCell.appendChild(codeInput);
-
-                // In places where you create auto-filled code field:
-                projectCodeCell.innerHTML = "";
-                if (projectData) {
-                    projectCodeCell.appendChild(createReadonlyProjectCode(projectData.project_code || ""));
-                } else {
-                    projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
-                }            }
-            showProjectPlanStatus(projectData ? projectData.project_code : "", { row });
-        } else {
-            showProjectPlanStatus("", { row });
-        }
-    }
-});
-  
-  // Trigger summary update on dropdown change
-  select.addEventListener("change", updateSummary);
-  
-  return select;
+  const combo = createSearchableCombo(type, options, currentValue);
+  combo.classList.add("smart-dropdown");
+  combo.addEventListener("change", updateSummary);
+  return combo;
 }
 
 
@@ -1105,55 +818,6 @@ function getPayrollWindow() {
 
   return { start, end };
 }
-
-
-function generateWeekOptions(start, end) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const weeks = [];
-  let weekNum = 1;
-
-  // Clone start date
-  let current = new Date(start);
-
-  // 🟢 1️⃣ First week: from payroll start → upcoming Sunday
-  const firstWeekEnd = new Date(current);
-  const daysToSunday = 7 - firstWeekEnd.getDay(); // e.g. if Wed → 4 days to Sunday
-  firstWeekEnd.setDate(firstWeekEnd.getDate() + (daysToSunday === 7 ? 0 : daysToSunday));
-
-  weeks.push(makeWeekObject(current, firstWeekEnd, weekNum++, months));
-
-  // 🟢 2️⃣ Move to next Monday
-  current = new Date(firstWeekEnd);
-  current.setDate(current.getDate() + 1);
-
-  // 🟢 3️⃣ Add full Mon–Sun weeks
-  while (current <= end) {
-    const weekStart = new Date(current);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-
-    if (weekEnd > end) weekEnd.setTime(end.getTime()); // last week truncated
-    weeks.push(makeWeekObject(weekStart, weekEnd, weekNum++, months));
-
-    current = new Date(weekEnd);
-    current.setDate(current.getDate() + 1);
-  }
-  return weeks;
-}
-
-
-// 🔹 Helper to build each week object
-function makeWeekObject(start, end, weekNum, months) {
-  const wsDay = start.getDate().toString().padStart(2, '0');
-  const wsMonth = months[start.getMonth()];
-  const weDay = end.getDate().toString().padStart(2, '0');
-  const weMonth = months[end.getMonth()];
-  const value = `${wsDay}/${start.getMonth() + 1}/${start.getFullYear()} to ${weDay}/${end.getMonth() + 1}/${end.getFullYear()}`;
-  const text = `Week ${weekNum} (${wsDay} ${wsMonth} - ${weDay} ${weMonth})`;
-
-  return { value, text, start, end };
-}
-
 
 
 // top-level cache for current payroll window
@@ -1284,111 +948,40 @@ async function refreshPayrollWeeks() {
       return;
     }
 
-    console.log("🔄 Payroll window changed — updating week dropdowns");
+    console.log("🔄 Payroll window changed — refreshing date rows");
     window._currentPayrollWindow = { start: startISO, end: endISO };
     window._activeCycle = data;
     window._payrollLocked = false;
 
-    const start = new Date(startISO);
-    const end   = new Date(endISO);
-    window.weekOptions = generateWeekOptions(start, end);
+    // Add rows for any newly-included cycle dates (existing rows are left as-is)
+    populateAllCycleDateRows();
 
-    document.querySelectorAll('select[id^="weekPeriod_"]').forEach(select => {
-      const prevVal = select.value;
-      select.innerHTML = "";
-      window.weekOptions.forEach(week => {
-        const o = document.createElement("option");
-        o.value = week.value;
-        o.textContent = week.text;
-        select.appendChild(o);
-      });
-      if (prevVal) {
-        const found = Array.from(select.options).find(opt => opt.value === prevVal);
-        if (found) select.value = prevVal;
-      }
-    });
-
-    showPopup("Payroll weeks updated by admin");
+    showPopup("Payroll cycle dates updated by admin");
   } catch (err) {
     console.error("❌ Error refreshing payroll weeks:", err);
   }
 }
 
 
-function addWeekSection() {
-  if (typeof sectionCount === "undefined") window.sectionCount = 0;
-  sectionCount++;
+// Builds the single flat timesheet table (no week-wise grouping — one row
+// per calendar day of the selected payroll cycle, all shown at once). Always
+// uses a fixed section/tbody id so the rest of the row-level code (addRow,
+// deleteRow, copy/paste, the modal, etc.) keeps working unchanged.
+const TIMESHEET_SECTION_ID = "section_1";
 
+function renderTimesheetTable() {
   const sectionsDiv = document.getElementById("timesheetSections");
   if (!sectionsDiv) {
     console.error("❌ timesheetSections container not found");
     return;
   }
 
-  const sectionId = `section_${sectionCount}`;
+  sectionsDiv.innerHTML = "";
+  sectionCount = 1;
+
   const section = document.createElement("div");
   section.className = "timesheet-section";
-  section.id = sectionId;
-
-  const weekDiv = document.createElement("div");
-  weekDiv.className = "week-period form-group";
-  weekDiv.innerHTML = `<label>Week Period ${sectionCount}</label>`;
-
-  const select = document.createElement("select");
-  select.id = `weekPeriod_${sectionCount}`;
-  select.className = "form-control";
-  select.style.fontWeight = "500";          
-  select.style.fontSize = "18px";          
-  select.style.padding = "8px 12px";  
-  select.style.color = "#2c3e50" ; 
-  select.style.padding = "15px"   
-
-
-
-  select.onchange = () => {
-    // Load saved draft for this specific week when week changes
-    loadDraftForWeek(sectionId, select.value);
-    if (typeof updateSummary === "function") updateSummary();
-    if (typeof updateExistingRowDates === "function")
-      updateExistingRowDates(sectionId);
-  };
-
-  
-
-  // ✅ Step 2: Populate dropdown
-  // ✅ Step 2: Populate dropdown directly from window.weekOptions
-select.innerHTML = "";
-
-if (window.weekOptions && window.weekOptions.length > 0) {
-  window.weekOptions.forEach((week) => {
-    const o = document.createElement("option");
-    o.value = week.value; // "21/10/2025 to 26/10/2025"
-    o.textContent = week.text; // "Week 1 (21 Oct - 26 Oct)"
-    o.style.fontWeight = "500";
-    select.appendChild(o);
-  });
-} else {
-  const o = document.createElement("option");
-  o.value = "";
-  o.textContent = "No week periods found";
-  o.style.fontWeight = "500";
-  select.appendChild(o);
-}
-
-
-  weekDiv.appendChild(select);
-
-  // Delete week button
-  const delBtn = document.createElement("button");
-  delBtn.className = "delete-week-btn";
-  delBtn.textContent = "Delete Week";
-  delBtn.onclick = () => {
-    if (typeof deleteWeekSection === "function") deleteWeekSection(sectionId);
-    else document.getElementById(sectionId)?.remove();
-  };
-  weekDiv.appendChild(delBtn);
-
-  section.appendChild(weekDiv);
+  section.id = TIMESHEET_SECTION_ID;
 
   // Table skeleton
   const tableWrapper = document.createElement("div");
@@ -1398,7 +991,7 @@ if (window.weekOptions && window.weekOptions.length > 0) {
     <table class="timesheet-table">
       <thead>
         <tr>
-          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th>
+          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Work</th>
           <th>Project Start</th><th>Project End</th><th>Client</th><th>Project</th>
           <th>Project Code</th><th>Reporting Manager</th><th>Activity</th>
           <th>Project Hours</th><th>Billable</th>
@@ -1407,7 +1000,7 @@ if (window.weekOptions && window.weekOptions.length > 0) {
           <th>Remarks</th><th>Delete</th>
         </tr>
       </thead>
-      <tbody id="timesheetBody_${sectionCount}"></tbody>
+      <tbody id="timesheetBody_1"></tbody>
     </table>
   `;
   section.appendChild(tableWrapper);
@@ -1416,19 +1009,36 @@ if (window.weekOptions && window.weekOptions.length > 0) {
   const btnDiv = document.createElement("div");
   btnDiv.className = "button-container";
   btnDiv.innerHTML = `
-    <button class="add-row-btn" onclick="addRow('${sectionId}')">+ Add New Entry</button>
-    <button class="save-week-btn" onclick="saveWeekDraft('${sectionId}')" style="background:linear-gradient(135deg,#5d5fef,#7c3aed);color:#fff;border:none;padding:.55rem 1.3rem;border-radius:9px;font-size:.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.4rem;margin-left:.5rem;"><i class="fas fa-save"></i> Save Week</button>
+    <button class="add-row-btn" onclick="addRow('${TIMESHEET_SECTION_ID}')">+ Add New Entry</button>
+    <button class="save-week-btn" onclick="saveDraft()" style="background:linear-gradient(135deg,#5d5fef,#7c3aed);color:#fff;border:none;padding:.55rem 1.3rem;border-radius:9px;font-size:.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.4rem;margin-left:.5rem;"><i class="fas fa-save"></i> Save Draft</button>
   `;
   section.appendChild(btnDiv);
 
   sectionsDiv.appendChild(section);
+}
 
-  // Initial row
-  if (typeof addRow === "function") addRow(sectionId);
-  if (typeof updateExistingRowDates === "function")
-    updateExistingRowDates(sectionId);
+// Adds one row for every calendar date in the selected payroll cycle that
+// doesn't already have a row, so "all days" are present by default without
+// the employee having to build the list up by hand.
+function populateAllCycleDateRows() {
+  if (!window._currentPayrollWindow) return;
+  const tbody = document.getElementById("timesheetBody_1");
+  if (!tbody) return;
 
-  console.log(`✅ Week section ${sectionId} added`);
+  const existingDates = new Set(
+    Array.from(tbody.querySelectorAll(".date-field")).map(i => i.value).filter(Boolean)
+  );
+
+  const start = new Date(window._currentPayrollWindow.start);
+  const end   = new Date(window._currentPayrollWindow.end);
+  const d = new Date(start);
+  while (d <= end) {
+    const dateStr = d.toISOString().split("T")[0];
+    if (!existingDates.has(dateStr)) {
+      addRow(TIMESHEET_SECTION_ID, dateStr);
+    }
+    d.setDate(d.getDate() + 1);
+  }
 }
 
 
@@ -1456,94 +1066,39 @@ function populateEmployeeInfo() {
   });
 }
 
-/* update dates in existing rows to match selected week */
-
-function updateExistingRowDates(sectionId) {
-    const secNum = sectionId.split("_")[1];
-    const tbody = document.getElementById(`timesheetBody_${secNum}`);
-    if (!tbody) return;
-
-    const weekSel = document.getElementById(`weekPeriod_${secNum}`);
-    if (!weekSel || !weekSel.value) return;
-
-    const selectedWeek = window.weekOptions.find(w => w.value === weekSel.value);
-    if (!selectedWeek) return;
-
-    const weekStartISO = new Date(selectedWeek.start).toISOString().split("T")[0];
-    const weekEndISO = new Date(selectedWeek.end).toISOString().split("T")[0];
-
-    // Sabhi date inputs ko update karo
-    tbody.querySelectorAll(".date-field").forEach(input => {
-        // min/max set karo
-        input.min = weekStartISO;
-        input.max = weekEndISO;
-
-        // Agar khali hai ya invalid date hai → week ki starting date daal do
-        if (!input.value || input.value < weekStartISO || input.value > weekEndISO) {
-            input.value = weekStartISO;
-        }
-
-        // Validation trigger karo
-        validateDate(input);
-    });
-
-    // Agar modal open hai to uska date bhi sync karo
-    const modalDate = document.getElementById("modalInput1");
-    if (modalDate && document.getElementById("modalOverlay")?.style.display === "flex") {
-        modalDate.min = weekStartISO;
-        modalDate.max = weekEndISO;
-        if (!modalDate.value || modalDate.value < weekStartISO || modalDate.value > weekEndISO) {
-            modalDate.value = weekStartISO;
-        }
-        validateDate(modalDate);
-    }
-}
-
-function addRow(sectionId, specificDate = null) {
+function addRow(sectionId, specificDate = null, insertAfterRow = null) {
   const sectionNum = sectionId.split("_")[1];
   const tbody = document.getElementById(`timesheetBody_${sectionNum}`);
   if (!tbody) {
     console.error("Table body not found for", sectionId);
     return;
-  }    
-
-  const weekSelect = document.getElementById(`weekPeriod_${sectionNum}`);
-  if (!weekSelect || !weekSelect.value) {
-    showPopup("Please select a week period first!", true);
-    return;
   }
 
-  const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-  if (!selectedWeek) {
-    showPopup("Invalid week selected", true);
-    return;
-  }
+  const win = window._currentPayrollWindow;
+  const cycleStart = win ? new Date(win.start) : null;
+  const cycleEnd   = win ? new Date(win.end)   : null;
 
-  const weekStart = new Date(selectedWeek.start);
-  const weekEnd = new Date(selectedWeek.end);
-
-  // Step 1: Find the last used date in THIS section only
-  const dateInputs = tbody.querySelectorAll(".date-field");
   let nextDate;
-
-  if (dateInputs.length === 0) {
-    // First row → use week start
-    nextDate = new Date(weekStart);
+  if (specificDate) {
+    nextDate = new Date(specificDate);
   } else {
-    // Get last row's date
-    const lastInput = dateInputs[dateInputs.length - 1];
-    const lastDate = new Date(lastInput.value || weekStart);
-    nextDate = new Date(lastDate);
-    nextDate.setDate(lastDate.getDate() + 1); // +1 day
+    // Find the last used date in the table and default to the day after it
+    const dateInputs = tbody.querySelectorAll(".date-field");
+    if (dateInputs.length === 0) {
+      nextDate = cycleStart ? new Date(cycleStart) : new Date();
+    } else {
+      const lastInput = dateInputs[dateInputs.length - 1];
+      const lastDate = new Date(lastInput.value || cycleStart || new Date());
+      nextDate = new Date(lastDate);
+      nextDate.setDate(lastDate.getDate() + 1);
+    }
+    if (cycleEnd && nextDate > cycleEnd) nextDate = new Date(cycleEnd);
+    if (cycleStart && nextDate < cycleStart) nextDate = new Date(cycleStart);
   }
 
-  // Step 2: If nextDate is beyond week end → set to week end
-  if (nextDate > weekEnd) {
-    nextDate = new Date(weekEnd);
-  }
-
-  // Step 3: Format as YYYY-MM-DD
   const defaultDate = nextDate.toISOString().split("T")[0];
+  const minDate = cycleStart ? cycleStart.toISOString().split("T")[0] : "";
+  const maxDate = cycleEnd ? cycleEnd.toISOString().split("T")[0] : "";
 
   const rowIndex = tbody.querySelectorAll("tr").length + 1;
   const tr = document.createElement("tr");
@@ -1551,11 +1106,12 @@ function addRow(sectionId, specificDate = null) {
     <td class="col-sno">${rowIndex}</td>
     <td class="col-add"><button class="eye-btn" onclick="openModal(this)"><i class="fas fa-eye"></i></button></td>
     <td class="col-action">
+      <button class="add-entry-btn" onclick="addEntryForRow(this)" title="Add another entry for this date"><i class="fas fa-plus"></i></button>
       <button class="copy-btn" onclick="copyRow(this)">Copy</button>
       <button class="paste-btn" onclick="pasteRow(this)">Paste</button>
     </td>
     <td class="col-date form-input">
-      <input type="date" class="date-field form-input" value="${defaultDate}" onchange="validateDate(this); updateSummary()">
+      <input type="date" class="date-field form-input" value="${defaultDate}" min="${minDate}" max="${maxDate}" onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
       <select class="location-select form-input" onchange="updateSummary()">
@@ -1610,7 +1166,11 @@ function addRow(sectionId, specificDate = null) {
     <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
   `;
 
-  tbody.appendChild(tr);
+  if (insertAfterRow && insertAfterRow.parentNode === tbody) {
+    insertAfterRow.insertAdjacentElement("afterend", tr);
+  } else {
+    tbody.appendChild(tr);
+  }
 
   // ✅ Setup smart dropdowns for client, project, project code
   setupSmartDropdowns(tr);
@@ -1620,6 +1180,18 @@ function addRow(sectionId, specificDate = null) {
 
   updateRowNumbers(tbody.id);
   updateSummary();
+  return tr;
+}
+
+// Inserts a fresh, otherwise-blank row directly after the clicked row,
+// pre-filled with that same date — the convenient way to log a second
+// (or third...) entry for one day without it landing out of order at the
+// bottom of the table.
+function addEntryForRow(button) {
+  const row = button.closest("tr");
+  if (!row) return;
+  const date = row.querySelector(".date-field")?.value;
+  addRow(TIMESHEET_SECTION_ID, date || null, row);
 }
 
 // ── TL project-plan status (Project_Plans collection) ───────────────────────
@@ -1803,35 +1375,84 @@ function createSharedServicesProjectCode(currentValue = "", inputId = null) {
   return wrapper;
 }
 
+// Rebuilds a row's Project + Project Code cells for the given Client value.
+// "Other" -> Project becomes free text, Project Code becomes a fixed,
+// non-typable "Other". A real client -> normal filtered Project dropdown,
+// which itself auto-fills Project Code (readonly) once a project is picked.
+function _applyRowClientCascade(row, clientValue) {
+  const projectCell = row.querySelector(".col-project");
+  const projectCodeCell = row.querySelector(".col-project-code");
+  if (!projectCell || !projectCodeCell) return;
+
+  if (clientValue === "Other") {
+    projectCell.innerHTML = "";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "project-field form-input";
+    input.placeholder = "Enter project";
+    input.addEventListener("input", updateSummary);
+    projectCell.appendChild(input);
+
+    projectCodeCell.innerHTML = "";
+    projectCodeCell.appendChild(createReadonlyProjectCode("Other", "Other"));
+    updateSummary();
+    return;
+  }
+
+  projectCell.innerHTML = "";
+  const projectDropdown = createSmartDropdown("project", projectCell, "", clientValue);
+  projectCell.appendChild(projectDropdown);
+  projectDropdown.addEventListener("change", function() {
+    _applyRowProjectCode(row, clientValue, this.value);
+    updateSummary();
+  });
+
+  projectCodeCell.innerHTML = "";
+  projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+  updateSummary();
+}
+
+// Auto-fills a row's Project Code (readonly) once a real Project is picked.
+function _applyRowProjectCode(row, clientValue, projectValue) {
+  const projectCodeCell = row.querySelector(".col-project-code");
+  if (!projectCodeCell) return;
+
+  let code = "";
+  if (clientValue && employeeProjects.projects_by_client && employeeProjects.projects_by_client[clientValue]) {
+    const projectData = employeeProjects.projects_by_client[clientValue].find(p => p.project_name === projectValue);
+    if (projectData) code = projectData.project_code;
+  }
+  projectCodeCell.innerHTML = "";
+  projectCodeCell.appendChild(createReadonlyProjectCode(code, "Auto-filled"));
+  showProjectPlanStatus(code, { row });
+}
+
 function setupSmartDropdowns(row) {
   const clientCell = row.querySelector(".col-client");
   const projectCell = row.querySelector(".col-project");
   const projectCodeCell = row.querySelector(".col-project-code");
-  
+
   // Setup client dropdown
   if (clientCell) {
     clientCell.innerHTML = "";
-    clientCell.appendChild(createSmartDropdown("client", clientCell));
+    const clientDropdown = createSmartDropdown("client", clientCell);
+    clientCell.appendChild(clientDropdown);
+    if (!window._freeTextClientProject) {
+      clientDropdown.addEventListener("change", function() {
+        _applyRowClientCascade(row, this.value);
+      });
+    }
   }
-  
+
   // Setup project dropdown (empty initially)
   if (projectCell) {
     projectCell.innerHTML = "";
     const emptyProjectDropdown = createSmartDropdown("project", projectCell, "", "");
     projectCell.appendChild(emptyProjectDropdown);
   }
-  
+
   // Setup project code field (readonly input)
   if (projectCodeCell) {
-    // projectCodeCell.innerHTML = "";
-    // const codeInput = document.createElement("input");
-    // codeInput.type = "text";
-    // codeInput.className = "project-code form-input";
-    // codeInput.placeholder = "Auto-filled";
-    // codeInput.readOnly = true;
-    // codeInput.style.backgroundColor = "#f0f0f0";
-    // projectCodeCell.appendChild(codeInput);
-    // In places where you create auto-filled code field:
     projectCodeCell.innerHTML = "";
     if (window._freeTextClientProject) {
       projectCodeCell.appendChild(createSharedServicesProjectCode());
@@ -1991,19 +1612,13 @@ function updateRowNumbers(tbodyId) {
   });
 }
 
-/* delete row / week */
+/* delete row */
 function deleteRow(btn) {
   const row = btn.closest("tr");
   if (!row) return;
   const tbody = row.closest("tbody");
   row.remove();
   updateRowNumbers(tbody.id);
-  updateSummary();
-}
-function deleteWeekSection(sectionId) {
-  if (!confirm("Delete this week section?")) return;
-  const section = document.getElementById(sectionId);
-  if (section) section.remove();
   updateSummary();
 }
 
@@ -2082,42 +1697,25 @@ function validateDate(input) {
         return;
     }
 
-    const inputDateStr = input.value;
-
-    // Agar weekOptions abhi load nahi hua → validation skip kar do
-    if (!window.weekOptions || window.weekOptions.length === 0) {
-        input.classList.remove("validation-error");
-        return; // Ab koi popup nahi aayega
-    }
-
-    const section = input.closest('.timesheet-section');
-    if (!section) return;
-
-    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-    if (!weekSelect || !weekSelect.value) {
+    const win = window._currentPayrollWindow;
+    if (!win) {
         input.classList.remove("validation-error");
         return;
     }
 
-    const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-    if (!selectedWeek || !selectedWeek.start || !selectedWeek.end) {
-        input.classList.remove("validation-error");
-        return;
-    }
-
-    const inputDate = new Date(inputDateStr);
-    const weekStart = new Date(selectedWeek.start);
-    const weekEnd = new Date(selectedWeek.end);
+    const inputDate = new Date(input.value);
+    const cycleStart = new Date(win.start);
+    const cycleEnd = new Date(win.end);
 
     inputDate.setHours(0, 0, 0, 0);
-    weekStart.setHours(0, 0, 0, 0);
-    weekEnd.setHours(0, 0, 0, 0);
+    cycleStart.setHours(0, 0, 0, 0);
+    cycleEnd.setHours(0, 0, 0, 0);
 
-    if (inputDate < weekStart || inputDate > weekEnd) {
+    if (inputDate < cycleStart || inputDate > cycleEnd) {
         input.classList.add("validation-error");
-        const startStr = weekStart.toLocaleDateString('en-GB');
-        const endStr = weekEnd.toLocaleDateString('en-GB');
-        showPopup(`Invalid Date! Only dates from <strong>${startStr}</strong> to <strong>${endStr}</strong> are allowed.`, true);
+        const startStr = cycleStart.toLocaleDateString('en-GB');
+        const endStr = cycleEnd.toLocaleDateString('en-GB');
+        showPopup(`Invalid Date! Only dates from <strong>${startStr}</strong> to <strong>${endStr}</strong> (the selected payroll cycle) are allowed.`, true);
     } else {
         input.classList.remove("validation-error");
     }
@@ -2354,6 +1952,10 @@ function setFieldValue(row, className, value) {
     select.dispatchEvent(new Event("change", { bubbles: true }));
   } else if (input) {
     input.value = value;
+    // Needed so pasting a Client value still cascades the Project combo
+    // (Client/Project are plain inputs now — the searchable combo — not a
+    // <select>, but they still listen for "change" the same way).
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 }
 
@@ -2392,35 +1994,45 @@ function openModal(button) {
     // free-text client/project fields are independent of one another)
     if (!window._freeTextClientProject) {
       clientDropdown.addEventListener("change", function() {
-        const selectedClient = this.value;
-        updateModalProjectDropdown(selectedClient, "");
+        updateModalProjectDropdown(this.value, "");
       });
     }
   }
 
-  // Clear and create project dropdown
-  const projectContainer = document.getElementById("modalProjectContainer");
-  if (projectContainer) {
-    projectContainer.innerHTML = "";
-    const projectDropdown = createSmartDropdown("project", projectContainer, projectValue, clientValue);
-    projectContainer.appendChild(projectDropdown);
+  if (window._freeTextClientProject) {
+    // Free-text partner: Client/Project are independent plain fields.
+    const projectContainer = document.getElementById("modalProjectContainer");
+    if (projectContainer) {
+      projectContainer.innerHTML = "";
+      projectContainer.appendChild(createSmartDropdown("project", projectContainer, projectValue, clientValue));
+    }
+    const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+    if (projectCodeContainer) {
+      projectCodeContainer.innerHTML = "";
+      projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
+    }
+    showProjectPlanStatus(projectCodeValue, { modal: true });
+  } else if (clientValue === "Other") {
+    _renderModalProjectOther(projectValue);
+  } else {
+    // Clear and create project dropdown
+    const projectContainer = document.getElementById("modalProjectContainer");
+    if (projectContainer) {
+      projectContainer.innerHTML = "";
+      const projectDropdown = createSmartDropdown("project", projectContainer, projectValue, clientValue);
+      projectContainer.appendChild(projectDropdown);
 
-    // Add change listener to auto-fill project code (dropdown mode only)
-    if (!window._freeTextClientProject) {
+      // Add change listener to auto-fill project code
       projectDropdown.addEventListener("change", function() {
-        const currentClient = clientContainer?.querySelector("select")?.value;
+        const currentClient = clientContainer?.querySelector("input")?.value;
         updateModalProjectCode(currentClient, this.value);
       });
     }
-  }
 
-  // Clear and create project code field
-  const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
-  if (projectCodeContainer) {
-    projectCodeContainer.innerHTML = "";
-    if (window._freeTextClientProject) {
-      projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
-    } else {
+    // Clear and create project code field
+    const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+    if (projectCodeContainer) {
+      projectCodeContainer.innerHTML = "";
       const codeInput = document.createElement("input");
       codeInput.type = "text";
       codeInput.id = "modalProjectCodeInput";
@@ -2430,8 +2042,8 @@ function openModal(button) {
       codeInput.style.backgroundColor = "#f0f0f0";
       projectCodeContainer.appendChild(codeInput);
     }
+    showProjectPlanStatus(projectCodeValue, { modal: true });
   }
-  showProjectPlanStatus(projectCodeValue, { modal: true });
 
   // Set other fields
   document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
@@ -2460,16 +2072,51 @@ function openModal(button) {
   }
 }
 
+// Renders Project as free text + Project Code as a fixed, non-typable
+// "Other" in the modal — used whenever Client is "Other".
+function _renderModalProjectOther(projectValue = "") {
+  const projectContainer = document.getElementById("modalProjectContainer");
+  if (projectContainer) {
+    projectContainer.innerHTML = "";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "project-field form-input";
+    input.placeholder = "Enter project";
+    input.value = projectValue || "";
+    projectContainer.appendChild(input);
+  }
+
+  const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+  if (projectCodeContainer) {
+    projectCodeContainer.innerHTML = "";
+    const codeInput = document.createElement("input");
+    codeInput.type = "text";
+    codeInput.id = "modalProjectCodeInput";
+    codeInput.className = "form-input";
+    codeInput.value = "Other";
+    codeInput.readOnly = true;
+    codeInput.disabled = true;
+    codeInput.style.backgroundColor = "#f0f0f0";
+    codeInput.style.cursor = "not-allowed";
+    projectCodeContainer.appendChild(codeInput);
+  }
+  showProjectPlanStatus("", { modal: true });
+}
+
 // Update project dropdown when client changes in modal
 function updateModalProjectDropdown(selectedClient, selectedProject = "") {
   if (window._freeTextClientProject) return; // free-text fields are independent, nothing to cascade
+  if (selectedClient === "Other") {
+    _renderModalProjectOther(selectedProject);
+    return;
+  }
   const projectContainer = document.getElementById("modalProjectContainer");
   if (!projectContainer) return;
-  
+
   projectContainer.innerHTML = "";
   const projectDropdown = createSmartDropdown("project", projectContainer, selectedProject, selectedClient);
   projectContainer.appendChild(projectDropdown);
-  
+
   // Add change listener
   projectDropdown.addEventListener("change", function() {
     updateModalProjectCode(selectedClient, this.value);
@@ -2490,10 +2137,6 @@ function updateModalProjectDropdown(selectedClient, selectedProject = "") {
     projectCodeContainer.appendChild(codeInput);
   }
   showProjectPlanStatus("", { modal: true });
-
-  // Clear project code when client changes
-  // const projectCodeInput = document.getElementById("modalProjectCodeInput");
-  // if (projectCodeInput) projectCodeInput.value = "";
 }
 
 // Auto-fill project code in modal
@@ -2607,44 +2250,28 @@ function saveModalEntry() {
   const projectEnd = currentRow.querySelector(".project-end");
   if (projectEnd) projectEnd.value = document.getElementById("modalInput4").value;
 
-  // ── Client ──────────────────────────────────────────────────────────────────
+  // ── Client (always a plain input now — combo or free text) ──────────────────
   const clientContainer = document.getElementById("modalClientContainer");
-  const clientValue = (clientContainer?.querySelector("select")?.value ||
-                       clientContainer?.querySelector("input")?.value || "").trim();
+  const clientValue = (clientContainer?.querySelector("input")?.value || "").trim();
 
   const clientCell = currentRow.querySelector(".col-client");
   if (clientCell) {
-    const existingSel = clientCell.querySelector("select");
     const existingInp = clientCell.querySelector("input");
-    if (existingSel) {
-      // Try to set the dropdown; if value not in options, replace with input
-      existingSel.value = clientValue;
-      if (existingSel.value !== clientValue && clientValue) {
-        clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${clientValue}">`;
-      }
-    } else if (existingInp) {
+    if (existingInp) {
       existingInp.value = clientValue;
     } else {
-      // Cell is empty — create input
       clientCell.innerHTML = `<input type="text" class="client-field form-input" value="${clientValue}">`;
     }
   }
 
-  // ── Project ──────────────────────────────────────────────────────────────────
+  // ── Project (always a plain input now — combo or free text) ─────────────────
   const projectContainer = document.getElementById("modalProjectContainer");
-  const projectValue = (projectContainer?.querySelector("select")?.value ||
-                        projectContainer?.querySelector("input")?.value || "").trim();
+  const projectValue = (projectContainer?.querySelector("input")?.value || "").trim();
 
   const projectCell = currentRow.querySelector(".col-project");
   if (projectCell) {
-    const existingSel = projectCell.querySelector("select");
     const existingInp = projectCell.querySelector("input");
-    if (existingSel) {
-      existingSel.value = projectValue;
-      if (existingSel.value !== projectValue && projectValue) {
-        projectCell.innerHTML = `<input type="text" class="project-field form-input" value="${projectValue}">`;
-      }
-    } else if (existingInp) {
+    if (existingInp) {
       existingInp.value = projectValue;
     } else {
       projectCell.innerHTML = `<input type="text" class="project-field form-input" value="${projectValue}">`;
@@ -2791,11 +2418,10 @@ async function openEmployeeDetails(employeeId, cycleId) {
         <thead>
           <tr>
             <th>Date</th>
-            <th>Week Period</th>
             <th>Client</th>
             <th>Project</th>
             <th>Activity</th>
-            <th>Location</th>
+            <th>Work</th>
             <th>Start</th>
             <th>End</th>
             <th>Hours</th>
@@ -2807,7 +2433,6 @@ async function openEmployeeDetails(employeeId, cycleId) {
           ${data.entries.map(entry => `
             <tr>
               <td>${entry.date || "-"}</td>
-              <td>${entry.weekPeriod || "-"}</td>
               <td>${entry.client || "-"}</td>
               <td>${entry.project || "-"}</td>
               <td>${entry.activity || "-"}</td>
@@ -2942,9 +2567,7 @@ async function loadHistory(){
 
             // Flatten for export compatibility
             payrolls.forEach(p => {
-              p.weeks.forEach(w => {
-                w.entries.forEach(e => historyEntries.push(e));
-              });
+              (p.entries || []).forEach(e => historyEntries.push(e));
             });
 
             // Render all payrolls initially
@@ -3070,7 +2693,7 @@ function _renderHistoryPayrolls(payrolls) {
 
     // Count unique working days
     const allDates = new Set();
-    payroll.weeks.forEach(w => w.entries.forEach(e => { if (e.date) allDates.add(e.date); }));
+    (payroll.entries || []).forEach(e => { if (e.date) allDates.add(e.date); });
     const workingDays = allDates.size;
 
     // Derive date range from entries
@@ -3115,80 +2738,73 @@ function _renderHistoryPayrolls(payrolls) {
       <!-- Card Detail Body (collapsed by default) -->
       <div id="${bodyId}" style="display:none;">
         ${approvalTimeline}
-        <div class="history-card-weeks" style="padding:.5rem 0;">
+        <div class="history-card-entries" style="padding:1rem 1.5rem 0;">
         </div>
         <div class="history-card-feedback"></div>
       </div>
     `;
 
-    // Build week tables inside the card body
-    const weeksContainer = card.querySelector('.history-card-weeks');
-    payroll.weeks.forEach(week => {
-      const weekDiv = document.createElement('div');
-      weekDiv.style.cssText = 'padding:1rem 1.5rem 0;';
-      weekDiv.innerHTML = `<h4 style="margin-bottom:.75rem;color:#2c3e50;font-size:.9rem;font-weight:700;"><i class="fas fa-calendar-week"></i> Week: ${week.week_period}</h4>`;
-
-      const tableWrapper = document.createElement('div');
-      tableWrapper.className = 'table-responsive';
-      const table = document.createElement('table');
-      table.className = 'timesheet-table history-table';
-      table.innerHTML = `
-        <thead>
-          <tr>
-            <th class="col-narrow">S.No</th>
-            <th class="col-narrow">Action</th>
-            <th class="col-medium">Date</th>
-            <th class="col-wide">Location</th>
-            <th class="col-medium">Start</th>
-            <th class="col-medium">End</th>
-            <th class="col-wide">Client</th>
-            <th class="col-wide">Project</th>
-            <th class="col-medium">Project Code</th>
-            <th class="col-wide">Reporting Manager</th>
-            <th class="col-wide">Activity</th>
-            <th class="col-narrow">Hours</th>
-            <th class="col-medium">Billable</th>
-            ${showLunchTravel ? '<th class="col-medium">Lunch Time</th>' : ''}
-            ${showLunchTravel ? '<th class="col-medium">Travel Time</th>' : ''}
-            <th class="col-wide">Remarks</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
+    // Build the entries table inside the card body — flat, no week grouping
+    const entriesContainer = card.querySelector('.history-card-entries');
+    const tableWrapper = document.createElement('div');
+    tableWrapper.className = 'table-responsive';
+    const table = document.createElement('table');
+    table.className = 'timesheet-table history-table';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th class="col-narrow">S.No</th>
+          <th class="col-narrow">Action</th>
+          <th class="col-medium">Date</th>
+          <th class="col-wide">Work</th>
+          <th class="col-medium">Start</th>
+          <th class="col-medium">End</th>
+          <th class="col-wide">Client</th>
+          <th class="col-wide">Project</th>
+          <th class="col-medium">Project Code</th>
+          <th class="col-wide">Reporting Manager</th>
+          <th class="col-wide">Activity</th>
+          <th class="col-narrow">Hours</th>
+          <th class="col-medium">Billable</th>
+          ${showLunchTravel ? '<th class="col-medium">Lunch Time</th>' : ''}
+          ${showLunchTravel ? '<th class="col-medium">Travel Time</th>' : ''}
+          <th class="col-wide">Remarks</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+    (payroll.entries || []).forEach((entry, rowIndex) => {
+      const isSubmitted = payroll.submitted;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${rowIndex + 1}</td>
+        <td style="min-width:120px;">
+          ${isSubmitted
+            ? '<span style="font-size:.78rem;color:#10b981;font-weight:600;"><i class="fas fa-lock"></i> Submitted</span>'
+            : `<button class="action-btn edit-btn" onclick="editHistoryRow(this,'${entry.id}')"><i class="fas fa-edit"></i> Edit</button>
+               <button class="action-btn delete-btn" onclick="deleteHistoryRow(this,'${entry.id}')"><i class="fas fa-trash"></i> Delete</button>`
+          }
+        </td>
+        <td>${entry.date||''}</td>
+        <td>${entry.location||''}</td>
+        <td>${entry.projectStartTime||''}</td>
+        <td>${entry.projectEndTime||''}</td>
+        <td>${entry.client||''}</td>
+        <td>${entry.project||''}</td>
+        <td>${entry.projectCode||''}</td>
+        <td>${entry.reportingManagerEntry||''}</td>
+        <td>${entry.activity||''}</td>
+        <td>${entry.projectHours||''}</td>
+        <td>${entry.billable||''}</td>
+        ${showLunchTravel ? `<td>${entry.lunchTime||''}</td>` : ''}
+        ${showLunchTravel ? `<td>${entry.travelTime||''}</td>` : ''}
+        <td>${entry.remarks||''}</td>
       `;
-      const tbody = table.querySelector('tbody');
-      week.entries.forEach((entry, rowIndex) => {
-        const isSubmitted = payroll.submitted;
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${rowIndex + 1}</td>
-          <td style="min-width:120px;">
-            ${isSubmitted
-              ? '<span style="font-size:.78rem;color:#10b981;font-weight:600;"><i class="fas fa-lock"></i> Submitted</span>'
-              : `<button class="action-btn edit-btn" onclick="editHistoryRow(this,'${entry.id}')"><i class="fas fa-edit"></i> Edit</button>
-                 <button class="action-btn delete-btn" onclick="deleteHistoryRow(this,'${entry.id}')"><i class="fas fa-trash"></i> Delete</button>`
-            }
-          </td>
-          <td>${entry.date||''}</td>
-          <td>${entry.location||''}</td>
-          <td>${entry.projectStartTime||''}</td>
-          <td>${entry.projectEndTime||''}</td>
-          <td>${entry.client||''}</td>
-          <td>${entry.project||''}</td>
-          <td>${entry.projectCode||''}</td>
-          <td>${entry.reportingManagerEntry||''}</td>
-          <td>${entry.activity||''}</td>
-          <td>${entry.projectHours||''}</td>
-          <td>${entry.billable||''}</td>
-          ${showLunchTravel ? `<td>${entry.lunchTime||''}</td>` : ''}
-          ${showLunchTravel ? `<td>${entry.travelTime||''}</td>` : ''}
-          <td>${entry.remarks||''}</td>
-        `;
-        tbody.appendChild(row);
-      });
-      tableWrapper.appendChild(table);
-      weekDiv.appendChild(tableWrapper);
-      weeksContainer.appendChild(weekDiv);
+      tbody.appendChild(row);
     });
+    tableWrapper.appendChild(table);
+    entriesContainer.appendChild(tableWrapper);
 
     // Feedback section inside card
     const meta = payroll.metadata || {};
@@ -3276,38 +2892,44 @@ function editHistoryRow(button, entryId) {
         });
       }
 
-      const projectContainer = document.getElementById("modalProjectContainer");
-      projectContainer.innerHTML = "";
-      const projectDropdown = createSmartDropdown(
-          "project",
-          projectContainer,
-          projectValue,
-          clientValue
-      );
-      projectContainer.appendChild(projectDropdown);
-
-      if (!window._freeTextClientProject) {
-        projectDropdown.addEventListener("change", function () {
-            const currentClient = clientContainer?.querySelector("select")?.value;
-            updateModalProjectCode(currentClient, this.value);
-        });
-      }
-
-      const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
-      projectCodeContainer.innerHTML = "";
-      if (window._freeTextClientProject) {
-        projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
+      if (!window._freeTextClientProject && clientValue === "Other") {
+        // Same "Other" treatment as openModal(): Project free text, Project
+        // Code fixed and non-typable.
+        _renderModalProjectOther(projectValue);
       } else {
-        const codeInput = document.createElement("input");
-        codeInput.type = "text";
-        codeInput.id = "modalProjectCodeInput";
-        codeInput.className = "form-input";
-        codeInput.value = projectCodeValue;
-        codeInput.readOnly = true;
-        codeInput.style.backgroundColor = "#f0f0f0";
-        projectCodeContainer.appendChild(codeInput);
+        const projectContainer = document.getElementById("modalProjectContainer");
+        projectContainer.innerHTML = "";
+        const projectDropdown = createSmartDropdown(
+            "project",
+            projectContainer,
+            projectValue,
+            clientValue
+        );
+        projectContainer.appendChild(projectDropdown);
+
+        if (!window._freeTextClientProject) {
+          projectDropdown.addEventListener("change", function () {
+              const currentClient = clientContainer?.querySelector("input")?.value;
+              updateModalProjectCode(currentClient, this.value);
+          });
+        }
+
+        const projectCodeContainer = document.getElementById("modalProjectCodeContainer");
+        projectCodeContainer.innerHTML = "";
+        if (window._freeTextClientProject) {
+          projectCodeContainer.appendChild(createSharedServicesProjectCode(projectCodeValue, "modalProjectCodeInput"));
+        } else {
+          const codeInput = document.createElement("input");
+          codeInput.type = "text";
+          codeInput.id = "modalProjectCodeInput";
+          codeInput.className = "form-input";
+          codeInput.value = projectCodeValue;
+          codeInput.readOnly = true;
+          codeInput.style.backgroundColor = "#f0f0f0";
+          projectCodeContainer.appendChild(codeInput);
+        }
+        showProjectPlanStatus(projectCodeValue, { modal: true });
       }
-      showProjectPlanStatus(projectCodeValue, { modal: true });
 
     document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
     document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Activity
@@ -3341,14 +2963,10 @@ function updateHistoryEntry() {
     return;
   }
   const clientContainer = document.getElementById("modalClientContainer");
-  const clientValue =
-    clientContainer?.querySelector("select")?.value ||
-    clientContainer?.querySelector("input")?.value || "";
+  const clientValue = clientContainer?.querySelector("input")?.value || "";
 
   const projectContainer = document.getElementById("modalProjectContainer");
-  const projectValue =
-    projectContainer?.querySelector("select")?.value ||
-    projectContainer?.querySelector("input")?.value || "";
+  const projectValue = projectContainer?.querySelector("input")?.value || "";
 
   const projectCodeValue =
     document.getElementById("modalProjectCodeInput")?.value || "";
@@ -3423,7 +3041,9 @@ function deleteHistoryRow(button, entryId) {
 
 
 // ── Collect entries from one week section ─────────────────────────────────────
-function _collectWeekEntries(section) {
+function _collectEntries() {
+  const section = document.getElementById(TIMESHEET_SECTION_ID);
+  if (!section) return [];
   const rows = section.querySelectorAll('tbody tr');
   const entries = [];
   rows.forEach(row => {
@@ -3474,8 +3094,8 @@ function _collectMetadata() {
   };
 }
 
-// ── Save a single week section as draft ──────────────────────────────────────
-async function saveWeekDraft(sectionId) {
+// ── Save the whole cycle's entries as draft ──────────────────────────────────
+async function saveDraft() {
   if (!_selectedCycle) {
     showPopup('Please select a payroll cycle first.', true);
     return;
@@ -3485,15 +3105,11 @@ async function saveWeekDraft(sectionId) {
     return;
   }
 
-  const section = document.getElementById(sectionId);
-  if (!section) { showPopup('Section not found.', true); return; }
+  const section = document.getElementById(TIMESHEET_SECTION_ID);
+  if (!section) { showPopup('Timesheet table not found.', true); return; }
 
-  const weekSelect = section.querySelector('.week-period select');
-  const weekPeriod = weekSelect?.value || '';
-  if (!weekPeriod) { showPopup('Please select a week period first.', true); return; }
-
-  const entries = _collectWeekEntries(section);
-  if (!entries.length) { showPopup('No entries to save in this week.', true); return; }
+  const entries = _collectEntries();
+  if (!entries.length) { showPopup('No entries to save.', true); return; }
 
   // Validate mandatory fields
   const errors = [];
@@ -3513,7 +3129,7 @@ async function saveWeekDraft(sectionId) {
   });
   if (errors.length) { showPopup(errors.slice(0, 5).join('\n'), true); return; }
 
-  showLoading('Saving week draft...');
+  showLoading('Saving draft...');
   try {
     const res = await fetch(`${API_URL}/timesheet/save-draft`, {
       method: 'POST',
@@ -3521,7 +3137,6 @@ async function saveWeekDraft(sectionId) {
       body: JSON.stringify({
         cycle_id:    _selectedCycle.id,
         cycle_label: _selectedCycle.cycle_label,
-        week_period: weekPeriod,
         entries:     entries,
         metadata:    _collectMetadata(),
       }),
@@ -3529,8 +3144,8 @@ async function saveWeekDraft(sectionId) {
     const data = await res.json();
     hideLoading();
     if (res.ok && data.success) {
-      showPopup(`✅ Week "${weekPeriod}" saved as draft!`);
-      // Highlight all rows in this section green to show they are saved
+      showPopup('✅ Draft saved!');
+      // Highlight all rows green to show they are saved
       const tbody = section.querySelector('tbody');
       if (tbody) {
         tbody.querySelectorAll('tr').forEach(row => {
@@ -3550,9 +3165,31 @@ async function saveWeekDraft(sectionId) {
     }
   } catch(err) {
     hideLoading();
-    console.error('saveWeekDraft error:', err);
+    console.error('saveDraft error:', err);
     showPopup('Network error saving draft.', true);
   }
+}
+
+// Every calendar date in the selected payroll cycle must have at least one
+// row before submit is allowed (a Leave/Week Off/PHY row still counts — this
+// only checks a row exists for the date, not that its other fields are
+// filled in). Returns an array of missing "YYYY-MM-DD" dates (empty if none).
+function _findMissingCycleDates() {
+  const win = window._currentPayrollWindow;
+  if (!win) return [];
+
+  const presentDates = new Set(_collectEntries().map(e => e.date).filter(Boolean));
+
+  const missing = [];
+  const start = new Date(win.start);
+  const end   = new Date(win.end);
+  const d = new Date(start);
+  while (d <= end) {
+    const dateStr = d.toISOString().split('T')[0];
+    if (!presentDates.has(dateStr)) missing.push(dateStr);
+    d.setDate(d.getDate() + 1);
+  }
+  return missing;
 }
 
 // ── Submit confirmation popup ─────────────────────────────────────────────────
@@ -3563,6 +3200,15 @@ function confirmSubmit() {
   }
   if (_selectedCycle.locked) {
     showPopup('Submission deadline has passed for this cycle.', true);
+    return;
+  }
+
+  // Every day in the cycle must have an entry row before submitting.
+  const missingDates = _findMissingCycleDates();
+  if (missingDates.length) {
+    const shown = missingDates.slice(0, 10).map(d => new Date(d).toLocaleDateString('en-GB')).join(', ');
+    const extra = missingDates.length > 10 ? ` and ${missingDates.length - 10} more` : '';
+    showPopup(`Cannot submit — missing entries for: ${shown}${extra}. Please add a row for every day before submitting.`, true);
     return;
   }
 
@@ -4040,10 +3686,9 @@ function getEmployeeInfoForExport() {
         'Gender': document.getElementById('gender').value || '',
         'Partner': document.getElementById('partner').value || '',
         'Reporting Manager': document.getElementById('reportingManager').value || '',
-        'Week Period': '',
         'S.No': '',
         'Date': '',
-        'Location of Work': '',
+        'Work': '',
         'Project Start Time': '',
         'Project End Time': '',
         'Client': '',
@@ -4069,7 +3714,7 @@ function exportTimesheetToExcel() {
 
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "weekPeriod","date","location","projectStartTime","projectEndTime",
+        "date","location","projectStartTime","projectEndTime",
         "client","project","projectCode","reportingManagerEntry","activity",
         "projectHours","billable","lunchTime","travelTime","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others"
@@ -4077,57 +3722,52 @@ function exportTimesheetToExcel() {
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Week Period","Date","Location of Work","Project Start Time","Project End Time",
+        "Date","Work","Project Start Time","Project End Time",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
         "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others"
     ];
 
     let cleanedRows = [];
-    const sections = document.querySelectorAll(".timesheet-section");
+    const rows = document.querySelectorAll(".timesheet-section tbody tr");
 
-    sections.forEach((section) => {
-        const weekPeriod = section.querySelector(".week-period select")?.value || "";
-        const rows = section.querySelectorAll("tbody tr");
+    rows.forEach((row) => {
+        const date            = row.querySelector('.date-field')?.value?.trim() || "";
+        const location        = row.querySelector('.location-select')?.value || "";
+        const projectStart    = row.querySelector('.project-start')?.value || "";
+        const projectEnd      = row.querySelector('.project-end')?.value || "";
+        const client          = getFieldValue(row, '.col-client') || "";
+        const project          = getFieldValue(row, '.col-project') || "";
+        const projectCode     = getFieldValue(row, '.col-project-code') || "";
+        const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || "";
+        const activity        = row.querySelector('.activity-field')?.value || "";
+        const projectHours    = row.querySelector('.project-hours-field')?.value || "";
+        const billable        = row.querySelector('.billable-select')?.value || "";
+        const lunchTime       = row.querySelector('.lunch-time-select')?.value || "";
+        const travelTime      = row.querySelector('.travel-time-select')?.value || "";
+        const remarks         = row.querySelector('.remarks-field')?.value || "";
 
-        rows.forEach((row) => {
-            const date            = row.querySelector('.date-field')?.value?.trim() || "";
-            const location        = row.querySelector('.location-select')?.value || "";
-            const projectStart    = row.querySelector('.project-start')?.value || "";
-            const projectEnd      = row.querySelector('.project-end')?.value || "";
-            const client          = getFieldValue(row, '.col-client') || "";
-            const project         = getFieldValue(row, '.col-project') || "";
-            const projectCode     = getFieldValue(row, '.col-project-code') || "";
-            const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || "";
-            const activity        = row.querySelector('.activity-field')?.value || "";
-            const projectHours    = row.querySelector('.project-hours-field')?.value || "";
-            const billable        = row.querySelector('.billable-select')?.value || "";
-            const lunchTime       = row.querySelector('.lunch-time-select')?.value || "";
-            const travelTime      = row.querySelector('.travel-time-select')?.value || "";
-            const remarks         = row.querySelector('.remarks-field')?.value || "";
+        if (!date && !project && !client) return;
 
-            if (!date && !project && !client) return;
-
-            cleanedRows.push({
-                employeeId: employeeInfo["Employee ID"],
-                employeeName: employeeInfo["Employee Name"],
-                designation: employeeInfo["Designation"],
-                gender: employeeInfo["Gender"],
-                partner: employeeInfo["Partner"],
-                reportingManager: employeeInfo["Reporting Manager"],
-                weekPeriod, date, location,
-                projectStartTime: projectStart,
-                projectEndTime: projectEnd,
-                client, project, projectCode,
-                reportingManagerEntry: reportingMgr,
-                activity, projectHours, billable, lunchTime, travelTime, remarks,
-                hits: document.getElementById("hits")?.value || "",
-                misses: document.getElementById("misses")?.value || "",
-                feedback_hr: document.getElementById("feedback_hr")?.value || "",
-                feedback_it: document.getElementById("feedback_it")?.value || "",
-                feedback_crm: document.getElementById("feedback_crm")?.value || "",
-                feedback_others: document.getElementById("feedback_others")?.value || ""
-            });
+        cleanedRows.push({
+            employeeId: employeeInfo["Employee ID"],
+            employeeName: employeeInfo["Employee Name"],
+            designation: employeeInfo["Designation"],
+            gender: employeeInfo["Gender"],
+            partner: employeeInfo["Partner"],
+            reportingManager: employeeInfo["Reporting Manager"],
+            date, location,
+            projectStartTime: projectStart,
+            projectEndTime: projectEnd,
+            client, project, projectCode,
+            reportingManagerEntry: reportingMgr,
+            activity, projectHours, billable, lunchTime, travelTime, remarks,
+            hits: document.getElementById("hits")?.value || "",
+            misses: document.getElementById("misses")?.value || "",
+            feedback_hr: document.getElementById("feedback_hr")?.value || "",
+            feedback_it: document.getElementById("feedback_it")?.value || "",
+            feedback_crm: document.getElementById("feedback_crm")?.value || "",
+            feedback_others: document.getElementById("feedback_others")?.value || ""
         });
     });
 
@@ -4150,7 +3790,7 @@ function exportHistoryToExcel() {
 
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "weekPeriod","date","location","projectStartTime","projectEndTime",
+        "date","location","projectStartTime","projectEndTime",
         "client","project","projectCode","reportingManagerEntry","activity",
         "projectHours","billable","lunchTime","travelTime","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others",
@@ -4159,7 +3799,7 @@ function exportHistoryToExcel() {
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Week Period","Date","Location of Work","Project Start Time","Project End Time",
+        "Date","Work","Project Start Time","Project End Time",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
         "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others",
@@ -4173,7 +3813,6 @@ function exportHistoryToExcel() {
         gender: row.gender || "",
         partner: row.partner || "",
         reportingManager: row.reportingManager || "",
-        weekPeriod: row.weekPeriod || "",
         date: row.date || "",
         location: row.location || "",
         projectStartTime: row.projectStartTime || "",
@@ -4612,9 +4251,8 @@ function toggleNavMenu() {
 
 function clearTimesheet(auto = false) {
   if (!auto && !confirm("Clear all timesheet data from the form?")) return;
-  document.querySelectorAll(".timesheet-section").forEach((s) => s.remove());
-  sectionCount = 0;
-  addWeekSection();
+  renderTimesheetTable();
+  if (_selectedCycle) populateAllCycleDateRows();
   document.querySelectorAll("textarea").forEach((t) => (t.value = ""));
   // Reset idle time fields
   const statusEl = document.getElementById('idle_time_status');
@@ -4767,22 +4405,16 @@ function cancelExit() {
 
 function validateModalDate(dateInput) {
     if (!dateInput || !currentRow) return;
-    const section = currentRow.closest('.timesheet-section');
-    const weekSelect = section.querySelector('.week-period select');
-    const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-    if (!selectedWeek) return;
+    const win = window._currentPayrollWindow;
+    if (!win) return;
 
     const inputDateStr = dateInput.value;
-    console.log("Selected week:", selectedWeek);
-    const weekStartStr = `${selectedWeek.start.getFullYear()}-${String(selectedWeek.start.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.start.getDate()).padStart(2, '0')}`;
-    const weekEndStr = `${selectedWeek.end.getFullYear()}-${String(selectedWeek.end.getMonth() + 1).padStart(2, '0')}-${String(selectedWeek.end.getDate()).padStart(2, '0')}`;
+    const cycleStartStr = new Date(win.start).toISOString().split('T')[0];
+    const cycleEndStr = new Date(win.end).toISOString().split('T')[0];
 
-    console.log('Validation check:', inputDateStr, weekStartStr, weekEndStr);
-
-    if (inputDateStr < weekStartStr || inputDateStr > weekEndStr) {
+    if (inputDateStr < cycleStartStr || inputDateStr > cycleEndStr) {
         dateInput.classList.add('validation-error');
-        console.log('Validation error on modal date:', inputDateStr, weekStartStr, weekEndStr);
-        showValidationMessage(dateInput, 'Please select a date within the specified week only.');
+        showValidationMessage(dateInput, 'Please select a date within the selected payroll cycle only.');
     } else {
         dateInput.classList.remove('validation-error');
         clearValidationMessage(dateInput);
@@ -4793,89 +4425,10 @@ function validateModalDate(dateInput) {
     const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
     const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
+
     if (inputDateStr < sixtyDaysAgoStr || inputDateStr > yesterdayStr) {
         dateInput.classList.add('validation-error');
         showValidationMessage(dateInput, 'Date must be within last 60 days up to yesterday');
-    }
-}
-
-function syncAndValidateModalDate() {
-    if (!weekOptionsReady || !window.weekOptions || window.weekOptions.length === 0) {
-        return; // Wait karo, abhi week load nahi hua
-    }
-
-    const modalDateInput = document.getElementById("modalInput1");
-    if (!modalDateInput) return;
-
-    // Current row ka section find karo
-    if (!currentRow) return;
-    const section = currentRow.closest(".timesheet-section");
-    if (!section) return;
-
-    const weekSelect = section.querySelector('select[id^="weekPeriod_"]');
-    if (!weekSelect || !weekSelect.value) return;
-
-    const selectedWeek = window.weekOptions.find(w => w.value === weekSelect.value);
-    if (!selectedWeek || !selectedWeek.start || !selectedWeek.end) return;
-
-    const start = new Date(selectedWeek.start).toISOString().split("T")[0];
-    const end = new Date(selectedWeek.end).toISOString().split("T")[0];
-
-    // Set min/max
-    modalDateInput.min = start;
-    modalDateInput.max = end;
-
-    // Agar date week ke bahar hai → auto-correct
-    if (!modalDateInput.value || modalDateInput.value < start || modalDateInput.value > end) {
-        modalDateInput.value = start;
-        showPopup(`Date auto-corrected to valid week: ${formatDate(start)}`, false);
-    }
-
-    // Red border hatao agar thi
-    modalDateInput.style.border = "";
-}
-
-
-
-function updateWeekDateLimits(sectionId) {
-    const section = document.getElementById(sectionId);
-    const weekSelect = section.querySelector(".week-period select");
-    const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-
-    if (!selectedWeek) return;
-
-    const weekStart = formatDate(selectedWeek.start);
-    const weekEnd = formatDate(selectedWeek.end);
-
-    const rows = section.querySelectorAll(".date-field");
-
-    rows.forEach(input => {
-        input.setAttribute("min", weekStart);
-        input.setAttribute("max", weekEnd);
-
-        if (!input.value || input.value < weekStart || input.value > weekEnd) {
-            input.value = weekStart; // FORCE FIRST DATE
-        }
-    });
-}
-
-function updateModalWeekLimits(sectionId) {
-    const section = document.getElementById(sectionId);
-    const weekSelect = section.querySelector(".week-period select");
-    const selectedWeek = weekOptions.find(opt => opt.value === weekSelect.value);
-
-    const modal = document.getElementById("modalOverlay");
-    const input = modal.querySelector("#modalInput1");
-
-    const weekStart = formatDate(selectedWeek.start);
-    const weekEnd = formatDate(selectedWeek.end);
-
-    input.setAttribute("min", weekStart);
-    input.setAttribute("max", weekEnd);
-
-    if (!input.value || input.value < weekStart || input.value > weekEnd) {
-        input.value = weekStart;
     }
 }
 
@@ -4958,7 +4511,7 @@ async function handleExcelUpload(event) {
             // ✅ Required columns to validate (Lunch Time & Travel Time are optional)
             const requiredColumns = [
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
-                'Reporting Manager', 'Week Period', 'Date', 'Location of Work',
+                'Reporting Manager', 'Date', 'Work',
                 'Project Start Time', 'Project End Time', 'Client', 'Project', 'Project Code',
                 'Reporting Manager Entry', 'Activity', 'Project Hours', 'Billable', 'Remarks'
             ];
@@ -5032,9 +4585,8 @@ async function handleExcelUpload(event) {
               gender: toStr(row['Gender']) || '',
               partner: toStr(row['Partner']) || '',
               reportingManager: toStr(row['Reporting Manager']) || '',
-              weekPeriod: toStr(row['Week Period']) || '',
               date: toStr(row['Date']) || '',
-              location: toStr(row['Location of Work']) || '',
+              location: toStr(row['Work']) || '',
 
               projectStartTime: excelTimeToHHMM(row['Project Start Time']),
               projectEndTime: excelTimeToHHMM(row['Project End Time']),
@@ -5101,18 +4653,25 @@ async function handleExcelUpload(event) {
           // Every partner except the free-text one (JHS01) must use real Nexus
           // Quant project codes (they all start with "PL"). Non-working days
           // ("Leave" / "PHY" / "Week Off") have no project to charge, so they're
-          // exempt from this check.
+          // exempt from this check — as is a Client of "Other" (no fixed
+          // project list to charge against), but its Project Code must then
+          // literally read "Other".
           if (!window._freeTextClientProject) {
             const nonWorkingLocations = ['Leave', 'PHY', 'Week Off'];
-            const badRow = realEntries.find(entry =>
-              !nonWorkingLocations.includes(entry.location) &&
-              !entry.projectCode.trim().toUpperCase().startsWith('PL')
-            );
+            const badRow = realEntries.find(entry => {
+              if (nonWorkingLocations.includes(entry.location)) return false;
+              const isOtherClient = entry.client.trim().toUpperCase() === 'OTHER';
+              if (isOtherClient) return entry.projectCode.trim().toUpperCase() !== 'OTHER';
+              return !entry.projectCode.trim().toUpperCase().startsWith('PL');
+            });
             if (badRow) {
               hideLoading();
+              const isOtherClient = badRow.client.trim().toUpperCase() === 'OTHER';
               showPopup(
-                `Invalid project code "${badRow.projectCode || '(blank)'}" on ${badRow.date}. ` +
-                `Projects must be from Nexus Quant only (project code must start with "PL").`,
+                isOtherClient
+                  ? `Row with Client "Other" on ${badRow.date} must have Project Code "Other" (found "${badRow.projectCode || '(blank)'}").`
+                  : `Invalid project code "${badRow.projectCode || '(blank)'}" on ${badRow.date}. ` +
+                    `Projects must be from Nexus Quant only (project code must start with "PL").`,
                 true
               );
               return;
@@ -5136,30 +4695,20 @@ async function handleExcelUpload(event) {
             });
           }
 
-          // Group rows by weekPeriod and save each as draft
-          const groups = {};
-          realEntries.forEach(entry => {
-            const wp = entry.weekPeriod;
-            if (!groups[wp]) groups[wp] = [];
-            groups[wp].push(entry);
+          // Save the whole flat set of parsed rows as one draft
+          const resDraft = await fetch(`${API_URL}/timesheet/save-draft`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+              cycle_id:    _selectedCycle.id,
+              cycle_label: _selectedCycle.cycle_label,
+              entries:     realEntries,
+              metadata:    _collectMetadata()
+            })
           });
-
-          for (const [wp, entries] of Object.entries(groups)) {
-            const resDraft = await fetch(`${API_URL}/timesheet/save-draft`, {
-              method: 'POST',
-              headers: getHeaders(),
-              body: JSON.stringify({
-                cycle_id:    _selectedCycle.id,
-                cycle_label: _selectedCycle.cycle_label,
-                week_period: wp,
-                entries:     entries,
-                metadata:    _collectMetadata()
-              })
-            });
-            if (!resDraft.ok) {
-              const errJson = await resDraft.json();
-              throw new Error(errJson.detail || `Failed to save draft for week: ${wp}`);
-            }
+          if (!resDraft.ok) {
+            const errJson = await resDraft.json();
+            throw new Error(errJson.detail || 'Failed to save draft from uploaded Excel');
           }
 
           // Load saved drafts onto the screen
@@ -5301,15 +4850,20 @@ async function downloadSampleTemplate() {
 
     const start = new Date(_selectedCycle.start_date);
     const end   = new Date(_selectedCycle.end_date);
-    const weeks = generateWeekOptions(start, end);
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Timesheet');
     const metaWS = wb.addWorksheet('MetadataLists', { state: 'hidden' });
+    // Plain, visible reference tab — a flat, alphabetical Client/Project/Code
+    // list with no formulas at all, so it can never break regardless of
+    // Excel version (unlike a live-filtered dropdown, which needs the
+    // FILTER() function that many real installs — e.g. Microsoft Office
+    // LTSC — don't have and never will). Ctrl+F searches it like any text.
+    const refWS = window._freeTextClientProject ? null : wb.addWorksheet('Client-Project List');
 
     const headers = [
       'Employee ID','Employee Name','Designation','Gender','Partner','Reporting Manager',
-      'Week Period','Date','Location of Work','Project Start Time','Project End Time',
+      'Date','Work','Project Start Time','Project End Time',
       'Client','Project','Project Code','Reporting Manager Entry','Activity',
       'Project Hours','Billable','Lunch Time','Travel Time','Remarks',
       '3 Hits','3 Misses','Feedback for HR','Feedback for IT','Feedback for CRM','Feedback for Others'
@@ -5325,13 +4879,11 @@ async function downloadSampleTemplate() {
     while (curr <= end) {
       const rIdx        = ws.rowCount + 1;
       const dateStr     = curr.toISOString().split('T')[0];
-      const week        = weeks.find(w => curr >= new Date(w.start) && curr <= new Date(w.end));
-      const weekPeriod  = week ? week.value : '';
-      const hFormula    = `IF(AND(J${rIdx}<>"",K${rIdx}<>""),(K${rIdx}-J${rIdx})*24,"")`;
+      const hFormula    = `IF(AND(I${rIdx}<>"",J${rIdx}<>""),(J${rIdx}-I${rIdx})*24,"")`;
 
       ws.addRow([
         empId, empName, designation, gender, partner, repManager,
-        weekPeriod, dateStr, '', '', '',
+        dateStr, '', '', '',
         '', '', '', repManager, '',
         { formula: hFormula }, 'Yes', '30 min', 'None', '',
         '', '', '', '', '', ''
@@ -5340,14 +4892,13 @@ async function downloadSampleTemplate() {
       curr.setDate(curr.getDate() + 1);
     }
 
-    // Apply hh:mm format to Project Start/End Time columns (J, K)
+    // Apply hh:mm format to Project Start/End Time columns (I, J)
     for (let r = 2; r <= lastDateRow; r++) {
+      ws.getCell(`I${r}`).numFmt = 'hh:mm';
       ws.getCell(`J${r}`).numFmt = 'hh:mm';
-      ws.getCell(`K${r}`).numFmt = 'hh:mm';
     }
 
     // ── Build MetadataLists sheet (hidden helper sheet backing the dropdowns) ──
-    const weekPeriodValues = weeks.map(w => w.value);
     const dateValues = [];
     let d = new Date(start);
     while (d <= end) { dateValues.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
@@ -5360,7 +4911,10 @@ async function downloadSampleTemplate() {
     // from in the app (free-typed fields instead), so the template mirrors
     // that: no Client/Project/Project Code dropdowns or lookup formula.
     const freeTextClientProject = window._freeTextClientProject;
-    const clients   = freeTextClientProject ? [] : (employeeProjects.clients || []);
+    // "Other" lets a dropdown-mode employee log against something outside
+    // their assigned client list — same escape hatch as the app's Client
+    // dropdown. Appended last so the real client list still reads cleanly.
+    const clients   = freeTextClientProject ? [] : [...(employeeProjects.clients || []), 'Other'];
     // Reporting Manager is a free-text field in the app (no <select>/manager
     // list exists), so there is nothing to build a dropdown from — keep the
     // template's "Reporting Manager Entry" column as free text too.
@@ -5369,7 +4923,7 @@ async function downloadSampleTemplate() {
     const clientCols = {};
     const projectCodeLookup = [];
     clients.forEach(c => {
-      const projs = employeeProjects.projects_by_client[c] || [];
+      const projs = employeeProjects.projects_by_client[c] || []; // [] for "Other" — no fixed project list
       clientCols[c] = projs.map(p => p.project_name);
       projs.forEach(p => projectCodeLookup.push([p.project_name, p.project_code]));
     });
@@ -5377,16 +4931,47 @@ async function downloadSampleTemplate() {
     const lookupNames = projectCodeLookup.map(p => p[0]);
     const lookupCodes = projectCodeLookup.map(p => p[1]);
 
-    // Fixed columns A-H, per-client project columns I+, lookup pair at X(23) & Y(24)
+    // ── Populate the plain Client-Project List reference tab ──
+    if (refWS) {
+      refWS.getCell('A1').value =
+        'Use Ctrl+F to search for a Client or Project name below, then go back to the Timesheet tab ' +
+        'and pick the matching entry from the dropdown in your row.';
+      refWS.getCell('A1').font = { italic: true, size: 10, color: { argb: 'FF6B7280' } };
+      refWS.mergeCells('A1:C1');
+      refWS.getRow(1).height = 30;
+      refWS.getCell('A1').alignment = { wrapText: true, vertical: 'middle' };
+
+      const refHeaderRow = refWS.addRow(['Client', 'Project', 'Project Code']);
+      refHeaderRow.font = { bold: true };
+      refHeaderRow.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
+
+      clients.forEach(c => {
+        if (c === 'Other') return; // "Other" has no fixed project list to reference
+        const projs = employeeProjects.projects_by_client[c] || [];
+        if (!projs.length) {
+          refWS.addRow([c, '', '']);
+        } else {
+          projs.forEach(p => refWS.addRow([c, p.project_name, p.project_code]));
+        }
+      });
+
+      refWS.views = [{ state: 'frozen', ySplit: 2 }];
+      refWS.getColumn(1).width = 40;
+      refWS.getColumn(2).width = 50;
+      refWS.getColumn(3).width = 16;
+    }
+
+    // Column 1 (was "Week Periods") is intentionally left unused now that
+    // week-wise grouping has been removed. Fixed columns B-H, per-client
+    // project columns I+, lookup pair at X(24) & Y(25).
     const maxRows = Math.max(
-      weekPeriodValues.length, dateValues.length, locations.length,
+      dateValues.length, locations.length,
       billable.length, lunch.length, travel.length, clients.length,
       managers.length, 1, ...clients.map(c => clientCols[c].length), lookupNames.length
     );
 
-    metaWS.addRow(['Week Periods','Dates','Locations','Billables','Lunch','Travel','Clients','Managers']);
+    metaWS.addRow(['', 'Dates','Locations','Billables','Lunch','Travel','Clients','Managers']);
     for (let r = 0; r < maxRows; r++) {
-      metaWS.getCell(r + 2, 1).value = weekPeriodValues[r] || '';
       metaWS.getCell(r + 2, 2).value = dateValues[r]       || '';
       metaWS.getCell(r + 2, 3).value = locations[r]        || '';
       metaWS.getCell(r + 2, 4).value = billable[r]         || '';
@@ -5427,6 +5012,20 @@ async function downloadSampleTemplate() {
       });
     }
 
+    // bufferRows gives room for a handful of extra manually-added rows beyond
+    // the cycle's actual dates, without ballooning the file with hundreds of
+    // unused (but styled/validated) rows.
+    const bufferRows = lastDateRow + 60;
+
+    // Plain informational text below the table — no formula, no input cell,
+    // just a pointer to the searchable reference tab. Can never break.
+    if (!freeTextClientProject) {
+      const noteCell = ws.getCell(`A${bufferRows + 2}`);
+      noteCell.value = 'Looking for a specific Client or Project? See the "Client-Project List" tab — press Ctrl+F there to search.';
+      noteCell.font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
+      noteCell.protection = { locked: true };
+    }
+
     // ── Data validations (strict: errorStyle 'error' blocks anything not on the list) ──
     const strictList = (formula1, allowBlank = true) => ({
       type: 'list',
@@ -5439,12 +5038,18 @@ async function downloadSampleTemplate() {
     });
 
     const clientsEnd = Math.max(clients.length + 1, 2);
-    const dvWeek     = strictList(`MetadataLists!$A$2:$A$${weekPeriodValues.length + 1}`);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
     const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
     const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
     const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
+    // Plain static strict list — Excel dropdowns can't live-filter based on
+    // their own in-progress typed text without a dynamic-array function
+    // (FILTER), which many real-world Excel installs don't have (notably
+    // Microsoft Office LTSC, which is permanently frozen without it — no
+    // future update adds it). A live-search dropdown isn't reliably
+    // achievable here, so this stays the plain, always-works list, same as
+    // the app's own dropdown, with "Other" as the last option.
     const dvClient   = freeTextClientProject ? null : strictList(`MetadataLists!$G$2:$G$${clientsEnd}`);
     // Non-strict: shows the SS-team list as a dropdown but doesn't reject
     // typed text, so "Type Here" behaves the same as it does in the app —
@@ -5465,53 +5070,56 @@ async function downloadSampleTemplate() {
       formulae: [0, 0.9999884259259259]
     };
 
-    // bufferRows gives room for a handful of extra manually-added rows beyond
-    // the cycle's actual dates, without ballooning the file with hundreds of
-    // unused (but styled/validated) rows.
-    const bufferRows = lastDateRow + 60;
+    // (bufferRows was computed earlier, alongside the search-helper block)
     for (let r = 2; r <= bufferRows; r++) {
-      ws.getCell(`G${r}`).dataValidation  = dvWeek;
-      ws.getCell(`H${r}`).dataValidation  = dvDate;
-      ws.getCell(`I${r}`).dataValidation  = dvLocation;
+      ws.getCell(`G${r}`).dataValidation  = dvDate;
+      ws.getCell(`H${r}`).dataValidation  = dvLocation;
+      ws.getCell(`I${r}`).dataValidation  = dvTime;
       ws.getCell(`J${r}`).dataValidation  = dvTime;
-      ws.getCell(`K${r}`).dataValidation  = dvTime;
-      if (dvClient) ws.getCell(`L${r}`).dataValidation = dvClient;
-      if (dvSSProjectCode) ws.getCell(`N${r}`).dataValidation = dvSSProjectCode;
+      if (dvClient) ws.getCell(`K${r}`).dataValidation = dvClient;
+      if (dvSSProjectCode) ws.getCell(`M${r}`).dataValidation = dvSSProjectCode;
       // Project's dependent-dropdown formula must reference *this* row's
-      // Client cell explicitly (MATCH(L{r}, ...)) rather than a single
-      // shared "L2" — ExcelJS splits a 500-row range into several XML
+      // Client cell explicitly (MATCH(K{r}, ...)) rather than a single
+      // shared reference — ExcelJS splits a 500-row range into several XML
       // <dataValidation> blocks internally, and each block re-anchors its
-      // relative references to its own first row, not row 2. A shared "L2"
-      // formula silently produced wrong (or empty) results for every row
-      // past the first block, which is why Project stopped working partway
-      // down the sheet. A per-row literal formula sidesteps that entirely.
+      // relative references to its own first row. A shared formula silently
+      // produced wrong (or empty) results for every row past the first
+      // block, which is why Project stopped working partway down the sheet.
+      // A per-row literal formula sidesteps that entirely. Non-strict (not
+      // errorStyle 'error') so a Client of "Other" — which has no fixed
+      // project list — can still be typed into freely.
       if (!freeTextClientProject) {
-        ws.getCell(`M${r}`).dataValidation =
-          strictList(`INDIRECT("Client_"&MATCH(L${r},MetadataLists!$G$2:$G$${clientsEnd},0))`);
+        ws.getCell(`L${r}`).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: false,
+          formulae: [`INDIRECT("Client_"&MATCH(K${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
+        };
       }
-      ws.getCell(`R${r}`).dataValidation  = dvBillable;
-      ws.getCell(`S${r}`).dataValidation  = dvLunch;
-      ws.getCell(`T${r}`).dataValidation  = dvTravel;
+      ws.getCell(`Q${r}`).dataValidation  = dvBillable;
+      ws.getCell(`R${r}`).dataValidation  = dvLunch;
+      ws.getCell(`S${r}`).dataValidation  = dvTravel;
     }
 
-    // ── VLOOKUP formula for Project Code (Column N) — skipped for the
-    // free-text partner, whose Project Code column is plain typed text ──
+    // ── Project Code formula (Column M) — auto-fills "Other" when Client is
+    // "Other", otherwise looks the code up from the picked Project. Skipped
+    // for the free-text partner, whose Project Code column is plain typed text ──
     if (!freeTextClientProject) {
       const lookupEnd = Math.max(lookupNames.length + 1, 2);
       for (let r = 2; r <= lastDateRow; r++) {
-        ws.getCell(`N${r}`).value = { formula: `IFERROR(VLOOKUP(M${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),"")` };
+        ws.getCell(`M${r}`).value = {
+          formula: `IF(K${r}="Other","Other",IFERROR(VLOOKUP(L${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
+        };
       }
     }
 
-    // ── Lock Project Code so it can only ever be auto-populated by picking
-    // a Project (not for the free-text partner, who has no fixed project
-    // list to look codes up from) — every other data column stays editable.
-    // Every cell's protection is set explicitly (never left at the default):
-    // ExcelJS appears to share a default style object across untouched cells,
-    // so leaving one column "untouched" let it silently pick up whatever
+    // ── Lock Project Code so it can only ever be auto-populated (not for
+    // the free-text partner, who has no fixed project list to look codes up
+    // from) — every other data column stays editable. Every cell's
+    // protection is set explicitly (never left at the default): ExcelJS
+    // appears to share a default style object across untouched cells, so
+    // leaving one column "untouched" let it silently pick up whatever
     // locked state a neighboring cell happened to set. ──
-    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','AA'];
-    const lockedCols = freeTextClientProject ? [] : ['N'];
+    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+    const lockedCols = freeTextClientProject ? [] : ['M'];
     for (let r = 2; r <= bufferRows; r++) {
       allDataCols.forEach(col => {
         ws.getCell(`${col}${r}`).protection = { locked: lockedCols.includes(col) };
@@ -5527,7 +5135,7 @@ async function downloadSampleTemplate() {
     });
 
     // Reasonable column widths so the template reads like the app, not a raw dump
-    const widths = [12,18,14,10,14,18,20,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
+    const widths = [12,18,14,10,14,18,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     const cycleLabel = _selectedCycle.cycle_label.replace(/[^a-zA-Z0-9]/g, '_');

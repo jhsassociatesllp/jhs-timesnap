@@ -12,22 +12,24 @@ New unified document structure (one doc per employee):
       "submitted": false,
       "submitted_at": null,
       "metadata": { "hits": "", "misses": "", "feedback_hr": "", ... },
-      "weeks": [
-        {
-          "week_period": "21/04/2026 to 26/04/2026",
-          "entries": [ { "id": "...", "date": "...", ... } ]
-        }
-      ]
+      "entries": [ { "id": "...", "date": "...", ... } ]
     }
   ],
   "updated_time": "...",
   "created_time": "..."
 }
+
+Entries are flat under each payroll — there is no week-wise grouping. Older
+documents written before this change may still have their entries nested
+under a "weeks": [{"week_period": ..., "entries": [...]}] list instead;
+_get_payroll_entries() transparently flattens those on read, and any
+mutating endpoint (save-draft, update, delete, submit) rewrites the payroll
+in the flat shape, so a document migrates itself the next time it's touched.
 """
 import hashlib
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from bson import ObjectId
@@ -92,29 +94,32 @@ def add_or_create(collection, reporting_emp_code: str, reporting_emp_name: str, 
         })
 
 
+def _get_payroll_entries(payroll: dict) -> list:
+    """Flat entries for a payroll. New documents store them directly under
+    "entries"; older documents still have them nested under "weeks" —
+    flatten those transparently so both shapes read the same."""
+    if "entries" in payroll:
+        return payroll.get("entries") or []
+    entries = []
+    for w in payroll.get("weeks", []) or []:
+        entries.extend(w.get("entries", []) or [])
+    return entries
+
+
+def _normalize_payroll_entries(payroll: dict) -> list:
+    """Like _get_payroll_entries, but also migrates the payroll dict in
+    place to the flat shape (drops "weeks") so the next save stays flat."""
+    entries = _get_payroll_entries(payroll)
+    payroll["entries"] = entries
+    payroll.pop("weeks", None)
+    return entries
+
+
 def recalc_totals_from_payrolls(payrolls: list) -> tuple:
     """Recalc totals for the entire document (sum of all payrolls)."""
     total = billable = non_billable = 0.0
     for payroll in payrolls:
-        for week in payroll.get("weeks", []):
-            for e in week.get("entries", []):
-                try:
-                    hrs = float(e.get("projectHours", 0))
-                except (ValueError, TypeError):
-                    hrs = 0.0
-                total += hrs
-                if e.get("billable") == "Yes":
-                    billable += hrs
-                elif e.get("billable") == "No":
-                    non_billable += hrs
-    return round(total, 2), round(billable, 2), round(non_billable, 2)
-
-
-def recalc_payroll_totals(payroll: dict) -> tuple:
-    """Recalc totals for a single payroll."""
-    total = billable = non_billable = 0.0
-    for week in payroll.get("weeks", []):
-        for e in week.get("entries", []):
+        for e in _get_payroll_entries(payroll):
             try:
                 hrs = float(e.get("projectHours", 0))
             except (ValueError, TypeError):
@@ -124,6 +129,22 @@ def recalc_payroll_totals(payroll: dict) -> tuple:
                 billable += hrs
             elif e.get("billable") == "No":
                 non_billable += hrs
+    return round(total, 2), round(billable, 2), round(non_billable, 2)
+
+
+def recalc_payroll_totals(payroll: dict) -> tuple:
+    """Recalc totals for a single payroll."""
+    total = billable = non_billable = 0.0
+    for e in _get_payroll_entries(payroll):
+        try:
+            hrs = float(e.get("projectHours", 0))
+        except (ValueError, TypeError):
+            hrs = 0.0
+        total += hrs
+        if e.get("billable") == "Yes":
+            billable += hrs
+        elif e.get("billable") == "No":
+            non_billable += hrs
     return round(total, 2), round(billable, 2), round(non_billable, 2)
 
 
@@ -138,19 +159,10 @@ def _get_or_create_payroll(payrolls: list, cycle_id: str, cycle_label: str) -> d
         "submitted": False,
         "submitted_at": None,
         "metadata": {},
-        "weeks": [],
+        "entries": [],
     }
     payrolls.append(new_payroll)
     return new_payroll
-
-
-def _upsert_week(payroll: dict, week_period: str, entries: list):
-    """Replace or add a week's entries in a payroll."""
-    for w in payroll["weeks"]:
-        if w["week_period"] == week_period:
-            w["entries"] = entries
-            return
-    payroll["weeks"].append({"week_period": week_period, "entries": entries})
 
 
 # ───────────────────────────── routes ────────────────────────────────────────
@@ -159,12 +171,11 @@ def _upsert_week(payroll: dict, week_period: str, entries: list):
 async def save_draft(
     cycle_id: str = Body(...),
     cycle_label: str = Body(...),
-    week_period: str = Body(...),
     entries: list = Body(...),
     metadata: dict = Body(default={}),
     current_user: str = Depends(get_current_user),
 ):
-    """Save one week's entries as draft (Timesheet_temp). New unified structure."""
+    """Save the whole cycle's entries as draft (Timesheet_temp), flat — no week grouping."""
     now_iso = datetime.utcnow().isoformat()
 
     # Validate lunch time if required by this cycle
@@ -207,6 +218,9 @@ async def save_draft(
 
     # Non-JHS01 partners must use real Nexus Quant project codes (all start
     # with "PL"). Day-off rows have no project to charge, so they're exempt.
+    # A row where the employee picked "Other" as the Client (no matching
+    # project in their assigned list) is exempt from the PL-prefix rule too,
+    # but must have its Project Code literally set to "Other".
     employee = employee_details_collection.find_one({"EmpID": current_user})
     partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
     if partner_code != FREE_TEXT_PARTNER_CODE:
@@ -214,7 +228,12 @@ async def save_draft(
         for i, entry in enumerate(entries):
             if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
                 continue
+            client = (entry.get("client", "") or "").strip().upper()
             code = (entry.get("projectCode", "") or "").strip().upper()
+            if client == "OTHER":
+                if code != "OTHER":
+                    code_errors.append(f'Row {i + 1}: project code must be "Other" when Client is "Other"')
+                continue
             if not code.startswith("PL"):
                 code_errors.append(f"Row {i + 1}: project code must start with \"PL\" (Nexus Quant only)")
         if code_errors:
@@ -234,7 +253,8 @@ async def save_draft(
     if doc:
         payrolls = doc.get("payrolls", [])
         payroll = _get_or_create_payroll(payrolls, cycle_id, cycle_label)
-        _upsert_week(payroll, week_period, new_entries)
+        payroll["entries"] = new_entries
+        payroll.pop("weeks", None)
         if metadata:
             payroll["metadata"] = metadata
         timesheet_temp_collection.update_one(
@@ -248,7 +268,7 @@ async def save_draft(
             "submitted": False,
             "submitted_at": None,
             "metadata": metadata or {},
-            "weeks": [{"week_period": week_period, "entries": new_entries}],
+            "entries": new_entries,
         }
         timesheet_temp_collection.insert_one({
             "employeeId": current_user,
@@ -257,7 +277,7 @@ async def save_draft(
             "updated_time": now_iso,
         })
 
-    return {"success": True, "message": f"Week '{week_period}' saved as draft"}
+    return {"success": True, "message": "Draft saved"}
 
 
 @router.get("/draft/{employee_id}")
@@ -278,6 +298,9 @@ async def get_draft(
     # Find the specific payroll
     for p in doc.get("payrolls", []):
         if p.get("cycle_id") == cycle_id:
+            p = dict(p)
+            p["entries"] = _get_payroll_entries(p)
+            p.pop("weeks", None)
             return {"draft": p, "submitted": p.get("submitted", False)}
 
     return {"draft": None, "submitted": False}
@@ -332,6 +355,34 @@ async def submit_timesheet(
 
     emp_id = current_user
     meta = temp_payroll.get("metadata") or metadata or {}
+    temp_entries = _get_payroll_entries(temp_payroll)
+
+    # ── Day-completeness gate ────────────────────────────────────────────
+    # Every calendar day in the payroll cycle must have at least one entry
+    # row before the timesheet can be submitted (a Leave/Week Off/PHY row
+    # still counts — this only checks a row exists for the date, not that
+    # its other fields are filled in, which is enforced at save-draft time).
+    from backend.database import payroll_cycles_collection
+    try:
+        cycle_doc = payroll_cycles_collection.find_one({"_id": ObjectId(cycle_id)})
+    except Exception:
+        cycle_doc = None
+    if cycle_doc and cycle_doc.get("start_date") and cycle_doc.get("end_date"):
+        start_d = datetime.fromisoformat(str(cycle_doc["start_date"])[:10])
+        end_d = datetime.fromisoformat(str(cycle_doc["end_date"])[:10])
+        required_dates = set()
+        d = start_d
+        while d <= end_d:
+            required_dates.add(d.strftime("%Y-%m-%d"))
+            d += timedelta(days=1)
+        present_dates = {(e.get("date", "") or "")[:10] for e in temp_entries if e.get("date")}
+        missing_dates = sorted(required_dates - present_dates)
+        if missing_dates:
+            extra = f" and {len(missing_dates) - 10} more" if len(missing_dates) > 10 else ""
+            raise HTTPException(
+                400,
+                "Cannot submit — missing entries for: " + ", ".join(missing_dates[:10]) + extra,
+            )
 
     # ── TL project-plan gate ──────────────────────────────────────────────
     # TLs (reporting managers) must have a valid project plan — matching both
@@ -345,26 +396,29 @@ async def submit_timesheet(
     if is_tl and partner_code != FREE_TEXT_PARTNER_CODE:
         plan_cache = {}
         plan_errors = []
-        for week in temp_payroll.get("weeks", []):
-            for entry in week.get("entries", []):
-                location = (entry.get("location", "") or "").strip()
-                if location in DAY_OFF_LOCATIONS:
-                    continue
-                code = (entry.get("projectCode", "") or "").strip().upper()
-                entry_date_str = entry.get("date", "") or ""
-                if code not in plan_cache:
-                    plan_cache[code] = _lookup_project_plan(code)
-                has_plan, plan_start, plan_end = plan_cache[code]
-                if not has_plan:
-                    plan_errors.append(f'{entry_date_str}: no project plan found for code "{code}"')
-                    continue
-                try:
-                    entry_date = datetime.fromisoformat(entry_date_str[:10])
-                except (ValueError, TypeError):
-                    plan_errors.append(f"{entry_date_str}: invalid entry date")
-                    continue
-                if (plan_start and entry_date.date() < plan_start.date()) or (plan_end and entry_date.date() > plan_end.date()):
-                    plan_errors.append(f'{entry_date_str}: outside the project plan window for "{code}"')
+        for entry in temp_entries:
+            location = (entry.get("location", "") or "").strip()
+            if location in DAY_OFF_LOCATIONS:
+                continue
+            # "Other" entries have no fixed project to look up a plan for —
+            # same exemption as the PL-prefix check at save-draft time.
+            if (entry.get("client", "") or "").strip().upper() == "OTHER":
+                continue
+            code = (entry.get("projectCode", "") or "").strip().upper()
+            entry_date_str = entry.get("date", "") or ""
+            if code not in plan_cache:
+                plan_cache[code] = _lookup_project_plan(code)
+            has_plan, plan_start, plan_end = plan_cache[code]
+            if not has_plan:
+                plan_errors.append(f'{entry_date_str}: no project plan found for code "{code}"')
+                continue
+            try:
+                entry_date = datetime.fromisoformat(entry_date_str[:10])
+            except (ValueError, TypeError):
+                plan_errors.append(f"{entry_date_str}: invalid entry date")
+                continue
+            if (plan_start and entry_date.date() < plan_start.date()) or (plan_end and entry_date.date() > plan_end.date()):
+                plan_errors.append(f'{entry_date_str}: outside the project plan window for "{code}"')
         if plan_errors:
             raise HTTPException(
                 400,
@@ -389,38 +443,23 @@ async def submit_timesheet(
             "submitted": False,
             "submitted_at": None,
             "metadata": meta,
-            "weeks": [],
+            "entries": [],
         }
         existing_payrolls.append(main_payroll)
 
-    # Collect existing hashes
-    existing_hashes = set()
-    for w in main_payroll.get("weeks", []):
-        for e in w.get("entries", []):
-            existing_hashes.add(compute_entry_hash(e))
+    main_entries = _get_payroll_entries(main_payroll)
+    existing_hashes = {compute_entry_hash(e) for e in main_entries}
 
     added = 0
-    for week in temp_payroll.get("weeks", []):
-        week_period = week["week_period"]
-        filtered = []
-        for e in week.get("entries", []):
-            h = compute_entry_hash(e)
-            if h not in existing_hashes:
-                filtered.append(e)
-                existing_hashes.add(h)
-                added += 1
-        if not filtered:
-            continue
-        # Find or create week in main payroll
-        found = False
-        for mw in main_payroll["weeks"]:
-            if mw["week_period"] == week_period:
-                mw["entries"].extend(filtered)
-                found = True
-                break
-        if not found:
-            main_payroll["weeks"].append({"week_period": week_period, "entries": filtered})
+    for e in temp_entries:
+        h = compute_entry_hash(e)
+        if h not in existing_hashes:
+            main_entries.append(e)
+            existing_hashes.add(h)
+            added += 1
 
+    main_payroll["entries"] = main_entries
+    main_payroll.pop("weeks", None)
     main_payroll["submitted"] = True
     main_payroll["submitted_at"] = now_iso
     main_payroll["metadata"] = meta
@@ -485,7 +524,7 @@ async def submit_timesheet(
 
 @router.get("/list/{employee_id}")
 async def get_timesheets(employee_id: str, current_user: str = Depends(get_current_user)):
-    """Return all payrolls with their weeks and entries."""
+    """Return all payrolls with their flat entries."""
     if employee_id != current_user:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -502,38 +541,31 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
     # Fetch payroll cycles to get show_lunch_travel flag
     from backend.database import payroll_cycles_collection
     from bson import ObjectId as BsonObjectId
-    
+
     payrolls_out = []
     for p in doc.get("payrolls", []):
-        weeks_out = []
-        for w in p.get("weeks", []):
-            entries_out = []
-            for e in w.get("entries", []):
-                entries_out.append({
-                    **e,
-                    "weekPeriod": w["week_period"],
-                    "cycle_id": p["cycle_id"],
-                    "cycle_label": p.get("cycle_label", ""),
-                    "submitted": p.get("submitted", False),
-                    "submitted_at": p.get("submitted_at"),
-                    "employeeId": doc.get("employeeId", ""),
-                    "employeeName": doc.get("employeeName", ""),
-                    "designation": doc.get("designation", ""),
-                    "reportingManager": doc.get("reportingManager", ""),
-                    "hits": p.get("metadata", {}).get("hits", ""),
-                    "misses": p.get("metadata", {}).get("misses", ""),
-                    "feedback_hr": p.get("metadata", {}).get("feedback_hr", ""),
-                    "feedback_it": p.get("metadata", {}).get("feedback_it", ""),
-                    "feedback_crm": p.get("metadata", {}).get("feedback_crm", ""),
-                    "feedback_others": p.get("metadata", {}).get("feedback_others", ""),
-                    "idle_time": p.get("metadata", {}).get("idle_time", ""),
-                    "idle_time_status": p.get("metadata", {}).get("idle_time_status", ""),
-                    "idle_time_hours": p.get("metadata", {}).get("idle_time_hours", ""),
-                    "idle_time_reason": p.get("metadata", {}).get("idle_time_reason", ""),
-                })
-            weeks_out.append({
-                "week_period": w["week_period"],
-                "entries": entries_out,
+        entries_out = []
+        for e in _get_payroll_entries(p):
+            entries_out.append({
+                **e,
+                "cycle_id": p["cycle_id"],
+                "cycle_label": p.get("cycle_label", ""),
+                "submitted": p.get("submitted", False),
+                "submitted_at": p.get("submitted_at"),
+                "employeeId": doc.get("employeeId", ""),
+                "employeeName": doc.get("employeeName", ""),
+                "designation": doc.get("designation", ""),
+                "reportingManager": doc.get("reportingManager", ""),
+                "hits": p.get("metadata", {}).get("hits", ""),
+                "misses": p.get("metadata", {}).get("misses", ""),
+                "feedback_hr": p.get("metadata", {}).get("feedback_hr", ""),
+                "feedback_it": p.get("metadata", {}).get("feedback_it", ""),
+                "feedback_crm": p.get("metadata", {}).get("feedback_crm", ""),
+                "feedback_others": p.get("metadata", {}).get("feedback_others", ""),
+                "idle_time": p.get("metadata", {}).get("idle_time", ""),
+                "idle_time_status": p.get("metadata", {}).get("idle_time_status", ""),
+                "idle_time_hours": p.get("metadata", {}).get("idle_time_hours", ""),
+                "idle_time_reason": p.get("metadata", {}).get("idle_time_reason", ""),
             })
 
         # Per-payroll totals (stored in payroll or recalculated)
@@ -562,7 +594,7 @@ async def get_timesheets(employee_id: str, current_user: str = Depends(get_curre
             "totalBillableHours": p_billable,
             "totalNonBillableHours": p_non_billable,
             "show_lunch_travel": show_lunch_travel,
-            "weeks": weeks_out,
+            "entries": entries_out,
         })
 
     return {
@@ -588,13 +620,11 @@ async def update_timesheet(
 
     updated = False
     for p in doc.get("payrolls", []):
-        for w in p.get("weeks", []):
-            for i, entry in enumerate(w.get("entries", [])):
-                if entry.get("id") == entry_id:
-                    w["entries"][i] = {**entry, **update_data.dict(exclude_none=True), "updated_time": now_iso, "id": entry_id}
-                    updated = True
-                    break
-            if updated:
+        entries = _normalize_payroll_entries(p)
+        for i, entry in enumerate(entries):
+            if entry.get("id") == entry_id:
+                entries[i] = {**entry, **update_data.dict(exclude_none=True), "updated_time": now_iso, "id": entry_id}
+                updated = True
                 break
         if updated:
             break
@@ -635,12 +665,11 @@ async def delete_timesheet(
 
     found = False
     for p in doc.get("payrolls", []):
-        for w in p.get("weeks", []):
-            orig_len = len(w.get("entries", []))
-            w["entries"] = [e for e in w.get("entries", []) if e.get("id") != entry_id]
-            if len(w["entries"]) != orig_len:
-                found = True
-        p["weeks"] = [w for w in p.get("weeks", []) if w.get("entries")]
+        entries = _normalize_payroll_entries(p)
+        orig_len = len(entries)
+        p["entries"] = [e for e in entries if e.get("id") != entry_id]
+        if len(p["entries"]) != orig_len:
+            found = True
 
     if not found:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -685,7 +714,10 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
     if not partner_code:
         return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
-    projects = list(db["Projects"].find({"partner_emp_code": partner_code}))
+    # Company-wide: every client/project is available to every dropdown-mode
+    # employee, not just the ones belonging to their own partner — they pick
+    # a client first, which then narrows the project list to that client's own.
+    projects = list(db["Projects"].find({}))
     projects_by_client: dict = {}
     for p in projects:
         client = p.get("client_name", "").strip()
@@ -787,24 +819,22 @@ async def get_employee_timesheet_for_manager(
             continue  # skip other cycles when a specific one is requested
         cycle_label_shown = p.get("cycle_label", "")
         meta = p.get("metadata", {}) or {}
-        for w in p.get("weeks", []):
-            for e in w.get("entries", []):
-                entries.append({
-                    "weekPeriod": w["week_period"],
-                    "cycle_label": p.get("cycle_label", ""),
-                    "date": e.get("date", ""),
-                    "client": e.get("client", ""),
-                    "project": e.get("project", ""),
-                    "activity": e.get("activity", ""),
-                    "location": e.get("location", ""),
-                    "start_time": e.get("projectStartTime", ""),
-                    "end_time": e.get("projectEndTime", ""),
-                    "hours": e.get("projectHours", ""),
-                    "billable": e.get("billable", ""),
-                    "lunchTime": e.get("lunchTime", ""),
-                    "travelTime": e.get("travelTime", ""),
-                    "remarks": e.get("remarks", ""),
-                })
+        for e in _get_payroll_entries(p):
+            entries.append({
+                "cycle_label": p.get("cycle_label", ""),
+                "date": e.get("date", ""),
+                "client": e.get("client", ""),
+                "project": e.get("project", ""),
+                "activity": e.get("activity", ""),
+                "location": e.get("location", ""),
+                "start_time": e.get("projectStartTime", ""),
+                "end_time": e.get("projectEndTime", ""),
+                "hours": e.get("projectHours", ""),
+                "billable": e.get("billable", ""),
+                "lunchTime": e.get("lunchTime", ""),
+                "travelTime": e.get("travelTime", ""),
+                "remarks": e.get("remarks", ""),
+            })
 
     return {
         "employee_id": doc.get("employeeId"),

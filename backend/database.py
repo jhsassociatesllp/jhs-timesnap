@@ -56,7 +56,8 @@ appraisal_collection          = appraisal_db["Appraisal_data"]
 payroll_cycles_collection     = db["payroll_cycles"]
 
 # ── timesheet temp (draft) collection ────────────────────────────────────────
-# One doc per employee per cycle:
-# { employeeId, cycle_id, cycle_label, Data: [{weekPeriod: [entries]}],
-#   submitted: false, metadata: {empName, designation, ...} }
+# One doc per employee: { employeeId, payrolls: [{ cycle_id, cycle_label,
+#   submitted, entries: [ {id, date, ...} ], metadata: {empName, ...} }] }
+# Entries are flat (no week grouping) — see backend/timesheet/router.py's
+# module docstring for the full shape and the read-side backward-compat note.
 timesheet_temp_collection     = db["Timesheet_temp"]

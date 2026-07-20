@@ -205,6 +205,15 @@ body{
 }
 .copy-btn:hover,.paste-btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-medium); }
 
+.add-entry-btn{
+    background:#10b981; color:white; border:none;
+    padding:.3rem .55rem; border-radius:6px; cursor:pointer;
+    font-size:.85rem; margin:0 .2rem; transition:var(--transition);
+    box-shadow:var(--shadow-light);
+    display:inline-flex; align-items:center; justify-content:center;
+}
+.add-entry-btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-medium); background:#0ea371; }
+
 .edit-btn,.delete-btn{
     background:var(--secondary-gradient); color:white; border:none;
     padding:.3rem .7rem; border-radius:6px; cursor:pointer;
@@ -391,7 +400,7 @@ body{
 .col-wide{ width:200px; }
 .col-client{ width:250px; }
 .col-project{ width:200px; }
-.col-action{ min-width:120px; }
+.col-action{ min-width:170px; }
 
 /* ── History Cards ── */
 .history-payroll-card { transition: box-shadow .2s, transform .15s; }
