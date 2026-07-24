@@ -30,6 +30,13 @@ pending_collection            = db["Pending"]
 approved_collection           = db["Approved"]
 rejected_collection           = db["Rejected"]
 
+# ── approval audit trail ──────────────────────────────────────────────────────
+# Append-only log of submit/resubmit/reject/approve events, one document per
+# event: { employeeId, employeeName, cycle_id, cycle_label, action, actor_code,
+#   actor_name, reason, timestamp }. Powers the manager-facing history tracker
+# and future analytics (e.g. rejection frequency per employee per month).
+approval_history_collection   = db["Approval_History"]
+
 # ── admin collections ─────────────────────────────────────────────────────────
 admin_details_collection      = db["admin_details"]
 appraisal_admin_collection = appraisal_db["Admin"]

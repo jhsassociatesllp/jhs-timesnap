@@ -26,8 +26,6 @@ _get_payroll_entries() transparently flattens those on read, and any
 mutating endpoint (save-draft, update, delete, submit) rewrites the payroll
 in the flat shape, so a document migrates itself the next time it's touched.
 """
-import hashlib
-import json
 import re
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -44,6 +42,7 @@ from backend.database import (
     approved_collection,
     rejected_collection,
     reporting_managers_collection,
+    approval_history_collection,
     db,
 )
 from backend.auth import get_current_user
@@ -66,15 +65,6 @@ DAY_OFF_LOCATIONS = {"Leave", "PHY", "Week Off"}
 
 
 # ─────────────────────────── helpers ────────────────────────────────────────
-
-def compute_entry_hash(entry: dict) -> str:
-    key = {k: entry.get(k, "") for k in [
-        "date", "location", "projectStartTime", "projectEndTime",
-        "client", "project", "projectCode", "reportingManagerEntry",
-        "activity", "projectHours", "billable", "remarks",
-        "lunchTime", "travelTime",
-    ]}
-    return hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
 
 
 def add_or_create(collection, reporting_emp_code: str, reporting_emp_name: str, employee_code: str):
@@ -175,69 +165,14 @@ async def save_draft(
     metadata: dict = Body(default={}),
     current_user: str = Depends(get_current_user),
 ):
-    """Save the whole cycle's entries as draft (Timesheet_temp), flat — no week grouping."""
+    """Save the whole cycle's entries as draft (Timesheet_temp), flat — no week grouping.
+
+    A draft save persists whatever the user has filled in so far, with no
+    completeness checks — those (lunch time, mandatory fields, PL-prefix
+    codes) are enforced at submit time instead, so partially-filled rows
+    never block saving progress.
+    """
     now_iso = datetime.utcnow().isoformat()
-
-    # Validate lunch time if required by this cycle
-    from backend.database import payroll_cycles_collection
-    show_lunch_travel = True
-    try:
-        cycle_doc = payroll_cycles_collection.find_one({"_id": ObjectId(cycle_id)})
-        if cycle_doc:
-            show_lunch_travel = cycle_doc.get("show_lunch_travel", True)
-    except Exception:
-        pass
-
-    if show_lunch_travel:
-        lunch_errors = []
-        for i, entry in enumerate(entries):
-            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
-                continue  # not a working day — lunch time isn't applicable
-            lt = entry.get("lunchTime", "") or ""
-            if not lt.strip():
-                lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
-        if lunch_errors:
-            raise HTTPException(400, "; ".join(lunch_errors[:5]))
-
-    # Mandatory fields for working-day rows — mirrors the frontend's check,
-    # but enforced here too so a bad upload/manual entry can't slip past a
-    # client-side bug (or a direct API call) and land in the draft.
-    mandatory_fields = [
-        "date", "projectStartTime", "projectEndTime", "client", "project",
-        "projectCode", "reportingManagerEntry", "activity",
-    ]
-    field_errors = []
-    for i, entry in enumerate(entries):
-        if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
-            continue
-        for field in mandatory_fields:
-            if not (entry.get(field, "") or "").strip():
-                field_errors.append(f"Row {i + 1}: {field} is required")
-    if field_errors:
-        raise HTTPException(400, "; ".join(field_errors[:5]))
-
-    # Non-JHS01 partners must use real Nexus Quant project codes (all start
-    # with "PL"). Day-off rows have no project to charge, so they're exempt.
-    # A row where the employee picked "Other" as the Client (no matching
-    # project in their assigned list) is exempt from the PL-prefix rule too,
-    # but must have its Project Code literally set to "Other".
-    employee = employee_details_collection.find_one({"EmpID": current_user})
-    partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
-    if partner_code != FREE_TEXT_PARTNER_CODE:
-        code_errors = []
-        for i, entry in enumerate(entries):
-            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
-                continue
-            client = (entry.get("client", "") or "").strip().upper()
-            code = (entry.get("projectCode", "") or "").strip().upper()
-            if client == "OTHER":
-                if code != "OTHER":
-                    code_errors.append(f'Row {i + 1}: project code must be "Other" when Client is "Other"')
-                continue
-            if not code.startswith("PL"):
-                code_errors.append(f"Row {i + 1}: project code must start with \"PL\" (Nexus Quant only)")
-        if code_errors:
-            raise HTTPException(400, "; ".join(code_errors[:5]))
 
     # Assign IDs to entries
     new_entries = []
@@ -357,16 +292,70 @@ async def submit_timesheet(
     meta = temp_payroll.get("metadata") or metadata or {}
     temp_entries = _get_payroll_entries(temp_payroll)
 
-    # ── Day-completeness gate ────────────────────────────────────────────
-    # Every calendar day in the payroll cycle must have at least one entry
-    # row before the timesheet can be submitted (a Leave/Week Off/PHY row
-    # still counts — this only checks a row exists for the date, not that
-    # its other fields are filled in, which is enforced at save-draft time).
     from backend.database import payroll_cycles_collection
     try:
         cycle_doc = payroll_cycles_collection.find_one({"_id": ObjectId(cycle_id)})
     except Exception:
         cycle_doc = None
+
+    # ── Lunch-time gate ─────────────────────────────────────────────────
+    show_lunch_travel = cycle_doc.get("show_lunch_travel", True) if cycle_doc else True
+    if show_lunch_travel:
+        lunch_errors = []
+        for i, entry in enumerate(temp_entries):
+            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+                continue  # not a working day — lunch time isn't applicable
+            lt = entry.get("lunchTime", "") or ""
+            if not lt.strip():
+                lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
+        if lunch_errors:
+            raise HTTPException(400, "Cannot submit — " + "; ".join(lunch_errors[:5]))
+
+    # ── Mandatory fields gate ───────────────────────────────────────────
+    # Every working-day row must be fully filled in before the timesheet can
+    # be submitted (draft saves allow partial rows; this is the final check).
+    mandatory_fields = [
+        "date", "projectStartTime", "projectEndTime", "client", "project",
+        "projectCode", "reportingManagerEntry", "activity",
+    ]
+    field_errors = []
+    for i, entry in enumerate(temp_entries):
+        if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+            continue
+        for field in mandatory_fields:
+            if not (entry.get(field, "") or "").strip():
+                field_errors.append(f"Row {i + 1}: {field} is required")
+    if field_errors:
+        raise HTTPException(400, "Cannot submit — " + "; ".join(field_errors[:5]))
+
+    # ── PL-prefix gate ──────────────────────────────────────────────────
+    # Non-JHS01 partners must use real Nexus Quant project codes (all start
+    # with "PL"). Day-off rows have no project to charge, so they're exempt.
+    # A row where the employee picked "Other" as the Client (no matching
+    # project in their assigned list) is exempt from the PL-prefix rule too,
+    # but must have its Project Code literally set to "Other".
+    submit_employee = employee_details_collection.find_one({"EmpID": current_user})
+    submit_partner_code = (submit_employee.get("PartnerEmpCode", "") if submit_employee else "").strip().upper()
+    if submit_partner_code != FREE_TEXT_PARTNER_CODE:
+        code_errors = []
+        for i, entry in enumerate(temp_entries):
+            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
+                continue
+            client = (entry.get("client", "") or "").strip().upper()
+            code = (entry.get("projectCode", "") or "").strip().upper()
+            if client == "OTHER":
+                if code != "OTHER":
+                    code_errors.append(f'Row {i + 1}: project code must be "Other" when Client is "Other"')
+                continue
+            if not code.startswith("PL"):
+                code_errors.append(f"Row {i + 1}: project code must start with \"PL\" (Nexus Quant only)")
+        if code_errors:
+            raise HTTPException(400, "Cannot submit — " + "; ".join(code_errors[:5]))
+
+    # ── Day-completeness gate ────────────────────────────────────────────
+    # Every calendar day in the payroll cycle must have at least one entry
+    # row before the timesheet can be submitted (a Leave/Week Off/PHY row
+    # still counts).
     if cycle_doc and cycle_doc.get("start_date") and cycle_doc.get("end_date"):
         start_d = datetime.fromisoformat(str(cycle_doc["start_date"])[:10])
         end_d = datetime.fromisoformat(str(cycle_doc["end_date"])[:10])
@@ -385,11 +374,12 @@ async def submit_timesheet(
             )
 
     # ── TL project-plan gate ──────────────────────────────────────────────
-    # TLs (reporting managers) must have a valid project plan — matching both
-    # the project code AND the entry's date falling inside the plan's task
-    # window — for every working-day entry before they can submit. This never
-    # blocks saving a draft, only the final submit. JHS01 TLs are shared
-    # services and don't create/track projects this way, so they're exempt.
+    # TLs (reporting managers) must have a valid project plan matching the
+    # project code for every working-day entry before they can submit. This
+    # never blocks saving a draft, only the final submit. JHS01 TLs are
+    # shared services and don't create/track projects this way, so they're
+    # exempt. Entry dates are NOT checked against the plan's task window —
+    # only whether a matching plan exists.
     is_tl = bool(reporting_managers_collection.find_one({"ReportingEmpCode": emp_id.strip().upper()}))
     employee = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()}, {"_id": 0, "PartnerEmpCode": 1})
     partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
@@ -408,25 +398,24 @@ async def submit_timesheet(
             entry_date_str = entry.get("date", "") or ""
             if code not in plan_cache:
                 plan_cache[code] = _lookup_project_plan(code)
-            has_plan, plan_start, plan_end = plan_cache[code]
+            has_plan, _plan_start, _plan_end = plan_cache[code]
             if not has_plan:
                 plan_errors.append(f'{entry_date_str}: no project plan found for code "{code}"')
-                continue
-            try:
-                entry_date = datetime.fromisoformat(entry_date_str[:10])
-            except (ValueError, TypeError):
-                plan_errors.append(f"{entry_date_str}: invalid entry date")
-                continue
-            if (plan_start and entry_date.date() < plan_start.date()) or (plan_end and entry_date.date() > plan_end.date()):
-                plan_errors.append(f'{entry_date_str}: outside the project plan window for "{code}"')
         if plan_errors:
             raise HTTPException(
                 400,
-                "Cannot submit — some entries have no matching project plan or fall outside its dates: "
+                "Cannot submit — some entries have no matching project plan: "
                 + "; ".join(plan_errors[:8]),
             )
 
-    # Build entries with dedup
+    # Publish draft → main. save-draft always fully replaces the temp
+    # payroll's entries (never appends), so temp_entries is the complete,
+    # current state of this cycle — submit therefore replaces the main
+    # payroll's entries wholesale too. Merging/deduping against the old main
+    # entries here (as this used to do) left superseded rows behind any time
+    # an entry's content changed, most visibly after a TL rejection + edit +
+    # resubmit: the old row and the corrected row would both survive as
+    # "different" entries since their content (and hash) differed.
     existing_doc = timesheets_collection.find_one({"employeeId": emp_id})
     existing_payrolls = existing_doc.get("payrolls", []) if existing_doc else []
 
@@ -447,22 +436,20 @@ async def submit_timesheet(
         }
         existing_payrolls.append(main_payroll)
 
-    main_entries = _get_payroll_entries(main_payroll)
-    existing_hashes = {compute_entry_hash(e) for e in main_entries}
+    # Capture prior state before overwriting, to tell the audit log apart —
+    # a resubmission that follows a rejection is worth distinguishing from a
+    # first-time submit.
+    was_previously_submitted = main_payroll.get("submitted", False)
+    was_previously_rejected = main_payroll.get("approval_status") == "rejected"
 
-    added = 0
-    for e in temp_entries:
-        h = compute_entry_hash(e)
-        if h not in existing_hashes:
-            main_entries.append(e)
-            existing_hashes.add(h)
-            added += 1
-
-    main_payroll["entries"] = main_entries
+    main_payroll["entries"] = temp_entries
     main_payroll.pop("weeks", None)
     main_payroll["submitted"] = True
     main_payroll["submitted_at"] = now_iso
     main_payroll["metadata"] = meta
+    # A fresh resubmission supersedes any prior verdict — it goes back into
+    # the approval queue as a new decision, not still flagged as rejected.
+    main_payroll["approval_status"] = None
 
     # Store totals inside the payroll, not at document root
     p_total, p_billable, p_non_billable = recalc_payroll_totals(main_payroll)
@@ -519,7 +506,25 @@ async def submit_timesheet(
     except Exception as e:
         print(f"Error updating Pending: {e}")
 
-    return {"success": True, "message": "Timesheet submitted successfully", "added": added}
+    # Audit trail entry — lets the tracker (and future rejection analytics)
+    # distinguish a first-time submit from a resubmission that followed a
+    # rejection. Carries a full snapshot of what was submitted, since main
+    # entries get overwritten on the next submit — this is the only place
+    # this exact version survives for later viewing.
+    approval_history_collection.insert_one({
+        "employeeId": emp_id,
+        "employeeName": meta.get("employeeName", ""),
+        "cycle_id": cycle_id,
+        "cycle_label": cycle_label,
+        "action": "resubmitted" if (was_previously_submitted and was_previously_rejected) else "submitted",
+        "actor_code": emp_id,
+        "actor_name": meta.get("employeeName", ""),
+        "reason": "",
+        "timestamp": now_iso,
+        "entries": temp_entries,
+    })
+
+    return {"success": True, "message": "Timesheet submitted successfully", "added": len(temp_entries)}
 
 
 @router.get("/list/{employee_id}")
@@ -879,18 +884,22 @@ def _get_approval_cycle_ids() -> list:
     return [str(c["_id"]) for c in cycles]
 
 
-def _find_best_payroll(payrolls: list, preferred_cycle_ids: list) -> dict | None:
+def _find_best_payroll(payrolls: list, preferred_cycle_ids: list, strict: bool = False) -> dict | None:
     """Find the most relevant payroll to display for approval screens.
 
     Priority:
     1. Submitted payroll matching the active approval cycle
     2. Any other submitted payroll (handles cross-cycle pending like April-May still awaiting)
-    Returns None only if employee has no submitted payrolls at all.
+       — skipped when strict=True, so callers can restrict results to the
+       currently selected/active payroll cycle only.
+    Returns None only if employee has no matching submitted payrolls.
     """
     # Priority 1: active cycle, submitted
     for p in reversed(payrolls):
         if p.get("cycle_id") in preferred_cycle_ids and p.get("submitted"):
             return p
+    if strict:
+        return None
     # Priority 2: any submitted payroll (most recent first)
     for p in reversed(payrolls):
         if p.get("submitted"):
@@ -910,24 +919,18 @@ def _get_employees_by_status(reporting_emp_code: str, coll_name: str):
     for code in doc.get("EmployeesCodes", []):
         ts = timesheets_collection.find_one({"employeeId": code}, {"_id": 0})
         if not ts:
-            # Employee has no timesheet data at all — still include with empty info
-            result.append({
-                "employeeId": code,
-                "cycle_id": "",
-                "timesheetData": {
-                    "employeeId": code,
-                    "employeeName": "",
-                    "designation": "",
-                    "cycle_label": "No data",
-                    "approval_status": None,
-                }
-            })
+            # No timesheet data at all — can't belong to the selected cycle
             continue
 
-        best = _find_best_payroll(ts.get("payrolls", []), approval_cycle_ids)
-        cycle_label = best.get("cycle_label", "") if best else "Not submitted"
-        cycle_id    = best.get("cycle_id", "") if best else ""
-        approval_status = best.get("approval_status") if best else None
+        # Only show employees whose submission matches the currently
+        # selected/active payroll cycle — other cycles are excluded, not
+        # just deprioritized.
+        best = _find_best_payroll(ts.get("payrolls", []), approval_cycle_ids, strict=True)
+        if not best:
+            continue
+        cycle_label = best.get("cycle_label", "")
+        cycle_id    = best.get("cycle_id", "")
+        approval_status = best.get("approval_status")
 
         result.append({
             "employeeId": code,
@@ -962,8 +965,9 @@ async def get_rejected(reporting_emp_code: str, current_user: str = Depends(get_
 
 def _set_payroll_approval_status(employee_code: str, status: str, approved_by: str = "", approved_by_name: str = "",
                                   rejected_at: str = "", reason: str = "", preferred_cycle_ids: list = None):
-    """Write approval_status into the employee's most relevant payroll in Timesheet_data."""
-    ts = timesheets_collection.find_one({"employeeId": employee_code}, {"payrolls": 1})
+    """Write approval_status into the employee's most relevant payroll in Timesheet_data,
+    and record the action in the Approval_History audit trail."""
+    ts = timesheets_collection.find_one({"employeeId": employee_code}, {"payrolls": 1, "employeeName": 1})
     if not ts:
         return
     best = _find_best_payroll(ts.get("payrolls", []), preferred_cycle_ids or [])
@@ -974,20 +978,34 @@ def _set_payroll_approval_status(employee_code: str, status: str, approved_by: s
         "payrolls.$[elem].approval_status": status,
         "payrolls.$[elem].status_updated_at": now_iso,
     }
+    event_timestamp = now_iso
     if status == "approved":
         update_fields["payrolls.$[elem].approved_by"]      = approved_by
         update_fields["payrolls.$[elem].approved_by_name"] = approved_by_name
         update_fields["payrolls.$[elem].approved_at"]      = now_iso
     elif status == "rejected":
+        event_timestamp = rejected_at or now_iso
         update_fields["payrolls.$[elem].rejected_by"]      = approved_by
         update_fields["payrolls.$[elem].rejected_by_name"] = approved_by_name
-        update_fields["payrolls.$[elem].rejected_at"]      = rejected_at or now_iso
+        update_fields["payrolls.$[elem].rejected_at"]      = event_timestamp
         update_fields["payrolls.$[elem].rejection_reason"] = reason
     timesheets_collection.update_one(
         {"employeeId": employee_code},
         {"$set": update_fields},
         array_filters=[{"elem.cycle_id": best["cycle_id"]}],
     )
+    approval_history_collection.insert_one({
+        "employeeId": employee_code,
+        "employeeName": ts.get("employeeName", ""),
+        "cycle_id": best.get("cycle_id", ""),
+        "cycle_label": best.get("cycle_label", ""),
+        "action": status,
+        "actor_code": approved_by,
+        "actor_name": approved_by_name,
+        "entries": _get_payroll_entries(best),
+        "reason": reason if status == "rejected" else "",
+        "timestamp": event_timestamp,
+    })
 
 
 @router.post("/approve")
@@ -1128,3 +1146,20 @@ async def get_approval_tracker(employee_id: str, current_user: str = Depends(get
         })
 
     return {"statuses": statuses}
+
+
+@router.get("/approval-history/{employee_id}")
+async def get_approval_history(
+    employee_id: str,
+    cycle_id: Optional[str] = None,
+    current_user: str = Depends(get_current_user),
+):
+    """Full audit trail (submit/resubmit/reject/approve) for an employee, oldest
+    first — the manager-facing tracker of how a timesheet's approval played out,
+    e.g. rejected → resubmitted → approved. Pass cycle_id to scope to one cycle."""
+    emp = employee_id.strip().upper()
+    query = {"employeeId": emp}
+    if cycle_id:
+        query["cycle_id"] = cycle_id
+    events = list(approval_history_collection.find(query, {"_id": 0}).sort("timestamp", 1))
+    return {"events": events}

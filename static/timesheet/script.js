@@ -2372,13 +2372,24 @@ async function openEmployeeDetails(employeeId, cycleId) {
     const url = cycleId
       ? `${API_URL}/get_timesheet/${employeeId}?cycle_id=${encodeURIComponent(cycleId)}`
       : `${API_URL}/get_timesheet/${employeeId}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: getHeaders(),
-    });
+    const historyUrl = cycleId
+      ? `${API_URL}/timesheet/approval-history/${employeeId}?cycle_id=${encodeURIComponent(cycleId)}`
+      : `${API_URL}/timesheet/approval-history/${employeeId}`;
+    const [response, historyRes] = await Promise.all([
+      fetch(url, { method: "GET", headers: getHeaders() }),
+      fetch(historyUrl, { method: "GET", headers: getHeaders() }).catch(() => null),
+    ]);
 
     if (!response.ok) throw new Error("Failed to fetch timesheet data");
     const data = await response.json();
+
+    let approvalHistoryHTML = '';
+    if (historyRes && historyRes.ok) {
+      try {
+        const historyData = await historyRes.json();
+        approvalHistoryHTML = _buildApprovalHistoryLog(historyData.events || [], cycleId);
+      } catch (e) { console.error('approval history parse error', e); }
+    }
 
     if (!data.entries || data.entries.length === 0) {
       modalContent.innerHTML = `
@@ -2472,6 +2483,7 @@ async function openEmployeeDetails(employeeId, cycleId) {
         ${empDetailsHTML}
         ${tableHTML}
         ${feedbackHTML}
+        ${approvalHistoryHTML}
       </div>
       <div style="text-align:center;margin-top:20px;">
         <button class="modal-cancel-btn" onclick="closeModalAndRestore()">Close</button>
@@ -2486,6 +2498,123 @@ async function openEmployeeDetails(employeeId, cycleId) {
       </div>
     `;
   }
+}
+
+// Renders the full submit/resubmit/reject/approve audit trail for a cycle —
+// used both in the manager's employee-details popup and the employee's own
+// History page, so both sides see the same complete track record. Each
+// submit/resubmit/reject/approve event carries a snapshot of the timesheet
+// entries as they stood at that moment (see backend's Approval_History
+// collection), so past rejected versions stay viewable even after a
+// resubmission overwrites the "live" data.
+function _buildApprovalHistoryLog(events, cycleId) {
+  if (!events || !events.length) return '';
+
+  window._approvalHistoryByCycle = window._approvalHistoryByCycle || {};
+  if (cycleId) window._approvalHistoryByCycle[cycleId] = events;
+
+  const fmtDate = iso => {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch { return iso; }
+  };
+
+  const meta = {
+    submitted:   { icon: 'fa-paper-plane',    color: '#6366f1', label: 'Submitted' },
+    resubmitted: { icon: 'fa-rotate-right',   color: '#f59e0b', label: 'Resubmitted' },
+    rejected:    { icon: 'fa-circle-xmark',   color: '#ef4444', label: 'Rejected' },
+    approved:    { icon: 'fa-circle-check',   color: '#10b981', label: 'Approved' },
+  };
+
+  const rows = events.map((ev, idx) => {
+    const m = meta[ev.action] || { icon: 'fa-circle', color: '#94a3b8', label: ev.action };
+    const who = ev.actor_name ? ` by ${ev.actor_name}` : '';
+    const reasonLine = ev.reason
+      ? `<div style="color:#64748b;margin-top:.15rem;font-size:.8rem;">Reason: ${ev.reason}</div>`
+      : '';
+    const viewBtn = (ev.entries && ev.entries.length && cycleId)
+      ? `<button type="button" onclick="showApprovalSnapshot('${cycleId}', ${idx})" style="margin-top:.35rem;font-size:.72rem;padding:.2rem .6rem;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#475569;cursor:pointer;"><i class="fas fa-eye"></i> View Timesheet</button>`
+      : '';
+    return `
+      <div style="display:flex;gap:.75rem;padding:.55rem 0;border-bottom:1px solid #e5e7eb;">
+        <div style="width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:${m.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.82rem;"><i class="fas ${m.icon}"></i></div>
+        <div>
+          <div style="font-weight:700;color:${m.color};font-size:.86rem;">${m.label}${who}</div>
+          <div style="color:#94a3b8;font-size:.76rem;">${fmtDate(ev.timestamp)}${ev.cycle_label ? ' · ' + ev.cycle_label : ''}</div>
+          ${reasonLine}
+          ${viewBtn}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.5rem;margin-top:1rem;border-left:5px solid #f59e0b;box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+      <h3 style="margin-bottom:.75rem;text-align:center;color:#2c3e50;"><i class="fas fa-route"></i> Approval History</h3>
+      ${rows}
+    </div>
+  `;
+}
+
+// Opens a read-only popup showing exactly what the timesheet looked like at
+// one point in its history (e.g. the version that was rejected), pulled from
+// the snapshot cached by _buildApprovalHistoryLog.
+function showApprovalSnapshot(cycleId, idx) {
+  const events = (window._approvalHistoryByCycle || {})[cycleId] || [];
+  const ev = events[idx];
+  if (!ev || !ev.entries) return;
+
+  const showLunchTravel = window._showLunchTravel !== false;
+  const rows = ev.entries.map((e, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${e.date || ''}</td>
+      <td>${e.location || ''}</td>
+      <td>${e.client || ''}</td>
+      <td>${e.project || ''}</td>
+      <td>${e.projectCode || ''}</td>
+      <td>${e.activity || ''}</td>
+      <td>${e.projectStartTime || ''}</td>
+      <td>${e.projectEndTime || ''}</td>
+      <td>${e.projectHours || ''}</td>
+      <td>${e.billable || ''}</td>
+      ${showLunchTravel ? `<td>${e.lunchTime || ''}</td>` : ''}
+      <td>${e.remarks || ''}</td>
+    </tr>`).join('');
+
+  let overlay = document.getElementById('snapshotModalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'snapshotModalOverlay';
+    overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:1.5rem;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:95vw;width:1150px;max-height:85vh;overflow:auto;padding:1.5rem;">
+        <div id="snapshotModalTitle" style="font-weight:800;font-size:1.05rem;margin-bottom:1rem;color:#2c3e50;"></div>
+        <div id="snapshotModalBody" style="overflow-x:auto;"></div>
+        <div style="text-align:center;margin-top:1.2rem;">
+          <button class="modal-cancel-btn" onclick="document.getElementById('snapshotModalOverlay').style.display='none';">Close</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.style.display = 'flex';
+  }
+
+  const label = ev.action.charAt(0).toUpperCase() + ev.action.slice(1);
+  const when = (() => { try { return new Date(ev.timestamp).toLocaleString('en-IN'); } catch { return ev.timestamp; } })();
+  document.getElementById('snapshotModalTitle').textContent =
+    `${label} — ${ev.cycle_label || ''} (${when})`;
+  document.getElementById('snapshotModalBody').innerHTML = `
+    <table class="timesheet-table" style="width:100%;font-size:13px;">
+      <thead>
+        <tr>
+          <th>#</th><th>Date</th><th>Work</th><th>Client</th><th>Project</th><th>Code</th>
+          <th>Activity</th><th>Start</th><th>End</th><th>Hours</th><th>Billable</th>
+          ${showLunchTravel ? '<th>Lunch</th>' : ''}
+          <th>Remarks</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function closeModalAndRestore() {
@@ -2508,10 +2637,12 @@ async function loadHistory(){
               if (sr.ok) { const sd = await sr.json(); _submittedCycles = sd.status || {}; }
             } catch(e) {}
 
-            // Fetch timesheet history AND approval tracker in parallel
-            const [response, trackerRes] = await Promise.all([
+            // Fetch timesheet history, approval tracker, AND the full approval
+            // audit trail (submit/resubmit/reject/approve events) in parallel
+            const [response, trackerRes, historyLogRes] = await Promise.all([
               fetch(`${API_URL}/timesheets/${loggedInEmployeeId}`, { headers: getHeaders() }),
               fetch(`${API_URL}/timesheet/approval-tracker/${loggedInEmployeeId}`, { headers: getHeaders() }).catch(() => null),
+              fetch(`${API_URL}/timesheet/approval-history/${loggedInEmployeeId}`, { headers: getHeaders() }).catch(() => null),
             ]);
             if (!response.ok) throw new Error('Failed to fetch history');
 
@@ -2525,6 +2656,18 @@ async function loadHistory(){
               try {
                 const td = await trackerRes.json();
                 (td.statuses || []).forEach(s => { window._approvalStatusMap[s.cycle_id] = s; });
+              } catch (e) {}
+            }
+
+            // Build cycle_id → full audit trail (submit/resubmit/reject/approve events)
+            window._approvalHistoryMap = {};
+            if (historyLogRes && historyLogRes.ok) {
+              try {
+                const hd = await historyLogRes.json();
+                (hd.events || []).forEach(ev => {
+                  if (!ev.cycle_id) return;
+                  (window._approvalHistoryMap[ev.cycle_id] = window._approvalHistoryMap[ev.cycle_id] || []).push(ev);
+                });
               } catch (e) {}
             }
 
@@ -2690,6 +2833,7 @@ function _renderHistoryPayrolls(payrolls) {
     const showLunchTravel = payroll.show_lunch_travel !== false;
     const approvalBadge = _getApprovalStatusBadge(payroll.cycle_id);
     const approvalTimeline = _buildApprovalTimeline(payroll.cycle_id);
+    const approvalHistoryLog = _buildApprovalHistoryLog((window._approvalHistoryMap || {})[payroll.cycle_id] || [], payroll.cycle_id);
 
     // Count unique working days
     const allDates = new Set();
@@ -2738,6 +2882,7 @@ function _renderHistoryPayrolls(payrolls) {
       <!-- Card Detail Body (collapsed by default) -->
       <div id="${bodyId}" style="display:none;">
         ${approvalTimeline}
+        ${approvalHistoryLog}
         <div class="history-card-entries" style="padding:1rem 1.5rem 0;">
         </div>
         <div class="history-card-feedback"></div>
@@ -3111,23 +3256,9 @@ async function saveDraft() {
   const entries = _collectEntries();
   if (!entries.length) { showPopup('No entries to save.', true); return; }
 
-  // Validate mandatory fields
-  const errors = [];
-  const requireLunch = window._showLunchTravel !== false;
-  entries.forEach((e, i) => {
-    // Leave / PHY / Week Off rows aren't working days — don't force project
-    // fields to be filled, but keep whatever the user did fill in.
-    if (isDayOffLocation(e.location)) return;
-
-    const mandatory = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
-    mandatory.forEach(f => {
-      if (!e[f] || e[f].trim() === '') errors.push(`Row ${i+1}: ${f} is required`);
-    });
-    if (requireLunch && (!e.lunchTime || e.lunchTime.trim() === '')) {
-      errors.push(`Row ${i+1}: Lunch Time is required`);
-    }
-  });
-  if (errors.length) { showPopup(errors.slice(0, 5).join('\n'), true); return; }
+  // Save whatever the user has filled in so far — mandatory-field and lunch
+  // time completeness are only enforced at submit time, not on every draft
+  // save, so partially-filled rows never block saving progress.
 
   showLoading('Saving draft...');
   try {
@@ -4892,8 +5023,16 @@ async function downloadSampleTemplate() {
       curr.setDate(curr.getDate() + 1);
     }
 
-    // Apply hh:mm format to Project Start/End Time columns (I, J)
-    for (let r = 2; r <= lastDateRow; r++) {
+    // bufferRows gives room for extra rows beyond the cycle's actual dates —
+    // both the pre-existing blank rows at the bottom, and any row a user
+    // inserts in between via Excel's own Insert Row, since it's this whole
+    // range (not just the date rows) that carries formulas/formatting/
+    // validation identically throughout.
+    const bufferRows = lastDateRow + 60;
+
+    // Apply hh:mm format to Project Start/End Time columns (I, J) across the
+    // full buffer range, not just the date rows, so inserted/extra rows format correctly too.
+    for (let r = 2; r <= bufferRows; r++) {
       ws.getCell(`I${r}`).numFmt = 'hh:mm';
       ws.getCell(`J${r}`).numFmt = 'hh:mm';
     }
@@ -5012,16 +5151,14 @@ async function downloadSampleTemplate() {
       });
     }
 
-    // bufferRows gives room for a handful of extra manually-added rows beyond
-    // the cycle's actual dates, without ballooning the file with hundreds of
-    // unused (but styled/validated) rows.
-    const bufferRows = lastDateRow + 60;
-
     // Plain informational text below the table — no formula, no input cell,
     // just a pointer to the searchable reference tab. Can never break.
     if (!freeTextClientProject) {
       const noteCell = ws.getCell(`A${bufferRows + 2}`);
-      noteCell.value = 'Looking for a specific Client or Project? See the "Client-Project List" tab — press Ctrl+F there to search.';
+      noteCell.value = 'Looking for a specific Client or Project? See the "Client-Project List" tab — press Ctrl+F there to search. ' +
+        'Need an extra row? Right-click a row number and choose Insert — the new row keeps working dropdowns for Client/Project/Project Code ' +
+        '(pick Project Code from its dropdown too — it\'ll show the one matching code). ' +
+        'For Project Code and Hours to auto-fill with no clicks at all, copy an existing row and use "Insert Copied Cells" instead.';
       noteCell.font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
       noteCell.protection = { locked: true };
     }
@@ -5038,6 +5175,7 @@ async function downloadSampleTemplate() {
     });
 
     const clientsEnd = Math.max(clients.length + 1, 2);
+    const lookupEnd  = Math.max(lookupNames.length + 1, 2);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
     const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
@@ -5093,6 +5231,19 @@ async function downloadSampleTemplate() {
           type: 'list', allowBlank: true, showErrorMessage: false,
           formulae: [`INDIRECT("Client_"&MATCH(K${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
         };
+        // Project Code (M) is normally auto-filled by the formula set below —
+        // but a row a user inserts via Excel's own Insert Row only inherits
+        // formatting/validation, never formulas/values, which would otherwise
+        // leave Project Code blank on an inserted row. Backing it with this
+        // same dependent-dropdown trick as Project (a list formula resolving
+        // to the single matching code's cell) means it still comes through on
+        // an inserted row too — one click instead of zero, but no dead end.
+        // Doesn't fight the formula: a formula-derived value never triggers
+        // its own cell's validation, only a value the user types/picks does.
+        ws.getCell(`M${r}`).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: false,
+          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(L${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
+        };
       }
       ws.getCell(`Q${r}`).dataValidation  = dvBillable;
       ws.getCell(`R${r}`).dataValidation  = dvLunch;
@@ -5101,35 +5252,65 @@ async function downloadSampleTemplate() {
 
     // ── Project Code formula (Column M) — auto-fills "Other" when Client is
     // "Other", otherwise looks the code up from the picked Project. Skipped
-    // for the free-text partner, whose Project Code column is plain typed text ──
+    // for the free-text partner, whose Project Code column is plain typed text.
+    // Applied across the full buffer range (not just the cycle's date rows) so
+    // extra/inserted rows compute the code too, not just the original dates. ──
     if (!freeTextClientProject) {
-      const lookupEnd = Math.max(lookupNames.length + 1, 2);
-      for (let r = 2; r <= lastDateRow; r++) {
+      for (let r = 2; r <= bufferRows; r++) {
         ws.getCell(`M${r}`).value = {
           formula: `IF(K${r}="Other","Other",IFERROR(VLOOKUP(L${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
         };
       }
     }
 
-    // ── Lock Project Code so it can only ever be auto-populated (not for
-    // the free-text partner, who has no fixed project list to look codes up
-    // from) — every other data column stays editable. Every cell's
-    // protection is set explicitly (never left at the default): ExcelJS
-    // appears to share a default style object across untouched cells, so
-    // leaving one column "untouched" let it silently pick up whatever
-    // locked state a neighboring cell happened to set. ──
+    // ── Project Hours formula (Column P) — computed from Start/End Time.
+    // Only the cycle's date rows get it inline when created (above); extend it
+    // across the full buffer range too, so extra/inserted rows compute hours
+    // automatically as well, exactly like the real date rows do. ──
+    for (let r = lastDateRow + 1; r <= bufferRows; r++) {
+      ws.getCell(`P${r}`).value = {
+        formula: `IF(AND(I${r}<>"",J${r}<>""),(J${r}-I${r})*24,"")`
+      };
+    }
+
+    // ── Every column stays editable, including Project Code (M) — it's
+    // auto-populated by formula for every row that already exists in the
+    // file, but a row a user inserts via Excel's own Insert Row only
+    // inherits formatting/validation (dropdowns), never formulas/values, so
+    // a locked-but-formula-less Project Code cell on an inserted row would
+    // be a permanent dead end. Leaving it unlocked means an inserted row
+    // falls back to the same manual entry the "Client-Project List" tab
+    // already exists to support. Every cell's protection is set explicitly
+    // (never left at the default): ExcelJS appears to share a default style
+    // object across untouched cells, so leaving one column "untouched" let
+    // it silently pick up whatever locked state a neighboring cell happened
+    // to set. ──
     const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
-    const lockedCols = freeTextClientProject ? [] : ['M'];
+    const lockedCols = [];
     for (let r = 2; r <= bufferRows; r++) {
       allDataCols.forEach(col => {
         ws.getCell(`${col}${r}`).protection = { locked: lockedCols.includes(col) };
       });
+      // A full row spans far more columns than A:Z. Excel's "Insert Copied
+      // Cells" (the standard way to insert a fully-working row — dropdowns
+      // *and* the Project Code/Hours formulas — by copying an existing row)
+      // operates on the entire row width, and fails under sheet protection
+      // if ANY cell in that width is still locked — including the untouched
+      // columns beyond Z that the per-cell loop above never reaches. Setting
+      // row-level protection covers the whole row so that paste succeeds.
+      ws.getRow(r).protection = { locked: false };
     }
     await ws.protect('', {
       selectLockedCells: true,
       selectUnlockedCells: true,
       formatCells: false, formatColumns: false, formatRows: false,
-      insertRows: false, insertColumns: false, insertHyperlinks: false,
+      // Allow inserting rows (e.g. to add an extra entry between two existing
+      // dates) even while the sheet stays protected. Every row up to
+      // bufferRows already carries identical dropdowns/formulas/protection,
+      // so a row inserted anywhere in that span inherits them the same way
+      // Excel always extends validation/formatting into a row inserted inside
+      // a uniformly-formatted range.
+      insertRows: true, insertColumns: false, insertHyperlinks: false,
       deleteRows: false, deleteColumns: false,
       sort: false, autoFilter: false, pivotTables: false
     });
