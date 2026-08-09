@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR Dashboard | Onboarding Assessment</title>
+  <link rel="stylesheet" href="/static/hr_policy_quiz/css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <img src="/static/hr_policy_quiz/assets/logo.svg" alt="" />
+      <div>
+        <div class="brand-name">Onboarding Assessment</div>
+        <div class="brand-sub">HR Dashboard</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="page-wide">
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total candidates</div></div>
+      <div class="stat-card"><div class="stat-value" id="statCompleted">-</div><div class="stat-label">Completed</div></div>
+      <div class="stat-card"><div class="stat-value" id="statProgress">-</div><div class="stat-label">In progress</div></div>
+      <div class="stat-card accent"><div class="stat-value" id="statAvg">-</div><div class="stat-label">Average score</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="overview">Candidates</button>
+      <button class="tab-btn" data-tab="documents">Documents</button>
+      <button class="tab-btn" data-tab="add">Add new joiners</button>
+    </div>
+
+    <!-- Overview tab -->
+    <div class="tab-panel" id="tab-overview">
+      <div class="panel">
+        <div class="panel-header">
+          <h3 style="margin:0;">Candidate activity</h3>
+          <div style="display:flex; gap:8px; position:relative;">
+            <button class="btn btn-secondary btn-sm" id="downloadBtn">Download &#9662;</button>
+            <div class="dropdown-menu" id="downloadMenu" style="display:none;">
+              <button type="button" data-format="xlsx">Excel (.xlsx)</button>
+              <button type="button" data-format="docx">Word (.docx)</button>
+              <button type="button" data-format="pdf">PDF (.pdf)</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refreshBtn">Refresh</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <table id="candidateTable">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Assigned document</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Submitted</th>
+                <th>Answers</th>
+                <th>Password</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody id="candidateTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="candidateEmpty" style="display:none;">No candidates added yet. Use "Add new joiners" to get started.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents tab -->
+    <div class="tab-panel" id="tab-documents" style="display:none;">
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;">Upload a document</h3></div>
+        <div class="panel-body">
+          <p class="hint" style="margin-bottom:18px;">Upload the onboarding material once. The whole document is read and a bank of questions is generated automatically - every candidate then receives a random 15 from that bank.</p>
+          <div class="error-box" id="uploadError"></div>
+          <div class="success-box" id="uploadSuccess" style="display:none;"></div>
+          <form id="uploadForm">
+            <div class="field">
+              <label for="docTitle">Document title</label>
+              <input type="text" id="docTitle" placeholder="e.g. Employee Handbook 2026" required />
+            </div>
+            <div class="field">
+              <label for="docFile">File (.pdf, .docx, .xlsx or .txt)</label>
+              <input type="file" id="docFile" accept=".pdf,.docx,.xlsx,.xlsm,.txt" required />
+            </div>
+            <button type="submit" class="btn btn-primary" id="uploadBtn">Upload and generate questions</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;">Uploaded documents</h3></div>
+        <div class="panel-body" style="padding:0;">
+          <table>
+            <thead><tr><th>Title</th><th>File</th><th>Uploaded</th><th></th></tr></thead>
+            <tbody id="documentTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="documentEmpty" style="display:none;">No documents uploaded yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add candidates tab -->
+    <div class="tab-panel" id="tab-add" style="display:none;">
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;">Add new joiners</h3></div>
+        <div class="panel-body">
+          <p class="hint" style="margin-bottom:18px;">Paste one or more emails, comma separated. Everyone you add in this batch gets the same password - share it with them directly.</p>
+          <div class="error-box" id="addError"></div>
+          <div class="success-box" id="addSuccess" style="display:none;"></div>
+          <form id="addForm">
+            <div class="field">
+              <label for="emails">New joiner emails</label>
+              <textarea id="emails" placeholder="priya@company.com, rahul@company.com"></textarea>
+            </div>
+            <div class="field">
+              <label for="docSelect">Assign document</label>
+              <select id="docSelect"></select>
+            </div>
+            <button type="submit" class="btn btn-primary" id="addBtn">Add and generate password</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;">Regenerate a password</h3></div>
+        <div class="panel-body">
+          <p class="hint" style="margin-bottom:18px;">Passwords can't be recovered once set, only replaced. Use this if a candidate forgot theirs - works for one email, or several at once.</p>
+          <div class="error-box" id="regenError"></div>
+          <div class="success-box" id="regenSuccess" style="display:none;"></div>
+          <form id="regenForm">
+            <div class="field">
+              <label for="regenEmails">Candidate email(s)</label>
+              <textarea id="regenEmails" placeholder="priya@company.com"></textarea>
+            </div>
+            <button type="submit" class="btn btn-secondary" id="regenBtn">Regenerate password</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="attemptModalRoot"></div>
+
+  <script src="/static/hr_policy_quiz/js/api.js"></script>
+  <script src="/static/hr_policy_quiz/js/hr-dashboard.js"></script>
+</body>
+</html>

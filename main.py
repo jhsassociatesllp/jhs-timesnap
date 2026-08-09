@@ -42,6 +42,7 @@ from backend.timesheet.router          import router as timesheet_router
 from backend.appraisal.router          import router as appraisal_router
 from backend.quality_audit.router      import router as quality_audit_router   # ← NEW
 from backend.timesheet.timesheet_admin import admin_router
+from backend.hr_policy_quiz.router     import router as hr_quiz_router         # ← NEW
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -58,7 +59,9 @@ app.add_middleware(
 _NO_STORE_EXTENSIONS = (".js", ".css", ".html")
 _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/quality-audit", "/dashboard", "/forgot-password",
-                         "/control-panel", "/admin-dashboard"}
+                         "/control-panel", "/admin-dashboard",
+                         "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
+                         "/hr-quiz/hr-dashboard", "/hr-quiz/quiz"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -77,6 +80,7 @@ app.include_router(timesheet_router)
 app.include_router(appraisal_router)
 app.include_router(quality_audit_router)   # prefix: /quality-audit
 app.include_router(admin_router)
+app.include_router(hr_quiz_router)         # prefix: /hr-quiz
 
 static_root = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_root), name="static")
@@ -129,6 +133,26 @@ async def appraisal_page():
 @app.get("/quality-audit", response_class=FileResponse)         # ← NEW
 async def quality_audit_page():
     return FileResponse(os.path.join(static_root, "quality_audit", "index.html"))
+
+@app.get("/hr-quiz", response_class=FileResponse)                # ← NEW
+async def hr_quiz_landing():
+    return FileResponse(os.path.join(static_root, "hr_policy_quiz", "index.html"))
+
+@app.get("/hr-quiz/", response_class=FileResponse)                # ← NEW
+async def hr_quiz_landing_slash():
+    return FileResponse(os.path.join(static_root, "hr_policy_quiz", "index.html"))
+
+@app.get("/hr-quiz/candidate-login", response_class=FileResponse)  # ← NEW
+async def hr_quiz_candidate_login():
+    return FileResponse(os.path.join(static_root, "hr_policy_quiz", "candidate-login.html"))
+
+@app.get("/hr-quiz/hr-dashboard", response_class=FileResponse)    # ← NEW
+async def hr_quiz_hr_dashboard():
+    return FileResponse(os.path.join(static_root, "hr_policy_quiz", "hr-dashboard.html"))
+
+@app.get("/hr-quiz/quiz", response_class=FileResponse)            # ← NEW
+async def hr_quiz_quiz_page():
+    return FileResponse(os.path.join(static_root, "hr_policy_quiz", "quiz.html"))
 
 @app.get("/dashboard", response_class=FileResponse)
 async def dashboard_page():

@@ -49,17 +49,20 @@
     .card-ts{border-left-color:#667eea}
     .card-ap{border-left-color:#11998e}
     .card-qa{border-left-color:#e67e22}
+    .card-hr{border-left-color:#8e44ad}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
     .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-hr .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
     .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-hr .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
     .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
@@ -72,6 +75,7 @@
     .card-ts .card-btn{background:var(--pg);color:white}
     .card-ap .card-btn{background:var(--sg);color:white}
     .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
+    .card-hr .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
     .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
     .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
     .clickable .card-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
@@ -214,6 +218,28 @@
         </div>
       </a>`;
 
+    // HR Policy Quiz — only shown to employee codes listed in the module's
+    // admins collection. "Open" goes straight to the dashboard: no separate
+    // login screen, the dashboard trusts this same platform token.
+    const CARD_HR = `
+      <a href="/hr-quiz/hr-dashboard" class="module-card card-hr clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-book-reader"></i></div>
+          <span class="card-tag">Admin</span>
+        </div>
+        <h2 class="card-title">HR Policy Quiz</h2>
+        <p class="card-desc">Manage the new-joiner onboarding assessment - upload policy documents, add candidates, and review scores.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-file-upload"></i> Documents</span>
+          <span class="chip"><i class="fas fa-user-plus"></i> Candidates</span>
+          <span class="chip"><i class="fas fa-chart-bar"></i> Scores</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">HR admin access</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
     function buildAppraisalCard(eligible, reason) {
       const isLocked = !eligible;
       return `
@@ -303,6 +329,13 @@
         if (res.ok) apprAccess = await res.json();
       } catch(e) {}
 
+      // Check HR Policy Quiz admin access
+      let hrQuizAccess = false;
+      try {
+        const res = await fetch('/hr-quiz/api/platform-access', {headers:{'Authorization':`Bearer ${token}`}});
+        hrQuizAccess = res.ok;
+      } catch(e) {}
+
       // Build cards
       const grid = document.getElementById('cards-grid');
       grid.innerHTML = '';
@@ -316,6 +349,11 @@
       // Quality Audit — only if user has access
       if (qaAccess?.has_access) {
         grid.innerHTML += buildQACard(qaAccess.is_admin, qaAccess.is_qa_only);
+      }
+
+      // HR Policy Quiz — only for admin-listed employee codes
+      if (hrQuizAccess) {
+        grid.innerHTML += CARD_HR;
       }
 
       // Show page
