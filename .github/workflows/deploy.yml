@@ -154,10 +154,10 @@ jobs:
                 -e SMTP_KEY="$SMTP" \
                 -e JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
                 -e HR_QUIZ_DB_NAME="$HR_QUIZ_DB_NAME" \
-                -e HR_QUIZ_JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
+                -e HR_QUIZ_JWT_SECRET="${{ secrets.HR_QUIZ_JWT_SECRET }}" \
                 -e HR_QUIZ_JWT_ALGORITHM="HS256" \
-                -e HR_QUIZ_HR_TOKEN_EXPIRE_MINUTES="60" \
-                -e HR_QUIZ_CANDIDATE_TOKEN_EXPIRE_MINUTES="60" \
+                -e HR_QUIZ_HR_TOKEN_EXPIRE_MINUTES="1440" \
+                -e HR_QUIZ_CANDIDATE_TOKEN_EXPIRE_MINUTES="120" \
                 -e HR_QUIZ_QUESTION_COUNT="15" \
                 -e HR_QUIZ_SECONDS_PER_QUESTION="30" \
                 -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
@@ -167,4 +167,4 @@ jobs:
               docker image prune -f --filter "dangling=true"
 
               echo "✅ Deployment successful for $ENV"
-          EO
+          EOF
