@@ -6,7 +6,6 @@ Session stores both empid & email.
 """
 import os, re, json, secrets
 from datetime import datetime, timedelta
-
 import jwt, requests
 from bson import ObjectId
 from dotenv import load_dotenv
