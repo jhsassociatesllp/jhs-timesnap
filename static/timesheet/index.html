@@ -211,7 +211,7 @@
       <div class="modal-content">
         <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()" /></div>
         <div><label id="modalLabel2">Work</label>
-          <select id="modalInput2" class="form-input">
+          <select id="modalInput2" class="form-input" onchange="applyModalLocationTimeRules()">
             <option value="Office">Office</option>
             <option value="Client Site">Client Site</option>
             <option value="Work From Home">Work From Home</option>

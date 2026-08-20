@@ -51,6 +51,57 @@ const SHARED_SERVICES_TYPE_HERE = "Type Here";
 // optional (but still accepted if filled in) for rows marked with these.
 const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
 const isDayOffLocation = (loc) => DAY_OFF_LOCATIONS.includes((loc || "").trim());
+const NO_TRAVEL_TIME_LOCATIONS = [...DAY_OFF_LOCATIONS, "Work From Home", "Office"];
+
+function applyLocationTimeRules(row) {
+  if (!row) return;
+  const location = row.querySelector('.location-select')?.value || '';
+  const lunchTime = row.querySelector('.lunch-time-select');
+  const travelTime = row.querySelector('.travel-time-select');
+  const billable = row.querySelector('.billable-select');
+  const isDayOff = isDayOffLocation(location);
+  const hasNoTravel = NO_TRAVEL_TIME_LOCATIONS.includes(location.trim());
+
+  if (lunchTime) {
+    if (isDayOff) lunchTime.value = '';
+    lunchTime.disabled = isDayOff;
+  }
+  if (travelTime) {
+    if (hasNoTravel) travelTime.value = '';
+    travelTime.disabled = hasNoTravel;
+  }
+  if (billable) {
+    if (isDayOff) billable.value = 'No';
+    billable.disabled = isDayOff;
+  }
+}
+
+function onLocationChange(select) {
+  applyLocationTimeRules(select?.closest('tr'));
+  updateSummary();
+}
+
+function applyModalLocationTimeRules() {
+  const location = document.getElementById('modalInput2')?.value || '';
+  const lunchTime = document.getElementById('modalInput13');
+  const travelTime = document.getElementById('modalInput14');
+  const billable = document.getElementById('modalInput11');
+  const isDayOff = isDayOffLocation(location);
+  const hasNoTravel = NO_TRAVEL_TIME_LOCATIONS.includes(location.trim());
+
+  if (lunchTime) {
+    if (isDayOff) lunchTime.value = '';
+    lunchTime.disabled = isDayOff;
+  }
+  if (travelTime) {
+    if (hasNoTravel) travelTime.value = '';
+    travelTime.disabled = hasNoTravel;
+  }
+  if (billable) {
+    if (isDayOff) billable.value = 'No';
+    billable.disabled = isDayOff;
+  }
+}
 
 function startPayrollPolling() {
   // Clear any existing interval first
@@ -476,7 +527,7 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
         onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="updateSummary()">
+      <select class="location-select form-input" onchange="onLocationChange(this)">
         <option value="Office"${entry.location==='Office'?' selected':''}>Office</option>
         <option value="Client Site"${entry.location==='Client Site'?' selected':''}>Client Site</option>
         <option value="Work From Home"${entry.location==='Work From Home'?' selected':''}>Work From Home</option>
@@ -530,6 +581,7 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
 
   tbody.appendChild(tr);
   setupSmartDropdowns(tr);
+  applyLocationTimeRules(tr);
 
   // Restore client/project/code after smart dropdowns are set up. Client and
   // Project (dropdown mode) are always plain <input> elements now (the
@@ -1017,11 +1069,36 @@ function renderTimesheetTable() {
   sectionsDiv.appendChild(section);
 }
 
-// Adds one row for every calendar date in the selected payroll cycle that
-// doesn't already have a row, so "all days" are present by default without
-// the employee having to build the list up by hand.
+function _employeeDateKey(value) {
+  // Employee_details currently stores Date of Joining/Exit as DD/MM/YYYY.
+  // Return a sortable YYYY-MM-DD key without relying on browser timezone.
+  const match = String(value || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  const isoMatch = String(value || '').trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return isoMatch ? isoMatch[1] : '';
+}
+
+function _applicableCycleDateKeys() {
+  const win = window._currentPayrollWindow;
+  if (!win) return null;
+
+  let start = _employeeDateKey(win.start);
+  let end = _employeeDateKey(win.end);
+  const employee = employeeData.find(e => String(e.EmpID) === String(loggedInEmployeeId)) || {};
+  const joiningDate = _employeeDateKey(employee['Date of Joining']);
+  const exitDate = _employeeDateKey(employee['Date of Exit']);
+
+  if (joiningDate && joiningDate > start) start = joiningDate;
+  if (exitDate && exitDate < end) end = exitDate;
+  return { start, end };
+}
+
+// Adds one row for every calendar date applicable to the employee in the
+// selected payroll cycle that doesn't already have a row. Dates outside the
+// recorded employment window are intentionally not auto-created.
 function populateAllCycleDateRows() {
-  if (!window._currentPayrollWindow) return;
+  const applicableWindow = _applicableCycleDateKeys();
+  if (!applicableWindow || applicableWindow.start > applicableWindow.end) return;
   const tbody = document.getElementById("timesheetBody_1");
   if (!tbody) return;
 
@@ -1029,8 +1106,8 @@ function populateAllCycleDateRows() {
     Array.from(tbody.querySelectorAll(".date-field")).map(i => i.value).filter(Boolean)
   );
 
-  const start = new Date(window._currentPayrollWindow.start);
-  const end   = new Date(window._currentPayrollWindow.end);
+  const start = new Date(`${applicableWindow.start}T00:00:00Z`);
+  const end   = new Date(`${applicableWindow.end}T00:00:00Z`);
   const d = new Date(start);
   while (d <= end) {
     const dateStr = d.toISOString().split("T")[0];
@@ -1114,7 +1191,7 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
       <input type="date" class="date-field form-input" value="${defaultDate}" min="${minDate}" max="${maxDate}" onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="updateSummary()">
+      <select class="location-select form-input" onchange="onLocationChange(this)">
         <option value="Office">Office</option>
         <option value="Client Site">Client Site</option>
         <option value="Work From Home">Work From Home</option>
@@ -1174,6 +1251,7 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
 
   // ✅ Setup smart dropdowns for client, project, project code
   setupSmartDropdowns(tr);
+  applyLocationTimeRules(tr);
 
   // Auto focus first input
   setTimeout(() => tr.querySelector("input, select")?.focus(), 100);
@@ -2056,6 +2134,7 @@ function openModal(button) {
   const travelSel = document.getElementById("modalInput14");
   if (travelSel) travelSel.value = currentRow.querySelector(".travel-time-select")?.value || "";
   document.getElementById("modalInput12").value = currentRow.querySelector(".remarks-field")?.value || "";
+  applyModalLocationTimeRules();
 
   updateModalHours();
 
@@ -2311,6 +2390,7 @@ function saveModalEntry() {
   if (lunchSel) lunchSel.value = document.getElementById("modalInput13")?.value || "";
   const travelSel = currentRow.querySelector(".travel-time-select");
   if (travelSel) travelSel.value = document.getElementById("modalInput14")?.value || "";
+  applyLocationTimeRules(currentRow);
 
   const remarks = currentRow.querySelector(".remarks-field");
   if (remarks) remarks.value = document.getElementById("modalInput12").value;
@@ -3202,10 +3282,13 @@ function _collectEntries() {
     const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || '';
     const activity        = row.querySelector('.activity-field')?.value || '';
     const projectHours    = row.querySelector('.project-hours-field')?.value || '0';
-    const billable        = row.querySelector('.billable-select')?.value || 'No';
+    let billable          = row.querySelector('.billable-select')?.value || 'No';
     const remarks         = row.querySelector('.remarks-field')?.value || '';
-    const lunchTime       = row.querySelector('.lunch-time-select')?.value || '';
-    const travelTime      = row.querySelector('.travel-time-select')?.value || '';
+    let lunchTime         = row.querySelector('.lunch-time-select')?.value || '';
+    let travelTime        = row.querySelector('.travel-time-select')?.value || '';
+    if (isDayOffLocation(location)) lunchTime = '';
+    if (NO_TRAVEL_TIME_LOCATIONS.includes(location.trim())) travelTime = '';
+    if (isDayOffLocation(location)) billable = 'No';
     if (!date) return;
     entries.push({
       date, location,
@@ -3301,19 +3384,19 @@ async function saveDraft() {
   }
 }
 
-// Every calendar date in the selected payroll cycle must have at least one
-// row before submit is allowed (a Leave/Week Off/PHY row still counts — this
-// only checks a row exists for the date, not that its other fields are
-// filled in). Returns an array of missing "YYYY-MM-DD" dates (empty if none).
+// Every calendar date applicable to the employee in the selected payroll
+// cycle must have at least one row before submit is allowed (a Leave/Week
+// Off/PHY row still counts — this only checks a row exists for the date, not
+// that its other fields are filled in). Returns missing YYYY-MM-DD dates.
 function _findMissingCycleDates() {
-  const win = window._currentPayrollWindow;
-  if (!win) return [];
+  const applicableWindow = _applicableCycleDateKeys();
+  if (!applicableWindow || applicableWindow.start > applicableWindow.end) return [];
 
   const presentDates = new Set(_collectEntries().map(e => e.date).filter(Boolean));
 
   const missing = [];
-  const start = new Date(win.start);
-  const end   = new Date(win.end);
+  const start = new Date(`${applicableWindow.start}T00:00:00Z`);
+  const end   = new Date(`${applicableWindow.end}T00:00:00Z`);
   const d = new Date(start);
   while (d <= end) {
     const dateStr = d.toISOString().split('T')[0];
@@ -3334,7 +3417,7 @@ function confirmSubmit() {
     return;
   }
 
-  // Every day in the cycle must have an entry row before submitting.
+  // Every date applicable to this employee must have an entry row.
   const missingDates = _findMissingCycleDates();
   if (missingDates.length) {
     const shown = missingDates.slice(0, 10).map(d => new Date(d).toLocaleDateString('en-GB')).join(', ');

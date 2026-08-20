@@ -62,6 +62,9 @@ FREE_TEXT_PARTNER_CODE = "JHS01"
 # Locations that mean "not a working day" — lunch time / project code aren't
 # applicable for rows marked with these.
 DAY_OFF_LOCATIONS = {"Leave", "PHY", "Week Off"}
+# Travel is not applicable for a day off, working from home, or working from
+# the office. Lunch is additionally not applicable for a day off.
+NO_TRAVEL_TIME_LOCATIONS = DAY_OFF_LOCATIONS | {"Work From Home", "Office"}
 
 
 # ─────────────────────────── helpers ────────────────────────────────────────
@@ -103,6 +106,55 @@ def _normalize_payroll_entries(payroll: dict) -> list:
     payroll["entries"] = entries
     payroll.pop("weeks", None)
     return entries
+
+
+def _parse_employment_date(value) -> Optional[datetime]:
+    """Parse the date values stored in ``Employee_details`` safely.
+
+    The current employee master stores Date of Joining and Date of Exit as
+    ``DD/MM/YYYY`` strings.  ISO values and datetime values are accepted too
+    so a future data-format change does not turn a valid submission into a
+    server error.  An unknown/malformed value intentionally returns ``None``:
+    the completeness check then retains its existing full-cycle behaviour.
+    """
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    value = str(value).strip()
+    for date_format in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value[:10], date_format)
+        except ValueError:
+            pass
+    return None
+
+
+def _required_timesheet_dates(cycle_start: datetime, cycle_end: datetime, employee: Optional[dict]) -> set:
+    """Return payroll dates for which this employee must have an entry.
+
+    Only the overlap between the payroll cycle and the employee's recorded
+    employment interval is required.  Missing/invalid employment dates do not
+    relax the current rule: the full cycle remains required in that case.
+    """
+    applicable_start = cycle_start
+    applicable_end = cycle_end
+    employee = employee or {}
+
+    joining_date = _parse_employment_date(employee.get("Date of Joining"))
+    exit_date = _parse_employment_date(employee.get("Date of Exit"))
+    if joining_date and joining_date > applicable_start:
+        applicable_start = joining_date
+    if exit_date and exit_date < applicable_end:
+        applicable_end = exit_date
+
+    required_dates = set()
+    current_date = applicable_start
+    while current_date <= applicable_end:
+        required_dates.add(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+    return required_dates
 
 
 def recalc_totals_from_payrolls(payrolls: list) -> tuple:
@@ -292,17 +344,46 @@ async def submit_timesheet(
     meta = temp_payroll.get("metadata") or metadata or {}
     temp_entries = _get_payroll_entries(temp_payroll)
 
+    # Keep not-applicable time fields consistently empty in both the submitted
+    # timesheet and the locked draft. This also makes older drafts conform when
+    # they are submitted after a location is changed.
+    for entry in temp_entries:
+        location = (entry.get("location", "") or "").strip()
+        if location in DAY_OFF_LOCATIONS:
+            entry["lunchTime"] = ""
+            entry["billable"] = "No"
+        if location in NO_TRAVEL_TIME_LOCATIONS:
+            entry["travelTime"] = ""
+
     from backend.database import payroll_cycles_collection
     try:
         cycle_doc = payroll_cycles_collection.find_one({"_id": ObjectId(cycle_id)})
     except Exception:
         cycle_doc = None
 
+    # The employee master is the source of the employment window used by the
+    # completeness gate below.  Rows outside that window are not applicable
+    # timesheet rows, so they must not trigger row-level submit validation
+    # either (older drafts may contain auto-created rows for those dates).
+    submit_employee = employee_details_collection.find_one({"EmpID": current_user})
+    required_dates = None
+    if cycle_doc and cycle_doc.get("start_date") and cycle_doc.get("end_date"):
+        start_d = datetime.fromisoformat(str(cycle_doc["start_date"])[:10])
+        end_d = datetime.fromisoformat(str(cycle_doc["end_date"])[:10])
+        required_dates = _required_timesheet_dates(start_d, end_d, submit_employee)
+
+    validation_entries = temp_entries
+    if required_dates is not None:
+        validation_entries = [
+            entry for entry in temp_entries
+            if not entry.get("date") or (entry.get("date", "") or "")[:10] in required_dates
+        ]
+
     # ── Lunch-time gate ─────────────────────────────────────────────────
     show_lunch_travel = cycle_doc.get("show_lunch_travel", True) if cycle_doc else True
     if show_lunch_travel:
         lunch_errors = []
-        for i, entry in enumerate(temp_entries):
+        for i, entry in enumerate(validation_entries):
             if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
                 continue  # not a working day — lunch time isn't applicable
             lt = entry.get("lunchTime", "") or ""
@@ -319,7 +400,7 @@ async def submit_timesheet(
         "projectCode", "reportingManagerEntry", "activity",
     ]
     field_errors = []
-    for i, entry in enumerate(temp_entries):
+    for i, entry in enumerate(validation_entries):
         if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
             continue
         for field in mandatory_fields:
@@ -334,11 +415,10 @@ async def submit_timesheet(
     # A row where the employee picked "Other" as the Client (no matching
     # project in their assigned list) is exempt from the PL-prefix rule too,
     # but must have its Project Code literally set to "Other".
-    submit_employee = employee_details_collection.find_one({"EmpID": current_user})
     submit_partner_code = (submit_employee.get("PartnerEmpCode", "") if submit_employee else "").strip().upper()
     if submit_partner_code != FREE_TEXT_PARTNER_CODE:
         code_errors = []
-        for i, entry in enumerate(temp_entries):
+        for i, entry in enumerate(validation_entries):
             if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
                 continue
             client = (entry.get("client", "") or "").strip().upper()
@@ -353,17 +433,11 @@ async def submit_timesheet(
             raise HTTPException(400, "Cannot submit — " + "; ".join(code_errors[:5]))
 
     # ── Day-completeness gate ────────────────────────────────────────────
-    # Every calendar day in the payroll cycle must have at least one entry
-    # row before the timesheet can be submitted (a Leave/Week Off/PHY row
-    # still counts).
+    # Every calendar day applicable to the employee in the payroll cycle must
+    # have at least one entry row before the timesheet can be submitted (a
+    # Leave/Week Off/PHY row still counts).  Days before Date of Joining and
+    # after Date of Exit in Employee_details are not applicable.
     if cycle_doc and cycle_doc.get("start_date") and cycle_doc.get("end_date"):
-        start_d = datetime.fromisoformat(str(cycle_doc["start_date"])[:10])
-        end_d = datetime.fromisoformat(str(cycle_doc["end_date"])[:10])
-        required_dates = set()
-        d = start_d
-        while d <= end_d:
-            required_dates.add(d.strftime("%Y-%m-%d"))
-            d += timedelta(days=1)
         present_dates = {(e.get("date", "") or "")[:10] for e in temp_entries if e.get("date")}
         missing_dates = sorted(required_dates - present_dates)
         if missing_dates:
@@ -386,7 +460,7 @@ async def submit_timesheet(
     if is_tl and partner_code != FREE_TEXT_PARTNER_CODE:
         plan_cache = {}
         plan_errors = []
-        for entry in temp_entries:
+        for entry in validation_entries:
             location = (entry.get("location", "") or "").strip()
             if location in DAY_OFF_LOCATIONS:
                 continue
