@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>JHS — Employee Declaration Admin</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    :root{
+      --pg:linear-gradient(135deg,#8e44ad 0%,#5b2c6f 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text-dark:#2c3e50;--text-light:#7f8c8d;
+      --border:#e1e8ed;--sh-sm:0 4px 6px rgba(0,0,0,.1);
+      --sh-md:0 10px 25px rgba(0,0,0,.15);--sh-lg:0 20px 40px rgba(0,0,0,.2);
+      --tr:all .3s cubic-bezier(.4,0,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:100vh;display:flex;flex-direction:column;color:var(--text-dark);line-height:1.6}
+
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-md);position:sticky;top:0;z-index:100}
+    .navbar-brand{font-size:1.1rem;font-weight:700;color:white;display:flex;align-items:center;gap:.55rem}
+    .navbar-brand i{color:#c39bd3;font-size:1rem}
+    .navbar-right{display:flex;align-items:center;gap:.9rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .nav-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr);text-decoration:none}
+    .nav-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.38);color:white}
+
+    .page-wrapper{flex:1;display:flex;justify-content:center;padding:2rem}
+    .container{width:100%;max-width:1100px;background:white;border-radius:20px;box-shadow:var(--sh-lg);overflow:hidden;animation:fadeInUp .6s ease-out}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+    .header{background:var(--pg);color:white;padding:2.5rem 2rem;text-align:center}
+    .header h1{margin:0;font-size:1.9rem;font-weight:700;letter-spacing:.5px}
+    .header p{margin:.5rem 0 0;opacity:.9;font-size:1rem;font-weight:300}
+
+    .body-content{padding:2rem 2.5rem 2.5rem}
+    .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
+
+    .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.6rem}
+    .stat-card{background:var(--light);border-radius:12px;padding:1.1rem 1.3rem;border-left:4px solid #8e44ad}
+    .stat-value{font-size:1.7rem;font-weight:700;color:var(--text-dark)}
+    .stat-label{font-size:.8rem;color:var(--text-light);margin-top:.2rem}
+
+    .toolbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap}
+    .search-box{position:relative;flex:1;min-width:220px}
+    .search-box input{width:100%;padding:.65rem 1rem .65rem 2.4rem;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:.9rem}
+    .search-box i{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:var(--text-light)}
+
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.3rem;border:none;border-radius:10px;font-size:.88rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .btn-primary{background:var(--pg);color:white;box-shadow:var(--sh-sm)}
+    .btn-primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:var(--sh-md)}
+    .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    thead th{text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);padding:.7rem .9rem;border-bottom:2px solid var(--border)}
+    tbody td{padding:.75rem .9rem;border-bottom:1px solid var(--border)}
+    tbody tr:hover{background:var(--light)}
+    .tag{font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}
+    .tag-yes{background:rgba(17,153,142,.12);color:#11998e}
+    .tag-no{background:rgba(230,126,34,.12);color:#e67e22}
+    .view-link{color:#8e44ad;font-weight:600;cursor:pointer;font-size:.85rem}
+    .view-link:hover{text-decoration:underline}
+    .empty-state{text-align:center;padding:2.5rem;color:var(--text-light)}
+
+    /* ── Signature modal ── */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:none;align-items:center;justify-content:center;padding:1rem}
+    .modal-backdrop.open{display:flex}
+    .modal{background:white;border-radius:16px;width:100%;max-width:480px;box-shadow:0 30px 60px rgba(0,0,0,.3);overflow:hidden}
+    .modal-head{background:var(--pg);color:white;padding:1.2rem 1.6rem;display:flex;justify-content:space-between;align-items:center}
+    .modal-head h3{font-size:1.05rem;font-weight:700}
+    .modal-close{background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer}
+    .modal-body{padding:1.5rem 1.6rem}
+    .modal-body img{width:100%;border:1px solid var(--border);border-radius:8px;background:#fbfcfe}
+    .modal-body .meta{margin-top:1rem;font-size:.85rem;color:var(--text-light)}
+
+    @media(max-width:768px){
+      .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.2rem}
+      .header{padding:1.8rem 1.2rem}
+      table{font-size:.8rem}
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i> Loading admin dashboard…
+  </div>
+
+  <div id="main-content" style="display:none;flex-direction:column;min-height:100vh">
+    <nav class="navbar">
+      <div class="navbar-brand"><i class="fas fa-user-shield"></i> Employee Declaration Admin</div>
+      <div class="navbar-right">
+        <span class="emp-badge" id="empBadge"></span>
+        <a href="/modules" class="nav-btn"><i class="fas fa-th-large"></i> Modules</a>
+      </div>
+    </nav>
+
+    <div class="page-wrapper">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-user-shield"></i> Employee Declaration Admin</h1>
+          <p>Review submission status and download the compliance report</p>
+        </div>
+
+        <div class="body-content">
+          <div class="stat-row">
+            <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total employees</div></div>
+            <div class="stat-card"><div class="stat-value" id="statSubmitted">-</div><div class="stat-label">Submitted</div></div>
+            <div class="stat-card"><div class="stat-value" id="statPending">-</div><div class="stat-label">Pending</div></div>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="searchInput" placeholder="Search by employee ID or name…" />
+            </div>
+            <button class="btn btn-primary" id="downloadBtn"><i class="fas fa-file-excel"></i> Download Report</button>
+          </div>
+
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Submitted At</th>
+                  <th>Signature</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="emptyState" style="display:none">No employees found.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature preview modal -->
+  <div class="modal-backdrop" id="sigModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="sigModalName">Signature</h3>
+        <button class="modal-close" onclick="closeSigModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <img id="sigModalImg" src="" alt="Employee signature" />
+        <div class="meta" id="sigModalMeta"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const empId = localStorage.getItem('loggedInEmployeeId') || '';
+    const token = localStorage.getItem('access_token') || '';
+
+    if (!token) { window.location.href = '/login'; }
+
+    document.getElementById('empBadge').textContent = empId;
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let allRows = [];
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function renderRows(rows) {
+      const body = document.getElementById('tableBody');
+      const empty = document.getElementById('emptyState');
+      if (!rows.length) {
+        body.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      body.innerHTML = rows.map((r, i) => `
+        <tr>
+          <td>${escapeHtml(r.empid)}</td>
+          <td>${escapeHtml(r.name)}</td>
+          <td><span class="tag ${r.submitted ? 'tag-yes' : 'tag-no'}">${r.submitted ? 'Submitted' : 'Pending'}</span></td>
+          <td>${r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—'}</td>
+          <td>${r.signature ? `<span class="view-link" onclick="viewSignature(${i})">View</span>` : '—'}</td>
+        </tr>`).join('');
+    }
+
+    function applyFilter() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!q) { renderRows(allRows); return; }
+      renderRows(allRows.filter(r => r.empid.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)));
+    }
+
+    function viewSignature(indexInFiltered) {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const visible = q ? allRows.filter(r => r.empid.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)) : allRows;
+      const r = visible[indexInFiltered];
+      if (!r) return;
+      document.getElementById('sigModalName').textContent = `${r.name} (${r.empid})`;
+      document.getElementById('sigModalImg').src = r.signature;
+      document.getElementById('sigModalMeta').textContent = r.submitted_at ? `Submitted ${new Date(r.submitted_at).toLocaleString()}` : '';
+      document.getElementById('sigModal').classList.add('open');
+    }
+    function closeSigModal() { document.getElementById('sigModal').classList.remove('open'); }
+    document.getElementById('sigModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSigModal(); });
+
+    document.getElementById('searchInput').addEventListener('input', applyFilter);
+
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('downloadBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing…';
+      try {
+        const res = await fetch('/employee-declaration/admin/export.xlsx', { headers: authHeaders });
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'employee-declaration-report.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Could not download the report. Please try again.');
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-file-excel"></i> Download Report';
+    });
+
+    async function init() {
+      try {
+        const accessRes = await fetch('/employee-declaration/admin/access-check', { headers: authHeaders });
+        const access = await accessRes.json();
+        if (!access.is_admin) {
+          window.location.href = '/modules';
+          return;
+        }
+
+        const res = await fetch('/employee-declaration/admin/submissions', { headers: authHeaders });
+        const data = await res.json();
+        allRows = data.rows || [];
+
+        document.getElementById('statTotal').textContent = allRows.length;
+        document.getElementById('statSubmitted').textContent = allRows.filter(r => r.submitted).length;
+        document.getElementById('statPending').textContent = allRows.filter(r => !r.submitted).length;
+
+        renderRows(allRows);
+      } catch (e) {
+        window.location.href = '/modules';
+        return;
+      }
+
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('main-content').style.display = 'flex';
+    }
+
+    init();
+  </script>
+</body>
+</html>

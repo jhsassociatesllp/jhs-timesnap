@@ -50,6 +50,8 @@
     .card-ap{border-left-color:#11998e}
     .card-qa{border-left-color:#e67e22}
     .card-hr{border-left-color:#8e44ad}
+    .card-ed{border-left-color:#c0392b}
+    .card-eda{border-left-color:#8e44ad}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
@@ -57,12 +59,16 @@
     .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
     .card-hr .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-ed .card-icon{background:rgba(192,57,43,.12);color:#c0392b}
+    .card-eda .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
     .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
     .card-hr .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-ed .card-tag{background:rgba(192,57,43,.12);color:#c0392b}
+    .card-eda .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
     .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
@@ -76,6 +82,8 @@
     .card-ap .card-btn{background:var(--sg);color:white}
     .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
     .card-hr .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-ed .card-btn{background:linear-gradient(135deg,#c0392b,#922b21);color:white}
+    .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
     .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
     .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
     .clickable .card-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
@@ -240,6 +248,48 @@
         </div>
       </a>`;
 
+    // Employee Declaration Form — always shown, like Timesheet. Tag/footer
+    // reflect whether this employee has already signed and submitted.
+    function buildDeclarationCard(submitted) {
+      return `
+        <a href="/employee-declaration" class="module-card card-ed clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-file-signature"></i></div>
+            <span class="card-tag">${submitted ? 'Submitted' : 'Action Required'}</span>
+          </div>
+          <h2 class="card-title">Employee Declaration Form</h2>
+          <p class="card-desc">Read the Code of Conduct, Confidentiality &amp; Compliance declaration and sign it digitally.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-file-alt"></i> Declaration</span>
+            <span class="chip"><i class="fas fa-signature"></i> Digital Signature</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${submitted ? 'Thank you for submitting' : 'Signature required'}</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
+    // Employee Declaration Admin — only for employee codes listed in the
+    // module's own admins collection (same shape as CARD_HR above).
+    const CARD_ED_ADMIN = `
+      <a href="/employee-declaration/admin" class="module-card card-eda clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-user-shield"></i></div>
+          <span class="card-tag">Admin</span>
+        </div>
+        <h2 class="card-title">Employee Declaration Admin</h2>
+        <p class="card-desc">View every employee's declaration submission status and download the compliance report.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-list-check"></i> All Records</span>
+          <span class="chip"><i class="fas fa-file-excel"></i> Export</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Declaration admin access</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
     function buildAppraisalCard(eligible, reason) {
       const isLocked = !eligible;
       return `
@@ -336,6 +386,18 @@
         hrQuizAccess = res.ok;
       } catch(e) {}
 
+      // Check Employee Declaration submission status + admin access
+      let declStatus = null;
+      let declIsAdmin = false;
+      try {
+        const res = await fetch('/employee-declaration/status', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) declStatus = await res.json();
+      } catch(e) {}
+      try {
+        const res = await fetch('/employee-declaration/admin/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) declIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
       // Build cards
       const grid = document.getElementById('cards-grid');
       grid.innerHTML = '';
@@ -354,6 +416,14 @@
       // HR Policy Quiz — only for admin-listed employee codes
       if (hrQuizAccess) {
         grid.innerHTML += CARD_HR;
+      }
+
+      // Employee Declaration Form — always shown, like Timesheet
+      grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
+
+      // Employee Declaration Admin — only for admin-listed employee codes
+      if (declIsAdmin) {
+        grid.innerHTML += CARD_ED_ADMIN;
       }
 
       // Show page

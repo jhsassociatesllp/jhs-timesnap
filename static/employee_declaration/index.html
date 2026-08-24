@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>JHS — Employee Declaration</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    :root{
+      --pg:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text-dark:#2c3e50;--text-light:#7f8c8d;
+      --border:#e1e8ed;--sh-sm:0 4px 6px rgba(0,0,0,.1);
+      --sh-md:0 10px 25px rgba(0,0,0,.15);--sh-lg:0 20px 40px rgba(0,0,0,.2);
+      --tr:all .3s cubic-bezier(.4,0,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:100vh;display:flex;flex-direction:column;color:var(--text-dark);line-height:1.6}
+
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-md);position:sticky;top:0;z-index:100}
+    .navbar-brand{font-size:1.1rem;font-weight:700;color:white;display:flex;align-items:center;gap:.55rem}
+    .navbar-brand i{color:#a78bfa;font-size:1rem}
+    .navbar-right{display:flex;align-items:center;gap:.9rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .nav-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr);text-decoration:none}
+    .nav-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.38);color:white}
+
+    .page-wrapper{flex:1;display:flex;justify-content:center;padding:2rem}
+    .container{width:100%;max-width:820px;background:white;border-radius:20px;box-shadow:var(--sh-lg);overflow:hidden;animation:fadeInUp .6s ease-out}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+    .header{background:var(--pg);color:white;padding:2.5rem 2rem;text-align:center}
+    .header h1{margin:0;font-size:1.9rem;font-weight:700;letter-spacing:.5px}
+    .header p{margin:.5rem 0 0;opacity:.9;font-size:1rem;font-weight:300}
+
+    .body-content{padding:2rem 2.5rem 2.5rem}
+
+    .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
+
+    /* ── Document viewer ── */
+    .doc-viewer{background:var(--light);border:1px solid var(--border);border-radius:12px;padding:2.2rem 2.4rem;max-height:520px;overflow-y:auto;font-family:'Georgia','Times New Roman',serif;color:#1f2d3d;line-height:1.75}
+    .doc-viewer h1,.doc-viewer h2,.doc-viewer h3{font-family:inherit;margin:1.1rem 0 .6rem;color:#1a2634}
+    .doc-viewer p{margin:0 0 .85rem}
+    .doc-viewer img{max-width:100%}
+    .doc-viewer strong{color:#111}
+
+    .section-label{font-size:.82rem;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin:1.8rem 0 .8rem;display:flex;align-items:center;gap:.5rem}
+
+    /* ── Signature pad ── */
+    .sig-wrap{border:2px dashed #cbd5e1;border-radius:12px;background:#fbfcfe;padding:1rem}
+    .sig-canvas-holder{background:white;border:1px solid var(--border);border-radius:8px;touch-action:none}
+    canvas#sigCanvas{display:block;width:100%;height:180px;cursor:crosshair;border-radius:8px}
+    .sig-hint{font-size:.82rem;color:var(--text-light);margin-top:.6rem;display:flex;align-items:center;gap:.4rem}
+    .sig-actions{display:flex;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap;gap:1rem}
+
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;border:none;border-radius:10px;font-size:.92rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .btn-primary{background:var(--pg);color:white;box-shadow:var(--sh-sm)}
+    .btn-primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:var(--sh-md)}
+    .btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-secondary{background:white;color:var(--text-light);border:1px solid var(--border)}
+    .btn-secondary:hover{background:var(--light);color:var(--text-dark)}
+
+    .msg-box{padding:.8rem 1rem;border-radius:10px;font-size:.88rem;margin-top:1rem;display:none}
+    .msg-error{background:#fdecea;color:#c0392b;border:1px solid #f5c6c0}
+    .msg-error.show{display:block}
+
+    /* ── Already-submitted state ── */
+    .done-state{text-align:center;padding:2.5rem 1rem}
+    .done-state i{font-size:3.2rem;color:#11998e;margin-bottom:1rem;display:block}
+    .done-state h2{font-size:1.4rem;color:var(--text-dark);margin-bottom:.5rem}
+    .done-state p{color:var(--text-light);font-size:.95rem}
+
+    @media(max-width:768px){
+      .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
+      .header{padding:1.8rem 1.2rem}
+      .doc-viewer{padding:1.4rem 1.3rem;max-height:400px}
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i> Loading declaration…
+  </div>
+
+  <div id="main-content" style="display:none;flex-direction:column;min-height:100vh">
+    <nav class="navbar">
+      <div class="navbar-brand"><i class="fas fa-file-signature"></i> Employee Declaration</div>
+      <div class="navbar-right">
+        <span class="emp-badge" id="empBadge"></span>
+        <a href="/modules" class="nav-btn"><i class="fas fa-th-large"></i> Modules</a>
+      </div>
+    </nav>
+
+    <div class="page-wrapper">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-file-signature"></i> Employee Declaration &amp; Undertaking</h1>
+          <p>Please read the declaration below carefully, then sign to submit</p>
+        </div>
+
+        <div class="body-content">
+
+          <!-- Form state (unsubmitted) -->
+          <div id="formState" style="display:none">
+            <div class="section-label"><i class="fas fa-file-alt"></i> Declaration Document</div>
+            <div class="doc-viewer" id="docViewer">Loading document…</div>
+
+            <div class="section-label"><i class="fas fa-signature"></i> Your Signature</div>
+            <div class="sig-wrap">
+              <div class="sig-canvas-holder">
+                <canvas id="sigCanvas"></canvas>
+              </div>
+              <p class="sig-hint"><i class="fas fa-info-circle"></i> Sign using your mouse or finger. A signature is required before you can submit.</p>
+              <div class="sig-actions">
+                <button class="btn btn-secondary" id="clearBtn"><i class="fas fa-eraser"></i> Clear</button>
+                <button class="btn btn-primary" id="submitBtn" disabled><i class="fas fa-check"></i> Submit Declaration</button>
+              </div>
+              <div class="msg-box msg-error" id="errorBox"></div>
+            </div>
+          </div>
+
+          <!-- Already-submitted state -->
+          <div id="doneState" class="done-state" style="display:none">
+            <i class="fas fa-check-circle"></i>
+            <h2>Declaration already submitted</h2>
+            <p>You submitted this declaration on <strong id="submittedDate">—</strong>. No further action is needed.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const empId = localStorage.getItem('loggedInEmployeeId') || '';
+    const token = localStorage.getItem('access_token') || '';
+
+    if (!token) { window.location.href = '/login'; }
+
+    document.getElementById('empBadge').textContent = empId;
+
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let hasSignature = false;
+    let drawing = false;
+    let canvas, ctx;
+
+    function setupCanvas() {
+      canvas = document.getElementById('sigCanvas');
+      ctx = canvas.getContext('2d');
+
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        const prev = hasSignature ? canvas.toDataURL() : null;
+        canvas.width = rect.width * ratio;
+        canvas.height = rect.height * ratio;
+        ctx.scale(ratio, ratio);
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#1f2d3d';
+        if (prev) {
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+          img.src = prev;
+        }
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      function pos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const p = e.touches ? e.touches[0] : e;
+        return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+      }
+
+      function start(e) {
+        e.preventDefault();
+        drawing = true;
+        const p = pos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      }
+      function move(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const p = pos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        if (!hasSignature) {
+          hasSignature = true;
+          document.getElementById('submitBtn').disabled = false;
+        }
+      }
+      function end() { drawing = false; }
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+    }
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      hasSignature = false;
+      document.getElementById('submitBtn').disabled = true;
+    });
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.classList.add('show');
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      if (!hasSignature) return;
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting…';
+
+      try {
+        const signature = canvas.toDataURL('image/png');
+        const res = await fetch('/employee-declaration/submit', {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signature }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.detail || 'Could not submit the declaration.');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-check"></i> Submit Declaration';
+          return;
+        }
+        showDoneState(data.submitted_at);
+      } catch (e) {
+        showError('Network error - please try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Submit Declaration';
+      }
+    });
+
+    function showDoneState(submittedAt) {
+      document.getElementById('formState').style.display = 'none';
+      document.getElementById('doneState').style.display = 'block';
+      let label = '—';
+      if (submittedAt) {
+        try { label = new Date(submittedAt).toLocaleString(); } catch (e) {}
+      }
+      document.getElementById('submittedDate').textContent = label;
+    }
+
+    async function init() {
+      try {
+        const statusRes = await fetch('/employee-declaration/status', { headers: authHeaders });
+        const status = await statusRes.json();
+
+        if (status.submitted) {
+          document.getElementById('formState').style.display = 'none';
+          showDoneState(status.submitted_at);
+        } else {
+          document.getElementById('formState').style.display = 'block';
+          const docRes = await fetch('/employee-declaration/document', { headers: authHeaders });
+          const docData = await docRes.json();
+          document.getElementById('docViewer').innerHTML = docData.html || '<p>Could not load the declaration document.</p>';
+          setupCanvas();
+        }
+      } catch (e) {
+        document.getElementById('docViewer').innerHTML = '<p>Could not load the declaration. Please refresh the page.</p>';
+        document.getElementById('formState').style.display = 'block';
+      }
+
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('main-content').style.display = 'flex';
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -42,6 +42,7 @@ from backend.appraisal.router          import router as appraisal_router
 from backend.quality_audit.router      import router as quality_audit_router   # ← NEW
 from backend.timesheet.timesheet_admin import admin_router
 from backend.hr_policy_quiz.router     import router as hr_quiz_router         # ← NEW
+from backend.employee_declaration.router import router as employee_declaration_router  # ← NEW
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -60,7 +61,8 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/quality-audit", "/dashboard", "/forgot-password",
                          "/control-panel", "/admin-dashboard",
                          "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
-                         "/hr-quiz/hr-dashboard", "/hr-quiz/quiz"}
+                         "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
+                         "/employee-declaration", "/employee-declaration/admin"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -80,6 +82,7 @@ app.include_router(appraisal_router)
 app.include_router(quality_audit_router)   # prefix: /quality-audit
 app.include_router(admin_router)
 app.include_router(hr_quiz_router)         # prefix: /hr-quiz
+app.include_router(employee_declaration_router)  # prefix: /employee-declaration
 
 static_root = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_root), name="static")
@@ -152,6 +155,14 @@ async def hr_quiz_hr_dashboard():
 @app.get("/hr-quiz/quiz", response_class=FileResponse)            # ← NEW
 async def hr_quiz_quiz_page():
     return FileResponse(os.path.join(static_root, "hr_policy_quiz", "quiz.html"))
+
+@app.get("/employee-declaration", response_class=FileResponse)   # ← NEW
+async def employee_declaration_page():
+    return FileResponse(os.path.join(static_root, "employee_declaration", "index.html"))
+
+@app.get("/employee-declaration/admin", response_class=FileResponse)   # ← NEW
+async def employee_declaration_admin_page():
+    return FileResponse(os.path.join(static_root, "employee_declaration", "admin.html"))
 
 @app.get("/dashboard", response_class=FileResponse)
 async def dashboard_page():
