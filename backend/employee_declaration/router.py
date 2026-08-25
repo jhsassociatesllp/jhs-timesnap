@@ -150,11 +150,30 @@ def _declaration_paragraphs() -> list[str]:
     return [ln.strip() for ln in text.split("\n") if ln.strip()]
 
 
+# fpdf2's core Helvetica font only supports Latin-1, but the source .docx
+# (and Word docs in general) is full of "smart" punctuation outside that
+# range - typing any of it straight into pdf.cell()/multi_cell() throws and
+# was silently turning every PDF download into a 500.
+_PDF_UNICODE_REPLACEMENTS = {
+    "‘": "'", "’": "'", "‚": "'",
+    "“": '"', "”": '"', "„": '"',
+    "–": "-", "—": "-", "−": "-",
+    "…": "...", " ": " ", "•": "-",
+}
+
+
+def _pdf_safe(text: str) -> str:
+    for uni, ascii_ in _PDF_UNICODE_REPLACEMENTS.items():
+        text = text.replace(uni, ascii_)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
 def _generate_declaration_pdf(empid: str, name: str, submitted_at, signature: str | None) -> bytes:
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
 
     submitted_str = submitted_at.strftime("%d %b %Y, %I:%M %p") if submitted_at else "-"
+    name = _pdf_safe(name)
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -180,8 +199,11 @@ def _generate_declaration_pdf(empid: str, name: str, submitted_at, signature: st
 
     pdf.set_font("Helvetica", "", 9.5)
     for para in _declaration_paragraphs():
-        pdf.multi_cell(0, 5.2, para, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(1.5)
+        try:
+            pdf.multi_cell(0, 5.2, _pdf_safe(para), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(1.5)
+        except Exception:
+            continue
 
     pdf.ln(2)
     pdf.set_draw_color(180, 180, 180)
@@ -233,7 +255,11 @@ def admin_submission_pdf(empid: str, current_user: str = Depends(get_current_use
         raise HTTPException(status_code=404, detail="No submission found for this employee")
 
     name = record.get("employee_name") or _employee_name(empid)
-    pdf_bytes = _generate_declaration_pdf(empid, name, record.get("submitted_at"), record.get("signature"))
+    try:
+        pdf_bytes = _generate_declaration_pdf(empid, name, record.get("submitted_at"), record.get("signature"))
+    except Exception as e:
+        print(f"[DeclarationPDF] Failed to generate PDF for {empid}: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate the declaration PDF")
 
     return Response(
         content=pdf_bytes,
