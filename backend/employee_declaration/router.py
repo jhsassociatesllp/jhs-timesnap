@@ -62,8 +62,13 @@ def get_status(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
     record = submissions.find_one({"empid": empid})
     if not record:
-        return {"submitted": False, "submitted_at": None}
-    return {"submitted": True, "submitted_at": record.get("submitted_at")}
+        return {"submitted": False, "submitted_at": None, "employee_name": _employee_name(empid), "signature": None}
+    return {
+        "submitted": True,
+        "submitted_at": record.get("submitted_at"),
+        "employee_name": record.get("employee_name") or _employee_name(empid),
+        "signature": record.get("signature"),
+    }
 
 
 class SubmitDeclarationRequest(BaseModel):
@@ -80,15 +85,17 @@ def submit_declaration(body: SubmitDeclarationRequest, current_user: str = Depen
     if submissions.find_one({"empid": empid}):
         raise HTTPException(status_code=409, detail="You have already submitted this declaration")
 
+    employee_name = _employee_name(empid)
+    submitted_at = now()
     submissions.insert_one(
         {
             "empid": empid,
-            "employee_name": _employee_name(empid),
+            "employee_name": employee_name,
             "signature": body.signature,
-            "submitted_at": now(),
+            "submitted_at": submitted_at,
         }
     )
-    return {"success": True, "submitted_at": now()}
+    return {"success": True, "submitted_at": submitted_at, "employee_name": employee_name}
 
 
 # ---------------------------------------------------------------------------
