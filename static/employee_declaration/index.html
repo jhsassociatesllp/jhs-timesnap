@@ -156,6 +156,12 @@
 
       function resize() {
         const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          // Container isn't laid out yet (e.g. still display:none) - retry
+          // next frame instead of sizing the drawing buffer to 0x0.
+          requestAnimationFrame(resize);
+          return;
+        }
         const ratio = window.devicePixelRatio || 1;
         const prev = hasSignature ? canvas.toDataURL() : null;
         canvas.width = rect.width * ratio;
@@ -259,27 +265,39 @@
     }
 
     async function init() {
+      let submitted = false;
+      let submittedAt = null;
+      let docHtml = '<p>Could not load the declaration document.</p>';
+
       try {
         const statusRes = await fetch('/employee-declaration/status', { headers: authHeaders });
         const status = await statusRes.json();
+        submitted = status.submitted;
+        submittedAt = status.submitted_at;
 
-        if (status.submitted) {
-          document.getElementById('formState').style.display = 'none';
-          showDoneState(status.submitted_at);
-        } else {
-          document.getElementById('formState').style.display = 'block';
+        if (!submitted) {
           const docRes = await fetch('/employee-declaration/document', { headers: authHeaders });
           const docData = await docRes.json();
-          document.getElementById('docViewer').innerHTML = docData.html || '<p>Could not load the declaration document.</p>';
-          setupCanvas();
+          docHtml = docData.html || docHtml;
         }
       } catch (e) {
-        document.getElementById('docViewer').innerHTML = '<p>Could not load the declaration. Please refresh the page.</p>';
-        document.getElementById('formState').style.display = 'block';
+        docHtml = '<p>Could not load the declaration. Please refresh the page.</p>';
       }
 
+      // Reveal the page layout FIRST - the signature canvas measures its own
+      // rendered size on setup, which is 0x0 while its container is still
+      // display:none, silently sizing its drawing buffer to nothing.
       document.getElementById('loading-screen').style.display = 'none';
       document.getElementById('main-content').style.display = 'flex';
+
+      if (submitted) {
+        document.getElementById('formState').style.display = 'none';
+        showDoneState(submittedAt);
+      } else {
+        document.getElementById('formState').style.display = 'block';
+        document.getElementById('docViewer').innerHTML = docHtml;
+        setupCanvas();
+      }
     }
 
     init();
