@@ -130,6 +130,7 @@
                   <th>Status</th>
                   <th>Submitted At</th>
                   <th>Signature</th>
+                  <th>Download</th>
                 </tr>
               </thead>
               <tbody id="tableBody"></tbody>
@@ -151,6 +152,7 @@
       <div class="modal-body">
         <img id="sigModalImg" src="" alt="Employee signature" />
         <div class="meta" id="sigModalMeta"></div>
+        <button class="btn btn-primary" id="sigModalDownloadBtn" style="margin-top:1.2rem;width:100%;justify-content:center"><i class="fas fa-file-pdf"></i> Download Declaration PDF</button>
       </div>
     </div>
   </div>
@@ -186,6 +188,7 @@
           <td><span class="tag ${r.submitted ? 'tag-yes' : 'tag-no'}">${r.submitted ? 'Submitted' : 'Pending'}</span></td>
           <td>${r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—'}</td>
           <td>${r.signature ? `<span class="view-link" onclick="viewSignature(${i})">View</span>` : '—'}</td>
+          <td>${r.submitted ? `<span class="view-link" onclick="downloadDeclaration('${escapeHtml(r.empid)}')"><i class="fas fa-file-pdf"></i> PDF</span>` : '—'}</td>
         </tr>`).join('');
     }
 
@@ -195,11 +198,14 @@
       renderRows(allRows.filter(r => r.empid.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)));
     }
 
+    let sigModalEmpid = null;
+
     function viewSignature(indexInFiltered) {
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
       const visible = q ? allRows.filter(r => r.empid.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)) : allRows;
       const r = visible[indexInFiltered];
       if (!r) return;
+      sigModalEmpid = r.empid;
       document.getElementById('sigModalName').textContent = `${r.name} (${r.empid})`;
       document.getElementById('sigModalImg').src = r.signature;
       document.getElementById('sigModalMeta').textContent = r.submitted_at ? `Submitted ${new Date(r.submitted_at).toLocaleString()}` : '';
@@ -207,6 +213,28 @@
     }
     function closeSigModal() { document.getElementById('sigModal').classList.remove('open'); }
     document.getElementById('sigModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSigModal(); });
+
+    async function downloadDeclaration(empid) {
+      try {
+        const res = await fetch(`/employee-declaration/admin/submissions/${encodeURIComponent(empid)}/pdf`, { headers: authHeaders });
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `declaration-${empid}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (e) {
+        alert("Could not download this employee's declaration. Please try again.");
+      }
+    }
+
+    document.getElementById('sigModalDownloadBtn').addEventListener('click', () => {
+      if (sigModalEmpid) downloadDeclaration(sigModalEmpid);
+    });
 
     document.getElementById('searchInput').addEventListener('input', applyFilter);
 

@@ -53,17 +53,20 @@
     .card-ts{border-left-color:#667eea}
     .card-ap{border-left-color:#11998e}
     .card-qa{border-left-color:#e67e22}
+    .card-eda{border-left-color:#8e44ad}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
     .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-eda .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
     .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-eda .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
 
     .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
     .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
@@ -76,6 +79,7 @@
     .card-ts .card-btn{background:var(--pg);color:white}
     .card-ap .card-btn{background:var(--sg);color:white}
     .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
+    .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
     .module-card:hover .card-btn{transform:translateY(-2px);box-shadow:var(--sh-md)}
 
     /* ── Info strip ── */
@@ -219,7 +223,32 @@
         </div>`;
     }
 
+    function buildDeclarationAdminCard() {
+      return `
+        <div class="module-card card-eda" onclick="goToDeclarationAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-user-shield"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Employee Declaration</h2>
+          <p class="card-desc">View every employee's declaration submission status and download the compliance report or an individual employee's signed form.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-list-check"></i> All Records</span>
+            <span class="chip"><i class="fas fa-file-signature"></i> Signatures</span>
+            <span class="chip"><i class="fas fa-file-pdf"></i> Per-Employee PDF</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Declaration admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
     // ── Navigation ─────────────────────────────────────────────────────────
+
+    function goToDeclarationAdmin() {
+      window.location.href = '/employee-declaration/admin';
+    }
 
     function goToTimesheetAdmin() {
       // User is already authenticated via regular token — go straight to admin dashboard
@@ -245,6 +274,7 @@
 
     async function initControlPanel() {
       let moduleAccess = null;
+      let declIsAdmin = false;
 
       try {
         const res = await fetch('/get-module-access', {
@@ -253,13 +283,21 @@
         if (res.ok) moduleAccess = await res.json();
       } catch(e) {}
 
-      // If no admin access at all, redirect back to modules
-      if (!moduleAccess || !moduleAccess.is_admin) {
+      try {
+        const res = await fetch('/employee-declaration/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) declIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      // If no admin access at all (neither module access nor declaration
+      // admin access), redirect back to modules
+      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin) {
         window.location.href = '/modules';
         return;
       }
 
-      const modules = moduleAccess.modules || [];
+      const modules = moduleAccess?.modules || [];
       const grid = document.getElementById('cards-grid');
       grid.innerHTML = '';
 
@@ -271,6 +309,9 @@
       }
       if (modules.includes('kra')) {
         grid.innerHTML += buildKRAAdminCard();
+      }
+      if (declIsAdmin) {
+        grid.innerHTML += buildDeclarationAdminCard();
       }
 
       if (grid.innerHTML === '') {

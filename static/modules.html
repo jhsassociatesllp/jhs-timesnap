@@ -356,11 +356,6 @@
 
       console.log('[ModuleAccess] is_admin:', moduleAccess?.is_admin, '| modules:', moduleAccess?.modules);
 
-      // Show Control Panel button if user has any admin module access
-      if (moduleAccess?.is_admin) {
-        document.getElementById('cpBtn').style.display = 'flex';
-      }
-
       // Check QA access
       try {
         const res  = await fetch('/quality-audit/access-check', {headers:{'Authorization':`Bearer ${token}`}});
@@ -397,6 +392,12 @@
         const res = await fetch('/employee-declaration/admin/access-check', {headers:{'Authorization':`Bearer ${token}`}});
         if (res.ok) declIsAdmin = (await res.json()).is_admin;
       } catch(e) {}
+
+      // Show Control Panel button if user has any admin module access
+      // (timesheet/QA/KRA) or Employee Declaration admin access
+      if (moduleAccess?.is_admin || declIsAdmin) {
+        document.getElementById('cpBtn').style.display = 'flex';
+      }
 
       // Build cards
       const grid = document.getElementById('cards-grid');
