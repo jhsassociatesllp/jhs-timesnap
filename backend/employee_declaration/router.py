@@ -31,6 +31,17 @@ def now():
     return datetime.now(timezone.utc)
 
 
+def _aware_utc(dt):
+    """pymongo hands datetimes back tz-naive (value is still UTC). Returning
+    those straight to the frontend serializes without a timezone marker, so
+    the browser's `new Date(...)` parses it as local time instead of UTC and
+    silently drops the IST offset. Reattach UTC tzinfo before it goes out
+    over JSON so the ISO string carries an explicit offset."""
+    if dt and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _format_ist(dt) -> str:
     """submitted_at is stored as UTC (pymongo hands it back tz-naive) - the
     admin table/JS side convert to the browser's local time automatically,
@@ -84,7 +95,7 @@ def get_status(current_user: str = Depends(get_current_user)):
         return {"submitted": False, "submitted_at": None, "employee_name": _employee_name(empid), "signature": None}
     return {
         "submitted": True,
-        "submitted_at": record.get("submitted_at"),
+        "submitted_at": _aware_utc(record.get("submitted_at")),
         "employee_name": record.get("employee_name") or _employee_name(empid),
         "signature": record.get("signature"),
     }
@@ -143,7 +154,7 @@ def _gather_roster() -> list[dict]:
                 "empid": empid,
                 "name": _display_name(emp, empid),
                 "submitted": record is not None,
-                "submitted_at": record.get("submitted_at") if record else None,
+                "submitted_at": _aware_utc(record.get("submitted_at")) if record else None,
                 "signature": record.get("signature") if record else None,
             }
         )
