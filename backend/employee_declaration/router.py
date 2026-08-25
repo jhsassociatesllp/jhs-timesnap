@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timezone
 from io import BytesIO
 
+import pytz
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
@@ -23,9 +24,24 @@ from backend.employee_declaration.html_render import DECLARATION_HTML
 
 router = APIRouter(prefix="/employee-declaration", tags=["Employee Declaration"])
 
+IST = pytz.timezone("Asia/Kolkata")
+
 
 def now():
     return datetime.now(timezone.utc)
+
+
+def _format_ist(dt) -> str:
+    """submitted_at is stored as UTC (pymongo hands it back tz-naive) - the
+    admin table/JS side convert to the browser's local time automatically,
+    but the PDF/Excel exports are rendered server-side, so they need an
+    explicit UTC -> IST conversion instead of just formatting the raw UTC
+    value as if it were already local."""
+    if not dt:
+        return "-"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p")
 
 
 def _employee_name(empid: str) -> str:
@@ -172,7 +188,7 @@ def _generate_declaration_pdf(empid: str, name: str, submitted_at, signature: st
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
 
-    submitted_str = submitted_at.strftime("%d %b %Y, %I:%M %p") if submitted_at else "-"
+    submitted_str = _format_ist(submitted_at)
     name = _pdf_safe(name)
 
     pdf = FPDF()
@@ -287,8 +303,7 @@ def admin_export_xlsx(current_user: str = Depends(get_current_user)):
         cell.font = bold
 
     for r in rows:
-        submitted_at = r["submitted_at"].strftime("%d %b %Y, %I:%M %p") if r["submitted_at"] else "-"
-        sheet.append([r["empid"], r["name"], "Yes" if r["submitted"] else "No", submitted_at])
+        sheet.append([r["empid"], r["name"], "Yes" if r["submitted"] else "No", _format_ist(r["submitted_at"])])
 
     for col in sheet.columns:
         width = max((len(str(c.value)) for c in col if c.value is not None), default=10)
