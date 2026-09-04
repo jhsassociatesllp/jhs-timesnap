@@ -13,7 +13,7 @@ db = _client[settings.DB_NAME]
 
 # Explicitly create the database + collections on startup so they show up
 # in Compass immediately, instead of waiting for the first insert.
-COLLECTION_NAMES = ["hr_quiz_candidates", "hr_quiz_documents", "hr_quiz_questions", "hr_quiz_attempts", "hr_quiz_deleted_candidates", "hr_quiz_admins"]
+COLLECTION_NAMES = ["hr_quiz_candidates", "hr_quiz_documents", "hr_quiz_questions", "hr_quiz_attempts", "hr_quiz_deleted_candidates", "hr_quiz_admins", "hr_quiz_sets"]
 existing_collections = db.list_collection_names()
 for name in COLLECTION_NAMES:
     if name not in existing_collections:
@@ -24,6 +24,13 @@ documents = db["hr_quiz_documents"]
 questions = db["hr_quiz_questions"]
 attempts = db["hr_quiz_attempts"]
 deleted_candidates = db["hr_quiz_deleted_candidates"]
+
+# Reusable named quiz compositions: { name, documents: [{document_id,
+# document_title, count}], total_questions, created_by, created_at,
+# updated_at }. A candidate is assigned a quiz_set_id (not a raw
+# document_id) - see router.py's start_quiz for how the weighted mix of
+# questions is assembled at quiz time.
+quiz_sets = db["hr_quiz_sets"]
 
 # JHS employee codes allowed to open the HR dashboard directly with their
 # normal Timesnap login (no separate hr-login screen). One document per
@@ -40,3 +47,4 @@ candidates.create_index("email", unique=True)
 attempts.create_index([("candidate_email", 1), ("started_at", -1)])
 deleted_candidates.create_index([("email", 1), ("deleted_at", -1)])
 hr_quiz_admins.create_index("empid", unique=True)
+quiz_sets.create_index("created_at")

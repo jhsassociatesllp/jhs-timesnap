@@ -24,7 +24,7 @@ def gather_report_rows() -> List[dict]:
         rows.append(
             {
                 "email": c["email"],
-                "document_title": c.get("document_title") or "-",
+                "quiz_set_name": c.get("quiz_set_name") or "-",
                 "status": "Completed" if latest_attempt else ("In progress" if in_progress else "Not started"),
                 "score": latest_attempt["score"] if latest_attempt else None,
                 "total_questions": latest_attempt["total_questions"] if latest_attempt else None,
@@ -57,12 +57,12 @@ def generate_excel(rows: List[dict]) -> bytes:
 
     summary = wb.active
     summary.title = "Summary"
-    summary.append(["Email", "Assigned document", "Status", "Score", "Total questions", "Submitted"])
+    summary.append(["Email", "Assigned quiz", "Status", "Score", "Total questions", "Submitted"])
     for cell in summary[1]:
         cell.font = bold
     for r in rows:
         summary.append(
-            [r["email"], r["document_title"], r["status"], r["score"] or "", r["total_questions"] or "", format_dt(r["submitted_at"])]
+            [r["email"], r["quiz_set_name"], r["status"], r["score"] or "", r["total_questions"] or "", format_dt(r["submitted_at"])]
         )
 
     answers = wb.create_sheet("Answers")
@@ -98,12 +98,12 @@ def generate_docx(rows: List[dict]) -> bytes:
     table = doc.add_table(rows=1, cols=6)
     table.style = "Light Grid Accent 1"
     hdr = table.rows[0].cells
-    for cell, text in zip(hdr, ["Email", "Assigned document", "Status", "Score", "Total", "Submitted"]):
+    for cell, text in zip(hdr, ["Email", "Assigned quiz", "Status", "Score", "Total", "Submitted"]):
         cell.text = text
     for r in rows:
         cells = table.add_row().cells
         cells[0].text = r["email"]
-        cells[1].text = r["document_title"]
+        cells[1].text = r["quiz_set_name"]
         cells[2].text = r["status"]
         cells[3].text = str(r["score"] or "-")
         cells[4].text = str(r["total_questions"] or "-")
@@ -148,14 +148,14 @@ def generate_pdf(rows: List[dict]) -> bytes:
     pdf.set_font("Helvetica", "", 10)
 
     col_widths = [45, 40, 25, 15, 20, 40]
-    headers = ["Email", "Document", "Status", "Score", "Total", "Submitted"]
+    headers = ["Email", "Assigned quiz", "Status", "Score", "Total", "Submitted"]
     pdf.set_font("Helvetica", "B", 9)
     for w, h in zip(col_widths, headers):
         pdf.cell(w, 8, h, border=1)
     pdf.ln()
     pdf.set_font("Helvetica", "", 9)
     for r in rows:
-        values = [r["email"], r["document_title"], r["status"], str(r["score"] or "-"), str(r["total_questions"] or "-"), format_dt(r["submitted_at"])]
+        values = [r["email"], r["quiz_set_name"], r["status"], str(r["score"] or "-"), str(r["total_questions"] or "-"), format_dt(r["submitted_at"])]
         for w, v in zip(col_widths, values):
             pdf.cell(w, 8, v[:28], border=1)
         pdf.ln()

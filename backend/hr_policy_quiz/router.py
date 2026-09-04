@@ -14,12 +14,14 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, R
 
 from backend.auth import get_current_user
 from backend.hr_policy_quiz.config import settings
-from backend.hr_policy_quiz.db import candidates, documents, questions, attempts, deleted_candidates, hr_quiz_admins
+from backend.hr_policy_quiz.db import candidates, documents, questions, attempts, deleted_candidates, hr_quiz_admins, quiz_sets
 from backend.hr_policy_quiz.schemas import (
     CandidateLoginRequest,
     AddCandidatesRequest,
     RegeneratePasswordRequest,
     SubmitQuizRequest,
+    CreateQuizSetRequest,
+    UpdateQuizSetRequest,
 )
 from backend.hr_policy_quiz.security import (
     hash_password,
@@ -70,6 +72,7 @@ def platform_access(current_user: str = Depends(get_current_user)):
 async def upload_document(
     file: UploadFile = File(...),
     title: str = Form(...),
+    category: str = Form(""),
     hr=Depends(get_current_hr),
 ):
     raw = await file.read()
@@ -90,6 +93,7 @@ async def upload_document(
         {
             "_id": doc_id,
             "title": title,
+            "category": category.strip(),
             "filename": file.filename,
             "chunk_count": len(chunks),
             "uploaded_by": hr["sub"],
@@ -98,14 +102,16 @@ async def upload_document(
     )
     questions.insert_one({"_id": doc_id, "document_id": doc_id, "pool": pool})
 
-    return {"document_id": doc_id, "title": title, "question_pool_size": len(pool)}
+    return {"document_id": doc_id, "title": title, "category": category.strip(), "question_pool_size": len(pool)}
 
 
 @router.get("/api/hr/documents")
 def list_documents(hr=Depends(get_current_hr)):
-    docs = list(documents.find({}, {"_id": 1, "title": 1, "filename": 1, "uploaded_at": 1, "chunk_count": 1}))
+    docs = list(documents.find({}, {"_id": 1, "title": 1, "category": 1, "filename": 1, "uploaded_at": 1, "chunk_count": 1}))
+    pools = {p["_id"]: len(p["pool"]) for p in questions.find({}, {"pool": 1})}
     for d in docs:
         d["document_id"] = d.pop("_id")
+        d["question_pool_size"] = pools.get(d["document_id"], 0)
     return docs
 
 
@@ -114,6 +120,13 @@ def delete_document(document_id: str, hr=Depends(get_current_hr)):
     doc = documents.find_one({"_id": document_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    in_use = quiz_sets.find_one({"documents.document_id": document_id})
+    if in_use:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This document is used by the quiz set \"{in_use['name']}\". Remove it from that quiz set first.",
+        )
 
     # Only removes the document + its generated question pool. Candidates
     # and their attempt history (candidates, attempts collections) are
@@ -124,14 +137,104 @@ def delete_document(document_id: str, hr=Depends(get_current_hr)):
 
 
 # ---------------------------------------------------------------------------
+# HR: quiz sets (multiple documents mixed together with a per-document
+# question-count weightage - e.g. 7 from "HR Handbook", 8 from "IT Policy").
+# A candidate is assigned one quiz set; at quiz time the questions are
+# randomly sampled from each document's pool per its weight and combined.
+# ---------------------------------------------------------------------------
+
+def _build_quiz_set_documents(entries) -> tuple[list, int]:
+    """Validates each document exists and has enough pooled questions for
+    the requested weight. Returns (denormalized entries, total_questions)."""
+    doc_entries = []
+    total = 0
+    for entry in entries:
+        doc = documents.find_one({"_id": entry.document_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document {entry.document_id} not found")
+        pool_doc = questions.find_one({"_id": entry.document_id})
+        pool_size = len(pool_doc["pool"]) if pool_doc else 0
+        if pool_size < entry.count:
+            raise HTTPException(
+                status_code=422,
+                detail=f"\"{doc['title']}\" only has {pool_size} questions available, cannot draw {entry.count}",
+            )
+        doc_entries.append({"document_id": entry.document_id, "document_title": doc["title"], "count": entry.count})
+        total += entry.count
+    return doc_entries, total
+
+
+@router.post("/api/hr/quiz-sets")
+def create_quiz_set(body: CreateQuizSetRequest, hr=Depends(get_current_hr)):
+    doc_entries, total = _build_quiz_set_documents(body.documents)
+
+    quiz_set_id = str(uuid.uuid4())
+    quiz_sets.insert_one(
+        {
+            "_id": quiz_set_id,
+            "name": body.name.strip(),
+            "documents": doc_entries,
+            "total_questions": total,
+            "created_by": hr["sub"],
+            "created_at": now(),
+            "updated_at": now(),
+        }
+    )
+    return {"quiz_set_id": quiz_set_id, "name": body.name.strip(), "documents": doc_entries, "total_questions": total}
+
+
+@router.get("/api/hr/quiz-sets")
+def list_quiz_sets(hr=Depends(get_current_hr)):
+    sets = list(quiz_sets.find({}))
+    for s in sets:
+        s["quiz_set_id"] = s.pop("_id")
+    sets.sort(key=lambda s: s.get("created_at") or now(), reverse=True)
+    return sets
+
+
+@router.put("/api/hr/quiz-sets/{quiz_set_id}")
+def update_quiz_set(quiz_set_id: str, body: UpdateQuizSetRequest, hr=Depends(get_current_hr)):
+    existing = quiz_sets.find_one({"_id": quiz_set_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Quiz set not found")
+
+    update = {"updated_at": now()}
+    if body.name is not None:
+        update["name"] = body.name.strip()
+    if body.documents is not None:
+        doc_entries, total = _build_quiz_set_documents(body.documents)
+        update["documents"] = doc_entries
+        update["total_questions"] = total
+
+    quiz_sets.update_one({"_id": quiz_set_id}, {"$set": update})
+    updated = quiz_sets.find_one({"_id": quiz_set_id})
+    updated["quiz_set_id"] = updated.pop("_id")
+    return updated
+
+
+@router.delete("/api/hr/quiz-sets/{quiz_set_id}")
+def delete_quiz_set(quiz_set_id: str, hr=Depends(get_current_hr)):
+    in_use = candidates.find_one({"quiz_set_id": quiz_set_id})
+    if in_use:
+        raise HTTPException(
+            status_code=409,
+            detail="This quiz set has candidates assigned to it. Reassign or delete them first.",
+        )
+    result = quiz_sets.delete_one({"_id": quiz_set_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Quiz set not found")
+    return {"deleted": True}
+
+
+# ---------------------------------------------------------------------------
 # HR: candidate (new joiner) management
 # ---------------------------------------------------------------------------
 
 @router.post("/api/hr/candidates")
 def add_candidates(body: AddCandidatesRequest, hr=Depends(get_current_hr)):
-    doc = documents.find_one({"_id": body.document_id})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Selected document does not exist")
+    quiz_set = quiz_sets.find_one({"_id": body.quiz_set_id})
+    if not quiz_set:
+        raise HTTPException(status_code=404, detail="Selected quiz set does not exist")
 
     shared_password = generate_password()
     password_hash = hash_password(shared_password)
@@ -144,8 +247,8 @@ def add_candidates(body: AddCandidatesRequest, hr=Depends(get_current_hr)):
                 "$set": {
                     "email": email,
                     "password_hash": password_hash,
-                    "document_id": body.document_id,
-                    "document_title": doc["title"],
+                    "quiz_set_id": body.quiz_set_id,
+                    "quiz_set_name": quiz_set["name"],
                     "updated_at": now(),
                 },
                 "$setOnInsert": {"created_at": now(), "created_by": hr["sub"]},
@@ -154,7 +257,7 @@ def add_candidates(body: AddCandidatesRequest, hr=Depends(get_current_hr)):
         )
         created.append(email)
 
-    return {"emails": created, "password": shared_password, "document_title": doc["title"]}
+    return {"emails": created, "password": shared_password, "quiz_set_name": quiz_set["name"]}
 
 
 @router.post("/api/hr/candidates/regenerate-password")
@@ -225,7 +328,7 @@ def list_candidates(hr=Depends(get_current_hr)):
         result.append(
             {
                 "email": c["email"],
-                "document_title": c.get("document_title"),
+                "quiz_set_name": c.get("quiz_set_name"),
                 "created_at": c.get("created_at"),
                 "status": "completed" if latest_attempt else ("in_progress" if in_progress else "not_started"),
                 "score": latest_attempt["score"] if latest_attempt else None,
@@ -267,12 +370,68 @@ def export_candidates_pdf(hr=Depends(get_current_hr)):
     )
 
 
+def _backfill_document_titles(attempt: dict) -> None:
+    """Ensures every answers_detail item has a document_title, so both the
+    per-question tag AND the score-by-document summary work in the HR
+    dashboard's "View answers" modal. Newer attempts already have this on
+    each answer (tagged at quiz-start time); older attempts (recorded
+    before that existed) are backfilled here - NOT by matching question
+    text against the full document pools, since different documents can
+    (and in practice do) generate near-identical or duplicate-sounding
+    questions, which would silently mis-attribute a question. Instead,
+    match text against THIS attempt's own question_snapshot (15-ish
+    questions, effectively never has an internal duplicate) to recover the
+    reliable globally-unique question id, then resolve that id against the
+    quiz set's pools - ids never collide across documents, so this is
+    exact. Mutates attempt["answers_detail"] in place."""
+    answers = attempt.get("answers_detail") or []
+    if not answers or all(a.get("document_title") for a in answers):
+        return
+
+    quiz_set = quiz_sets.find_one({"_id": attempt.get("quiz_set_id")})
+    snapshot = attempt.get("question_snapshot") or []
+    if not quiz_set or not snapshot:
+        return
+
+    id_to_title = {}
+    for entry in quiz_set["documents"]:
+        pool_doc = questions.find_one({"_id": entry["document_id"]})
+        if pool_doc:
+            for q in pool_doc["pool"]:
+                id_to_title[q["id"]] = entry["document_title"]
+    text_to_id = {q["question"]: q["id"] for q in snapshot}
+
+    for a in answers:
+        if not a.get("document_title"):
+            a["document_title"] = id_to_title.get(text_to_id.get(a["question"]), "Unknown")
+
+
+def _score_by_document(attempt: dict) -> list:
+    """Per-document correct/total breakdown for a completed attempt (e.g.
+    "HR Handbook: 6/8", "IT Policy: 5/7"). Call _backfill_document_titles
+    first so this works for both new and older attempts alike."""
+    breakdown = {}
+    for a in attempt.get("answers_detail") or []:
+        title = a.get("document_title") or "Unknown"
+        b = breakdown.setdefault(title, {"document_title": title, "correct": 0, "total": 0})
+        b["total"] += 1
+        if a.get("is_correct"):
+            b["correct"] += 1
+    return list(breakdown.values())
+
+
 @router.get("/api/hr/candidates/{email}/attempts")
 def candidate_attempts(email: str, hr=Depends(get_current_hr)):
     docs = list(
-        attempts.find({"candidate_email": email.lower()}, {"answers_detail": 1, "score": 1, "total_questions": 1, "submitted_at": 1, "started_at": 1, "status": 1})
+        attempts.find(
+            {"candidate_email": email.lower()},
+            {"answers_detail": 1, "score": 1, "total_questions": 1, "submitted_at": 1, "started_at": 1, "status": 1, "quiz_set_id": 1, "question_snapshot": 1},
+        )
     )
     for d in docs:
+        _backfill_document_titles(d)
+        d["score_by_document"] = _score_by_document(d)
+        d.pop("question_snapshot", None)  # internal only (has correct_index/ids) - not part of the public shape
         d["attempt_id"] = str(d.pop("_id"))
     docs.sort(key=lambda d: d.get("started_at") or now(), reverse=True)
     return docs
@@ -288,7 +447,7 @@ def candidate_login(body: CandidateLoginRequest):
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
     token = create_token(user["email"], "candidate", settings.CANDIDATE_TOKEN_EXPIRE_MINUTES)
-    return {"access_token": token, "document_title": user.get("document_title")}
+    return {"access_token": token, "quiz_set_name": user.get("quiz_set_name")}
 
 
 # ---------------------------------------------------------------------------
@@ -306,18 +465,31 @@ def start_quiz(candidate=Depends(get_current_candidate)):
     if existing:
         raise HTTPException(status_code=409, detail="You have already completed this quiz")
 
-    pool_doc = questions.find_one({"_id": user["document_id"]})
-    if not pool_doc or len(pool_doc["pool"]) < settings.QUIZ_QUESTION_COUNT:
+    quiz_set = quiz_sets.find_one({"_id": user["quiz_set_id"]})
+    if not quiz_set:
         raise HTTPException(status_code=500, detail="Quiz is not ready yet, please contact HR")
 
-    selected = random.sample(pool_doc["pool"], settings.QUIZ_QUESTION_COUNT)
+    # Weighted mix: draw `count` random questions from each document's pool
+    # per the quiz set's composition, then shuffle so they don't cluster by
+    # source document. Each question is tagged with where it came from so
+    # the HR dashboard can later show a per-document score breakdown.
+    selected: list = []
+    for entry in quiz_set["documents"]:
+        pool_doc = questions.find_one({"_id": entry["document_id"]})
+        pool = pool_doc["pool"] if pool_doc else []
+        if len(pool) < entry["count"]:
+            raise HTTPException(status_code=500, detail="Quiz is not ready yet, please contact HR")
+        for q in random.sample(pool, entry["count"]):
+            selected.append({**q, "document_id": entry["document_id"], "document_title": entry["document_title"]})
+    random.shuffle(selected)
+
     session_id = str(uuid.uuid4())
 
     attempts.insert_one(
         {
             "_id": session_id,
             "candidate_email": email,
-            "document_id": user["document_id"],
+            "quiz_set_id": user["quiz_set_id"],
             "status": "in_progress",
             "started_at": now(),
             "seconds_per_question": settings.SECONDS_PER_QUESTION,
@@ -345,7 +517,10 @@ def submit_quiz(body: SubmitQuizRequest, candidate=Depends(get_current_candidate
         raise HTTPException(status_code=409, detail="This quiz was already submitted")
 
     correct_by_id = {q["id"]: q["correct_index"] for q in attempt["question_snapshot"]}
-    text_by_id = {q["id"]: (q["question"], q["options"]) for q in attempt["question_snapshot"]}
+    meta_by_id = {
+        q["id"]: (q["question"], q["options"], q.get("document_id", ""), q.get("document_title", ""))
+        for q in attempt["question_snapshot"]
+    }
 
     score = 0
     detail = []
@@ -356,7 +531,7 @@ def submit_quiz(body: SubmitQuizRequest, candidate=Depends(get_current_candidate
         is_correct = ans.selected_option == correct_index
         if is_correct:
             score += 1
-        q_text, options = text_by_id[ans.question_id]
+        q_text, options, doc_id, doc_title = meta_by_id[ans.question_id]
         detail.append(
             {
                 "question": q_text,
@@ -365,6 +540,8 @@ def submit_quiz(body: SubmitQuizRequest, candidate=Depends(get_current_candidate
                 "correct_index": correct_index,
                 "is_correct": is_correct,
                 "time_taken_seconds": ans.time_taken_seconds,
+                "document_id": doc_id,
+                "document_title": doc_title,
             }
         )
 

@@ -87,7 +87,7 @@ async function loadCandidates() {
 
     tr.innerHTML = `
       <td>${escapeHtml(r.email)}</td>
-      <td>${escapeHtml(r.document_title || "-")}</td>
+      <td>${escapeHtml(r.quiz_set_name || "-")}</td>
       <td><span class="badge ${badgeClass}">${badgeText}</span></td>
       <td>${scoreHtml}</td>
       <td>${formatDateTime(r.submitted_at)}</td>
@@ -246,39 +246,43 @@ document.getElementById("refreshBtn").addEventListener("click", loadCandidates);
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
+let allDocuments = [];
+
 async function loadDocuments() {
   const docs = await apiRequest("/api/hr/documents", { role: "hr" });
+  allDocuments = docs;
   const tbody = document.getElementById("documentTableBody");
   const empty = document.getElementById("documentEmpty");
-  const select = document.getElementById("docSelect");
+  const categoryList = document.getElementById("docCategoryList");
 
   tbody.innerHTML = "";
-  select.innerHTML = "";
   empty.style.display = docs.length === 0 ? "block" : "none";
 
+  const categories = new Set();
+
   docs.forEach((d) => {
+    if (d.category) categories.add(d.category);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(d.title)}</td>
+      <td>${d.category ? `<span class="cat-tag">${escapeHtml(d.category)}</span>` : "-"}</td>
       <td>${escapeHtml(d.filename)}</td>
+      <td>${d.question_pool_size}</td>
       <td>${formatDateTime(d.uploaded_at)}</td>
       <td><button class="btn btn-ghost btn-sm" data-action="delete-doc">Delete</button></td>
     `;
     tr.querySelector('[data-action="delete-doc"]').addEventListener("click", () => deleteDocument(d.document_id, d.title));
     tbody.appendChild(tr);
-
-    const opt = document.createElement("option");
-    opt.value = d.document_id;
-    opt.textContent = d.title;
-    select.appendChild(opt);
   });
 
-  if (docs.length === 0) {
+  categoryList.innerHTML = "";
+  categories.forEach((c) => {
     const opt = document.createElement("option");
-    opt.textContent = "Upload a document first";
-    opt.disabled = true;
-    select.appendChild(opt);
-  }
+    opt.value = c;
+    categoryList.appendChild(opt);
+  });
+
+  renderQuizSetDocPicker();
 }
 
 function deleteDocument(documentId, title) {
@@ -309,6 +313,7 @@ document.getElementById("uploadForm").addEventListener("submit", async (e) => {
 
   const formData = new FormData();
   formData.append("title", document.getElementById("docTitle").value.trim());
+  formData.append("category", document.getElementById("docCategory").value.trim());
   formData.append("file", fileInput.files[0]);
 
   btn.disabled = true;
@@ -328,6 +333,184 @@ document.getElementById("uploadForm").addEventListener("submit", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// Quiz sets: pick multiple documents + a per-document question count
+// (weightage), save as a named, reusable, editable composition.
+// ---------------------------------------------------------------------------
+let editingQuizSetId = null;
+
+function renderQuizSetDocPicker(checkedEntries) {
+  // checkedEntries: optional [{document_id, count}] to pre-check when
+  // loading a quiz set for editing. Without it, keeps whatever is
+  // currently checked (e.g. after a re-render triggered by loadDocuments).
+  const preset = checkedEntries ? new Map(checkedEntries.map((e) => [e.document_id, e.count])) : null;
+  const list = document.getElementById("quizSetDocList");
+  const previouslyChecked = preset || new Map(
+    Array.from(list.querySelectorAll(".quiz-doc-check:checked")).map((cb) => [cb.dataset.docId, parseInt(cb.closest(".quiz-doc-row").querySelector(".quiz-doc-count").value, 10) || 1])
+  );
+
+  list.innerHTML = "";
+  if (allDocuments.length === 0) {
+    list.innerHTML = `<div class="quiz-doc-row"><span class="hint">Upload a document first.</span></div>`;
+    updateQuizSetTotal();
+    return;
+  }
+
+  allDocuments.forEach((d) => {
+    const isChecked = previouslyChecked.has(d.document_id);
+    const count = previouslyChecked.get(d.document_id) || Math.min(5, d.question_pool_size || 1);
+    const row = document.createElement("label");
+    row.className = "quiz-doc-row" + (isChecked ? " checked" : "");
+    row.innerHTML = `
+      <input type="checkbox" class="quiz-doc-check" data-doc-id="${d.document_id}" ${isChecked ? "checked" : ""} />
+      <span class="quiz-doc-title">${escapeHtml(d.title)}
+        ${d.category ? `<span class="cat-tag">${escapeHtml(d.category)}</span>` : ""}
+        <span class="quiz-doc-pool">(${d.question_pool_size} available)</span>
+      </span>
+      <span class="quiz-doc-count-label">questions:</span>
+      <input type="number" class="quiz-doc-count" min="1" max="${d.question_pool_size}" value="${count}" ${isChecked ? "" : "disabled"} />
+    `;
+    const checkbox = row.querySelector(".quiz-doc-check");
+    const countInput = row.querySelector(".quiz-doc-count");
+    checkbox.addEventListener("change", () => {
+      countInput.disabled = !checkbox.checked;
+      row.classList.toggle("checked", checkbox.checked);
+      updateQuizSetTotal();
+    });
+    countInput.addEventListener("input", updateQuizSetTotal);
+    countInput.addEventListener("click", (e) => e.stopPropagation());
+    list.appendChild(row);
+  });
+
+  updateQuizSetTotal();
+}
+
+function getQuizSetSelection() {
+  return Array.from(document.querySelectorAll("#quizSetDocList .quiz-doc-check:checked")).map((cb) => ({
+    document_id: cb.dataset.docId,
+    count: parseInt(cb.closest(".quiz-doc-row").querySelector(".quiz-doc-count").value, 10) || 0,
+  }));
+}
+
+function updateQuizSetTotal() {
+  const total = getQuizSetSelection().reduce((sum, e) => sum + e.count, 0);
+  document.getElementById("quizSetTotalHint").textContent = `Total questions: ${total}`;
+}
+
+async function loadQuizSets() {
+  const sets = await apiRequest("/api/hr/quiz-sets", { role: "hr" });
+  const tbody = document.getElementById("quizSetTableBody");
+  const empty = document.getElementById("quizSetEmpty");
+  const select = document.getElementById("quizSetSelect");
+
+  tbody.innerHTML = "";
+  select.innerHTML = "";
+  empty.style.display = sets.length === 0 ? "block" : "none";
+
+  sets.forEach((s) => {
+    const composition = s.documents.map((doc) => `${escapeHtml(doc.document_title)} ×${doc.count}`).join(", ");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(s.name)}</td>
+      <td>${composition}</td>
+      <td>${s.total_questions}</td>
+      <td><button class="btn btn-ghost btn-sm" data-action="edit-set">Edit</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-action="delete-set">Delete</button></td>
+    `;
+    tr.querySelector('[data-action="edit-set"]').addEventListener("click", () => editQuizSet(s));
+    tr.querySelector('[data-action="delete-set"]').addEventListener("click", () => deleteQuizSet(s.quiz_set_id, s.name));
+    tbody.appendChild(tr);
+
+    const opt = document.createElement("option");
+    opt.value = s.quiz_set_id;
+    opt.textContent = `${s.name} (${s.total_questions} questions)`;
+    select.appendChild(opt);
+  });
+
+  if (sets.length === 0) {
+    const opt = document.createElement("option");
+    opt.textContent = "Build a quiz set first";
+    opt.disabled = true;
+    select.appendChild(opt);
+  }
+}
+
+function editQuizSet(set) {
+  editingQuizSetId = set.quiz_set_id;
+  document.getElementById("quizSetFormTitle").textContent = `Editing "${set.name}"`;
+  document.getElementById("quizSetName").value = set.name;
+  document.getElementById("quizSetSaveBtn").textContent = "Update quiz set";
+  document.getElementById("quizSetCancelEditBtn").style.display = "inline-flex";
+  renderQuizSetDocPicker(set.documents.map((d) => ({ document_id: d.document_id, count: d.count })));
+  document.querySelector('.tab-btn[data-tab="quizsets"]').click();
+  document.getElementById("quizSetForm").scrollIntoView({ behavior: "smooth" });
+}
+
+function resetQuizSetForm() {
+  editingQuizSetId = null;
+  document.getElementById("quizSetFormTitle").textContent = "Build a quiz set";
+  document.getElementById("quizSetForm").reset();
+  document.getElementById("quizSetSaveBtn").textContent = "Save quiz set";
+  document.getElementById("quizSetCancelEditBtn").style.display = "none";
+  renderQuizSetDocPicker([]);
+}
+
+document.getElementById("quizSetCancelEditBtn").addEventListener("click", resetQuizSetForm);
+
+function deleteQuizSet(quizSetId, name) {
+  showConfirmModal(
+    `Delete quiz set "<strong>${escapeHtml(name)}</strong>"? This only works if no candidates are currently assigned to it.`,
+    "Yes, delete",
+    async () => {
+      try {
+        await apiRequest(`/api/hr/quiz-sets/${encodeURIComponent(quizSetId)}`, { method: "DELETE", role: "hr" });
+        if (editingQuizSetId === quizSetId) resetQuizSetForm();
+        loadQuizSets();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  );
+}
+
+document.getElementById("quizSetForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorBox = document.getElementById("quizSetError");
+  const successBox = document.getElementById("quizSetSuccess");
+  const btn = document.getElementById("quizSetSaveBtn");
+  hideError(errorBox);
+  successBox.style.display = "none";
+
+  const name = document.getElementById("quizSetName").value.trim();
+  const documents = getQuizSetSelection();
+
+  if (!name) { showError(errorBox, "Give this quiz set a name"); return; }
+  if (documents.length === 0) { showError(errorBox, "Tick at least one document"); return; }
+  if (documents.some((d) => !d.count || d.count < 1)) { showError(errorBox, "Every ticked document needs a question count of at least 1"); return; }
+
+  btn.disabled = true;
+  btn.textContent = editingQuizSetId ? "Updating..." : "Saving...";
+  try {
+    if (editingQuizSetId) {
+      await apiRequest(`/api/hr/quiz-sets/${encodeURIComponent(editingQuizSetId)}`, {
+        method: "PUT", role: "hr", body: { name, documents },
+      });
+      successBox.textContent = `"${name}" updated.`;
+    } else {
+      await apiRequest("/api/hr/quiz-sets", { method: "POST", role: "hr", body: { name, documents } });
+      successBox.textContent = `"${name}" saved.`;
+    }
+    successBox.style.display = "block";
+    resetQuizSetForm();
+    loadQuizSets();
+  } catch (err) {
+    showError(errorBox, err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingQuizSetId ? "Update quiz set" : "Save quiz set";
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Add candidates
 // ---------------------------------------------------------------------------
 document.getElementById("addForm").addEventListener("submit", async (e) => {
@@ -342,10 +525,10 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const documentId = document.getElementById("docSelect").value;
+  const quizSetId = document.getElementById("quizSetSelect").value;
 
   if (emails.length === 0) { showError(errorBox, "Add at least one email"); return; }
-  if (!documentId) { showError(errorBox, "Choose a document to assign"); return; }
+  if (!quizSetId) { showError(errorBox, "Choose a quiz set to assign"); return; }
 
   btn.disabled = true;
   btn.textContent = "Adding...";
@@ -353,9 +536,9 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
     const data = await apiRequest("/api/hr/candidates", {
       method: "POST",
       role: "hr",
-      body: { emails, document_id: documentId },
+      body: { emails, quiz_set_id: quizSetId },
     });
-    successBox.innerHTML = `Added ${data.emails.length} candidate(s) for "${data.document_title}".
+    successBox.innerHTML = `Added ${data.emails.length} candidate(s) for "${data.quiz_set_name}".
       <div class="password-inline">
         <strong>${escapeHtml(data.password)}</strong>
         <button type="button" class="btn btn-secondary btn-sm" id="addCopyBtn">Copy</button>
@@ -446,12 +629,19 @@ async function viewAttempt(email) {
         <div class="question-review">
           <div class="question-review-header">
             <span class="question-review-num">Q${qi + 1}</span>
+            ${item.document_title ? `<span class="cat-tag">${escapeHtml(item.document_title)}</span>` : ""}
             <span class="badge ${item.is_correct ? "badge-completed" : "badge-pending"}">${item.is_correct ? "Correct" : (item.selected_option === null ? "Unattempted" : "Incorrect")}</span>
           </div>
           <div class="question-text" style="font-size:15px; margin-bottom:14px;">${escapeHtml(item.question)}</div>
           ${optionsHtml}
         </div>`;
     }).join("");
+
+    const breakdownHtml = (attempt.score_by_document || []).length > 1
+      ? `<div class="score-breakdown">
+          ${attempt.score_by_document.map((b) => `<span class="score-breakdown-item"><strong>${escapeHtml(b.document_title)}:</strong> ${b.correct}/${b.total}</span>`).join("")}
+        </div>`
+      : "";
 
     root.innerHTML = `
       <div class="modal-overlay" id="attemptModalOverlay">
@@ -460,6 +650,7 @@ async function viewAttempt(email) {
             <div>
               <h3>${escapeHtml(email)}</h3>
               <div class="hint" style="margin-top:2px;">Score: ${attempt.score} / ${attempt.total_questions} - Submitted ${formatDateTime(attempt.submitted_at)}</div>
+              ${breakdownHtml}
             </div>
             <button class="btn btn-ghost btn-sm" id="attemptModalClose">Close</button>
           </div>
@@ -501,6 +692,6 @@ function escapeHtml(str) {
 hrDashboardReady.then((ok) => {
   if (ok) {
     loadCandidates();
-    loadDocuments();
+    loadDocuments().then(loadQuizSets);
   }
 });

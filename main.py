@@ -662,6 +662,8 @@ async def bulk_set_cycle_status(
     if status not in ("approved", "rejected", "pending"):
         raise HTTPException(400, "status must be approved, rejected, or pending")
 
+    from backend.database import timesheets_collection
+
     now_iso = __import__("datetime").datetime.utcnow().isoformat()
 
     # 1. Update approval_status in Timesheet_data for all employees with this cycle

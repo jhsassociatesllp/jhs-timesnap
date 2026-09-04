@@ -32,6 +32,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="overview">Candidates</button>
       <button class="tab-btn" data-tab="documents">Documents</button>
+      <button class="tab-btn" data-tab="quizsets">Quiz Sets</button>
       <button class="tab-btn" data-tab="add">Add new joiners</button>
     </div>
 
@@ -55,7 +56,7 @@
             <thead>
               <tr>
                 <th>Email</th>
-                <th>Assigned document</th>
+                <th>Assigned quiz</th>
                 <th>Status</th>
                 <th>Score</th>
                 <th>Submitted</th>
@@ -85,6 +86,11 @@
               <input type="text" id="docTitle" placeholder="e.g. Employee Handbook 2026" required />
             </div>
             <div class="field">
+              <label for="docCategory">Category (optional)</label>
+              <input type="text" id="docCategory" placeholder="e.g. HR, IT" list="docCategoryList" />
+              <datalist id="docCategoryList"></datalist>
+            </div>
+            <div class="field">
               <label for="docFile">File (.pdf, .docx, .xlsx or .txt)</label>
               <input type="file" id="docFile" accept=".pdf,.docx,.xlsx,.xlsm,.txt" required />
             </div>
@@ -97,10 +103,48 @@
         <div class="panel-header"><h3 style="margin:0;">Uploaded documents</h3></div>
         <div class="panel-body" style="padding:0;">
           <table>
-            <thead><tr><th>Title</th><th>File</th><th>Uploaded</th><th></th></tr></thead>
+            <thead><tr><th>Title</th><th>Category</th><th>File</th><th>Questions</th><th>Uploaded</th><th></th></tr></thead>
             <tbody id="documentTableBody"></tbody>
           </table>
           <div class="empty-state" id="documentEmpty" style="display:none;">No documents uploaded yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quiz sets tab -->
+    <div class="tab-panel" id="tab-quizsets" style="display:none;">
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;" id="quizSetFormTitle">Build a quiz set</h3></div>
+        <div class="panel-body">
+          <p class="hint" style="margin-bottom:18px;">Tick the documents to mix into one quiz and set how many questions each contributes. The quiz set's total length is the sum of these numbers.</p>
+          <div class="error-box" id="quizSetError"></div>
+          <div class="success-box" id="quizSetSuccess" style="display:none;"></div>
+          <form id="quizSetForm">
+            <div class="field">
+              <label for="quizSetName">Quiz set name</label>
+              <input type="text" id="quizSetName" placeholder="e.g. New Joiner - HR + IT" required />
+            </div>
+            <div class="field">
+              <label>Documents &amp; weightage</label>
+              <div id="quizSetDocList" class="quiz-doc-list"></div>
+              <div class="hint" id="quizSetTotalHint" style="margin-top:8px;">Total questions: 0</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button type="submit" class="btn btn-primary" id="quizSetSaveBtn">Save quiz set</button>
+              <button type="button" class="btn btn-ghost" id="quizSetCancelEditBtn" style="display:none;">Cancel edit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3 style="margin:0;">Saved quiz sets</h3></div>
+        <div class="panel-body" style="padding:0;">
+          <table>
+            <thead><tr><th>Name</th><th>Composition</th><th>Total questions</th><th></th><th></th></tr></thead>
+            <tbody id="quizSetTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="quizSetEmpty" style="display:none;">No quiz sets yet. Build one above.</div>
         </div>
       </div>
     </div>
@@ -119,8 +163,8 @@
               <textarea id="emails" placeholder="priya@company.com, rahul@company.com"></textarea>
             </div>
             <div class="field">
-              <label for="docSelect">Assign document</label>
-              <select id="docSelect"></select>
+              <label for="quizSetSelect">Assign quiz set</label>
+              <select id="quizSetSelect"></select>
             </div>
             <button type="submit" class="btn btn-primary" id="addBtn">Add and generate password</button>
           </form>
