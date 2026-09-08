@@ -2,6 +2,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class TimesheetEntry(BaseModel):
     employeeId: str
     employeeName: Optional[str] = None
