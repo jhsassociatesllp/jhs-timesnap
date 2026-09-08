@@ -43,6 +43,9 @@ from backend.quality_audit.router      import router as quality_audit_router   #
 from backend.timesheet.timesheet_admin import admin_router
 from backend.hr_policy_quiz.router     import router as hr_quiz_router         # ← NEW
 from backend.employee_declaration.router import router as employee_declaration_router  # ← NEW
+from backend.chatbot.router            import router as chatbot_router             # ← CHATBOT
+from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
+from backend.rcm_chatbot.router        import router as rcm_chatbot_router          # ← CHATBOT (RCM)
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -83,6 +86,48 @@ app.include_router(quality_audit_router)   # prefix: /quality-audit
 app.include_router(admin_router)
 app.include_router(hr_quiz_router)         # prefix: /hr-quiz
 app.include_router(employee_declaration_router)  # prefix: /employee-declaration
+app.include_router(chatbot_router)         # prefix: /chatbot
+app.include_router(library_chatbot_router) # prefix: /chatbot/library
+app.include_router(rcm_chatbot_router)     # prefix: /chatbot/rcm
+
+# ── Chatbot warm-up on startup ────────────────────────────────────────────────
+# Pre-loads the sentence-transformer embedding model into memory so the FIRST
+# user message gets answered instantly instead of waiting ~10s for model load.
+@app.on_event("startup")
+async def warmup_chatbot():
+    import asyncio
+    import logging
+    loop = asyncio.get_event_loop()
+    def _warmup():
+        try:
+            from backend.chatbot.config import chatbot_settings
+            from backend.chatbot.embeddings import embed_text
+            from backend.chatbot.vectorstore import get_index
+            chatbot_settings.validate()   # fail loudly at boot, not on the first chat request
+            embed_text("warmup")          # loads + caches the embedding model
+            get_index()                   # connects + caches the Pinecone index
+            logging.info(
+                f"[Chatbot] Ready. LLM provider={chatbot_settings.LLM_PROVIDER} "
+                f"model={chatbot_settings.ACTIVE_MODEL}. Embedding model and Pinecone index pre-loaded."
+            )
+        except Exception as e:
+            logging.warning(f"[Chatbot] Warm-up skipped: {e}")
+        try:
+            from backend.library_chatbot.config import library_settings
+            library_settings.validate()
+            logging.info("[Library Chatbot] Ready.")
+        except Exception as e:
+            logging.warning(f"[Library Chatbot] Warm-up skipped: {e}")
+        try:
+            from backend.rcm_chatbot.config import rcm_settings
+            from backend.rcm_chatbot.vectorstore import get_index
+            rcm_settings.validate()
+            get_index()  # connects + caches the RCM Pinecone index
+            logging.info("[RCM Chatbot] Ready.")
+        except Exception as e:
+            logging.warning(f"[RCM Chatbot] Warm-up skipped: {e}")
+    await loop.run_in_executor(None, _warmup)
+
 
 static_root = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_root), name="static")
@@ -163,6 +208,14 @@ async def employee_declaration_page():
 @app.get("/employee-declaration/admin", response_class=FileResponse)   # ← NEW
 async def employee_declaration_admin_page():
     return FileResponse(os.path.join(static_root, "employee_declaration", "admin.html"))
+
+@app.get("/jhs-chatbot", response_class=FileResponse)   # ← NEW
+async def jhs_chatbot_page():
+    return FileResponse(os.path.join(static_root, "chatbot", "index.html"))
+
+@app.get("/jhs-chatbot/admin", response_class=FileResponse)   # ← NEW
+async def jhs_chatbot_admin_page():
+    return FileResponse(os.path.join(static_root, "chatbot", "admin.html"))
 
 @app.get("/dashboard", response_class=FileResponse)
 async def dashboard_page():
@@ -469,15 +522,18 @@ async def set_module_access(
     """
     Set module admin access for a user.
     Only callable by users who themselves have all-module access (super admin).
-    modules: list of strings from ["timesheet", "quality_audit", "kra"]
+    modules: list of strings from ["timesheet", "quality_audit", "kra", "chatbot"]
     """
-    # Check caller is a super admin (has all 3 modules)
+    # Check caller is a super admin (has at least the core 3 modules) —
+    # "chatbot" is additive and deliberately not required to already be a
+    # super admin, so existing super admins can grant it to others (and
+    # themselves) without first being granted it.
     caller_doc = module_admin_collection.find_one({"empid": current_user.strip().upper()})
-    caller_modules = caller_doc.get("modules", []) if caller_doc else []
-    if set(["timesheet", "quality_audit", "kra"]) != set(caller_modules):
+    caller_modules = set(caller_doc.get("modules", []) if caller_doc else [])
+    if not {"timesheet", "quality_audit", "kra"}.issubset(caller_modules):
         raise HTTPException(403, "Only super admins can assign module access")
 
-    valid = {"timesheet", "quality_audit", "kra"}
+    valid = {"timesheet", "quality_audit", "kra", "chatbot"}
     modules = [m for m in request.modules if m in valid]
     empid = request.empid.strip().upper()
 

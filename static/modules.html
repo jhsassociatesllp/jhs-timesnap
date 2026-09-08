@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -52,6 +52,7 @@
     .card-hr{border-left-color:#8e44ad}
     .card-ed{border-left-color:#c0392b}
     .card-eda{border-left-color:#8e44ad}
+    .card-cb{border-left-color:#4a6fa5}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
@@ -61,6 +62,10 @@
     .card-hr .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
     .card-ed .card-icon{background:rgba(192,57,43,.12);color:#c0392b}
     .card-eda .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-cb .card-icon{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:#fff;position:relative;animation:cbPulse 2.6s ease-in-out infinite}
+    .card-cb .card-icon img{width:40px;height:40px;border-radius:50%;object-fit:cover}
+    .module-card.no-hover-lift.clickable:hover{transform:none;box-shadow:var(--sh-sm)}
+    @keyframes cbPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,111,165,.45)}50%{box-shadow:0 0 0 8px rgba(74,111,165,0)}}
 
     .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
     .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
@@ -69,6 +74,7 @@
     .card-hr .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
     .card-ed .card-tag{background:rgba(192,57,43,.12);color:#c0392b}
     .card-eda .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-cb .card-tag{background:rgba(243,156,18,.15);color:#e67e22}
 
     .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
     .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
@@ -84,6 +90,7 @@
     .card-hr .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
     .card-ed .card-btn{background:linear-gradient(135deg,#c0392b,#922b21);color:white}
     .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-cb .card-btn{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:white}
     .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
     .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
     .clickable .card-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
@@ -222,6 +229,27 @@
         </div>
         <div class="card-footer">
           <span class="card-footer-label">Time tracking &amp; approvals</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    // JHS Chatbot — always shown, like Timesheet. All three tabs (HR Policy,
+    // RCM, JHS Library) are live.
+    const CARD_CB = `
+      <a href="/jhs-chatbot" class="module-card card-cb clickable no-hover-lift">
+        <div class="card-top">
+          <div class="card-icon"><img src="/static/chatbot/bot_icon.png" alt="JHS Chatbot" /></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Jhs Chatbot</h2>
+        <p class="card-desc">Ask HR Policy, RCM, or the audit observation library — one assistant, three tabs, your chat history saved per topic.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-book-reader"></i> HR Policy</span>
+          <span class="chip"><i class="fas fa-sync-alt"></i> RCM</span>
+          <span class="chip"><i class="fas fa-database"></i> Observation Library</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Sourced answers, saved history</span>
           <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
         </div>
       </a>`;
@@ -386,6 +414,9 @@
       // Timesheet — always shown
       grid.innerHTML += CARD_TS;
 
+      // JHS Chatbot — always shown
+      grid.innerHTML += CARD_CB;
+
       // KRA
       grid.innerHTML += buildAppraisalCard(apprAccess?.eligible || false, apprAccess?.reason || '');
 
@@ -413,5 +444,7 @@
 
     initModules();
   </script>
+    <script src="/static/chatbot/chat-core.js"></script>
+    <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
 </html>

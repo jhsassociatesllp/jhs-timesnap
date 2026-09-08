@@ -1,0 +1,146 @@
+/**
+ * JHS Chatbot module page shell — ONE unified header (brand + tabs + account
+ * links), a persistent ChatGPT-style left sidebar (new chat / chat history /
+ * employee card) shared by whichever tab is currently chat-shaped (HR Policy,
+ * or the Library's Ask sub-tab), the HR Policy tab's chat panel, and the RCM
+ * placeholder. Follows the same token conventions as static/modules.html
+ * (--pg gradient, --dark, --light, --text-*, --border, --sh-*).
+ */
+:root {
+  --pg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --dark: #2c3e50; --light: #f8f9fa; --text-dark: #2c3e50; --text-light: #7f8c8d;
+  --border: #e1e8ed; --sh-sm: 0 4px 6px rgba(0,0,0,.1); --sh-md: 0 10px 25px rgba(0,0,0,.15);
+  --chat-accent: #4a6fa5; --chat-accent-dark: #2f4d75;
+  --chat-grad: linear-gradient(135deg, #4a6fa5 0%, #2f4d75 100%);
+  --tr: all .2s cubic-bezier(.4,0,.2,1);
+}
+* , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background: var(--pg);
+  color: var(--text-dark);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.loader-full { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: white; font-size: 1.1rem; gap: .8rem; }
+
+/* ── Page shell ───────────────────────────────────────────────────────── */
+#main-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* ── THE single header — brand, tabs, and account links all in one row ── */
+.cb-header { display: flex; align-items: center; gap: .3rem; background: var(--dark); padding: 0 1.5rem; box-shadow: var(--sh-md); flex-shrink: 0; z-index: 20; height: 58px; }
+.cb-header-brand { display: flex; align-items: center; gap: .6rem; padding-right: 1.2rem; margin-right: .6rem; border-right: 1px solid rgba(255,255,255,.14); flex-shrink: 0; }
+.cb-header-brand .badge { width: 30px; height: 30px; border-radius: 50%; background: var(--chat-grad); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cb-header-brand .badge svg { width: 20px; height: 20px; }
+.cb-header-brand .name { font-size: .95rem; font-weight: 700; color: white; white-space: nowrap; }
+.cb-tabs { display: flex; align-items: center; gap: .2rem; height: 100%; }
+.cb-tab-btn { display: flex; align-items: center; gap: .5rem; padding: 0 1.1rem; height: 100%; background: none; border: none; border-bottom: 3px solid transparent; font-family: inherit; font-size: .87rem; font-weight: 600; color: rgba(255,255,255,.55); cursor: pointer; transition: var(--tr); }
+.cb-tab-btn i { font-size: .9rem; }
+.cb-tab-btn:hover { color: rgba(255,255,255,.85); }
+.cb-tab-btn.active { color: #fff; border-bottom-color: var(--chat-accent); }
+.cb-header-right { display: flex; align-items: center; gap: .7rem; margin-left: auto; flex-shrink: 0; }
+.nav-link-btn { display: flex; align-items: center; gap: .4rem; background: transparent; border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.75); padding: .42rem .9rem; border-radius: 8px; font-size: .82rem; font-family: inherit; font-weight: 500; cursor: pointer; text-decoration: none; transition: var(--tr); white-space: nowrap; }
+.nav-link-btn:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.38); color: white; }
+
+/* ── Body: sidebar + tab content, side by side ───────────────────────── */
+.cb-body { display: flex; flex: 1; min-height: 0; }
+
+/* ── Shared sidebar — ChatGPT-style: new chat, history, account card ──── */
+.cb-sidebar { width: 268px; flex-shrink: 0; background: #f7f7f8; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; transition: width .2s ease, opacity .2s ease; }
+.cb-sidebar.hidden { width: 0; border-right: none; opacity: 0; }
+
+/* Observation Library's Browse/Ask switch — sits above "New chat" (see
+   index.html); shown only while the Library tab is active. */
+.cb-sidebar-libtabs { display: flex; gap: .4rem; margin: .9rem .8rem .3rem; }
+.cb-sidebar-libtabs.hidden { display: none; }
+.cb-sidebar-libtabs .lib-tab-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .55rem .5rem; background: white; border: 1px solid var(--border); border-radius: 9px; font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dark); cursor: pointer; transition: var(--tr); white-space: nowrap; }
+.cb-sidebar-libtabs .lib-tab-btn:hover { border-color: var(--chat-accent); color: var(--chat-accent); }
+.cb-sidebar-libtabs .lib-tab-btn.active { background: var(--chat-grad); border-color: transparent; color: #fff; box-shadow: var(--sh-sm); }
+
+/* Wraps new-chat/history/account so it can hide independently of the
+   libtabs switch above it (e.g. while Browse is active, history isn't
+   relevant, but the Browse/Ask switch should stay visible). */
+#cb-sidebar-chatsection { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#cb-sidebar-chatsection.hidden { display: none; }
+
+.cb-sidebar-newchat { margin: .9rem .8rem .3rem; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem 1rem; background: white; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: .84rem; font-weight: 600; color: var(--text-dark); cursor: pointer; transition: var(--tr); white-space: nowrap; }
+.cb-sidebar-newchat:hover { border-color: var(--chat-accent); color: var(--chat-accent); box-shadow: var(--sh-sm); }
+.cb-sidebar-label { padding: 1rem .95rem .4rem; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-light); white-space: nowrap; }
+.cb-sidebar-list { flex: 1; overflow-y: auto; padding: 0 .5rem; display: flex; flex-direction: column; gap: 2px; }
+.cb-sidebar-item { padding: .6rem .7rem; font-size: .82rem; border-radius: 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-dark); transition: background .15s; }
+.cb-sidebar-item:hover { background: #ebebee; }
+.cb-sidebar-item.active { background: #e4e9f2; color: var(--chat-accent-dark); font-weight: 600; }
+.cb-sidebar-empty { padding: .6rem .7rem; font-size: .78rem; color: var(--text-light); }
+.cb-sidebar-user { display: flex; align-items: center; gap: .6rem; padding: .8rem; border-top: 1px solid var(--border); flex-shrink: 0; }
+.cb-sidebar-user .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--chat-grad); color: white; font-size: .8rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cb-sidebar-user .meta { min-width: 0; }
+.cb-sidebar-user .name { font-size: .82rem; font-weight: 600; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-sidebar-user .empid { font-size: .72rem; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Tab content area ─────────────────────────────────────────────────── */
+.cb-content { flex: 1; min-height: 0; min-width: 0; background: #f6f4ef; }
+.cb-panel { display: none; height: 100%; min-height: 0; }
+.cb-panel.active { display: flex; flex-direction: column; }
+
+/* ── HR Policy tab: full-page chat panel (no separate topbar — New Chat /
+   history now live in the shared sidebar) ───────────────────────────── */
+.hr-messages { flex: 1; overflow-y: auto; padding: 2.2rem 2rem 1rem; display: flex; flex-direction: column; gap: 1.4rem; max-width: 900px; margin: 0 auto; width: 100%; }
+.hr-welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .8rem; text-align: center; max-width: 600px; margin: 0 auto; color: #4d5566; }
+.hr-welcome .w-icon { width: 68px; height: 68px; border-radius: 50%; background: var(--chat-grad); display: flex; align-items: center; justify-content: center; }
+.hr-welcome .w-icon svg { width: 48px; height: 48px; }
+.hr-welcome h3 { font-size: 1.3rem; color: var(--text-dark); }
+.hr-welcome p { font-size: .92rem; line-height: 1.7; }
+.hr-suggestions { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: .7rem; }
+.hr-sugg-btn { background: white; border: 1px solid var(--border); border-radius: 20px; padding: .65rem 1.15rem; font-size: .84rem; color: var(--text-dark); cursor: pointer; transition: var(--tr); }
+.hr-sugg-btn:hover { border-color: var(--chat-accent); color: var(--chat-accent); }
+
+.hr-msg-row { display: flex; gap: .5rem; align-items: flex-end; max-width: 100%; }
+.hr-msg-row.user { justify-content: flex-end; }
+.hr-avatar-mini { width: 26px; height: 26px; border-radius: 50%; background: var(--chat-grad); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hr-avatar-mini svg { width: 18px; height: 18px; }
+.hr-msg { max-width: 74%; padding: .9rem 1.15rem; border-radius: 14px; font-size: .92rem; line-height: 1.6; }
+.hr-msg.user { background: #232a3b; color: #fff; border-bottom-right-radius: 4px; }
+.hr-msg.assistant { background: white; border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: var(--sh-sm); }
+.hr-msg p { margin: 0 0 .5rem; }
+.hr-msg p:last-child { margin-bottom: 0; }
+.hr-msg ul, .hr-msg ol { margin: .25rem 0 .5rem; padding-left: 1.1rem; }
+.hr-msg strong { color: var(--chat-accent-dark); }
+.hr-msg.user strong { color: #fff; }
+.hr-msg-time { margin-top: .3rem; font-size: .68rem; opacity: .6; }
+.hr-cursor { display: inline-block; width: 2px; height: 13px; background: var(--chat-accent); margin-left: 2px; vertical-align: middle; animation: hr-blink .9s steps(1) infinite; }
+@keyframes hr-blink { 50% { opacity: 0; } }
+.hr-typing { background: white; border: 1px solid var(--border); border-radius: 14px; border-bottom-left-radius: 4px; padding: .7rem 1rem; display: flex; gap: 4px; align-items: center; }
+.hr-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--chat-accent); animation: hr-bounce 1s infinite; }
+.hr-typing span:nth-child(2) { animation-delay: .15s; }
+.hr-typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes hr-bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+/* ── Follow-up suggestion chips (shared across HR/RCM/Library) ──────────── */
+.cb-followups { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
+.cb-followup-chip { font-family: inherit; font-size: .8rem; font-weight: 500; background: white; color: var(--chat-accent-dark); border: 1px solid var(--border); border-radius: 20px; padding: .45rem .9rem; cursor: pointer; transition: var(--tr); }
+.cb-followup-chip:hover { border-color: var(--chat-accent); background: #f4f7fc; }
+
+.hr-input-bar { background: #f6f4ef; padding: .8rem 2rem 1.4rem; display: flex; gap: .7rem; align-items: flex-end; flex-shrink: 0; max-width: 900px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.hr-input { flex: 1; border: 1px solid var(--border); border-radius: 14px; padding: .8rem 1rem; font-size: .92rem; resize: none; outline: none; max-height: 120px; font-family: inherit; color: var(--text-dark); background: white; box-shadow: var(--sh-sm); }
+.hr-input:focus { border-color: var(--chat-accent); }
+.hr-send-btn { width: 42px; height: 42px; border-radius: 12px; background: var(--chat-grad); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity .15s; }
+.hr-send-btn:disabled { opacity: .4; cursor: not-allowed; }
+.hr-send-btn svg { width: 17px; height: 17px; fill: #fff; }
+.hr-error-toast { max-width: 900px; margin: 0 auto .6rem; background: #f04c4c; color: #fff; border-radius: 8px; padding: .55rem .8rem; font-size: .8rem; display: none; }
+.hr-error-toast.show { display: block; }
+
+@media (max-width: 900px) {
+  .cb-sidebar:not(.hidden) { position: fixed; top: 58px; left: 0; bottom: 0; z-index: 50; box-shadow: 8px 0 24px rgba(0,0,0,.25); }
+  .hr-msg { max-width: 84%; }
+}
+@media (max-width: 600px) {
+  .cb-header-brand .name { display: none; }
+  .cb-tab-btn { padding: 0 .8rem; font-size: .82rem; }
+  .cb-tab-btn span.lbl { display: none; }
+  .hr-messages { padding: 1.4rem 1rem 1rem; }
+  .hr-input-bar { padding: .7rem 1rem 1rem; }
+}

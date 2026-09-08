@@ -24,3 +24,21 @@ openai==2.53.0
 # Employee Declaration module
 mammoth==1.8.0
 Pillow==10.4.0
+
+# Chatbot module (HR Policy RAG)
+pinecone==9.1.0
+sentence-transformers==3.0.1
+python-pptx==1.0.2
+pdfplumber==0.11.10
+xlrd==2.0.2
+striprtf==0.0.32
+
+# RCM Chatbot module
+olefile==0.47
+
+# Chatbot admin (knowledge-base upload) — JHS Library's .xlsx ingestion
+pandas==2.2.2
+
+# HR chatbot — hybrid (keyword + semantic) retrieval
+rank-bm25==0.2.2
+
