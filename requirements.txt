@@ -23,7 +23,7 @@ openai==2.53.0
 
 # Employee Declaration module
 mammoth==1.8.0
-Pillow==10.4.0
+Pillow>=12.2.0
 
 # Chatbot module (HR Policy RAG)
 pinecone==9.1.0
