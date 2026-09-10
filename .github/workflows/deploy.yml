@@ -161,6 +161,18 @@ jobs:
                 -e HR_QUIZ_QUESTION_COUNT="15" \
                 -e HR_QUIZ_SECONDS_PER_QUESTION="30" \
                 -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+                -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+                -e LLM_PROVIDER="${{ secrets.LLM_PROVIDER }}" \
+                -e HF_API_KEY="${{ secrets.HF_API_KEY }}" \
+                -e HF_MODEL="${{ secrets.HF_MODEL }}" \
+                -e HF_BASE_URL="${{ secrets.HF_BASE_URL }}" \
+                -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+                -e HR_OPENAI_API_KEY="${{ secrets.HR_OPENAI_API_KEY }}" \
+                -e LIBRARY_MONGODB_URI="${{ secrets.LIBRARY_MONGODB_URI }}" \
+                -e LIBRARY_OPENAI_API_KEY="${{ secrets.LIBRARY_OPENAI_API_KEY }}" \
+                -e LIBRARY_PINECONE_API_KEY="${{ secrets.LIBRARY_PINECONE_API_KEY }}" \
+                -e RCM_PINECONE_API_KEY="${{ secrets.RCM_PINECONE_API_KEY }}" \
+                -e RCM_OPENAI_API_KEY="${{ secrets.RCM_OPENAI_API_KEY }}" \
                 "$IMAGE"
 
               echo "🧹 Cleaning dangling images..."
