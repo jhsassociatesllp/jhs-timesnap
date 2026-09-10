@@ -31,7 +31,7 @@
   // ── generate / persist a session id per browser tab ───────────────────────
   let currentSessionId =
     sessionStorage.getItem("chatbot_session_id") ||
-    crypto.randomUUID();
+    Core.genUUID();
   sessionStorage.setItem("chatbot_session_id", currentSessionId);
 
   // ── branded bubble artwork ─────────────────────────────────────────────────
@@ -698,7 +698,7 @@
 
   // ── New chat ──────────────────────────────────────────────────────────────
   function startNewChat() {
-    currentSessionId = crypto.randomUUID();
+    currentSessionId = Core.genUUID();
     sessionStorage.setItem("chatbot_session_id", currentSessionId);
     messages.innerHTML = "";
     messages.appendChild(welcome);

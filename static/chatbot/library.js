@@ -51,7 +51,7 @@
 
   let searchDebounce = null;
   let librarySessionId =
-    sessionStorage.getItem("library_chat_session_id") || crypto.randomUUID();
+    sessionStorage.getItem("library_chat_session_id") || window.JHSChatCore.genUUID();
   sessionStorage.setItem("library_chat_session_id", librarySessionId);
 
   let initialized = false;
@@ -531,7 +531,7 @@
   window.askQuestion = askQuestion;
 
   function startNewLibraryChat() {
-    librarySessionId = crypto.randomUUID();
+    librarySessionId = window.JHSChatCore.genUUID();
     sessionStorage.setItem("library_chat_session_id", librarySessionId);
     const chatWindow = document.getElementById('chatWindow');
     chatWindow.innerHTML = `

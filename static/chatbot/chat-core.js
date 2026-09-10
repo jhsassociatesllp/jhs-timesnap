@@ -16,6 +16,30 @@
     return localStorage.getItem("access_token") || localStorage.getItem("token") || "";
   }
 
+  // crypto.randomUUID() only exists in secure contexts (HTTPS, or the
+  // literal hostname "localhost") — on a plain-HTTP IP address like a
+  // staging box (http://1.2.3.4:8010) it's simply undefined, and every
+  // chatbot script that generated its session id with a bare
+  // `crypto.randomUUID()` at the top of the file would throw immediately
+  // on load, silently killing the ENTIRE rest of that script (so nothing
+  // past that line — including every window.initXTab assignment — ever
+  // ran). This still uses crypto.getRandomValues() when available (that
+  // one IS available in insecure contexts, unlike randomUUID), so the id
+  // stays cryptographically random everywhere; Math.random() is only the
+  // last-resort fallback for a browser missing the Crypto API outright.
+  function genUUID() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    const bytes = (typeof crypto !== "undefined" && crypto.getRandomValues)
+      ? crypto.getRandomValues(new Uint8Array(16))
+      : Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
   function decodeEmpid() {
     try {
       const token = getToken();
@@ -238,6 +262,7 @@
   window.JHSChatCore = {
     getToken,
     decodeEmpid,
+    genUUID,
     api,
     escapeHtml,
     renderInline,

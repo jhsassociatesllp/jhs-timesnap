@@ -11,7 +11,7 @@
   const Core = window.JHSChatCore;
   const BOT_SVG = '<svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg"><text x="60" y="43" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="40" letter-spacing="-1" fill="#ffffff">JHS</text></svg>';
 
-  let sessionId = sessionStorage.getItem("rcm_tab_session_id") || crypto.randomUUID();
+  let sessionId = sessionStorage.getItem("rcm_tab_session_id") || Core.genUUID();
   sessionStorage.setItem("rcm_tab_session_id", sessionId);
 
   let isLoading = false;
@@ -78,7 +78,7 @@
   window.rcmActivateSidebar = rcmActivateSidebar;
 
   function startNewRcmChat() {
-    sessionId = crypto.randomUUID();
+    sessionId = Core.genUUID();
     sessionStorage.setItem("rcm_tab_session_id", sessionId);
     messagesEl.innerHTML = "";
     messagesEl.appendChild(welcomeEl);
