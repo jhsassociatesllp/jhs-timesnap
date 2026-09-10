@@ -125,7 +125,15 @@ jobs:
           echo "📦 Container: $APP_NAME"
           echo "🔌 Port: $PORT"
 
+          # ServerAliveInterval/CountMax: the chatbot module's dependencies
+          # (sentence-transformers -> torch, pandas, scikit-learn, etc.) made
+          # the image considerably bigger, and a long-running docker pull
+          # over this piped SSH session was getting killed mid-transfer
+          # ("client_loop: send disconnect: Broken pipe") — these keep the
+          # connection alive with periodic pings instead of it looking idle
+          # to a NAT/firewall in between.
           ssh -p "${{ secrets.SERVER_PORT }}" -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" << EOF
               set -e
 
@@ -133,7 +141,18 @@ jobs:
               echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
               echo "📥 Pulling latest image..."
-              docker pull "$IMAGE"
+              # Retries on a transient drop mid-pull — cheap even on retry,
+              # since docker skips any layer it already has fully.
+              PULL_ATTEMPT=0
+              until docker pull "$IMAGE"; do
+                PULL_ATTEMPT=\$((PULL_ATTEMPT + 1))
+                if [ "\$PULL_ATTEMPT" -ge 3 ]; then
+                  echo "❌ docker pull failed after 3 attempts"
+                  exit 1
+                fi
+                echo "⚠️ docker pull failed (attempt \$PULL_ATTEMPT/3) — retrying in 5s..."
+                sleep 5
+              done
 
               echo "🔍 Checking port ownership..."
               if docker ps --format "{{.Names}} {{.Ports}}" | grep ":$PORT->" | grep -v "$APP_NAME"; then
