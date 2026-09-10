@@ -76,6 +76,7 @@
           current.activeSessionId = s.id;
           current.onSelect(s.id);
           renderList();
+          window.toggleMobileSidebar && window.toggleMobileSidebar(false); // reveal the conversation instead of leaving the overlay covering it
         });
         list.appendChild(item);
       });
@@ -163,7 +164,21 @@
 
   const initialized = { hr: false, rcm: false, library: false };
 
+  // ── Mobile sidebar toggle ────────────────────────────────────────────────
+  // Only relevant under chatbot.css's @media (max-width:900px), where the
+  // sidebar becomes a full-height overlay — desktop ignores .mobile-open
+  // entirely (see the CSS), so this is safe to call unconditionally.
+  function toggleMobileSidebar(open) {
+    const sidebar = document.getElementById("cb-sidebar");
+    const backdrop = document.getElementById("cbSidebarMobileBackdrop");
+    const willOpen = open === undefined ? !sidebar.classList.contains("mobile-open") : open;
+    sidebar.classList.toggle("mobile-open", willOpen);
+    backdrop.classList.toggle("show", willOpen);
+  }
+  window.toggleMobileSidebar = toggleMobileSidebar;
+
   function switchCbTab(name) {
+    toggleMobileSidebar(false); // switching the outer tab should close the overlay, not leave it covering the new tab's content
     document.querySelectorAll(".cb-tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.cbtab === name));
     document.querySelectorAll(".cb-panel").forEach((p) => p.classList.toggle("active", p.id === `cbtab-${name}`));
 

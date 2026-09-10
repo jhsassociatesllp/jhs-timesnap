@@ -67,6 +67,16 @@
             </div>
             <div class="admin-status-line" id="hrKbStatus"></div>
           </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-clock-rotate-left"></i> Document upload history</div>
+                <div class="admin-card-sub">Every update/replace made to this knowledge base, most recent first.</div>
+              </div>
+            </div>
+            <div id="hrHistoryList">Loading…</div>
+          </div>
         </div>
       </div>
 
@@ -127,6 +137,16 @@
             </div>
             <div class="admin-status-line" id="libKbStatus"></div>
           </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-clock-rotate-left"></i> Document upload history</div>
+                <div class="admin-card-sub">Every update/replace made to this knowledge base, most recent first.</div>
+              </div>
+            </div>
+            <div id="libHistoryList">Loading…</div>
+          </div>
         </div>
       </div>
 
@@ -179,9 +199,24 @@
             <div class="admin-card-head">
               <div>
                 <div class="admin-card-title"><i class="fas fa-triangle-exclamation"></i> Retention-risk alerts</div>
-                <div class="admin-card-sub">Employees whose own chat messages matched resignation/exit/dissatisfaction language — most recent first. Detected automatically as messages come in; nothing here is shared with the employee.</div>
+                <div class="admin-card-sub">Employees whose own chat messages matched resignation/exit/dissatisfaction/harassment language — most recent first. Detected automatically as messages come in; nothing here is shared with the employee.</div>
               </div>
             </div>
+            <div class="dash-export-row">
+              <div class="dash-bot-switch" id="dashExportPresets">
+                <button class="dash-bot-btn active" data-preset="all">All time</button>
+                <button class="dash-bot-btn" data-preset="week">This week</button>
+                <button class="dash-bot-btn" data-preset="month">This month</button>
+                <button class="dash-bot-btn" data-preset="custom">Custom range</button>
+              </div>
+              <div class="dash-export-dates" id="dashExportDates" hidden>
+                <input type="date" id="dashExportFrom" />
+                <span>to</span>
+                <input type="date" id="dashExportTo" />
+              </div>
+              <button class="admin-btn admin-btn-primary" id="dashExportBtn"><i class="fas fa-file-excel"></i> Download Excel</button>
+            </div>
+            <div id="dashHighAlertBanner"></div>
             <div id="dashAlertsWrap">Loading…</div>
           </div>
         </div>

@@ -32,12 +32,21 @@
         <button class="cb-tab-btn" data-cbtab="library" onclick="switchCbTab('library')"><i class="fas fa-database"></i> <span class="lbl">Observation Library</span></button>
       </nav>
       <div class="cb-header-right">
-        <a class="nav-link-btn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
-        <button class="nav-link-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        <!-- Mobile-only — the sidebar becomes a full-height overlay at
+             narrow widths (see chatbot.css's @media (max-width:900px)),
+             so on a phone there needs to be an explicit way to open/close
+             it instead of it just always covering the chat underneath. -->
+        <button class="nav-link-btn cb-mobile-history-btn" id="cbMobileHistoryBtn" onclick="toggleMobileSidebar()" aria-label="Chat history">
+          <i class="fas fa-clock-rotate-left"></i>
+        </button>
+        <a class="nav-link-btn" href="/modules"><i class="fas fa-th-large"></i> <span class="lbl">Modules</span></a>
+        <button class="nav-link-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> <span class="lbl">Logout</span></button>
       </div>
     </header>
 
     <div class="cb-body">
+
+      <div id="cbSidebarMobileBackdrop" class="cb-sidebar-mobile-backdrop" onclick="toggleMobileSidebar(false)"></div>
 
       <!-- ══════════════ SHARED SIDEBAR — new chat / history / account ═══ -->
       <aside id="cb-sidebar" class="cb-sidebar hidden">

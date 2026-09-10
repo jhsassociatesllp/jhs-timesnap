@@ -120,3 +120,13 @@
 .dash-sev-critical { background: #2c3e50; color: #fff; }
 .dash-alert-msg { max-width: 320px; font-size: .8rem; color: var(--text-dark); white-space: normal; }
 .dash-alerts-table td { vertical-align: top; }
+
+.dash-export-row { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.dash-export-dates { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-light); }
+.dash-export-dates input[type="date"] { padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: .8rem; color: var(--text-dark); }
+.dash-export-row .admin-btn { margin-left: auto; }
+
+.dash-high-alert-banner { background: #2c1010; border: 1px solid #5a1f1f; border-radius: 10px; padding: .9rem 1rem; margin-bottom: 1rem; }
+.dash-high-alert-title { color: #ff8a8a; font-weight: 700; font-size: .84rem; margin-bottom: .5rem; }
+.dash-high-alert-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dash-high-alert-chip { background: rgba(255,255,255,.08); color: #fff; font-size: .78rem; padding: .35rem .7rem; border-radius: 20px; }

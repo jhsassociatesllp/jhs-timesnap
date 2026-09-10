@@ -234,8 +234,16 @@
   // Same wiring for both tabs — a single-file picker plus an Update button
   // (adds to the existing knowledge base) and a Replace button (wipes it
   // first, confirmed before proceeding since it's destructive).
+  function formatHistoryDate(ts) {
+    if (!ts) return "—";
+    return new Date(ts * 1000).toLocaleString(undefined, {
+      year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  }
+
   function wireKnowledgeUpload({ statEl, dropEl, inputEl, titleEl, updateBtn, replaceBtn, statusEl,
-                                   statsPath, updatePath, replacePath, statLabel, fileNoun, warnLabel }) {
+                                   statsPath, updatePath, replacePath, statLabel, fileNoun, warnLabel,
+                                   historyPath, historyListEl }) {
     async function refreshStat() {
       try {
         const data = await api("GET", statsPath);
@@ -243,6 +251,28 @@
         statEl.textContent = `Currently: ${n} ${statLabel} in the knowledge base.`;
       } catch {
         statEl.textContent = "Couldn't load the current knowledge-base size.";
+      }
+    }
+
+    async function refreshHistory() {
+      if (!historyListEl) return;
+      try {
+        const rows = await api("GET", historyPath);
+        if (!rows.length) {
+          historyListEl.innerHTML = `<div class="admin-empty-note">No uploads yet.</div>`;
+          return;
+        }
+        historyListEl.innerHTML = rows.map((r) => `
+          <div class="admin-coll-item">
+            <div style="flex:1; min-width:220px;">
+              <div class="admin-coll-name">${escapeHtml(r.filename)}</div>
+              <div class="admin-coll-meta">${escapeHtml(r.name || r.empid)} · ${r.mode === "replace" ? "Replaced" : "Updated"} · ${pluralize(r.count, statLabel.replace(/s$/, ""))}</div>
+            </div>
+            <div class="admin-coll-meta">${formatHistoryDate(r.created_at)}</div>
+          </div>
+        `).join("");
+      } catch {
+        historyListEl.innerHTML = `<div class="admin-empty-note">Couldn't load upload history.</div>`;
       }
     }
 
@@ -269,6 +299,7 @@
         inputEl.value = "";
         titleEl.textContent = `Click to choose ${fileNoun}`;
         await refreshStat();
+        await refreshHistory();
       } catch (err) {
         setStatus(statusEl, err.message || "Upload failed.", "err");
       } finally {
@@ -286,6 +317,7 @@
     });
 
     refreshStat();
+    refreshHistory();
   }
 
   wireKnowledgeUpload({
@@ -302,6 +334,8 @@
     statLabel: "chunks",
     fileNoun: "a file",
     warnLabel: "HR policy chunk",
+    historyPath: "/chatbot/admin/knowledge/history",
+    historyListEl: document.getElementById("hrHistoryList"),
   });
 
   wireKnowledgeUpload({
@@ -318,6 +352,8 @@
     statLabel: "observations",
     fileNoun: "a file",
     warnLabel: "observation",
+    historyPath: "/chatbot/library/admin/knowledge/history",
+    historyListEl: document.getElementById("libHistoryList"),
   });
 
   // ── Dashboard: active users + API usage per bot ────────────────────────
@@ -336,6 +372,8 @@
     el.innerHTML = Object.keys(BOT_LABELS).map((bot) => {
       const d = dashboardData[bot] || {};
       const u = d.api_usage || {};
+      const c = u.cost_usd || {};
+      const fmt = (v) => `$${(v ?? 0).toFixed(2)}`;
       return `
         <div class="dash-bot-card">
           <div class="dash-bot-name">${BOT_LABELS[bot]}</div>
@@ -347,6 +385,13 @@
             <div class="dash-usage-cell"><span class="dash-num-sm">${u.all_time ?? 0}</span><label>All time</label></div>
           </div>
           <div class="dash-usage-caption">LLM API calls</div>
+          <div class="dash-usage-row">
+            <div class="dash-usage-cell"><span class="dash-num-sm">${fmt(c.today)}</span><label>Today</label></div>
+            <div class="dash-usage-cell"><span class="dash-num-sm">${fmt(c.this_week)}</span><label>This week</label></div>
+            <div class="dash-usage-cell"><span class="dash-num-sm">${fmt(c.this_month)}</span><label>This month</label></div>
+            <div class="dash-usage-cell"><span class="dash-num-sm">${fmt(c.all_time)}</span><label>All time</label></div>
+          </div>
+          <div class="dash-usage-caption">Estimated $ spent</div>
         </div>`;
     }).join("");
   }
@@ -425,6 +470,21 @@
 
   const SEVERITY_LABEL = { red: "🔴", orange: "🟠", yellow: "🟡", critical: "⚠️" };
   let alertsData = null;
+  let highAlertUsers = [];
+
+  function renderHighAlertBanner() {
+    const el = document.getElementById("dashHighAlertBanner");
+    if (!highAlertUsers.length) { el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <div class="dash-high-alert-banner">
+        <div class="dash-high-alert-title">⚠️ HIGH ALERT — repeated red-flagged activity</div>
+        <div class="dash-high-alert-list">
+          ${highAlertUsers.map((u) => `
+            <span class="dash-high-alert-chip">${escapeHtml(u.name)} (${escapeHtml(u.empid)}) — <strong>${u.red_session_count}</strong> red-flagged sessions</span>
+          `).join("")}
+        </div>
+      </div>`;
+  }
 
   function formatDateTime(ts) {
     if (!ts) return "—";
@@ -466,6 +526,7 @@
       renderDashboardSummary();
       renderDashCompareChart();
       renderDashboardUserTable();
+      renderHighAlertBanner();
       renderAlerts();
       return;
     }
@@ -478,9 +539,11 @@
       ]);
       dashboardData = dashboard;
       alertsData = alertsRes.alerts || [];
+      highAlertUsers = alertsRes.high_alert_users || [];
       renderDashboardSummary();
       renderDashCompareChart();
       renderDashboardUserTable();
+      renderHighAlertBanner();
       renderAlerts();
     } catch {
       document.getElementById("dashboardSummary").textContent = "Couldn't load dashboard data.";
@@ -489,6 +552,70 @@
   }
 
   document.getElementById("dashboardRefreshBtn").addEventListener("click", () => loadDashboard(true));
+
+  // ── Alerts export (Excel, with week/month/custom date presets) ─────────
+  document.querySelectorAll("#dashExportPresets .dash-bot-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#dashExportPresets .dash-bot-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      document.getElementById("dashExportDates").hidden = btn.dataset.preset !== "custom";
+    });
+  });
+
+  function exportDateRange() {
+    const preset = document.querySelector("#dashExportPresets .dash-bot-btn.active")?.dataset.preset || "all";
+    const iso = (d) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    if (preset === "week") {
+      const monday = new Date(today);
+      const dayOffset = (today.getDay() + 6) % 7; // Monday = 0
+      monday.setDate(today.getDate() - dayOffset);
+      return { start: iso(monday), end: iso(today) };
+    }
+    if (preset === "month") {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { start: iso(first), end: iso(today) };
+    }
+    if (preset === "custom") {
+      return {
+        start: document.getElementById("dashExportFrom").value || "",
+        end: document.getElementById("dashExportTo").value || "",
+      };
+    }
+    return { start: "", end: "" }; // all time
+  }
+
+  document.getElementById("dashExportBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("dashExportBtn");
+    const { start, end } = exportDateRange();
+    const params = new URLSearchParams();
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+
+    btn.disabled = true;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = "Preparing…";
+    try {
+      const res = await fetch(`/chatbot/admin/alerts/export.xlsx?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "retention-risk-alerts.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Couldn't generate the export. Please try again.");
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  });
   document.querySelectorAll(".dash-bot-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".dash-bot-btn").forEach((b) => b.classList.toggle("active", b === btn));

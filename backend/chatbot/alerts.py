@@ -158,6 +158,28 @@ CATEGORIES = [
             "counter offer", "retention bonus", "can company match another offer",
         ],
     },
+    {
+        # Not a retention signal — a safety one. Kept in the same alerts
+        # taxonomy/table (rather than a separate feature) per an explicit
+        # request that this surface alongside the retention-risk alerts, so
+        # whoever reviews that list sees it too. Always RED regardless of
+        # what the category severity scheme would otherwise suggest, given
+        # what this is actually about.
+        "id": "harassment_posh", "label": "Harassment / Workplace Safety (POSH)", "severity": RED,
+        "keywords": [
+            "posh complaint", "posh policy", "posh committee", "sexual harassment",
+            "harassment complaint", "harassment at work", "workplace harassment",
+            "being harassed", "being harassed by", "inappropriate behavior",
+            "inappropriate comments", "inappropriate touching", "inappropriate remarks",
+            "inappropriate messages", "unwanted advances", "unwanted attention",
+            "unwelcome behavior", "hostile work environment", "internal complaints committee",
+            "icc complaint", "file a complaint against", "report harassment",
+            "feel unsafe at work", "feel unsafe around", "uncomfortable around my manager",
+            "uncomfortable around my colleague", "misconduct by", "molestation",
+            "verbal abuse at work", "stalking me at work", "gender discrimination",
+            "sexual advances", "unwanted physical contact",
+        ],
+    },
 ]
 
 # Two related signals in the SAME message — a stronger indicator than
@@ -263,6 +285,88 @@ def record_if_match(empid: str, bot: str, session_id: str, message: str) -> None
 
 
 def list_alerts(limit: int = 500) -> list:
-    """Most recent alerts first."""
+    """Most recent alerts first. Nothing here is ever overwritten — every
+    match gets its own document (see record_if_match), so this is the full
+    history, not just each user's latest state."""
     docs = list(_col.find({}, {"_id": 0}).sort("created_at", -1).limit(limit))
     return docs
+
+
+def list_alerts_in_range(start_ts: float = None, end_ts: float = None, limit: int = 5000) -> list:
+    """Same as list_alerts, but scoped to a [start_ts, end_ts] unix-timestamp
+    window (either end optional) — backs the Excel export's week/month/
+    custom date filter."""
+    query = {}
+    ts_filter = {}
+    if start_ts is not None:
+        ts_filter["$gte"] = start_ts
+    if end_ts is not None:
+        ts_filter["$lte"] = end_ts
+    if ts_filter:
+        query["created_at"] = ts_filter
+    return list(_col.find(query, {"_id": 0}).sort("created_at", -1).limit(limit))
+
+
+def generate_excel(rows: list) -> bytes:
+    """One row per (alert, matched category) — a single alert with 2
+    matched categories becomes 2 spreadsheet rows sharing everything else,
+    so a category/severity filter in Excel itself (AutoFilter) works
+    cleanly instead of needing to parse a combined cell."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Retention-risk alerts"
+
+    headers = ["Date", "Time", "Employee", "Emp ID", "Bot", "Category", "Severity", "Matched keyword", "Multi-signal", "Message"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for a in rows:
+        dt = datetime.datetime.fromtimestamp(a.get("created_at", 0)) if a.get("created_at") else None
+        date_str = dt.strftime("%Y-%m-%d") if dt else ""
+        time_str = dt.strftime("%H:%M") if dt else ""
+        matches = a.get("matches") or [{"label": "", "severity": "", "keyword": ""}]
+        for m in matches:
+            ws.append([
+                date_str, time_str, a.get("name", ""), a.get("empid", ""),
+                a.get("bot", ""), m.get("label", ""), m.get("severity", ""),
+                m.get("keyword", ""), "Yes" if a.get("multi_signal") else "No",
+                a.get("message", ""),
+            ])
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for col_idx in range(1, len(headers) + 1):
+        col_letter = get_column_letter(col_idx)
+        width = max((len(str(c.value)) for c in ws[col_letter] if c.value is not None), default=10)
+        ws.column_dimensions[col_letter].width = min(max(width + 2, 10), 60)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def high_alert_users(session_threshold: int = 5) -> list:
+    """Employees with a RED-severity match in MORE than `session_threshold`
+    distinct chat sessions — repeated red flags across separate
+    conversations, not just several red words in one sitting, which is a
+    meaningfully stronger signal than a single flagged chat. Returns
+    [{"empid", "name", "red_session_count"}, ...], worst first."""
+    pipeline = [
+        {"$match": {"matches.severity": RED}},
+        {"$group": {"_id": {"empid": "$empid", "session_id": "$session_id"}}},
+        {"$group": {"_id": "$_id.empid", "red_session_count": {"$sum": 1}}},
+        {"$match": {"red_session_count": {"$gt": session_threshold}}},
+        {"$sort": {"red_session_count": -1}},
+    ]
+    results = list(_col.aggregate(pipeline))
+    return [
+        {"empid": r["_id"], "name": _employee_name(r["_id"]), "red_session_count": r["red_session_count"]}
+        for r in results
+    ]

@@ -14,6 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Qu
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
+from backend.chatbot import upload_history
 from backend.chatbot.admin_auth import require_chatbot_admin
 from backend.library_chatbot import audit_bot, data_access, history, ingest, search
 
@@ -197,6 +198,11 @@ def library_knowledge_stats(empid: str = Depends(require_chatbot_admin)):
     return ingest.stats()
 
 
+@router.get("/admin/knowledge/history")
+def library_knowledge_history(empid: str = Depends(require_chatbot_admin)):
+    return upload_history.list_uploads("library")
+
+
 _SUPPORTED_EXTS = ingest.TABULAR_EXTS + ("pdf", "docx", "txt", "json")
 
 
@@ -222,6 +228,7 @@ async def library_knowledge_update(empid: str = Depends(require_chatbot_admin), 
         result = ingest.update(file.filename, content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    upload_history.record_upload("library", empid, "update", file.filename, result.get("rows_inserted", 0))
     return {"file": file.filename, **result}
 
 
@@ -235,4 +242,5 @@ async def library_knowledge_replace(empid: str = Depends(require_chatbot_admin),
         result = ingest.replace(file.filename, content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    upload_history.record_upload("library", empid, "replace", file.filename, result.get("rows_inserted", 0))
     return {"file": file.filename, **result}

@@ -99,10 +99,18 @@ def _rcm_answer(question: str):
 
 
 def dispatch_stream(message: str, history: List[Dict[str, str]]) -> Generator[Dict, None, None]:
+    """Every "done" event carries a "bot" field (hr/library/rcm/general) —
+    the router uses it to persist the turn into THAT bot's own history
+    collection instead of always defaulting to HR's, which previously made
+    an RCM- or Library-answered question asked through the floating widget
+    show up in the HR tab's own chat history sidebar."""
     label = classify_message(message)
 
     if label == "HR":
-        yield from rag.answer_query_stream(message, history)
+        for event in rag.answer_query_stream(message, history):
+            if event.get("type") == "done":
+                event["bot"] = "hr"
+            yield event
         return
 
     if label == "LIBRARY":
@@ -113,7 +121,7 @@ def dispatch_stream(message: str, history: List[Dict[str, str]]) -> Generator[Di
             yield {"type": "error", "message": "Something went wrong searching the library. Please try again."}
             return
         yield {"type": "chunk", "text": answer}
-        yield {"type": "done", "sources": ["JHS Library"], "from_cache": False, "follow_ups": follow_ups}
+        yield {"type": "done", "sources": ["JHS Library"], "from_cache": False, "follow_ups": follow_ups, "bot": "library"}
         return
 
     if label == "RCM":
@@ -124,10 +132,11 @@ def dispatch_stream(message: str, history: List[Dict[str, str]]) -> Generator[Di
             yield {"type": "error", "message": "Something went wrong searching the RCM knowledge base. Please try again."}
             return
         yield {"type": "chunk", "text": answer}
-        yield {"type": "done", "sources": ["RCM Checklist Library"], "from_cache": False, "follow_ups": follow_ups}
+        yield {"type": "done", "sources": ["RCM Checklist Library"], "from_cache": False, "follow_ups": follow_ups, "bot": "rcm"}
         return
 
-    # GENERAL
+    # GENERAL — no dedicated history collection of its own; stays in HR's
+    # (the original default) since it's not really "about" any one bot.
     messages = [{"role": "system", "content": GENERAL_SYSTEM_PROMPT}]
     messages.extend(history[-6:])
     messages.append({"role": "user", "content": message})
@@ -136,6 +145,6 @@ def dispatch_stream(message: str, history: List[Dict[str, str]]) -> Generator[Di
         for token in stream_llm(messages):
             full.append(token)
             yield {"type": "chunk", "text": token}
-        yield {"type": "done", "sources": [], "from_cache": False}
+        yield {"type": "done", "sources": [], "from_cache": False, "bot": "hr"}
     except RuntimeError as e:
         yield {"type": "error", "message": str(e)}

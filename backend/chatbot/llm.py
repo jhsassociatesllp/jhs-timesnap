@@ -55,12 +55,18 @@ def _resolve(provider: Optional[ProviderOverride]):
     )
 
 
-def _track_usage(provider: Optional[ProviderOverride]) -> None:
+def _track_usage(provider: Optional[ProviderOverride], model: str = None, usage_block: dict = None) -> None:
     bot = (provider or {}).get("bot")
     if not bot:
         return
     from backend.chatbot import usage
-    usage.record_call(bot)
+    usage_block = usage_block or {}
+    usage.record_call(
+        bot,
+        model=model,
+        prompt_tokens=usage_block.get("prompt_tokens", 0),
+        completion_tokens=usage_block.get("completion_tokens", 0),
+    )
 
 
 def _raise_for_status(resp: requests.Response, provider_name: str) -> None:
@@ -162,9 +168,9 @@ def call_llm(
         raise RuntimeError(f"Could not reach {provider_name} API: {e}")
 
     _raise_for_status(resp, provider_name)
-    _track_usage(provider)
 
     data = resp.json()
+    _track_usage(provider, model=model, usage_block=data.get("usage"))
     try:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError) as e:

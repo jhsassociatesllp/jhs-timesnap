@@ -11,12 +11,12 @@ import logging
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
-from backend.chatbot import rag, cache, history, assistant, ingest_policy, multi_format, admin_stats, usage, alerts
+from backend.chatbot import rag, cache, history, assistant, ingest_policy, multi_format, admin_stats, usage, alerts, upload_history
 from backend.chatbot.admin_auth import require_chatbot_admin
 from backend.chatbot.config import chatbot_settings
 from backend.chatbot.vectorstore import get_index
@@ -72,12 +72,33 @@ def _persist_turn(empid: str, session_id: str, user_message: str, answer: str) -
     """Runs AFTER the HTTP response has already gone out (see BackgroundTasks
     below) — Mongo writes never add to the reply latency the employee feels.
     Any failure here is logged, not raised, since the user already has their
-    answer and there's nothing left to return an error to."""
+    answer and there's nothing left to return an error to. Used by the
+    HR-dedicated /chat and /chat/stream endpoints, always HR's own history."""
     try:
         history.save_turn(empid, session_id, user_message, answer)
     except Exception:
         logger.exception("Failed to persist chat turn for empid=%s session=%s", empid, session_id)
     alerts.record_if_match(empid, "hr", session_id, user_message)
+
+
+def _persist_assistant_turn(empid: str, session_id: str, user_message: str, answer: str, bot: str) -> None:
+    """Same as _persist_turn, but for the floating assistant bubble, which
+    can answer via ANY of the three bots — routes into THAT bot's own
+    history collection instead of always defaulting to HR's, which
+    previously made an RCM- or Library-answered question asked through the
+    bubble show up in the HR tab's own chat history sidebar."""
+    try:
+        if bot == "rcm":
+            from backend.rcm_chatbot import history as rcm_history
+            rcm_history.save_turn(empid, session_id, user_message, answer)
+        elif bot == "library":
+            from backend.library_chatbot import history as library_history
+            library_history.save_turn(empid, session_id, user_message, answer)
+        else:
+            history.save_turn(empid, session_id, user_message, answer)
+    except Exception:
+        logger.exception("Failed to persist assistant chat turn for empid=%s session=%s bot=%s", empid, session_id, bot)
+    alerts.record_if_match(empid, bot, session_id, user_message)
 
 
 def _recent_context(empid: str, session_id: str) -> List[dict]:
@@ -169,10 +190,13 @@ def assistant_chat_stream(req: ChatRequest, empid: str = Depends(get_current_use
 
     def event_stream():
         full_answer: List[str] = []
+        answered_by = "hr"
         try:
             for event in assistant.dispatch_stream(req.message, context):
                 if event.get("type") == "chunk":
                     full_answer.append(event["text"])
+                elif event.get("type") == "done":
+                    answered_by = event.get("bot") or "hr"
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception:
             logger.exception("Unexpected failure in assistant stream for empid=%s", empid)
@@ -181,7 +205,7 @@ def assistant_chat_stream(req: ChatRequest, empid: str = Depends(get_current_use
 
         answer = "".join(full_answer)
         if answer:
-            _persist_turn(empid, req.session_id, req.message, answer)
+            _persist_assistant_turn(empid, req.session_id, req.message, answer, answered_by)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -234,9 +258,42 @@ def admin_dashboard(empid: str = Depends(require_chatbot_admin)):
 def admin_alerts(empid: str = Depends(require_chatbot_admin)):
     """Retention-risk alerts — employees whose own chat messages (any bot,
     including ones dispatched through the floating assistant) matched the
-    resignation/exit/dissatisfaction keyword taxonomy in alerts.py. Most
-    recent first."""
-    return {"alerts": alerts.list_alerts()}
+    resignation/exit/dissatisfaction/harassment keyword taxonomy in
+    alerts.py. Most recent first. `high_alert_users` are employees with a
+    RED-severity match in more than 5 distinct chat sessions — surfaced
+    separately so a genuinely repeated pattern doesn't get lost in the
+    full list."""
+    return {"alerts": alerts.list_alerts(), "high_alert_users": alerts.high_alert_users()}
+
+
+@router.get("/admin/alerts/export.xlsx")
+def admin_alerts_export(
+    start: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
+    end: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
+    empid: str = Depends(require_chatbot_admin),
+):
+    """Excel export of retention-risk alerts, optionally scoped to a date
+    range (inclusive both ends) — the admin Dashboard's week/month presets
+    and custom range both just resolve to start/end here."""
+    import datetime as _dt
+
+    start_ts = None
+    end_ts = None
+    try:
+        if start:
+            start_ts = _dt.datetime.combine(_dt.date.fromisoformat(start), _dt.time.min).timestamp()
+        if end:
+            end_ts = _dt.datetime.combine(_dt.date.fromisoformat(end), _dt.time.max).timestamp()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="start/end must be YYYY-MM-DD")
+
+    rows = alerts.list_alerts_in_range(start_ts, end_ts)
+    content = alerts.generate_excel(rows)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=retention-risk-alerts.xlsx"},
+    )
 
 
 def _build_chunks_from_upload(file: UploadFile, content: bytes) -> list:
@@ -261,6 +318,7 @@ async def hr_knowledge_update(empid: str = Depends(require_chatbot_admin), file:
     content = await file.read()
     chunks = _build_chunks_from_upload(file, content)
     added = ingest_policy.ingest_records(chunks, mode="update")
+    upload_history.record_upload("hr", empid, "update", file.filename, added)
     return {"mode": "update", "file": file.filename, "chunks_added": added}
 
 
@@ -272,7 +330,13 @@ async def hr_knowledge_replace(empid: str = Depends(require_chatbot_admin), file
     content = await file.read()
     chunks = _build_chunks_from_upload(file, content)
     added = ingest_policy.ingest_records(chunks, mode="replace")
+    upload_history.record_upload("hr", empid, "replace", file.filename, added)
     return {"mode": "replace", "file": file.filename, "chunks_added": added}
+
+
+@router.get("/admin/knowledge/history")
+def hr_knowledge_history(empid: str = Depends(require_chatbot_admin)):
+    return upload_history.list_uploads("hr")
 
 
 @router.get("/me", response_model=GreetingOut)

@@ -92,7 +92,11 @@ Rules:
                 {"role": "user", "content": question},
             ],
         )
-        usage.record_call("library")
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+        )
         result = json.loads(response.choices[0].message.content)
         result.setdefault("filters", {})
         result.setdefault("keywords", "")
@@ -124,7 +128,11 @@ Respond now using HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.3, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call("library")
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+        )
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_answer failed: {e}")
@@ -160,7 +168,11 @@ Respond with ONLY the one <p> sentence, HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.3, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call("library")
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+        )
         intro = response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_breakdown_answer failed: {e}")
@@ -201,7 +213,11 @@ Respond now using HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.2, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call("library")
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+        )
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_summary failed: {e}")
@@ -249,7 +265,11 @@ Return ONLY valid JSON:
             response_format={"type": "json_object"},
             messages=[{"role": "user", "content": prompt}],
         )
-        usage.record_call("library")
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+        )
         draft = json.loads(response.choices[0].message.content)
         draft.setdefault("grounded_on", [r["sr_no"] for r in grounding_rows])
         return draft

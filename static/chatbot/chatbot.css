@@ -133,8 +133,30 @@ body {
 .hr-error-toast { max-width: 900px; margin: 0 auto .6rem; background: #f04c4c; color: #fff; border-radius: 8px; padding: .55rem .8rem; font-size: .8rem; display: none; }
 .hr-error-toast.show { display: block; }
 
+.cb-mobile-history-btn { display: none; }
+.cb-sidebar-mobile-backdrop { display: none; }
+
 @media (max-width: 900px) {
-  .cb-sidebar:not(.hidden) { position: fixed; top: 58px; left: 0; bottom: 0; z-index: 50; box-shadow: 8px 0 24px rgba(0,0,0,.25); }
+  .cb-mobile-history-btn { display: flex; }
+
+  /* Closed by default on mobile (unlike desktop, where "not .hidden" means
+     fully visible) — .mobile-open (toggled by toggleMobileSidebar() below)
+     slides it in as an overlay instead, with a tap-outside backdrop to
+     close it. Without this the sidebar covered the chat underneath with no
+     way to dismiss it, since nothing ever added a mobile-specific closed
+     state before. */
+  .cb-sidebar:not(.hidden) {
+    position: fixed; top: 58px; left: 0; bottom: 0; z-index: 50;
+    box-shadow: 8px 0 24px rgba(0,0,0,.25);
+    transform: translateX(-100%); transition: transform .25s ease;
+  }
+  .cb-sidebar:not(.hidden).mobile-open { transform: translateX(0); }
+
+  .cb-sidebar-mobile-backdrop.show {
+    display: block; position: fixed; inset: 58px 0 0 0; z-index: 49;
+    background: rgba(0,0,0,.35);
+  }
+
   .hr-msg { max-width: 84%; }
 }
 @media (max-width: 600px) {
@@ -143,4 +165,10 @@ body {
   .cb-tab-btn span.lbl { display: none; }
   .hr-messages { padding: 1.4rem 1rem 1rem; }
   .hr-input-bar { padding: .7rem 1rem 1rem; }
+  /* "Modules"/"Logout" collapse to icon-only too, matching the tab labels
+     above — with the mobile history button added, the header row (badge +
+     3 tabs + 3 right-side buttons) is otherwise too tight to fit a phone
+     screen without wrapping/overflowing. */
+  .cb-header-right .nav-link-btn .lbl { display: none; }
+  .cb-header-right .nav-link-btn { padding: 0 .65rem; height: 34px; }
 }
