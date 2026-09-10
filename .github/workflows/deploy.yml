@@ -1,79 +1,4 @@
-# name: 🚀 Deploy to Server
-
-# on:
-#   push:
-#     branches:
-#       - main
-#       - staging
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Setup SSH Agent
-#         uses: webfactory/ssh-agent@v0.8.0
-#         with:
-#           ssh-private-key: ${{ secrets.SERVER_KEY }}
-
-#       - name: Deploy to Server
-#         run: |
-#           BRANCH=${GITHUB_REF_NAME}
-
-#           # Map branch → tag + container + port
-#           if [ "$BRANCH" = "main" ]; then
-#             TAG="production"
-#             APP_NAME="jhs_timesnap_production"
-#             PORT=8011
-#             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
-#           else
-#             TAG="staging"
-#             APP_NAME="jhs_timesnap_staging"
-#             PORT=8010
-#             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
-#           fi
-
-#           IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$TAG"
-
-#           echo "🌍 Environment: $TAG"
-#           echo "🐳 Image: $IMAGE"
-#           echo "🔌 Port: $PORT"
-#           echo "📦 Container: $APP_NAME"
-
-#           ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
-#             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-              
-#               echo '🔐 Logging into GHCR...'
-#               echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-
-#               echo '📥 Pulling latest image...'
-#               docker pull $IMAGE || {
-#                 echo '❌ Pull failed — keeping old container alive.';
-#                 exit 1;
-#               }
-
-#               echo '🛑 Stopping old container...'
-#               docker stop $APP_NAME || true
-#               docker rm $APP_NAME || true
-
-#               echo '▶️ Starting new container...'
-#               docker run -d \
-#                 --name $APP_NAME \
-#                 -p $PORT:8000 \
-#                 -e APP_ENV=$TAG \
-#                 -e MONGO_CONNECTION_STRING=\"${{ secrets.MONGO_CONNECTION_STRING }}\" \
-#                 -e SMTP_KEY=\"$SMTP\" \
-#                 -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
-#                 $IMAGE
-
-#               echo '🧹 Cleaning unused images...'
-#               docker image prune -f
-
-#               echo '✅ Deployment successful for $TAG!'
-#           "
-
-
-name: 🚀 Deploy to Server
+name: 🚀 Build, Push & Deploy
 
 on:
   push:
@@ -82,7 +7,47 @@ on:
       - staging
 
 jobs:
+  # Builds the image and pushes it to GHCR. The deploy job below declares
+  # `needs: build`, so GitHub Actions guarantees it only starts once this
+  # has genuinely finished — before this, build and deploy were two
+  # separate workflow files that both triggered on the same push with
+  # nothing linking them, so they ran concurrently: deploy's `docker pull`
+  # could (and repeatedly did) reach GHCR before this job had finished
+  # pushing the new image, silently pulling and redeploying the PREVIOUS
+  # image instead while still reporting success, since pulling an
+  # existing-but-stale tag isn't an error.
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build & Push Docker Image
+        run: |
+          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap"
+
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            TAG="production"
+          elif [ "${GITHUB_REF_NAME}" = "staging" ]; then
+            TAG="staging"
+          else
+            echo "❌ Unsupported branch: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          echo "📦 Building $IMAGE:$TAG"
+          docker build -t "$IMAGE:$TAG" .
+
+          echo "📤 Pushing $IMAGE:$TAG"
+          docker push "$IMAGE:$TAG"
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
