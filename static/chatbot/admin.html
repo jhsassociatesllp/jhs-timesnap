@@ -147,6 +147,22 @@
           <div class="admin-card">
             <div class="admin-card-head">
               <div>
+                <div class="admin-card-title"><i class="fas fa-chart-simple"></i> Which bot gets used more</div>
+                <div class="admin-card-sub" id="dashCompareHeadline">Loading…</div>
+              </div>
+              <div class="dash-bot-switch" id="dashCompareWindowSwitch">
+                <button class="dash-bot-btn" data-window="today">Today</button>
+                <button class="dash-bot-btn" data-window="this_week">This week</button>
+                <button class="dash-bot-btn active" data-window="this_month">This month</button>
+                <button class="dash-bot-btn" data-window="all_time">All time</button>
+              </div>
+            </div>
+            <div id="dashCompareChart" class="dash-compare-chart"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
                 <div class="admin-card-title"><i class="fas fa-users"></i> Active users</div>
                 <div class="admin-card-sub">Message counts per employee, most active first.</div>
               </div>

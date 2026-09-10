@@ -351,6 +351,54 @@
     }).join("");
   }
 
+  const WINDOW_LABELS = { today: "today", this_week: "this week", this_month: "this month", all_time: "all time" };
+  let dashCompareWindow = "this_month";
+
+  // Fixed categorical order — never reassigned when a bot has zero calls or
+  // the window changes, so a color always means the same bot everywhere on
+  // this page (see admin.css's .dash-series-* — validated palette slots 1-3).
+  function renderDashCompareChart() {
+    const headline = document.getElementById("dashCompareHeadline");
+    const chart = document.getElementById("dashCompareChart");
+    const bots = Object.keys(BOT_LABELS);
+    const values = bots.map((bot) => (dashboardData[bot] && dashboardData[bot].api_usage && dashboardData[bot].api_usage[dashCompareWindow]) || 0);
+    const max = Math.max(...values, 1);
+    const windowLabel = WINDOW_LABELS[dashCompareWindow];
+
+    const ranked = bots.map((bot, i) => ({ bot, value: values[i] })).sort((a, b) => b.value - a.value);
+    const top = ranked[0], second = ranked[1];
+    if (top.value === 0) {
+      headline.textContent = `No LLM calls recorded yet ${windowLabel}.`;
+    } else if (second.value === 0) {
+      headline.innerHTML = `<strong>${BOT_LABELS[top.bot]}</strong> is the only bot with activity ${windowLabel} — ${top.value.toLocaleString()} call${top.value === 1 ? "" : "s"}.`;
+    } else {
+      const times = top.value / second.value;
+      const timesText = times >= 1.05 ? ` — ${times.toFixed(1)}× ${BOT_LABELS[second.bot]}'s usage` : " — roughly tied with the next busiest bot";
+      headline.innerHTML = `<strong>${BOT_LABELS[top.bot]}</strong> gets used the most ${windowLabel}, with <strong>${top.value.toLocaleString()}</strong> call${top.value === 1 ? "" : "s"}${timesText}.`;
+    }
+
+    chart.innerHTML = bots.map((bot, i) => {
+      const value = values[i];
+      const pct = value > 0 ? Math.max((value / max) * 100, 2) : 0;
+      return `
+        <div class="dash-bar-row dash-series-${bot}">
+          <div class="dash-bar-label"><span class="dash-bar-swatch"></span>${BOT_LABELS[bot]}</div>
+          <div class="dash-bar-track" title="${value.toLocaleString()} call${value === 1 ? "" : "s"} ${windowLabel}">
+            <div class="dash-bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="dash-bar-value">${value.toLocaleString()}</div>
+        </div>`;
+    }).join("");
+  }
+
+  document.querySelectorAll("#dashCompareWindowSwitch .dash-bot-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#dashCompareWindowSwitch .dash-bot-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      dashCompareWindow = btn.dataset.window;
+      if (dashboardData) renderDashCompareChart();
+    });
+  });
+
   function renderDashboardUserTable() {
     const wrap = document.getElementById("dashUserTableWrap");
     const rows = (dashboardData[dashboardBot] || {}).user_activity || [];
@@ -416,6 +464,7 @@
   async function loadDashboard(forceRefresh) {
     if (dashboardData && !forceRefresh) {
       renderDashboardSummary();
+      renderDashCompareChart();
       renderDashboardUserTable();
       renderAlerts();
       return;
@@ -430,6 +479,7 @@
       dashboardData = dashboard;
       alertsData = alertsRes.alerts || [];
       renderDashboardSummary();
+      renderDashCompareChart();
       renderDashboardUserTable();
       renderAlerts();
     } catch {

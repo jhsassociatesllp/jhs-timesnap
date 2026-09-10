@@ -67,6 +67,28 @@
 /* ═══ DASHBOARD ═══ */
 .admin-wrap-wide { max-width: 1100px; }
 
+/* Fixed categorical order, one hue per bot, never cycled/reassigned —
+   validated palette slots 1-3 (dataviz skill's references/palette.md),
+   chosen specifically because they're the three slots proven to clear
+   every colorblind-safety gate together. This page has no dark-mode
+   support anywhere else, so — matching that — these are the light-mode
+   values only. */
+.dash-series-hr      { --series: #2a78d6; }
+.dash-series-rcm      { --series: #eb6834; }
+.dash-series-library { --series: #1baf7a; }
+
+.dash-compare-chart { display: flex; flex-direction: column; gap: 10px; padding-top: .3rem; }
+.dash-bar-row { display: grid; grid-template-columns: 148px 1fr 64px; align-items: center; gap: .75rem; }
+.dash-bar-label { font-size: .82rem; font-weight: 600; color: var(--text-dark); display: flex; align-items: center; gap: .45rem; }
+.dash-bar-swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--series); flex-shrink: 0; }
+.dash-bar-track { position: relative; height: 22px; background: var(--light); border-radius: 5px; overflow: hidden; }
+.dash-bar-fill {
+  position: absolute; inset: 0 auto 0 0; height: 100%; background: var(--series);
+  border-radius: 5px; min-width: 3px; transition: width .3s ease;
+}
+.dash-bar-value { font-size: .82rem; font-weight: 700; color: var(--text-dark); text-align: right; font-variant-numeric: tabular-nums; }
+.dash-bar-row:hover .dash-bar-fill { filter: brightness(1.08); }
+
 .dash-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 .dash-bot-card { border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.2rem; }
 .dash-bot-name { font-weight: 700; font-size: .88rem; color: var(--text-dark); margin-bottom: .5rem; }
