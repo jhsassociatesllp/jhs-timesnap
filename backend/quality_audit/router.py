@@ -26,7 +26,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
-from backend.database import employee_details_collection
+from backend.database import employee_details_collection, module_admin_collection
 from backend.quality_audit.db import (
     qa_users_collection,
     qa_audit_collection,
@@ -61,12 +61,22 @@ def _email_from_emp(emp_id: str) -> str:
         return (emp.get("EMail") or emp.get("JHS Email") or "").lower().strip()
     return ""
 
+def _is_qa_module_admin(empid: str) -> bool:
+    empid = empid.strip().upper()
+    doc = module_admin_collection.find_one({"empid": empid})
+    if not doc:
+        doc = module_admin_collection.find_one(
+            {"empid": {"$regex": f"^{empid}$", "$options": "i"}}
+        )
+    return bool(doc and "quality_audit" in doc.get("modules", []))
+
+
 def _check_qa_access(current_user: str):
     email  = _email_from_emp(current_user)
     doc    = _get_access_doc()
     users  = [e.lower().strip() for e in doc.get("user",  [])]
     admins = [e.lower().strip() for e in doc.get("admin", [])]
-    is_admin   = email in admins
+    is_admin   = email in admins or _is_qa_module_admin(current_user)
     is_user    = email in users
     is_qa_only = email in QA_ONLY_EMAILS
     if not (is_admin or is_user):

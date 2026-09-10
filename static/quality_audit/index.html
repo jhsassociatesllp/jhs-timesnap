@@ -2547,6 +2547,10 @@
         // Parse both in parallel
         const [kpiJson, statsJson] = await Promise.all([kpiRes.json(), statsRes.json()]);
 
+        if (!kpiRes.ok || !statsRes.ok) {
+          throw new Error((kpiJson && kpiJson.detail) || (statsJson && statsJson.detail) || 'Failed to load dashboard data');
+        }
+
         _kpiData = kpiJson;
         _statsData = statsJson;
 
