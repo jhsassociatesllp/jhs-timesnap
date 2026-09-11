@@ -33,6 +33,7 @@ _client = MongoClient(
 )
 _col = _client[chatbot_settings.CHATBOT_DB_NAME]["chatbot_alerts"]
 _col.create_index([("empid", 1), ("created_at", -1)])
+_col.create_index([("matches.severity", 1)])  # backs high_alert_users()'s RED-only $match
 
 
 # Severity, in escalating order — drives the badge color in the dashboard.
@@ -287,10 +288,13 @@ def list_alerts(limit: int = 500) -> list:
     return docs
 
 
-def list_alerts_in_range(start_ts: float = None, end_ts: float = None, limit: int = 5000) -> list:
+def list_alerts_in_range(start_ts: float = None, end_ts: float = None, limit: int = 200000) -> list:
     """Same as list_alerts, but scoped to a [start_ts, end_ts] unix-timestamp
     window (either end optional) — backs the Excel export's week/month/
-    custom date filter."""
+    custom date filter. Default limit is a safety cap, not a real-world
+    expectation — an export should be complete, not silently truncated,
+    so this is set far above any plausible alert volume rather than
+    matching list_alerts()'s much smaller dashboard-page default."""
     query = {}
     ts_filter = {}
     if start_ts is not None:

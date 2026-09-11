@@ -16,8 +16,8 @@ import time
 
 from pymongo import MongoClient
 
+from backend.chatbot.admin_stats import employee_name
 from backend.chatbot.config import chatbot_settings
-from backend.database import employee_details_collection
 
 logger = logging.getLogger("chatbot.upload_history")
 
@@ -30,11 +30,6 @@ _col = _client[chatbot_settings.CHATBOT_DB_NAME]["chatbot_upload_history"]
 _col.create_index([("bot", 1), ("created_at", -1)])
 
 
-def _employee_name(empid: str) -> str:
-    emp = employee_details_collection.find_one({"EmpID": empid}, {"_id": 0, "Emp Name": 1})
-    return (emp or {}).get("Emp Name") or empid
-
-
 def record_upload(bot: str, empid: str, mode: str, filename: str, count: int) -> None:
     """Logs one upload event. Never raises — a logging hiccup must never
     break the actual upload it's describing, so this is best-effort and
@@ -43,7 +38,7 @@ def record_upload(bot: str, empid: str, mode: str, filename: str, count: int) ->
         _col.insert_one({
             "bot": bot,
             "empid": empid,
-            "name": _employee_name(empid),
+            "name": employee_name(empid),
             "mode": mode,
             "filename": filename,
             "count": count,
