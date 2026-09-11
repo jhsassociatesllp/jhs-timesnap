@@ -10,8 +10,8 @@ bots' credentials/indexes never collide.
 
 Chat HISTORY is the one exception — per product requirement, Library chat
 history lives in the SAME MongoDB database as the HR Policy bot's history
-(ChatbotDB), just a different collection ("Jhs_lib"). See history.py, which
-imports the HR bot's chatbot_settings for that connection instead of
+(Chat_bot), just a different collection ("observation_bot"). See history.py,
+which imports the HR bot's chatbot_settings for that connection instead of
 duplicating it here.
 """
 import os

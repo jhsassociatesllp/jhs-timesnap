@@ -69,7 +69,11 @@ jobs:
               PORT=8011
               SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
               HR_QUIZ_DB_NAME="hr_quiz_production"
-              CHATBOT_DB_NAME="ChatbotDB_production"
+              # Fixed on purpose, SAME on both branches — this is where the
+              # chatbot's HR/RCM/observation_bot history collections have
+              # always actually lived; not environment-scoped like
+              # HR_QUIZ_DB_NAME above.
+              CHATBOT_DB_NAME="Chat_bot"
               ;;
             staging)
               ENV="staging"
@@ -77,7 +81,7 @@ jobs:
               PORT=8010
               SMTP="${{ secrets.SMTP_KEY_STAGING }}"
               HR_QUIZ_DB_NAME="hr_quiz_staging"
-              CHATBOT_DB_NAME="ChatbotDB"
+              CHATBOT_DB_NAME="Chat_bot"
               ;;
             *)
               echo "❌ Unsupported branch: $BRANCH"

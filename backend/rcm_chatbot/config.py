@@ -53,7 +53,10 @@ class RcmChatbotSettings:
     CHATBOT_MONGO_URI = chatbot_settings.CHATBOT_MONGO_URI
     CHATBOT_DB_NAME = chatbot_settings.CHATBOT_DB_NAME
     CHATBOT_MONGO_TIMEOUT_MS = chatbot_settings.CHATBOT_MONGO_TIMEOUT_MS
-    HISTORY_COLLECTION_NAME = os.getenv("RCM_HISTORY_COLLECTION_NAME", "rcm_chat_history")
+    # "RCM" — fixed name, not meant to change: matches the pre-existing
+    # collection in the shared Chat_bot database (see backend/chatbot/
+    # config.py's CHATBOT_DB_NAME/CHATBOT_COLLECTION_NAME comment).
+    HISTORY_COLLECTION_NAME = os.getenv("RCM_HISTORY_COLLECTION_NAME", "RCM")
     QA_CACHE_COLLECTION_NAME = os.getenv("RCM_QA_CACHE_COLLECTION_NAME", "rcm_qa_cache")
 
     def validate(self):

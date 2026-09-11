@@ -1,10 +1,10 @@
 """
 Per-user chat history for the JHS Library "Ask" bot — stored in the SAME
-MongoDB database as the HR Policy bot's history (ChatbotDB, via the HR bot's
-own chatbot_settings/connection), just a different collection ("Jhs_lib").
-That's a deliberate product requirement, not an accident — see
-backend/chatbot/history.py for the canonical version of this pattern, which
-this mirrors document-for-document.
+MongoDB database as the HR Policy bot's history (Chat_bot, via the HR bot's
+own chatbot_settings/connection), just a different collection
+("observation_bot" — fixed name, not meant to change). That's a deliberate
+product requirement, not an accident — see backend/chatbot/history.py for
+the canonical version of this pattern, which this mirrors document-for-document.
 
 Document shape:
 {
@@ -32,14 +32,15 @@ from backend.chatbot.config import chatbot_settings
 from backend.library_chatbot import data_access
 
 # Reuses the HR Policy bot's Mongo connection/database on purpose — Library
-# chat history lives alongside HR history in ChatbotDB, just its own collection.
+# chat history lives alongside HR/RCM history in Chat_bot, just its own
+# collection.
 _client = MongoClient(
     chatbot_settings.CHATBOT_MONGO_URI,
     serverSelectionTimeoutMS=chatbot_settings.CHATBOT_MONGO_TIMEOUT_MS,
     connectTimeoutMS=chatbot_settings.CHATBOT_MONGO_TIMEOUT_MS,
 )
 _db = _client[chatbot_settings.CHATBOT_DB_NAME]
-_col = _db["Jhs_lib"]
+_col = _db["observation_bot"]
 
 _col.create_index("empid", unique=True)
 

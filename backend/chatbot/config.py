@@ -132,8 +132,12 @@ class ChatbotSettings:
     CHATBOT_MONGO_URI = os.getenv("CHATBOT_MONGO_URI") or os.getenv(
         "MONGO_CONNECTION_STRING", "mongodb://localhost:27017/"
     )
-    CHATBOT_DB_NAME         = os.getenv("CHATBOT_DB_NAME", "ChatbotDB")
-    CHATBOT_COLLECTION_NAME = os.getenv("CHATBOT_COLLECTION_NAME", "chat_history")
+    # "Chat_bot" / "HR" — fixed names, not meant to change: this is where
+    # the HR bot's chat history has always actually lived (RCM's and the
+    # Observation Library's own history collections sit alongside it in the
+    # same database — see their own config/history modules).
+    CHATBOT_DB_NAME         = os.getenv("CHATBOT_DB_NAME", "Chat_bot")
+    CHATBOT_COLLECTION_NAME = os.getenv("CHATBOT_COLLECTION_NAME", "HR")
 
     # Fail fast instead of hanging: if Mongo is unreachable, give up after
     # this many milliseconds rather than blocking the request for ~30s.
