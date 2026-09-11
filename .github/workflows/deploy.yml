@@ -105,6 +105,20 @@ jobs:
               echo "🔐 Logging into GHCR..."
               echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+              # Runs unconditionally, BEFORE the pull — not just after a
+              # successful deploy like the old dangling-only prune below.
+              # The chatbot module's deps (torch, sentence-transformers,
+              # etc.) made each image several GB; a run that fails before
+              # reaching the post-deploy prune (as this one just did) left
+              # old layers stranded with nothing ever reclaiming them,
+              # until the pull itself failed with "no space left on
+              # device". -a also catches unused-but-tagged images (e.g. an
+              # old production image sitting untouched on a staging pull),
+              # not just dangling ones.
+              echo "🧹 Freeing disk space before pulling..."
+              docker image prune -af || true
+              docker container prune -f || true
+
               echo "📥 Pulling latest image..."
               # Retries on a transient drop mid-pull — cheap even on retry,
               # since docker skips any layer it already has fully.
@@ -127,7 +141,23 @@ jobs:
 
               echo "🛑 Stopping existing container (if any)..."
               docker stop "$APP_NAME" || true
-              docker rm "$APP_NAME" || true
+              docker rm -f "$APP_NAME" || true
+
+              # docker rm returning doesn't guarantee the daemon has
+              # actually finished tearing down the old container's storage
+              # layer, especially under the disk pressure that caused this
+              # deploy to fail last time — starting the new container
+              # immediately after raced an in-flight removal and hit
+              # "Conflict... already in use by container <hash>" even
+              # though rm had already been called.
+              echo "⏳ Confirming old container is fully removed..."
+              for i in \$(seq 1 30); do
+                if ! docker ps -a --format '{{.Names}}' | grep -qx "$APP_NAME"; then
+                  break
+                fi
+                echo "   still there, waiting... (\$i/30)"
+                sleep 2
+              done
 
               echo "▶️ Starting new container..."
               docker run -d \
