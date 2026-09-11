@@ -69,6 +69,7 @@ jobs:
               PORT=8011
               SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
               HR_QUIZ_DB_NAME="hr_quiz_production"
+              CHATBOT_DB_NAME="ChatbotDB_production"
               ;;
             staging)
               ENV="staging"
@@ -76,6 +77,7 @@ jobs:
               PORT=8010
               SMTP="${{ secrets.SMTP_KEY_STAGING }}"
               HR_QUIZ_DB_NAME="hr_quiz_staging"
+              CHATBOT_DB_NAME="ChatbotDB"
               ;;
             *)
               echo "❌ Unsupported branch: $BRANCH"
@@ -168,6 +170,7 @@ jobs:
                 -e SMTP_KEY="$SMTP" \
                 -e JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
                 -e HR_QUIZ_DB_NAME="$HR_QUIZ_DB_NAME" \
+                -e CHATBOT_DB_NAME="$CHATBOT_DB_NAME" \
                 -e HR_QUIZ_JWT_SECRET="${{ secrets.HR_QUIZ_JWT_SECRET }}" \
                 -e HR_QUIZ_JWT_ALGORITHM="HS256" \
                 -e HR_QUIZ_HR_TOKEN_EXPIRE_MINUTES="1440" \
