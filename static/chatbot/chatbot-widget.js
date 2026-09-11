@@ -753,11 +753,20 @@
         messages.innerHTML = "";
         messages.appendChild(welcome);
         welcome.style.display = "flex";
+        userMsgCount = 0;
+        nudgeShown = false;
         return;
       }
       messages.innerHTML = "";
       msgs.forEach((m) => appendMessage(m.role, m.content, false, m.created_at));
+      // userMsgCount is in-memory only, so it resets to 0 on every page
+      // load/navigation even though the session itself (sessionStorage'd
+      // id, server-side history) carries on — without this, a
+      // conversation whose 5 questions span more than one page view never
+      // trips the nudge, since the counter never actually reaches 5.
+      userMsgCount = msgs.filter((m) => m.role === "user").length;
       scrollToBottom();
+      maybeShowModuleNudge();
     } catch {
       // new session or error — just show welcome
     }
