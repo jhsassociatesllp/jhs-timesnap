@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>JHS Chatbot Admin</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/chatbot/chatbot.css" />
+  <link rel="stylesheet" href="/static/chatbot/admin.css" />
+</head>
+<body>
+
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i>&nbsp; Loading JHS Chatbot Admin…
+  </div>
+
+  <div id="main-content" style="display:none">
+    <header class="cb-header">
+      <div class="cb-header-brand">
+        <div class="badge"><svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg"><text x="60" y="43" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="40" letter-spacing="-1" fill="#ffffff">JHS</text></svg></div>
+        <span class="name">JHS Chatbot Admin</span>
+      </div>
+      <nav class="cb-tabs">
+        <button class="cb-tab-btn" data-atab="hr" onclick="switchAdminTab('hr')"><i class="fas fa-book-reader"></i> <span class="lbl">HR Policy</span></button>
+        <button class="cb-tab-btn active" data-atab="rcm" onclick="switchAdminTab('rcm')"><i class="fas fa-sync-alt"></i> <span class="lbl">RCM</span></button>
+        <button class="cb-tab-btn" data-atab="library" onclick="switchAdminTab('library')"><i class="fas fa-database"></i> <span class="lbl">Observation Library</span></button>
+        <button class="cb-tab-btn" data-atab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-line"></i> <span class="lbl">Dashboard</span></button>
+      </nav>
+      <div class="cb-header-right">
+        <a class="nav-link-btn" href="/jhs-chatbot"><i class="fas fa-comments"></i> Chatbot</a>
+        <a class="nav-link-btn" href="/control-panel"><i class="fas fa-cogs"></i> Control Panel</a>
+      </div>
+    </header>
+
+    <div id="accessDeniedWrap" style="display:none; max-width:820px; margin:2rem auto; padding:0 1.5rem;">
+      <div class="admin-access-denied">
+        <i class="fas fa-lock"></i>
+        <p>Admin access required for the JHS Chatbot admin hub. Ask an existing super admin to grant the "chatbot" module from the Control Panel.</p>
+      </div>
+    </div>
+
+    <div id="tabsWrap">
+      <!-- ══════════════ HR POLICY ADMIN ══════════════ -->
+      <div id="atab-hr" class="admin-tab-panel">
+        <div class="admin-wrap">
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-book-reader"></i> HR Policy knowledge base</div>
+                <div class="admin-card-sub">Upload a single document, any format. <strong>Update</strong> adds its content alongside what's already there; <strong>Replace</strong> deletes everything currently stored first.</div>
+              </div>
+            </div>
+            <div class="admin-kb-stat" id="hrKbStat">Loading current size…</div>
+            <div class="admin-filedrop" id="hrFileDrop">
+              <input type="file" id="hrFileInput" accept=".docx,.pdf,.xlsx,.xls,.csv,.txt,.json">
+              <div class="admin-ftitle" id="hrFileTitle">Click to choose a file</div>
+              <div class="admin-fsub">.docx · .pdf · .xlsx · .xls · .csv · .txt · .json</div>
+            </div>
+            <div class="admin-btn-row admin-btn-row-split">
+              <button class="admin-btn admin-btn-primary" id="hrUpdateBtn" disabled>Update (add to existing)</button>
+              <button class="admin-btn admin-btn-danger" id="hrReplaceBtn" disabled>Replace (delete existing)</button>
+            </div>
+            <div class="admin-status-line" id="hrKbStatus"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-clock-rotate-left"></i> Document upload history</div>
+                <div class="admin-card-sub">Every update/replace made to this knowledge base, most recent first.</div>
+              </div>
+            </div>
+            <div id="hrHistoryList">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ RCM ADMIN ══════════════ -->
+      <div id="atab-rcm" class="admin-tab-panel active">
+        <div class="admin-wrap">
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-folder-open"></i> Bulk import a folder</div>
+                <div class="admin-card-sub">Pick a folder from your computer — every file inside becomes its own collection in the RCM chatbot's knowledge base.</div>
+              </div>
+            </div>
+            <div class="admin-filedrop" id="rcmFolderDrop">
+              <input type="file" id="rcmFolderInput" webkitdirectory directory multiple>
+              <div class="admin-ftitle" id="rcmFolderTitle">Click to choose a folder</div>
+              <div class="admin-fsub">.xlsx · .xls · .csv · .docx · .pdf · .txt · .json — unsupported files in the folder are skipped</div>
+            </div>
+            <div class="admin-btn-row">
+              <button class="admin-btn admin-btn-primary" id="rcmImportFolderBtn" disabled>Import folder</button>
+            </div>
+            <div class="admin-status-line" id="rcmFolderStatus"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-layer-group"></i> Collections in the knowledge base</div>
+                <div class="admin-card-sub">These power what the RCM chatbot can answer questions about.</div>
+              </div>
+              <button class="admin-btn admin-btn-ghost" id="rcmRefreshCollBtn">Refresh</button>
+            </div>
+            <div id="rcmCollList"></div>
+            <div class="admin-pagination-row" id="rcmCollPagination"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ JHS LIBRARY ADMIN ══════════════ -->
+      <div id="atab-library" class="admin-tab-panel">
+        <div class="admin-wrap">
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-database"></i> Observation Library knowledge base</div>
+                <div class="admin-card-sub">Upload a single file, any format. <strong>.xlsx/.xls/.csv</strong> with the standard columns (Sr. No., Headline, Observation, Risk, Root Cause, Recommendation, Management Action Plan, Sector, Audit Type, Process Area, etc.) become normal filterable observations. Any other file (.pdf/.docx/.txt/.json) becomes searchable "unclassified" observations — no sector/risk filters, since a freeform document doesn't state those, but still found by Ask/Summarize. <strong>Update</strong> adds alongside what's already there; <strong>Replace</strong> deletes every existing observation first.</div>
+              </div>
+            </div>
+            <div class="admin-kb-stat" id="libKbStat">Loading current size…</div>
+            <div class="admin-filedrop" id="libFileDrop">
+              <input type="file" id="libFileInput" accept=".xlsx,.xls,.csv,.pdf,.docx,.txt,.json">
+              <div class="admin-ftitle" id="libFileTitle">Click to choose a file</div>
+              <div class="admin-fsub">.xlsx · .xls · .csv (filterable) — .pdf · .docx · .txt · .json (searchable, unclassified)</div>
+            </div>
+            <div class="admin-btn-row admin-btn-row-split">
+              <button class="admin-btn admin-btn-primary" id="libUpdateBtn" disabled>Update (add to existing)</button>
+              <button class="admin-btn admin-btn-danger" id="libReplaceBtn" disabled>Replace (delete existing)</button>
+            </div>
+            <div class="admin-status-line" id="libKbStatus"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-clock-rotate-left"></i> Document upload history</div>
+                <div class="admin-card-sub">Every update/replace made to this knowledge base, most recent first.</div>
+              </div>
+            </div>
+            <div id="libHistoryList">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ DASHBOARD ══════════════ -->
+      <div id="atab-dashboard" class="admin-tab-panel">
+        <div class="admin-wrap admin-wrap-wide">
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-chart-line"></i> Usage Dashboard</div>
+                <div class="admin-card-sub">Active users and LLM API call volume across all three bots.</div>
+              </div>
+              <button class="admin-btn admin-btn-ghost" id="dashboardRefreshBtn">Refresh</button>
+            </div>
+            <div id="dashboardSummary" class="dash-summary-grid">Loading…</div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-chart-simple"></i> Which bot gets used more</div>
+                <div class="admin-card-sub" id="dashCompareHeadline">Loading…</div>
+              </div>
+              <div class="dash-bot-switch" id="dashCompareWindowSwitch">
+                <button class="dash-bot-btn" data-window="today">Today</button>
+                <button class="dash-bot-btn" data-window="this_week">This week</button>
+                <button class="dash-bot-btn active" data-window="this_month">This month</button>
+                <button class="dash-bot-btn" data-window="all_time">All time</button>
+              </div>
+            </div>
+            <div id="dashCompareChart" class="dash-compare-chart"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-users"></i> Active users</div>
+                <div class="admin-card-sub">Message counts per employee, most active first.</div>
+              </div>
+            </div>
+            <div class="dash-bot-switch" id="dashUserBotSwitch">
+              <button class="dash-bot-btn active" data-dashbot="hr">HR Policy</button>
+              <button class="dash-bot-btn" data-dashbot="rcm">RCM</button>
+              <button class="dash-bot-btn" data-dashbot="library">Observation Library</button>
+            </div>
+            <div id="dashUserTableWrap"></div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-head">
+              <div>
+                <div class="admin-card-title"><i class="fas fa-triangle-exclamation"></i> Retention-risk alerts</div>
+                <div class="admin-card-sub">Employees whose own chat messages matched resignation/exit/dissatisfaction/harassment language — most recent first. Detected automatically as messages come in; nothing here is shared with the employee.</div>
+              </div>
+            </div>
+            <div class="dash-export-row">
+              <div class="dash-bot-switch" id="dashExportPresets">
+                <button class="dash-bot-btn active" data-preset="all">All time</button>
+                <button class="dash-bot-btn" data-preset="week">This week</button>
+                <button class="dash-bot-btn" data-preset="month">This month</button>
+                <button class="dash-bot-btn" data-preset="custom">Custom range</button>
+              </div>
+              <div class="dash-export-dates" id="dashExportDates" hidden>
+                <input type="date" id="dashExportFrom" />
+                <span>to</span>
+                <input type="date" id="dashExportTo" />
+              </div>
+              <button class="admin-btn admin-btn-primary" id="dashExportBtn"><i class="fas fa-file-excel"></i> Download Excel</button>
+            </div>
+            <div id="dashHighAlertBanner"></div>
+            <div id="dashAlertsWrap">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-modal-overlay" id="rcmSkippedModal" style="display:none;">
+    <div class="admin-modal-card">
+      <div class="admin-modal-head">
+        <span>Skipped files</span>
+        <button id="rcmSkippedModalClose" title="Close">✕</button>
+      </div>
+      <div class="admin-modal-body" id="rcmSkippedModalBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/chatbot/admin.js"></script>
+</body>
+</html>

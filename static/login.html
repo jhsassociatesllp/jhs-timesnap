@@ -182,6 +182,9 @@
                     localStorage.setItem('access_token',        result.access_token);
                     localStorage.setItem('loggedInEmployeeId',  result.employeeId);
                     localStorage.setItem('loggedInEmail',       result.email || '');
+                    // Fresh login = fresh budget for the chatbot's "N follow-up
+                    // suggestions shown" cap (static/chatbot/chat-core.js).
+                    localStorage.removeItem('chatbot_followup_shown_count');
                     window.location.href = '/modules';
                 } else {
                     showMessage(result.detail || 'Invalid credentials', 'error');

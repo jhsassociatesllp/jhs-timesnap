@@ -1,79 +1,4 @@
-# name: 🚀 Deploy to Server
-
-# on:
-#   push:
-#     branches:
-#       - main
-#       - staging
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Setup SSH Agent
-#         uses: webfactory/ssh-agent@v0.8.0
-#         with:
-#           ssh-private-key: ${{ secrets.SERVER_KEY }}
-
-#       - name: Deploy to Server
-#         run: |
-#           BRANCH=${GITHUB_REF_NAME}
-
-#           # Map branch → tag + container + port
-#           if [ "$BRANCH" = "main" ]; then
-#             TAG="production"
-#             APP_NAME="jhs_timesnap_production"
-#             PORT=8011
-#             SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
-#           else
-#             TAG="staging"
-#             APP_NAME="jhs_timesnap_staging"
-#             PORT=8010
-#             SMTP="${{ secrets.SMTP_KEY_STAGING }}"
-#           fi
-
-#           IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap:$TAG"
-
-#           echo "🌍 Environment: $TAG"
-#           echo "🐳 Image: $IMAGE"
-#           echo "🔌 Port: $PORT"
-#           echo "📦 Container: $APP_NAME"
-
-#           ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no \
-#             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-              
-#               echo '🔐 Logging into GHCR...'
-#               echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-
-#               echo '📥 Pulling latest image...'
-#               docker pull $IMAGE || {
-#                 echo '❌ Pull failed — keeping old container alive.';
-#                 exit 1;
-#               }
-
-#               echo '🛑 Stopping old container...'
-#               docker stop $APP_NAME || true
-#               docker rm $APP_NAME || true
-
-#               echo '▶️ Starting new container...'
-#               docker run -d \
-#                 --name $APP_NAME \
-#                 -p $PORT:8000 \
-#                 -e APP_ENV=$TAG \
-#                 -e MONGO_CONNECTION_STRING=\"${{ secrets.MONGO_CONNECTION_STRING }}\" \
-#                 -e SMTP_KEY=\"$SMTP\" \
-#                 -e JWT_SECRET=\"${{ secrets.JWT_SECRET_KEY }}\" \
-#                 $IMAGE
-
-#               echo '🧹 Cleaning unused images...'
-#               docker image prune -f
-
-#               echo '✅ Deployment successful for $TAG!'
-#           "
-
-
-name: 🚀 Deploy to Server
+name: 🚀 Build, Push & Deploy
 
 on:
   push:
@@ -82,7 +7,47 @@ on:
       - staging
 
 jobs:
+  # Builds the image and pushes it to GHCR. The deploy job below declares
+  # `needs: build`, so GitHub Actions guarantees it only starts once this
+  # has genuinely finished — before this, build and deploy were two
+  # separate workflow files that both triggered on the same push with
+  # nothing linking them, so they ran concurrently: deploy's `docker pull`
+  # could (and repeatedly did) reach GHCR before this job had finished
+  # pushing the new image, silently pulling and redeploying the PREVIOUS
+  # image instead while still reporting success, since pulling an
+  # existing-but-stale tag isn't an error.
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build & Push Docker Image
+        run: |
+          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap"
+
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            TAG="production"
+          elif [ "${GITHUB_REF_NAME}" = "staging" ]; then
+            TAG="staging"
+          else
+            echo "❌ Unsupported branch: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          echo "📦 Building $IMAGE:$TAG"
+          docker build -t "$IMAGE:$TAG" .
+
+          echo "📤 Pushing $IMAGE:$TAG"
+          docker push "$IMAGE:$TAG"
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -125,15 +90,48 @@ jobs:
           echo "📦 Container: $APP_NAME"
           echo "🔌 Port: $PORT"
 
+          # ServerAliveInterval/CountMax: the chatbot module's dependencies
+          # (sentence-transformers -> torch, pandas, scikit-learn, etc.) made
+          # the image considerably bigger, and a long-running docker pull
+          # over this piped SSH session was getting killed mid-transfer
+          # ("client_loop: send disconnect: Broken pipe") — these keep the
+          # connection alive with periodic pings instead of it looking idle
+          # to a NAT/firewall in between.
           ssh -p "${{ secrets.SERVER_PORT }}" -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" << EOF
               set -e
 
               echo "🔐 Logging into GHCR..."
               echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+              # Runs unconditionally, BEFORE the pull — not just after a
+              # successful deploy like the old dangling-only prune below.
+              # The chatbot module's deps (torch, sentence-transformers,
+              # etc.) made each image several GB; a run that fails before
+              # reaching the post-deploy prune (as this one just did) left
+              # old layers stranded with nothing ever reclaiming them,
+              # until the pull itself failed with "no space left on
+              # device". -a also catches unused-but-tagged images (e.g. an
+              # old production image sitting untouched on a staging pull),
+              # not just dangling ones.
+              echo "🧹 Freeing disk space before pulling..."
+              docker image prune -af || true
+              docker container prune -f || true
+
               echo "📥 Pulling latest image..."
-              docker pull "$IMAGE"
+              # Retries on a transient drop mid-pull — cheap even on retry,
+              # since docker skips any layer it already has fully.
+              PULL_ATTEMPT=0
+              until docker pull "$IMAGE"; do
+                PULL_ATTEMPT=\$((PULL_ATTEMPT + 1))
+                if [ "\$PULL_ATTEMPT" -ge 3 ]; then
+                  echo "❌ docker pull failed after 3 attempts"
+                  exit 1
+                fi
+                echo "⚠️ docker pull failed (attempt \$PULL_ATTEMPT/3) — retrying in 5s..."
+                sleep 5
+              done
 
               echo "🔍 Checking port ownership..."
               if docker ps --format "{{.Names}} {{.Ports}}" | grep ":$PORT->" | grep -v "$APP_NAME"; then
@@ -143,7 +141,23 @@ jobs:
 
               echo "🛑 Stopping existing container (if any)..."
               docker stop "$APP_NAME" || true
-              docker rm "$APP_NAME" || true
+              docker rm -f "$APP_NAME" || true
+
+              # docker rm returning doesn't guarantee the daemon has
+              # actually finished tearing down the old container's storage
+              # layer, especially under the disk pressure that caused this
+              # deploy to fail last time — starting the new container
+              # immediately after raced an in-flight removal and hit
+              # "Conflict... already in use by container <hash>" even
+              # though rm had already been called.
+              echo "⏳ Confirming old container is fully removed..."
+              for i in \$(seq 1 30); do
+                if ! docker ps -a --format '{{.Names}}' | grep -qx "$APP_NAME"; then
+                  break
+                fi
+                echo "   still there, waiting... (\$i/30)"
+                sleep 2
+              done
 
               echo "▶️ Starting new container..."
               docker run -d \
@@ -161,6 +175,18 @@ jobs:
                 -e HR_QUIZ_QUESTION_COUNT="15" \
                 -e HR_QUIZ_SECONDS_PER_QUESTION="30" \
                 -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+                -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+                -e LLM_PROVIDER="${{ secrets.LLM_PROVIDER }}" \
+                -e HF_API_KEY="${{ secrets.HF_API_KEY }}" \
+                -e HF_MODEL="${{ secrets.HF_MODEL }}" \
+                -e HF_BASE_URL="${{ secrets.HF_BASE_URL }}" \
+                -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+                -e HR_OPENAI_API_KEY="${{ secrets.HR_OPENAI_API_KEY }}" \
+                -e LIBRARY_MONGODB_URI="${{ secrets.LIBRARY_MONGODB_URI }}" \
+                -e LIBRARY_OPENAI_API_KEY="${{ secrets.LIBRARY_OPENAI_API_KEY }}" \
+                -e LIBRARY_PINECONE_API_KEY="${{ secrets.LIBRARY_PINECONE_API_KEY }}" \
+                -e RCM_PINECONE_API_KEY="${{ secrets.RCM_PINECONE_API_KEY }}" \
+                -e RCM_OPENAI_API_KEY="${{ secrets.RCM_OPENAI_API_KEY }}" \
                 "$IMAGE"
 
               echo "🧹 Cleaning dangling images..."
