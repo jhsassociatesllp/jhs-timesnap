@@ -21,8 +21,8 @@ import time
 
 from pymongo import MongoClient
 
+from backend.chatbot.admin_stats import employee_name
 from backend.chatbot.config import chatbot_settings
-from backend.database import employee_details_collection
 
 logger = logging.getLogger("chatbot.alerts")
 
@@ -256,11 +256,6 @@ def scan_message(text: str) -> dict:
     return {"matches": matches, "multi_signal": multi_signal}
 
 
-def _employee_name(empid: str) -> str:
-    emp = employee_details_collection.find_one({"EmpID": empid}, {"_id": 0, "Emp Name": 1})
-    return (emp or {}).get("Emp Name") or empid
-
-
 def record_if_match(empid: str, bot: str, session_id: str, message: str) -> None:
     """Scans `message` (the EMPLOYEE's own text, never the bot's reply) and
     inserts an alert document if anything matched. Never raises — called
@@ -272,7 +267,7 @@ def record_if_match(empid: str, bot: str, session_id: str, message: str) -> None
             return
         _col.insert_one({
             "empid": empid,
-            "name": _employee_name(empid),
+            "name": employee_name(empid),
             "bot": bot,
             "session_id": session_id,
             "message": message,
@@ -367,6 +362,6 @@ def high_alert_users(session_threshold: int = 5) -> list:
     ]
     results = list(_col.aggregate(pipeline))
     return [
-        {"empid": r["_id"], "name": _employee_name(r["_id"]), "red_session_count": r["red_session_count"]}
+        {"empid": r["_id"], "name": employee_name(r["_id"]), "red_session_count": r["red_session_count"]}
         for r in results
     ]

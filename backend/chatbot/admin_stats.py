@@ -18,7 +18,9 @@ from pymongo.collection import Collection
 from backend.database import employee_details_collection
 
 
-def _employee_name(empid: str) -> str:
+def employee_name(empid: str) -> str:
+    """Shared by alerts.py and upload_history.py too — the one lookup for
+    turning an empid into a display name across the chatbot admin surface."""
     emp = employee_details_collection.find_one({"EmpID": empid}, {"_id": 0, "Emp Name": 1})
     return (emp or {}).get("Emp Name") or empid
 
@@ -60,7 +62,7 @@ def user_activity(collection: Collection, limit: int = 200) -> list:
     return [
         {
             "empid": r["_id"],
-            "name": _employee_name(r["_id"]),
+            "name": employee_name(r["_id"]),
             "today": r["today"],
             "this_week": r["this_week"],
             "this_month": r["this_month"],

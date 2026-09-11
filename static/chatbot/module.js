@@ -119,11 +119,23 @@
       hideLibTabs() {
         libTabsEl.classList.add("hidden");
       },
+      // "browse-mode" opts THIS use of #cb-sidebar out of the mobile
+      // closed-by-default drawer behavior below (chatbot.css's
+      // @media max-width:900px rules) — that behavior exists for the chat
+      // HISTORY use of this element (new chat / session list), which should
+      // default closed on mobile with a toggle button. The Browse tab's
+      // filter panel is the tab's primary on-screen content, not a
+      // toggleable drawer, and was always just a plain visible overlay on
+      // mobile before that drawer behavior was added — .browse-mode keeps
+      // it that way instead of leaving it permanently off-screen since
+      // nothing here ever sets .mobile-open for it.
       showBrowseFilters() {
         browseFiltersEl?.classList.remove("hidden");
+        el.classList.add("browse-mode");
       },
       hideBrowseFilters() {
         browseFiltersEl?.classList.add("hidden");
+        el.classList.remove("browse-mode");
       },
       showAskSearch() {
         askSearchEl?.classList.remove("hidden");
@@ -171,6 +183,11 @@
   function toggleMobileSidebar(open) {
     const sidebar = document.getElementById("cb-sidebar");
     const backdrop = document.getElementById("cbSidebarMobileBackdrop");
+    // Observation Library's Browse filter panel (.browse-mode) isn't a
+    // drawer — it has no closed/mobile-open state to toggle, so this
+    // history-button action is a no-op there instead of flashing a
+    // dismiss-backdrop over the filters with nothing actually behind it.
+    if (sidebar.classList.contains("browse-mode")) return;
     const willOpen = open === undefined ? !sidebar.classList.contains("mobile-open") : open;
     sidebar.classList.toggle("mobile-open", willOpen);
     backdrop.classList.toggle("show", willOpen);

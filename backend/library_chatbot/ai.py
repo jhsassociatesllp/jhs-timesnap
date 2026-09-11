@@ -13,6 +13,24 @@ logger = logging.getLogger(__name__)
 _openai = OpenAI(api_key=library_settings.OPENAI_API_KEY)
 CHAT_MODEL = library_settings.CHAT_MODEL
 
+
+def _track_usage(response) -> None:
+    """Records one LLM call's token usage. Deliberately isolated from the
+    caller's own try/except around parsing `response`'s content — that
+    block exists to fall back gracefully if the ANSWER is malformed, not to
+    silently discard an already-good answer just because `response.usage`
+    happened to be missing (some OpenAI-compatible endpoints omit it).
+    Never raises."""
+    try:
+        u = response.usage
+        usage.record_call(
+            "library", model=CHAT_MODEL,
+            prompt_tokens=getattr(u, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(u, "completion_tokens", 0) or 0,
+        )
+    except Exception:
+        logger.exception("Failed to record library LLM usage")
+
 HTML_FORMAT_RULES = """
 CRITICAL OUTPUT FORMAT — HTML ONLY, NO EXCEPTIONS:
 - Your ENTIRE response must be an HTML fragment.
@@ -92,11 +110,7 @@ Rules:
                 {"role": "user", "content": question},
             ],
         )
-        usage.record_call(
-            "library", model=CHAT_MODEL,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        _track_usage(response)
         result = json.loads(response.choices[0].message.content)
         result.setdefault("filters", {})
         result.setdefault("keywords", "")
@@ -128,11 +142,7 @@ Respond now using HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.3, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call(
-            "library", model=CHAT_MODEL,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        _track_usage(response)
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_answer failed: {e}")
@@ -168,11 +178,7 @@ Respond with ONLY the one <p> sentence, HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.3, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call(
-            "library", model=CHAT_MODEL,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        _track_usage(response)
         intro = response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_breakdown_answer failed: {e}")
@@ -213,11 +219,7 @@ Respond now using HTML only."""
         response = _openai.chat.completions.create(
             model=CHAT_MODEL, temperature=0.2, messages=[{"role": "user", "content": prompt}]
         )
-        usage.record_call(
-            "library", model=CHAT_MODEL,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        _track_usage(response)
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"generate_summary failed: {e}")
@@ -265,11 +267,7 @@ Return ONLY valid JSON:
             response_format={"type": "json_object"},
             messages=[{"role": "user", "content": prompt}],
         )
-        usage.record_call(
-            "library", model=CHAT_MODEL,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        _track_usage(response)
         draft = json.loads(response.choices[0].message.content)
         draft.setdefault("grounded_on", [r["sr_no"] for r in grounding_rows])
         return draft

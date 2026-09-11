@@ -145,12 +145,21 @@ body {
      close it. Without this the sidebar covered the chat underneath with no
      way to dismiss it, since nothing ever added a mobile-specific closed
      state before. */
-  .cb-sidebar:not(.hidden) {
+  .cb-sidebar:not(.hidden):not(.browse-mode) {
     position: fixed; top: 58px; left: 0; bottom: 0; z-index: 50;
     box-shadow: 8px 0 24px rgba(0,0,0,.25);
     transform: translateX(-100%); transition: transform .25s ease;
   }
-  .cb-sidebar:not(.hidden).mobile-open { transform: translateX(0); }
+  .cb-sidebar:not(.hidden):not(.browse-mode).mobile-open { transform: translateX(0); }
+
+  /* Observation Library's Browse tab: the filter panel is this tab's
+     primary content, not a history drawer, so it keeps the original
+     always-visible-when-shown overlay behavior (no closed/toggle state)
+     instead of the drawer rule above — see module.js's showBrowseFilters(). */
+  .cb-sidebar.browse-mode:not(.hidden) {
+    position: fixed; top: 58px; left: 0; bottom: 0; z-index: 50;
+    box-shadow: 8px 0 24px rgba(0,0,0,.25);
+  }
 
   .cb-sidebar-mobile-backdrop.show {
     display: block; position: fixed; inset: 58px 0 0 0; z-index: 49;
@@ -158,17 +167,21 @@ body {
   }
 
   .hr-msg { max-width: 84%; }
+
+  /* Tab labels + "Modules"/"Logout" collapse to icon-only starting at the
+     SAME breakpoint the mobile history button appears (900px), not only
+     at 600px — the button adds width pressure to a header (badge + 3 tabs
+     + history button + Modules + Logout, .cb-header has no flex-wrap or
+     overflow-x) starting here, so waiting until 600px to compact left a
+     600-900px band where a tablet/small-laptop width could crowd or clip
+     the row. */
+  .cb-tab-btn { padding: 0 .8rem; font-size: .82rem; }
+  .cb-tab-btn span.lbl { display: none; }
+  .cb-header-right .nav-link-btn .lbl { display: none; }
+  .cb-header-right .nav-link-btn { padding: 0 .65rem; height: 34px; }
 }
 @media (max-width: 600px) {
   .cb-header-brand .name { display: none; }
-  .cb-tab-btn { padding: 0 .8rem; font-size: .82rem; }
-  .cb-tab-btn span.lbl { display: none; }
   .hr-messages { padding: 1.4rem 1rem 1rem; }
   .hr-input-bar { padding: .7rem 1rem 1rem; }
-  /* "Modules"/"Logout" collapse to icon-only too, matching the tab labels
-     above — with the mobile history button added, the header row (badge +
-     3 tabs + 3 right-side buttons) is otherwise too tight to fit a phone
-     screen without wrapping/overflowing. */
-  .cb-header-right .nav-link-btn .lbl { display: none; }
-  .cb-header-right .nav-link-btn { padding: 0 .65rem; height: 34px; }
 }

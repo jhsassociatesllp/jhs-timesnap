@@ -595,7 +595,6 @@
   let isLoading    = false;
   let typingRow    = null;
   let userMsgCount = 0;   // resets on "new chat" — drives the module nudge below
-  let nudgeShown   = false;
 
   const BOT_AVATAR_IMG = JHS_BADGE_IMG;
   const header = root.querySelector("#jhs-chat-header");
@@ -706,7 +705,6 @@
     sessBar.classList.remove("open");
     histOpen = false;
     userMsgCount = 0;
-    nudgeShown = false;
     input.focus();
   }
 
@@ -754,7 +752,6 @@
         messages.appendChild(welcome);
         welcome.style.display = "flex";
         userMsgCount = 0;
-        nudgeShown = false;
         return;
       }
       messages.innerHTML = "";
@@ -843,12 +840,26 @@
     setLoading(false);
   }
 
-  // Shown once per session, after the user's 5th question — not a
-  // permanently-visible footer, just a gentle nudge when the conversation
-  // is clearly going deep enough to benefit from the full module.
+  // Shown once per session (persisted in sessionStorage, keyed by session
+  // id — not an in-memory flag), after the user's 5th question. An
+  // in-memory-only flag would either re-show this on every page reopen for
+  // a session that already saw it (it resets to false on every fresh page
+  // load, same bug class the userMsgCount fix above addressed), or wrongly
+  // suppress it for a DIFFERENT, separately-qualifying session switched to
+  // later in the same page view. Scoping the "already shown" state to the
+  // session id itself avoids both.
+  function nudgeShownKey(sessionId) {
+    return "jhs_chatbot_nudge_shown_" + sessionId;
+  }
+
   function maybeShowModuleNudge() {
-    if (nudgeShown || userMsgCount < 5) return;
-    nudgeShown = true;
+    if (userMsgCount < 5) return;
+    try {
+      if (sessionStorage.getItem(nudgeShownKey(currentSessionId))) return;
+    } catch {
+      // sessionStorage unavailable (private browsing etc.) — fall through
+      // and show it; worst case it can show again on a later reload.
+    }
     const card = document.createElement("div");
     card.className = "jhs-nudge-card";
     card.innerHTML = `
@@ -860,6 +871,11 @@
       </a>`;
     messages.appendChild(card);
     scrollToBottom();
+    try {
+      sessionStorage.setItem(nudgeShownKey(currentSessionId), "1");
+    } catch {
+      // sessionStorage unavailable — nothing to persist, it just may show again
+    }
   }
 
   // ── DOM helpers ───────────────────────────────────────────────────────────

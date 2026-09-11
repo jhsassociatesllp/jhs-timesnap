@@ -169,7 +169,17 @@ def call_llm(
 
     _raise_for_status(resp, provider_name)
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError as e:
+        # Still record that the call happened (no token counts available)
+        # before raising — a 2xx response with a malformed body is still a
+        # real, billed call, and this used to be tracked unconditionally
+        # before usage.py grew token/cost tracking that needs the parsed
+        # body; only the (rare) failure-to-parse path should ever miss it.
+        _track_usage(provider, model=model, usage_block=None)
+        raise RuntimeError(f"Invalid JSON from {provider_name} API: {e}") from e
+
     _track_usage(provider, model=model, usage_block=data.get("usage"))
     try:
         return data["choices"][0]["message"]["content"].strip()

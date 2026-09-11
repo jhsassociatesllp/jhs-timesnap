@@ -616,9 +616,17 @@
       btn.innerHTML = originalHtml;
     }
   });
-  document.querySelectorAll(".dash-bot-btn").forEach((btn) => {
+  // Scoped to #dashUserBotSwitch specifically — .dash-bot-btn is reused by
+  // two OTHER independent button groups on this page (the compare-window
+  // switch and the export-date-range presets), so an unscoped selector here
+  // double-binds onto their buttons too: clicking "Today" in the compare
+  // switch would also fire this handler, clear "active" off every
+  // .dash-bot-btn on the page (including the other groups' own active
+  // button), and blank the Active Users table by setting dashboardBot to
+  // undefined (compare/preset buttons carry no data-dashbot attribute).
+  document.querySelectorAll("#dashUserBotSwitch .dash-bot-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".dash-bot-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll("#dashUserBotSwitch .dash-bot-btn").forEach((b) => b.classList.toggle("active", b === btn));
       dashboardBot = btn.dataset.dashbot;
       renderDashboardUserTable();
     });
