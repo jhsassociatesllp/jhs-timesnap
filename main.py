@@ -178,10 +178,13 @@ async def timesheet_page():
 async def appraisal_page():
     return FileResponse(os.path.join(static_root, "appraisal", "index.html"))
 
+<<<<<<< HEAD
 @app.get("/appraisal/admin", response_class=FileResponse)
 async def appraisal_admin_page():
     return FileResponse(os.path.join(static_root, "appraisal", "admin_dashboard.html"))
 
+=======
+>>>>>>> origin/main
 @app.get("/quality-audit", response_class=FileResponse)         # ← NEW
 async def quality_audit_page():
     return FileResponse(os.path.join(static_root, "quality_audit", "index.html"))
@@ -1311,7 +1314,10 @@ async def save_timesheets_from_excel(
     # For now, we'll need to match the week period to an existing cycle
     # This is a simplified approach - you may need to enhance this logic
     
+<<<<<<< HEAD
     
+=======
+>>>>>>> origin/main
     from backend.database import timesheets_collection
     from backend.timesheet.router import _get_or_create_payroll, _upsert_week, recalc_payroll_totals
     

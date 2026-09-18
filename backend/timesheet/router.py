@@ -789,11 +789,17 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
     if not employee:
         return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
+<<<<<<< HEAD
     # partner_code only decides dropdown vs. free-text mode (shared services,
     # matched against FREE_TEXT_PARTNER_CODE on the frontend) — it must NOT
     # gate the company-wide list below, which every employee should see
     # regardless of whether PartnerEmpCode happens to be populated for them.
     partner_code = employee.get("PartnerEmpCode", "").strip().upper()
+=======
+    partner_code = employee.get("PartnerEmpCode", "").strip().upper()
+    if not partner_code:
+        return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
+>>>>>>> origin/main
 
     # Company-wide: every client/project is available to every dropdown-mode
     # employee, not just the ones belonging to their own partner — they pick

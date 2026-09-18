@@ -25,7 +25,11 @@ users_collection              = db["users"]
 
 # ── timesheet collections ─────────────────────────────────────────────────────
 timesheets_collection         = db["Timesheet_data"]
+<<<<<<< HEAD
 client_details_collection     = db["Projects"]
+=======
+client_details_collection     = db["Client_details"]
+>>>>>>> origin/main
 reporting_managers_collection = db["Reporting_managers"]
 pending_collection            = db["Pending"]
 approved_collection           = db["Approved"]
@@ -50,6 +54,7 @@ module_admin_collection       = db["module_admin_access"]
 # ── appraisal collections (add when ready) ────────────────────────────────────
 appraisal_collection          = appraisal_db["Appraisal_data"]
 
+<<<<<<< HEAD
 # ── appraisal (KRA) quarter/cycle collections ─────────────────────────────────
 # Document shape:
 # {
@@ -75,6 +80,8 @@ appraisal_eligibility_collection = appraisal_db["Appraisal_eligibility"]
 #   "invalid_count": int, "duplicate_count": int, "invalid_rows": [...] }
 appraisal_upload_history_collection = appraisal_db["Appraisal_upload_history"]
 
+=======
+>>>>>>> origin/main
 # ── payroll cycles collection ─────────────────────────────────────────────────
 # Document shape:
 # {
