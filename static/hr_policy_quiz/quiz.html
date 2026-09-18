@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assessment | Onboarding Assessment</title>
+  <link rel="stylesheet" href="/static/hr_policy_quiz/css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <img src="/static/hr_policy_quiz/assets/logo.svg" alt="" />
+      <div>
+        <div class="brand-name">Onboarding Assessment</div>
+        <div class="brand-sub" id="docTitle">Assessment</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="quiz-shell">
+
+    <!-- Intro -->
+    <div class="card" id="introView">
+      <div class="card-top-bar"></div>
+      <div class="eyebrow">Before you begin</div>
+      <h1>15 quick questions</h1>
+      <p style="color:var(--gray-600); margin: 10px 0 20px; font-size:14px;">
+        You'll get 30 seconds per question. If time runs out, the question is marked
+        unattempted and the assessment moves on automatically. Your final marks are shown
+        as soon as you finish. This can only be attempted once, so take your time reading
+        each question.
+      </p>
+      <div class="error-box" id="introError"></div>
+      <button class="btn btn-primary btn-block" id="startBtn">Start assessment</button>
+    </div>
+
+    <!-- Quiz -->
+    <div id="quizView" style="display:none;">
+      <div class="quiz-progress">
+        <div class="quiz-progress-text" id="progressText">Question 1 of 15</div>
+        <div class="timer-ring" id="timerRing">
+          <svg width="62" height="62" viewBox="0 0 62 62">
+            <circle class="track" cx="31" cy="31" r="26"></circle>
+            <circle class="progress" id="timerCircle" cx="31" cy="31" r="26"></circle>
+          </svg>
+          <div class="timer-ring-value" id="timerValue">30</div>
+        </div>
+      </div>
+
+      <div class="card question-card">
+        <div class="question-text" id="questionText"></div>
+        <div id="optionsList"></div>
+      </div>
+
+      <div class="quiz-footer">
+        <button class="btn btn-primary" id="nextBtn">Next question</button>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="card result-hero" id="resultView" style="display:none;">
+      <div class="eyebrow">Assessment complete</div>
+      <div class="result-score"><span id="scoreValue">0</span><span> / <span id="totalValue">15</span></span></div>
+      <div class="result-label">Your response has been recorded and shared with HR.</div>
+      <a class="btn btn-secondary" style="margin-top:24px;" href="/hr-quiz/">Done</a>
+    </div>
+
+    <!-- Answer review -->
+    <div id="reviewView" style="display:none; margin-top:20px;">
+      <h3 style="margin-bottom:14px;">Answer review</h3>
+      <div id="reviewList"></div>
+    </div>
+
+  </div>
+
+  <script src="/static/hr_policy_quiz/js/api.js"></script>
+  <script src="/static/hr_policy_quiz/js/quiz.js"></script>
+</body>
+</html>

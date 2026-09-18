@@ -1,0 +1,283 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Timesheet — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Timesheet-specific styles -->
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+  </head>
+  <body>
+    <!-- NAVBAR -->     
+    <div class="navbar">
+      <div class="hamburger" onclick="toggleNavMenu()">
+        <i class="fas fa-bars"></i>
+      </div>
+      <div class="nav-menu" id="navMenu">
+        <a href="#" onclick="showSection('timesheet')" id="timesheetLink" class="active">
+          <i class="fas fa-clock"></i> Timesheet
+        </a>
+        <a href="#" onclick="showSection('history')" id="historyLink">
+          <i class="fas fa-history"></i> History
+        </a>
+        <a href="#" id="pendingBtn" class="manager-only" onclick="showSection('pending')">
+          <i class="fas fa-hourglass-half"></i> Pending
+        </a>
+        <a href="#" id="approveBtn" class="manager-only" onclick="showSection('approve')">
+          <i class="fas fa-check-circle"></i> Approved
+        </a>
+        <a href="#" id="rejectedBtn" class="manager-only" onclick="showSection('rejected')">
+          <i class="fas fa-times-circle"></i> Rejected
+        </a>
+        <!-- Back to modules -->
+        <a href="/modules">
+          <i class="fas fa-th-large"></i> Modules
+        </a>
+        <button onclick="showExitConfirmation()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1><i class="fas fa-stopwatch"></i> JHS TIMESHEET</h1>
+      </div>
+
+      <!-- TIMESHEET SECTION -->
+      <div class="form-section active" id="timesheetSection">
+        <div id="errorMessage" class="error-message"></div>
+        <div class="employee-info">
+          <div class="form-group"><label>Employee ID</label><input type="text" id="employeeId" readonly /></div>
+          <div class="form-group"><label>Employee Name</label><input type="text" id="employeeName" readonly /></div>
+          <div class="form-group"><label>Designation</label><input type="text" id="designation" readonly /></div>
+          <div class="form-group"><label>Gender</label><input type="text" id="gender" readonly /></div>
+          <div class="form-group"><label>Partner</label><input type="text" id="partner" readonly /></div>
+          <div class="form-group"><label>Reporting Manager</label><input type="text" id="reportingManager" /></div>
+        </div>
+
+        <!-- Payroll Cycle Selector -->
+        <div id="payrollCycleSelectorWrap" style="margin:1rem 0 1.5rem;padding:1.2rem 1.5rem;background:#f0f4ff;border-radius:12px;border:2px solid #c5cef9;display:none;text-align:center;">
+          <label style="font-weight:700;font-size:.95rem;color:#5d5fef;display:block;margin-bottom:.8rem;"><i class="fas fa-calendar-alt"></i> Select Payroll Cycle</label>
+          <select id="payrollCycleSelect" style="width:100%;max-width:340px;padding:.75rem 1.1rem;border:2px solid #c5cef9;border-radius:9px;font-size:1rem;font-family:inherit;background:#fff;color:#2c3e50;font-weight:600;display:inline-block;" onchange="onCycleChange()">
+            <option value="">-- Select a payroll cycle --</option>
+          </select>
+          <div id="cycleDeadlineInfo" style="margin-top:.5rem;font-size:.82rem;color:#7f8c8d;"></div>
+          <div id="cycleLockBanner" style="display:none;margin-top:.6rem;padding:.5rem 1rem;background:#fee2e2;color:#dc2626;border-radius:8px;font-weight:600;font-size:.85rem;"><i class="fas fa-lock"></i> This cycle's submission deadline has passed. You cannot save or submit.</div>
+        </div>
+        <div id="noCyclesBanner" style="display:none;margin:1rem 0 1.5rem;padding:1rem 1.5rem;background:#fef9c3;border-radius:12px;border:2px solid #fde047;color:#854d0e;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> No active payroll cycle available. Please contact admin.</div>
+
+        <div id="timesheetSections"></div>
+
+        <!-- IDLE TIME SECTION -->
+        <div class="idle-section" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;margin-top:1.5rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <h3 style="margin-top:0;margin-bottom:1rem;color:#1e293b;font-size:1.1rem;font-weight:700;"><i class="fas fa-hourglass-half" style="color:#f59e0b;margin-right:8px;"></i> Idle Time Details</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;align-items:start;">
+            <div>
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Idle Time? <span style="color:#ef4444;">*</span></label>
+              <select id="idle_time_status" class="form-input" style="width:100%;" onchange="toggleIdleTimeFields()">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div id="idle_time_hours_wrapper" style="display:none;">
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Idle Time (Hours / Min) <span style="color:#ef4444;">*</span></label>
+              <input type="text" id="idle_time_hours" class="form-input" placeholder="e.g. 2.5 hours" style="width:100%;">
+            </div>
+            <div id="idle_time_reason_wrapper" style="display:none;">
+              <label style="font-weight:700;display:block;margin-bottom:.5rem;color:#475569;">Reason <span style="color:#ef4444;">*</span></label>
+              <textarea id="idle_time_reason" class="form-input" placeholder="Enter reason for idle time" rows="2" style="width:100%;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="feedback-section">
+          <div class="feedback-item"><label>3 HITS</label><textarea id="hits" rows="3"></textarea></div>
+          <div class="feedback-item"><label>3 MISSES</label><textarea id="misses" rows="3"></textarea></div>
+          <div class="feedback-item"><label>FEEDBACK FOR HR</label><textarea id="feedback_hr" rows="3"></textarea></div>
+          <div class="feedback-item"><label>FEEDBACK FOR IT</label><textarea id="feedback_it" rows="3"></textarea></div>
+          <div class="feedback-item"><label>FEEDBACK FOR CRM</label><textarea id="feedback_crm" rows="3"></textarea></div>
+          <div class="feedback-item"><label>FEEDBACK FOR OTHERS</label><textarea id="feedback_others" rows="3"></textarea></div>
+        </div>
+
+        <div class="summary-section">
+          <div class="summary-item total-hours"><h3><i class="fas fa-clock"></i> Total Hours</h3><div class="value">0.00</div></div>
+          <div class="summary-item billable-hours"><h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3><div class="value">0.00</div></div>
+          <div class="summary-item non-billable-hours"><h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3><div class="value">0.00</div></div>
+        </div>
+
+        <div class="export-section">
+          <h3><i class="fas fa-download"></i> Export & Upload Timesheet</h3>
+          <button class="export-btn" onclick="exportTimesheetToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
+          <button id="submitBtn" class="export-btn" onclick="confirmSubmit()"><i class="fas fa-paper-plane"></i> Submit Timesheet</button>
+          <button class="clear-btn" onclick="clearTimesheet()"><i class="fas fa-eraser"></i> Clear</button>
+          <button class="export-btn" onclick="document.getElementById('excelUploadInput').click()">
+            <i class="fas fa-upload"></i> Upload Excel
+          </button>
+          <button class="export-btn" onclick="downloadSampleTemplate()" style="background:#5d5fef;color:#fff;">
+            <i class="fas fa-file-excel"></i> Download Template
+          </button>
+          <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)" />
+        </div>
+      </div>
+
+      <!-- Submit Confirmation Popup -->
+      <div id="submitConfirmPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:2rem 2.5rem;max-width:420px;width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.2);">
+          <div style="font-size:2.5rem;margin-bottom:1rem;">⚠️</div>
+          <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:.75rem;color:#1e293b;">Submit Timesheet?</h3>
+          <p style="font-size:.9rem;color:#475569;margin-bottom:1.5rem;line-height:1.6;">Once submitted, you <strong>will not be able to edit</strong> your timesheet entries. Please review everything before confirming.</p>
+          <div style="display:flex;gap:1rem;justify-content:center;">
+            <button onclick="doSubmitTimesheet()" style="background:#10b981;color:#fff;border:none;padding:.75rem 1.8rem;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;">Yes, Submit</button>
+            <button onclick="document.getElementById('submitConfirmPopup').style.display='none'" style="background:#f1f5f9;color:#475569;border:none;padding:.75rem 1.5rem;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORY SECTION -->
+      <div class="history-section" id="historySection" style="display:none">
+        <h2><i class="fas fa-history"></i> Past Timesheet Entries</h2>
+        <div class="summary-section history-summary">
+          <div class="summary-item total-hours"><h3><i class="fas fa-clock"></i> Total Hours</h3><div class="value">0.00</div></div>
+          <div class="summary-item billable-hours"><h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3><div class="value">0.00</div></div>
+          <div class="summary-item non-billable-hours"><h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3><div class="value">0.00</div></div>
+        </div>
+        <div id="historyContent"></div>
+        <div class="history-export-section">
+          <h3><i class="fas fa-download"></i> Export History</h3>
+          <button class="export-btn" onclick="exportHistoryToExcel()"><i class="fas fa-file-excel"></i> Export History to Excel</button>
+        </div>
+      </div>
+
+      <!-- PENDING SECTION -->
+      <div class="pending-section" id="pendingSection" style="display:none">
+        <h2><i class="fas fa-hourglass-half"></i> Pending Approval</h2>
+        <div id="approveAllPendingContainer" style="display:none; margin-bottom:1rem;">
+          <button class="approve-all-btn" onclick="approveAll('Pending')">
+            <i class="fas fa-check-double"></i> Approve All Pending
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead><tr><th>Employee ID</th><th>Employee Name</th><th>Payroll Cycle</th><th>Actions</th></tr></thead>
+            <tbody id="pendingTableBody"><tr><td colspan="4">Loading pending approvals...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- APPROVED SECTION -->
+      <div class="approve-section" id="approveSection" style="display:none">
+        <h2><i class="fas fa-check-circle"></i> Approved Employees</h2>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead><tr><th>Employee ID</th><th>Employee Name</th><th>Payroll Cycle</th><th>Actions</th></tr></thead>
+            <tbody id="approveTableBody"><tr><td colspan="4">Loading approved list...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REJECTED SECTION -->
+      <div class="rejected-section" id="rejectedSection" style="display:none">
+        <h2><i class="fas fa-times-circle"></i> Rejected Employees</h2>
+        <div id="approveAllRejectedContainer" style="display:none; margin-bottom:1rem;">
+          <button class="approve-all-btn" onclick="approveAll('Rejected')">
+            <i class="fas fa-check-double"></i> Approve All Rejected
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="timesheet-table">
+            <thead><tr><th>Employee ID</th><th>Employee Name</th><th>Payroll Cycle</th><th>Actions</th></tr></thead>
+            <tbody id="rejectedTableBody"><tr><td colspan="4">Loading rejected list...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUPS -->
+    <div class="popup" id="successPopup">
+      <p id="popupMessage"><i class="fas fa-check-circle"></i> Message</p>
+      <button class="popup-close" onclick="closePopup()">&times;</button>
+    </div>
+    <div class="loading-bar" id="loadingBar"><i class="fas fa-spinner fa-spin"></i> Saving...</div>
+
+    <!-- MODAL OVERLAY -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal-content">
+        <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()" /></div>
+        <div><label id="modalLabel2">Work</label>
+          <select id="modalInput2" class="form-input" onchange="applyModalLocationTimeRules()">
+            <option value="Office">Office</option>
+            <option value="Client Site">Client Site</option>
+            <option value="Work From Home">Work From Home</option>
+            <option value="Field Work">Field Work</option>
+            <option value="Leave">Leave</option>
+            <option value="PHY">PHY</option>
+            <option value="Week Off">Week Off</option>
+          </select>
+        </div>
+        <div><label id="modalLabel3">Project Start</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
+        <div><label id="modalLabel4">Project End</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
+        <div><label id="modalLabel5">Client</label><div id="modalClientContainer"></div></div>
+        <div><label id="modalLabel6">Project</label><div id="modalProjectContainer"></div></div>
+        <div><label id="modalLabel7">Project Code</label><div id="modalProjectCodeContainer"></div></div>
+        <div id="modalProjectMetaTL" style="display:none;"></div>
+        <div><label id="modalLabel8">Reporting Manager</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()" /></div>
+        <div><label id="modalLabel9">Activity</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()" /></div>
+        <div><label id="modalLabel10">Project Hours</label><input type="number" id="modalInput10" class="form-input" readonly /></div>
+        <div><label id="modalLabel11">Billable</label>
+          <select id="modalInput11" class="form-input" onchange="updateModalHours()">
+            <option value="Yes">Billable</option>
+            <option value="No">Non-Billable</option>
+          </select>
+        </div>
+        <div><label id="modalLabel13">Lunch Time Taken</label>
+          <select id="modalInput13" class="form-input">
+            <option value="">None</option>
+            <option value="15 min">15 min</option>
+            <option value="30 min">30 min</option>
+            <option value="45 min">45 min</option>
+            <option value="1 hr">1 hr</option>
+            <option value="1.5 hr">1.5 hr</option>
+            <option value="2 hr">2 hr</option>
+          </select>
+        </div>
+        <div><label id="modalLabel14">Travel Time Taken</label>
+          <select id="modalInput14" class="form-input">
+            <option value="">None</option>
+            <option value="15 min">15 min</option>
+            <option value="30 min">30 min</option>
+            <option value="45 min">45 min</option>
+            <option value="1 hr">1 hr</option>
+            <option value="1.5 hr">1.5 hr</option>
+            <option value="2 hr">2 hr</option>
+            <option value="2.5 hr">2.5 hr</option>
+            <option value="3 hr">3 hr</option>
+          </select>
+        </div>
+        <div><label id="modalLabel12">Remarks</label><input type="text" id="modalInput12" class="form-input" placeholder="Additional notes" onchange="updateModalHours()" /></div>
+        <button id="modalCancelBtn" class="modal-cancel-btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+        <button id="modalAddBtn" class="modal-add-btn" onclick="saveModalEntry()"><i class="fas fa-check"></i> Add</button>
+      </div>
+    </div>
+
+    <div class="exit-confirmation" id="exitConfirmation">
+      <p>Do you want to exit?</p>
+      <button class="cancel-btn" onclick="cancelExit()">No</button>
+      <button class="confirm-btn" onclick="confirmExit()">Yes</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- ExcelJS: used only for the downloadable template, since it (unlike the free SheetJS build) can actually write dropdown data validation into the .xlsx -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <!-- Timesheet-specific script -->
+    <script src="/static/timesheet/script.js"></script>
+      <script src="/static/chatbot/chat-core.js"></script>
+      <script src="/static/chatbot/chatbot-widget.js"></script>
+</body>
+</html>

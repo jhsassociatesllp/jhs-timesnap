@@ -1,0 +1,449 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>JHS — Select Module</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    :root{
+      --pg:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      --sg:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text-dark:#2c3e50;--text-light:#7f8c8d;
+      --border:#e1e8ed;--sh-sm:0 4px 6px rgba(0,0,0,.1);
+      --sh-md:0 10px 25px rgba(0,0,0,.15);--sh-lg:0 20px 40px rgba(0,0,0,.2);
+      --tr:all .3s cubic-bezier(.4,0,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:100vh;display:flex;flex-direction:column;color:var(--text-dark);line-height:1.6}
+
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-md);position:sticky;top:0;z-index:100}
+    .navbar-brand{font-size:1.1rem;font-weight:700;color:white;display:flex;align-items:center;gap:.55rem}
+    .navbar-brand i{color:#a78bfa;font-size:1rem}
+    .navbar-right{display:flex;align-items:center;gap:.9rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .logout-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr)}
+    .logout-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.38);color:white}
+
+    .page-wrapper{flex:1;display:flex;justify-content:center;padding:2rem}
+    .container{width:100%;max-width:1100px;background:white;border-radius:20px;box-shadow:var(--sh-lg);overflow:hidden;animation:fadeInUp .6s ease-out}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+    .header{background:var(--pg);color:white;padding:3rem 2rem;text-align:center;position:relative;overflow:hidden;border-bottom-left-radius:20px;border-bottom-right-radius:20px}
+    .header::before{content:'';position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10"><defs><pattern id="g" width="100" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="10" fill="url(%23g)"/></svg>');opacity:.1}
+    .header h1{margin:0;font-size:3rem;font-weight:700;position:relative;z-index:1;text-shadow:2px 2px 8px rgba(0,0,0,.3);letter-spacing:2px;text-transform:uppercase}
+    .header p{margin:.6rem 0 0;opacity:.9;font-size:1.1rem;position:relative;z-index:1;font-weight:300}
+
+    .body-content{padding:2.5rem 3rem 3rem}
+    .section-label{font-size:.82rem;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.6px;margin-bottom:1.5rem;display:flex;align-items:center;gap:.5rem}
+    .cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.8rem}
+
+    .module-card{background:var(--light);border-radius:15px;border-left:5px solid #667eea;padding:2rem;text-decoration:none;display:flex;flex-direction:column;gap:1rem;box-shadow:var(--sh-sm);transition:var(--tr);color:var(--text-dark)}
+    .module-card.clickable:hover{transform:translateY(-5px);box-shadow:var(--sh-md)}
+    .module-card.locked{opacity:.72;cursor:default}
+    .card-ts{border-left-color:#667eea}
+    .card-ap{border-left-color:#11998e}
+    .card-qa{border-left-color:#e67e22}
+    .card-hr{border-left-color:#8e44ad}
+    .card-ed{border-left-color:#c0392b}
+    .card-eda{border-left-color:#8e44ad}
+    .card-cb{border-left-color:#4a6fa5}
+
+    .card-top{display:flex;align-items:center;justify-content:space-between}
+    .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
+    .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-hr .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-ed .card-icon{background:rgba(192,57,43,.12);color:#c0392b}
+    .card-eda .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-cb .card-icon{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:#fff;position:relative;animation:cbPulse 2.6s ease-in-out infinite}
+    .module-card.no-hover-lift.clickable:hover{transform:none;box-shadow:var(--sh-sm)}
+    @keyframes cbPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,111,165,.45)}50%{box-shadow:0 0 0 8px rgba(74,111,165,0)}}
+
+    .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
+    .card-ts .card-tag{background:rgba(102,126,234,.12);color:#667eea}
+    .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
+    .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
+    .card-hr .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-ed .card-tag{background:rgba(192,57,43,.12);color:#c0392b}
+    .card-eda .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-cb .card-tag{background:rgba(243,156,18,.15);color:#e67e22}
+
+    .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
+    .card-desc{font-size:.92rem;color:var(--text-light);line-height:1.65;margin:0;flex:1}
+    .card-features{display:flex;flex-wrap:wrap;gap:.45rem}
+    .chip{font-size:.73rem;font-weight:500;padding:.22rem .65rem;border-radius:20px;background:white;border:1px solid var(--border);color:var(--text-light);display:flex;align-items:center;gap:.3rem}
+    .card-footer{margin-top:.25rem;padding-top:1.1rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .card-footer-label{font-size:.78rem;color:var(--text-light);font-weight:500}
+
+    .card-btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.4rem;border:none;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr);text-decoration:none;box-shadow:var(--sh-sm)}
+    .card-ts .card-btn{background:var(--pg);color:white}
+    .card-ap .card-btn{background:var(--sg);color:white}
+    .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
+    .card-hr .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-ed .card-btn{background:linear-gradient(135deg,#c0392b,#922b21);color:white}
+    .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-cb .card-btn{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:white}
+    .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
+    .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
+    .clickable .card-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+
+    .info-strip{margin-top:2rem;padding:1.4rem 1.8rem;background:var(--light);border-radius:15px;border-left:5px solid #3498db;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:.9rem;font-size:.9rem;color:var(--text-light)}
+    .info-strip i{font-size:1.15rem;color:#3498db;flex-shrink:0}
+    .info-strip strong{color:var(--text-dark)}
+
+    .loader-full{display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;font-size:1.1rem;gap:.8rem}
+
+    /* Control Panel button */
+    .cp-btn{display:flex;align-items:center;gap:.45rem;background:linear-gradient(135deg,#f39c12,#e67e22);border:none;color:white;padding:.48rem 1.1rem;border-radius:8px;font-size:.84rem;font-family:inherit;font-weight:600;cursor:pointer;transition:var(--tr);box-shadow:0 2px 8px rgba(230,126,34,.35)}
+    .cp-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(230,126,34,.45)}
+
+    /* Switch popup */
+    .cp-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:none;align-items:center;justify-content:center;padding:1rem}
+    .cp-modal-backdrop.open{display:flex}
+    .cp-modal{background:white;border-radius:18px;width:100%;max-width:420px;box-shadow:0 30px 60px rgba(0,0,0,.3);overflow:hidden;animation:fadeInUp .3s ease-out}
+    .cp-modal-head{background:linear-gradient(135deg,#f39c12,#e67e22);color:white;padding:1.4rem 1.8rem;text-align:center}
+    .cp-modal-head i{font-size:2rem;margin-bottom:.5rem;display:block}
+    .cp-modal-head h3{font-size:1.15rem;font-weight:700;margin:0}
+    .cp-modal-body{padding:1.5rem 1.8rem;text-align:center;color:var(--text-dark)}
+    .cp-modal-body p{font-size:.95rem;color:var(--text-light);line-height:1.6;margin-bottom:1.4rem}
+    .cp-modal-actions{display:flex;gap:.75rem;justify-content:center}
+    .cp-btn-confirm{background:linear-gradient(135deg,#f39c12,#e67e22);color:white;border:none;padding:.65rem 1.6rem;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .cp-btn-confirm:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(230,126,34,.4)}
+    .cp-btn-cancel{background:white;color:var(--text-light);border:1px solid var(--border);padding:.65rem 1.4rem;border-radius:10px;font-size:.9rem;font-weight:600;font-family:inherit;cursor:pointer;transition:var(--tr)}
+    .cp-btn-cancel:hover{background:var(--light);color:var(--text-dark)}
+
+    @media(max-width:768px){
+      .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
+      .header{padding:2rem 1rem}.header h1{font-size:2rem;letter-spacing:1px}.cards-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Show a brief loading state while we check roles -->
+  <div id="loading-screen" class="loader-full">
+    <i class="fas fa-spinner fa-spin"></i> Loading your workspace…
+  </div>
+
+  <div id="main-content" style="display:none;flex-direction:column;min-height:100vh">
+    <nav class="navbar">
+      <div class="navbar-brand"><i class="fas fa-th-large"></i> JHS Timesnap</div>
+      <div class="navbar-right">
+        <span class="emp-badge" id="empBadge"></span>
+        <button class="cp-btn" id="cpBtn" style="display:none" onclick="openCpModal()"><i class="fas fa-cogs"></i> Switch to Control Panel</button>
+        <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </nav>
+
+    <div class="page-wrapper">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-th-large"></i> JHS PLATFORM</h1>
+          <p>Select a module to get started</p>
+        </div>
+
+        <div class="body-content">
+          <p class="section-label"><i class="fas fa-cubes"></i> Available Modules</p>
+
+          <div class="cards-grid" id="cards-grid">
+            <!-- injected by JS -->
+          </div>
+
+          <div class="info-strip">
+            <i class="fas fa-info-circle"></i>
+            <span>Logged in as <strong id="empName">—</strong>. Module visibility is determined by your role and eligibility.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Panel Switch Popup -->
+  <div class="cp-modal-backdrop" id="cpModalBackdrop">
+    <div class="cp-modal">
+      <div class="cp-modal-head">
+        <i class="fas fa-cogs"></i>
+        <h3>Switch to Control Panel</h3>
+      </div>
+      <div class="cp-modal-body">
+        <p>You are about to switch to the <strong>Admin Control Panel</strong>. This gives you access to administrative tools for your assigned modules.</p>
+        <div class="cp-modal-actions">
+          <button class="cp-btn-confirm" onclick="goToControlPanel()"><i class="fas fa-arrow-right"></i> &nbsp;Switch Now</button>
+          <button class="cp-btn-cancel" onclick="closeCpModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const empId  = localStorage.getItem('loggedInEmployeeId') || '';
+    const token  = localStorage.getItem('access_token')       || '';
+
+    if (!token) { window.location.href = '/login'; }
+
+    document.getElementById('empBadge').textContent = empId;
+    document.getElementById('empName').textContent  = empId;
+
+    function handleLogout() {
+      localStorage.clear(); sessionStorage.clear();
+      window.location.href = '/login';
+    }
+
+    // ── Control Panel modal ──
+    function openCpModal() {
+      document.getElementById('cpModalBackdrop').classList.add('open');
+    }
+    function closeCpModal() {
+      document.getElementById('cpModalBackdrop').classList.remove('open');
+    }
+    function goToControlPanel() {
+      window.location.href = '/control-panel';
+    }
+    // Close on backdrop click
+    document.getElementById('cpModalBackdrop').addEventListener('click', function(e) {
+      if (e.target === this) closeCpModal();
+    });
+
+    // ── Card templates ──
+    const CARD_TS = `
+      <a href="/timesheet" class="module-card card-ts clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-stopwatch"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Timesheet</h2>
+        <p class="card-desc">Log daily hours, track project activity, manage weekly periods, and submit for manager approval.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-clock"></i> Time Tracking</span>
+          <span class="chip"><i class="fas fa-check-circle"></i> Approvals</span>
+          <span class="chip"><i class="fas fa-history"></i> History</span>
+          <span class="chip"><i class="fas fa-file-excel"></i> Export</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Time tracking &amp; approvals</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    // JHS Chatbot — always shown, like Timesheet. All three tabs (HR Policy,
+    // RCM, JHS Library) are live.
+    const CARD_CB = `
+      <a href="/jhs-chatbot" class="module-card card-cb clickable no-hover-lift">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-robot"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Jhs Chatbot</h2>
+        <p class="card-desc">Ask HR Policy, RCM, or the audit observation library — one assistant, three tabs, your chat history saved per topic.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-book-reader"></i> HR Policy</span>
+          <span class="chip"><i class="fas fa-sync-alt"></i> RCM</span>
+          <span class="chip"><i class="fas fa-database"></i> Observation Library</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Sourced answers, saved history</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    // HR Policy Quiz — only shown to employee codes listed in the module's
+    // admins collection. "Open" goes straight to the dashboard: no separate
+    // login screen, the dashboard trusts this same platform token.
+    const CARD_HR = `
+      <a href="/hr-quiz/hr-dashboard" class="module-card card-hr clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-book-reader"></i></div>
+          <span class="card-tag">Admin</span>
+        </div>
+        <h2 class="card-title">HR Policy Quiz</h2>
+        <p class="card-desc">Manage the new-joiner onboarding assessment - upload policy documents, add candidates, and review scores.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-file-upload"></i> Documents</span>
+          <span class="chip"><i class="fas fa-user-plus"></i> Candidates</span>
+          <span class="chip"><i class="fas fa-chart-bar"></i> Scores</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">HR admin access</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    // Employee Declaration Form — always shown, like Timesheet. Tag/footer
+    // reflect whether this employee has already signed and submitted.
+    function buildDeclarationCard(submitted) {
+      return `
+        <a href="/employee-declaration" class="module-card card-ed clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-file-signature"></i></div>
+            <span class="card-tag">${submitted ? 'Submitted' : 'Action Required'}</span>
+          </div>
+          <h2 class="card-title">Employee Declaration Form</h2>
+          <p class="card-desc">Read the Code of Conduct, Confidentiality &amp; Compliance declaration and sign it digitally.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-file-alt"></i> Declaration</span>
+            <span class="chip"><i class="fas fa-signature"></i> Digital Signature</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${submitted ? 'Thank you for submitting' : 'Signature required'}</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
+    function buildAppraisalCard(eligible, reason) {
+      const isLocked = !eligible;
+      return `
+        <div class="module-card card-ap ${eligible ? 'clickable' : 'locked'}" ${eligible ? 'onclick="window.location.href=\'/appraisal\'"' : ''}>
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+            <span class="card-tag" style="${eligible ? '' : 'background:rgba(127,140,141,.12);color:#7f8c8d'}">${eligible ? 'Active' : 'Locked'}</span>
+          </div>
+          <h2 class="card-title">KRA</h2>
+          <p class="card-desc">Complete performance reviews, set goals, share self-assessments, and track career milestones.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-bullseye"></i> Goal Setting</span>
+            <span class="chip"><i class="fas fa-user-check"></i> Self Assessment</span>
+            <span class="chip"><i class="fas fa-medal"></i> Ratings</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${reason || ''}</span>
+            <span class="card-btn ${isLocked ? 'locked-btn' : ''}">${eligible ? 'Open &nbsp;<i class="fas fa-arrow-right"></i>' : '<i class="fas fa-lock"></i> &nbsp;Locked'}</span>
+          </div>
+        </div>`;
+    }
+
+    function buildQACard(isAdmin, isQaOnly) {
+      const roleLabel = isAdmin ? 'Admin — all audits visible' : isQaOnly ? 'Dashboard & History access' : 'User — your audits only';
+      const tagText   = isAdmin || isQaOnly ? 'Admin' : 'Active';
+      const tagStyle  = isAdmin || isQaOnly ? 'background:rgba(102,126,234,.15);color:#667eea' : 'background:rgba(230,126,34,.12);color:#e67e22';
+      return `
+        <a href="/quality-audit" class="module-card card-qa clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-clipboard-check"></i></div>
+            <span class="card-tag" style="${tagStyle}">${tagText}</span>
+          </div>
+          <h2 class="card-title">Quality Audit</h2>
+          <p class="card-desc">Conduct structured quality audits — planning, execution, reporting, QC &amp; optimization — section by section.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-list-check"></i> Checklist</span>
+            <span class="chip"><i class="fas fa-save"></i> Draft &amp; Submit</span>
+            <span class="chip"><i class="fas fa-history"></i> History</span>
+            <span class="chip"><i class="fas fa-chart-bar"></i> Dashboard</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">${roleLabel}</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
+    // ── Main init ──
+    async function initModules() {
+      let qaAccess  = null;
+      let apprAccess = null;
+      let moduleAccess = null;
+
+      // Check module admin access (for Control Panel button)
+      try {
+        const res = await fetch('/get-module-access', {headers:{'Authorization':`Bearer ${token}`}});
+        console.log('[ModuleAccess] status:', res.status);
+        const data = await res.json();
+        console.log('[ModuleAccess] response:', JSON.stringify(data));
+        if (res.ok) moduleAccess = data;
+      } catch(e) {
+        console.error('[ModuleAccess] fetch error:', e);
+      }
+
+      console.log('[ModuleAccess] is_admin:', moduleAccess?.is_admin, '| modules:', moduleAccess?.modules);
+
+      // Check QA access
+      try {
+        const res  = await fetch('/quality-audit/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) qaAccess = await res.json();
+      } catch(e) {}
+
+      // If QA-only user — redirect immediately to QA, skip module selector
+      if (qaAccess?.is_qa_only) {
+        window.location.href = '/quality-audit';
+        return;
+      }
+
+      // Check appraisal eligibility
+      try {
+        const res  = await fetch(`/appraisal/eligibility/${empId}`, {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) apprAccess = await res.json();
+      } catch(e) {}
+
+      // Check HR Policy Quiz admin access
+      let hrQuizAccess = false;
+      try {
+        const res = await fetch('/hr-quiz/api/platform-access', {headers:{'Authorization':`Bearer ${token}`}});
+        hrQuizAccess = res.ok;
+      } catch(e) {}
+
+      // Check Employee Declaration submission status + admin access
+      let declStatus = null;
+      let declIsAdmin = false;
+      try {
+        const res = await fetch('/employee-declaration/status', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) declStatus = await res.json();
+      } catch(e) {}
+      try {
+        const res = await fetch('/employee-declaration/admin/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) declIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      // Show Control Panel button if user has any admin module access
+      // (timesheet/QA/KRA) or Employee Declaration admin access
+      if (moduleAccess?.is_admin || declIsAdmin) {
+        document.getElementById('cpBtn').style.display = 'flex';
+      }
+
+      // Build cards
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = '';
+
+      // Timesheet — always shown
+      grid.innerHTML += CARD_TS;
+
+      // JHS Chatbot — always shown
+      grid.innerHTML += CARD_CB;
+
+      // KRA
+      grid.innerHTML += buildAppraisalCard(apprAccess?.eligible || false, apprAccess?.reason || '');
+
+      // Quality Audit — only if user has access
+      if (qaAccess?.has_access) {
+        grid.innerHTML += buildQACard(qaAccess.is_admin, qaAccess.is_qa_only);
+      }
+
+      // HR Policy Quiz — only for admin-listed employee codes
+      if (hrQuizAccess) {
+        grid.innerHTML += CARD_HR;
+      }
+
+      // Employee Declaration Form — always shown, like Timesheet
+      grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
+
+      // Employee Declaration Admin now lives in the Control Panel only
+      // (see cpBtn above) — not shown as its own card here.
+
+      // Show page
+      document.getElementById('loading-screen').style.display = 'none';
+      const mc = document.getElementById('main-content');
+      mc.style.display = 'flex';
+    }
+
+    initModules();
+  </script>
+    <script src="/static/chatbot/chat-core.js"></script>
+    <script src="/static/chatbot/chatbot-widget.js"></script>
+</body>
+</html>
