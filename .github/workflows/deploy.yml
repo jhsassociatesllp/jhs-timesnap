@@ -23,28 +23,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
+      - name: Determine image tag
+        id: tag
         run: |
-          echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Build & Push Docker Image
-        run: |
-          IMAGE="ghcr.io/jhsassociatesllp/jhs-timesnap"
-
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            TAG="production"
+            echo "tag=production" >> "$GITHUB_OUTPUT"
           elif [ "${GITHUB_REF_NAME}" = "staging" ]; then
-            TAG="staging"
+            echo "tag=staging" >> "$GITHUB_OUTPUT"
           else
             echo "❌ Unsupported branch: ${GITHUB_REF_NAME}"
             exit 1
           fi
 
-          echo "📦 Building $IMAGE:$TAG"
-          docker build -t "$IMAGE:$TAG" .
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
 
-          echo "📤 Pushing $IMAGE:$TAG"
-          docker push "$IMAGE:$TAG"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Buildx + the GitHub Actions cache backend persist layers (notably
+      # the heavy torch/pandas/scikit-learn install layer) ACROSS separate
+      # workflow runs, which plain `docker build` on these ephemeral
+      # runners never could — so a code-only push reuses the dependency
+      # layers instead of reinstalling them from scratch every time.
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/jhsassociatesllp/jhs-timesnap:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: build
