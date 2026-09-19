@@ -22,7 +22,6 @@ Status flow:
   submitted → TL_approved / TL_rejected → PnD_approved / PnD_rejected
 """
 
-<<<<<<< HEAD
 import io
 import re
 from datetime import date, datetime
@@ -45,21 +44,6 @@ from backend.appraisal.models import (
     AppraisalSaveRequest, AppraisalReviewRequest, CycleToggleRequest,
     CreateCycleRequest, UpdateCycleRequest,
 )
-=======
-from datetime import date, datetime
-from typing import Optional
-
-from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
-
-from backend.auth import get_current_user
-from backend.database import (
-    employee_details_collection,   # Timesheets DB
-    appraisal_collection,          # Appraisal DB  (Appraisal_data)
-    appraisal_admin_collection,    # Appraisal DB  (admin_details)
-)
-from backend.appraisal.models import AppraisalSaveRequest, AppraisalReviewRequest
->>>>>>> origin/main
 from backend.appraisal.questions import (
     get_questions_for_employee,
     calculate_score,
@@ -71,16 +55,12 @@ reporting_managers_collection = timesheets_db["Reporting_managers"]
 
 router = APIRouter(prefix="/appraisal", tags=["Appraisal"])
 
-<<<<<<< HEAD
 try:
     appraisal_eligibility_collection.create_index(
         [("quarter_id", 1), ("employee_code", 1)], unique=True, name="quarter_employee_unique"
     )
 except Exception:
     pass
-=======
-period = "2025-26"
->>>>>>> origin/main
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Role helpers
@@ -171,7 +151,6 @@ def _tls_under_partner(partner_id: str) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-<<<<<<< HEAD
 # Quarter / cycle helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -269,19 +248,6 @@ def _check_eligibility(emp_id: str) -> dict:
             "reason":   f"KRA appraisal is currently closed/not applicable for you for {live['quarter_label']}.",
             "doj": None, "one_year_date": None,
         }
-=======
-# Period helper
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _get_current_period() -> str:
-    return period
-
-
-def _check_eligibility(emp_id: str) -> dict:
-    emp = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()})
-    if not emp:
-        return {"eligible": False, "reason": "Employee record not found.", "doj": None, "one_year_date": None}
->>>>>>> origin/main
     return {"eligible": True, "reason": "", "doj": "", "one_year_date": ""}
 
 
@@ -340,7 +306,6 @@ def _require_admin(current_user: str):
 
 @router.get("/period")
 async def get_period(current_user: str = Depends(get_current_user)):
-<<<<<<< HEAD
     live = _get_live_cycle()
     if not live:
         return {"period": "", "quarterId": None, "quarterLabel": None, "status": "closed"}
@@ -362,9 +327,6 @@ async def list_cycles_public(current_user: str = Depends(get_current_user)):
         {"quarter_id": c["quarter_id"], "quarter_label": c["quarter_label"], "status": c["status"]}
         for c in cycles
     ]}
-=======
-    return {"period": _get_current_period()}
->>>>>>> origin/main
 
 
 @router.get("/my_role")
@@ -389,7 +351,6 @@ async def get_my_role(current_user: str = Depends(get_current_user)):
     }
 
 
-<<<<<<< HEAD
 @router.get("/cycle_status")
 async def get_cycle_status(current_user: str = Depends(get_current_user)):
     """Whether the KRA submission window is open. Visible to everyone."""
@@ -621,8 +582,6 @@ async def admin_list_eligibility(quarter_id: str, current_user: str = Depends(ge
     return {"success": True, "data": data}
 
 
-=======
->>>>>>> origin/main
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes — employee (own KRA)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -650,12 +609,9 @@ async def get_questions(emp_id: str, current_user: str = Depends(get_current_use
 async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends(get_current_user)):
     if data.employeeId.upper() != current_user.upper():
         raise HTTPException(403, "Unauthorized")
-<<<<<<< HEAD
     live = _get_live_cycle()
     if not live:
         raise HTTPException(403, "KRA submission window is currently closed.")
-=======
->>>>>>> origin/main
     elig = _check_eligibility(data.employeeId)
     if not elig["eligible"]:
         raise HTTPException(403, elig["reason"])
@@ -671,21 +627,13 @@ async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends
     reporting   = emp.get("ReportingEmpCode") or "" if emp else ""
     reporting_name = emp.get("ReportingEmpName") or "" if emp else ""
 
-<<<<<<< HEAD
     quarter_id = live["quarter_id"]
     period_val = live["quarter_label"]
-=======
-    period_val = data.period or _get_current_period()
->>>>>>> origin/main
     now_iso    = datetime.utcnow().isoformat()
 
     existing_submitted = appraisal_collection.find_one({
         "employeeId": data.employeeId.upper(),
-<<<<<<< HEAD
         "quarter_id": quarter_id,
-=======
-        "period":     period_val,
->>>>>>> origin/main
         "status":     {"$in": ["submitted", "TL_approved", "TL_rejected",
                                 "PnD_approved", "PnD_rejected"]},
     })
@@ -702,10 +650,7 @@ async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends
         "partnerEmpName":    partner_name,
         "reportingEmpCode":  reporting,
         "reportingEmpName":  reporting_name,
-<<<<<<< HEAD
         "quarter_id":        quarter_id,
-=======
->>>>>>> origin/main
         "period":            period_val,
         "answers":           data.answers,
         "status":            data.status,
@@ -729,11 +674,7 @@ async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends
 
     existing_draft = appraisal_collection.find_one({
         "employeeId": data.employeeId.upper(),
-<<<<<<< HEAD
         "quarter_id": quarter_id,
-=======
-        "period":     period_val,
->>>>>>> origin/main
         "status":     "draft",
     })
     if existing_draft:
@@ -758,11 +699,7 @@ async def get_my_appraisals(emp_id: str, current_user: str = Depends(get_current
         raise HTTPException(403, "Unauthorized")
     records = list(appraisal_collection.find(
         {"employeeId": emp_id.upper()},
-<<<<<<< HEAD
         {"_id": 1, "period": 1, "quarter_id": 1, "status": 1, "updatedAt": 1,
-=======
-        {"_id": 1, "period": 1, "status": 1, "updatedAt": 1,
->>>>>>> origin/main
          "createdAt": 1, "answers": 1, "designation": 1}
     ))
     result = []
@@ -770,10 +707,7 @@ async def get_my_appraisals(emp_id: str, current_user: str = Depends(get_current
         result.append({
             "id":          str(r["_id"]),
             "period":      r.get("period"),
-<<<<<<< HEAD
             "quarterId":   r.get("quarter_id"),
-=======
->>>>>>> origin/main
             "status":      r.get("status"),
             "designation": r.get("designation"),
             "answers":     r.get("answers", {}),
@@ -787,7 +721,6 @@ async def get_my_appraisals(emp_id: str, current_user: str = Depends(get_current
 async def get_appraisal_status(emp_id: str, current_user: str = Depends(get_current_user)):
     if emp_id.upper() != current_user.upper():
         raise HTTPException(403, "Unauthorized")
-<<<<<<< HEAD
     live = _get_live_cycle()
     p = live["quarter_label"] if live else ""
     record = None
@@ -796,13 +729,6 @@ async def get_appraisal_status(emp_id: str, current_user: str = Depends(get_curr
             {"employeeId": emp_id.upper(), "quarter_id": live["quarter_id"]},
             sort=[("updatedAt", -1)]
         )
-=======
-    p = _get_current_period()
-    record = appraisal_collection.find_one(
-        {"employeeId": emp_id.upper(), "period": p},
-        sort=[("updatedAt", -1)]
-    )
->>>>>>> origin/main
     if not record:
         return {"success": True, "status": "not_started", "period": p, "id": None, "answers": {}}
     return {
@@ -820,7 +746,6 @@ async def get_my_status_detail(emp_id: str, current_user: str = Depends(get_curr
     if emp_id.upper() != current_user.upper():
         raise HTTPException(403, "Unauthorized")
 
-<<<<<<< HEAD
     live = _get_live_cycle()
     p = live["quarter_label"] if live else ""
     record = None
@@ -829,13 +754,6 @@ async def get_my_status_detail(emp_id: str, current_user: str = Depends(get_curr
             {"employeeId": emp_id.upper(), "quarter_id": live["quarter_id"]},
             sort=[("updatedAt", -1)]
         )
-=======
-    p = _get_current_period()
-    record = appraisal_collection.find_one(
-        {"employeeId": emp_id.upper(), "period": p},
-        sort=[("updatedAt", -1)]
-    )
->>>>>>> origin/main
 
     emp = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()})
     tl_code      = emp.get("ReportingEmpCode", "") if emp else ""
@@ -911,26 +829,16 @@ def _build_pipeline(status, tl_name, partner_name, tl_is_partner):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/tl/pending")
-<<<<<<< HEAD
 async def tl_pending(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_tl_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "data": []}
-=======
-async def tl_pending(current_user: str = Depends(get_current_user)):
-    _require_tl_or_above(current_user)
-    p    = _get_current_period()
->>>>>>> origin/main
     emps = _employees_under_tl(current_user)
     emp_ids = [e["EmpID"].upper() for e in emps]
     records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "submitted",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "percentage": 1, "score": 1, "maxScore": 1}))
@@ -938,26 +846,16 @@ async def tl_pending(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/tl/approved")
-<<<<<<< HEAD
 async def tl_approved(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_tl_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "data": []}
-=======
-async def tl_approved(current_user: str = Depends(get_current_user)):
-    _require_tl_or_above(current_user)
-    p    = _get_current_period()
->>>>>>> origin/main
     emps = _employees_under_tl(current_user)
     emp_ids = [e["EmpID"].upper() for e in emps]
     records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "TL_approved",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
@@ -966,26 +864,16 @@ async def tl_approved(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/tl/rejected")
-<<<<<<< HEAD
 async def tl_rejected(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_tl_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "data": []}
-=======
-async def tl_rejected(current_user: str = Depends(get_current_user)):
-    _require_tl_or_above(current_user)
-    p    = _get_current_period()
->>>>>>> origin/main
     emps = _employees_under_tl(current_user)
     emp_ids = [e["EmpID"].upper() for e in emps]
     records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "TL_rejected",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
@@ -1041,15 +929,12 @@ async def tl_action(
     if record["status"] not in ("submitted", "TL_rejected"):
         raise HTTPException(400, f"Cannot action a record with status '{record['status']}'")
 
-<<<<<<< HEAD
     record_quarter_id = record.get("quarter_id")
     if record_quarter_id:
         rec_cycle = _get_cycle(record_quarter_id)
         if not rec_cycle or rec_cycle.get("status") != "live":
             raise HTTPException(403, "This quarter is closed; approvals are disabled.")
 
-=======
->>>>>>> origin/main
     role = _resolve_role(current_user)
     if role == "tl":
         emps    = _employees_under_tl(current_user)
@@ -1106,11 +991,7 @@ async def tl_action(
 #         "percentage": 1, "score": 1, "maxScore": 1}))
 #     return [_serialize(r) for r in records]
 
-<<<<<<< HEAD
 def _pnd_pending_employees(partner_id: str, qid: str):
-=======
-def _pnd_pending_employees(partner_id: str, p: str):
->>>>>>> origin/main
     emps     = _employees_under_partner(partner_id)
     emp_ids  = [e["EmpID"].upper() for e in emps]
     tl_codes = set(
@@ -1137,20 +1018,12 @@ def _pnd_pending_employees(partner_id: str, p: str):
     records = []
     if direct_ids:
         records += list(appraisal_collection.find(
-<<<<<<< HEAD
             {"employeeId": {"$in": direct_ids}, "quarter_id": qid, "status": "submitted"},
-=======
-            {"employeeId": {"$in": direct_ids}, "period": p, "status": "submitted"},
->>>>>>> origin/main
             projection
         ))
     if indirect_ids:
         records += list(appraisal_collection.find(
-<<<<<<< HEAD
             {"employeeId": {"$in": indirect_ids}, "quarter_id": qid, "status": "TL_approved"},
-=======
-            {"employeeId": {"$in": indirect_ids}, "period": p, "status": "TL_approved"},
->>>>>>> origin/main
             projection
         ))
 
@@ -1167,19 +1040,11 @@ def _pnd_pending_employees(partner_id: str, p: str):
 #         "status": 1, "updatedAt": 1, "selfPercentage": 1, "percentage": 1, "score": 1, "maxScore": 1}))
 #     return [_serialize(r) for r in records]
 
-<<<<<<< HEAD
 def _pnd_pending_tls(partner_id: str, qid: str):
     tl_codes = _tls_under_partner(partner_id)
     records = list(appraisal_collection.find({
         "employeeId": {"$in": tl_codes},
         "quarter_id": qid,
-=======
-def _pnd_pending_tls(partner_id: str, p: str):
-    tl_codes = _tls_under_partner(partner_id)
-    records = list(appraisal_collection.find({
-        "employeeId": {"$in": tl_codes},
-        "period":     p,
->>>>>>> origin/main
         "status":     {"$in": ["submitted", "TL_approved"]},  # ← add TL_approved
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
@@ -1188,7 +1053,6 @@ def _pnd_pending_tls(partner_id: str, p: str):
 
 
 @router.get("/pnd/pending")
-<<<<<<< HEAD
 async def pnd_pending(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_partner_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
@@ -1198,30 +1062,15 @@ async def pnd_pending(quarter_id: Optional[str] = None, current_user: str = Depe
         "success":   True,
         "employees": _pnd_pending_employees(current_user, qid),
         "tls":       _pnd_pending_tls(current_user, qid),
-=======
-async def pnd_pending(current_user: str = Depends(get_current_user)):
-    _require_partner_or_above(current_user)
-    p = _get_current_period()
-    return {
-        "success":   True,
-        "employees": _pnd_pending_employees(current_user, p),
-        "tls":       _pnd_pending_tls(current_user, p),
->>>>>>> origin/main
     }
 
 
 @router.get("/pnd/approved")
-<<<<<<< HEAD
 async def pnd_approved(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_partner_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "employees": [], "tls": []}
-=======
-async def pnd_approved(current_user: str = Depends(get_current_user)):
-    _require_partner_or_above(current_user)
-    p       = _get_current_period()
->>>>>>> origin/main
     emps    = _employees_under_partner(current_user)
     all_ids = [e["EmpID"].upper() for e in emps]
     tl_ids  = set(_tls_under_partner(current_user))
@@ -1229,11 +1078,7 @@ async def pnd_approved(current_user: str = Depends(get_current_user)):
 
     emp_records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "PnD_approved",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1,
@@ -1242,11 +1087,7 @@ async def pnd_approved(current_user: str = Depends(get_current_user)):
 
     tl_records = list(appraisal_collection.find({
         "employeeId": {"$in": list(tl_ids)},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "PnD_approved",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1,
@@ -1261,17 +1102,11 @@ async def pnd_approved(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/pnd/rejected")
-<<<<<<< HEAD
 async def pnd_rejected(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_partner_or_above(current_user)
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "employees": [], "tls": []}
-=======
-async def pnd_rejected(current_user: str = Depends(get_current_user)):
-    _require_partner_or_above(current_user)
-    p       = _get_current_period()
->>>>>>> origin/main
     emps    = _employees_under_partner(current_user)
     all_ids = [e["EmpID"].upper() for e in emps]
     tl_ids  = set(_tls_under_partner(current_user))
@@ -1279,11 +1114,7 @@ async def pnd_rejected(current_user: str = Depends(get_current_user)):
 
     emp_records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "PnD_rejected",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1,
@@ -1292,11 +1123,7 @@ async def pnd_rejected(current_user: str = Depends(get_current_user)):
 
     tl_records = list(appraisal_collection.find({
         "employeeId": {"$in": list(tl_ids)},
-<<<<<<< HEAD
         "quarter_id": qid,
-=======
-        "period":     p,
->>>>>>> origin/main
         "status":     "PnD_rejected",
     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1,
@@ -1353,15 +1180,12 @@ async def pnd_action(
     if record["status"] not in allowed_statuses:
         raise HTTPException(400, f"Cannot action record with status '{record['status']}'")
 
-<<<<<<< HEAD
     record_quarter_id = record.get("quarter_id")
     if record_quarter_id:
         rec_cycle = _get_cycle(record_quarter_id)
         if not rec_cycle or rec_cycle.get("status") != "live":
             raise HTTPException(403, "This quarter is closed; approvals are disabled.")
 
-=======
->>>>>>> origin/main
     new_status = "PnD_approved" if data.action == "approve" else "PnD_rejected"
     now_iso    = datetime.utcnow().isoformat()
 
@@ -1404,7 +1228,6 @@ async def pnd_action(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/admin/pending")
-<<<<<<< HEAD
 async def admin_pending(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_admin(current_user)
     qid = _resolve_quarter_id(quarter_id)
@@ -1412,13 +1235,6 @@ async def admin_pending(quarter_id: Optional[str] = None, current_user: str = De
         return {"success": True, "data": []}
     records = list(appraisal_collection.find(
         {"quarter_id": qid, "status": {"$in": ["submitted", "TL_approved"]}},
-=======
-async def admin_pending(current_user: str = Depends(get_current_user)):
-    _require_admin(current_user)
-    p       = _get_current_period()
-    records = list(appraisal_collection.find(
-        {"period": p, "status": {"$in": ["submitted", "TL_approved"]}},
->>>>>>> origin/main
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
          "reportingEmpCode": 1, "partnerEmpCode": 1, "percentage": 1, "score": 1, "maxScore": 1}
@@ -1427,7 +1243,6 @@ async def admin_pending(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/admin/approved")
-<<<<<<< HEAD
 async def admin_approved(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_admin(current_user)
     qid = _resolve_quarter_id(quarter_id)
@@ -1435,13 +1250,6 @@ async def admin_approved(quarter_id: Optional[str] = None, current_user: str = D
         return {"success": True, "data": []}
     records = list(appraisal_collection.find(
         {"quarter_id": qid, "status": "PnD_approved"},
-=======
-async def admin_approved(current_user: str = Depends(get_current_user)):
-    _require_admin(current_user)
-    p       = _get_current_period()
-    records = list(appraisal_collection.find(
-        {"period": p, "status": "PnD_approved"},
->>>>>>> origin/main
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1,
          "tlPercentage": 1, "pndPercentage": 1,
@@ -1452,7 +1260,6 @@ async def admin_approved(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/admin/rejected")
-<<<<<<< HEAD
 async def admin_rejected(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
     _require_admin(current_user)
     qid = _resolve_quarter_id(quarter_id)
@@ -1460,13 +1267,6 @@ async def admin_rejected(quarter_id: Optional[str] = None, current_user: str = D
         return {"success": True, "data": []}
     records = list(appraisal_collection.find(
         {"quarter_id": qid, "status": {"$in": ["TL_rejected", "PnD_rejected"]}},
-=======
-async def admin_rejected(current_user: str = Depends(get_current_user)):
-    _require_admin(current_user)
-    p       = _get_current_period()
-    records = list(appraisal_collection.find(
-        {"period": p, "status": {"$in": ["TL_rejected", "PnD_rejected"]}},
->>>>>>> origin/main
         {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
          "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
          "reportingEmpCode": 1, "partnerEmpCode": 1, "percentage": 1, "score": 1, "maxScore": 1}
@@ -1479,11 +1279,7 @@ async def admin_rejected(current_user: str = Depends(get_current_user)):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/analysis")
-<<<<<<< HEAD
 async def get_analysis(quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
-=======
-async def get_analysis(current_user: str = Depends(get_current_user)):
->>>>>>> origin/main
     """
     Analysis is accessible to:
       - Pure admin  → full company data
@@ -1496,7 +1292,6 @@ async def get_analysis(current_user: str = Depends(get_current_user)):
     # Access check: must be partner, admin, or admin+partner
     # if role not in ("partner", "admin") and not is_admin:
     #     raise HTTPException(403, "Admin or Partner access required")
-<<<<<<< HEAD
 
     if not is_admin and role != "admin":
         raise HTTPException(403, "Admin access required for Analysis")
@@ -1512,34 +1307,18 @@ async def get_analysis(current_user: str = Depends(get_current_user)):
             "pipeline": {"pending": 0, "tlApproved": 0, "tlRejected": 0, "pndApproved": 0, "pndRejected": 0},
             "tlWise": {}, "pndWise": {},
         }
-=======
-    
-    if not is_admin and role != "admin":
-        raise HTTPException(403, "Admin access required for Analysis")
-
-    p = _get_current_period()
->>>>>>> origin/main
 
     # ── KEY LOGIC ──
     # If user is admin (even if also partner) → NO filter, see all company data
     # If pure partner (not in admin list)     → filter by their partnerEmpCode
     if is_admin:
         # Full company-wide queries — no partner filter
-<<<<<<< HEAD
         approved_query    = {"quarter_id": qid, "status": "PnD_approved"}
         all_period_query  = {"quarter_id": qid}
     else:
         # Pure partner — only their employees
         approved_query    = {"quarter_id": qid, "status": "PnD_approved", "partnerEmpCode": current_user.upper()}
         all_period_query  = {"quarter_id": qid, "partnerEmpCode": current_user.upper()}
-=======
-        approved_query    = {"period": p, "status": "PnD_approved"}
-        all_period_query  = {"period": p}
-    else:
-        # Pure partner — only their employees
-        approved_query    = {"period": p, "status": "PnD_approved", "partnerEmpCode": current_user.upper()}
-        all_period_query  = {"period": p, "partnerEmpCode": current_user.upper()}
->>>>>>> origin/main
 
     records = list(appraisal_collection.find(approved_query, {
         "_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
@@ -1787,11 +1566,7 @@ async def get_analysis(current_user: str = Depends(get_current_user)):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/analysis/kra/{emp_id}")
-<<<<<<< HEAD
 async def analysis_kra_detail(emp_id: str, quarter_id: Optional[str] = None, current_user: str = Depends(get_current_user)):
-=======
-async def analysis_kra_detail(emp_id: str, current_user: str = Depends(get_current_user)):
->>>>>>> origin/main
     """
     Returns the full KRA record for an employee including questions and all
     three tiers of answers (self, TL, PnD) for display in the analysis modal.
@@ -1802,17 +1577,11 @@ async def analysis_kra_detail(emp_id: str, current_user: str = Depends(get_curre
     if role not in ("partner", "admin") and not is_admin:
         raise HTTPException(403, "Admin or Partner access required")
 
-<<<<<<< HEAD
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         raise HTTPException(404, "No active or selected quarter.")
     record = appraisal_collection.find_one(
         {"employeeId": emp_id.upper(), "quarter_id": qid},
-=======
-    p = _get_current_period()
-    record = appraisal_collection.find_one(
-        {"employeeId": emp_id.upper(), "period": p},
->>>>>>> origin/main
         sort=[("updatedAt", -1)]
     )
     if not record:
@@ -1844,7 +1613,6 @@ async def analysis_kra_detail(emp_id: str, current_user: str = Depends(get_curre
 
 @router.get("/review/{emp_id}")
 async def review_appraisal(emp_id: str, current_user: str = Depends(get_current_user)):
-<<<<<<< HEAD
     live = _get_live_cycle()
     record = None
     if live:
@@ -1852,13 +1620,6 @@ async def review_appraisal(emp_id: str, current_user: str = Depends(get_current_
             {"employeeId": emp_id.upper(), "quarter_id": live["quarter_id"]},
             sort=[("updatedAt", -1)]
         )
-=======
-    p = _get_current_period()
-    record = appraisal_collection.find_one(
-        {"employeeId": emp_id.upper(), "period": p},
-        sort=[("updatedAt", -1)]
-    )
->>>>>>> origin/main
     if not record:
         raise HTTPException(404, "No appraisal found for this employee.")
     result = _serialize(record)

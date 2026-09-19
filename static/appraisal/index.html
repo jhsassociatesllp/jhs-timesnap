@@ -217,11 +217,8 @@
   <div class="header">
     <h1><i class="fas fa-chart-line"></i> JHS KRA <span id="roleBadge" class="role-badge"></span></h1>
     <p id="headerSub">Annual Performance Review</p>
-<<<<<<< HEAD
     <div id="cycleStatusBar" style="display:none;margin-top:.8rem;align-items:center;justify-content:center;gap:.8rem;flex-wrap:wrap;position:relative;z-index:2;"></div>
     <div id="quarterSwitcherBar" style="display:none;margin-top:.6rem;align-items:center;justify-content:center;gap:.8rem;flex-wrap:wrap;position:relative;z-index:2;"></div>
-=======
->>>>>>> origin/main
   </div>
   <div id="tabContents"></div>
 </div>
@@ -233,7 +230,6 @@
   <button class="confirm-btn" onclick="doLogout()">Yes</button>
   <button class="cancel-btn" onclick="document.getElementById('logoutConfirm').style.display='none'">No</button>
 </div>
-<<<<<<< HEAD
 <div class="exit-confirmation" id="submitConfirm">
   <p><i class="fas fa-exclamation-triangle" style="color:#e67e22;font-size:1.5rem;margin-bottom:.5rem;display:block"></i>
      Once submitted, your KRA <strong>cannot be edited</strong>.<br>Are you sure you want to submit?</p>
@@ -245,8 +241,6 @@
   <button class="confirm-btn" id="cycleConfirmYesBtn" onclick="doToggleCycle()">Yes</button>
   <button class="cancel-btn" onclick="closeCycleConfirm()">Cancel</button>
 </div>
-=======
->>>>>>> origin/main
 
 <div class="modal-overlay" id="kraModal">
   <div class="modal-box">
@@ -263,16 +257,10 @@ if (!TOK) window.location.href = "/static/login.html";
 const H = () => ({"Content-Type":"application/json",Authorization:`Bearer ${TOK}`});
 
 // ── Global state ──────────────────────────────────────────────────────────────
-<<<<<<< HEAD
 let _role       = "employee";  // natural role: employee | tl | partner | admin
 let _isAdmin    = false;       // true if user is in admin list (regardless of natural role)
 let _period     = "";
 let _cycleOpen  = false;       // whether the KRA submission window is open
-=======
-let _role    = "employee";  // natural role: employee | tl | partner | admin
-let _isAdmin = false;       // true if user is in admin list (regardless of natural role)
-let _period  = "";
->>>>>>> origin/main
 let _modalRecord = null, _editMode = false, _editedAnswers = {};
 const _loaded = new Set();
 const _CP_ADMIN = sessionStorage.getItem('cp_admin') === '1' && sessionStorage.getItem('admin_mode') === 'kra';
@@ -284,7 +272,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sv = await fetch(`${API}/verify_session`,{method:"POST",headers:H()});
     if (!sv.ok) throw new Error("Session invalid");
 
-<<<<<<< HEAD
     const [rr, pr, cr] = await Promise.all([
       fetch(`${API}/appraisal/my_role`,{headers:H()}),
       fetch(`${API}/appraisal/period`,{headers:H()}),
@@ -306,22 +293,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       await _fetchQuarterList();
       _renderQuarterSwitcher();
     }
-=======
-    const [rr, pr] = await Promise.all([
-      fetch(`${API}/appraisal/my_role`,{headers:H()}),
-      fetch(`${API}/appraisal/period`,{headers:H()}),
-    ]);
-    const rd = await rr.json(), pd = await pr.json();
-
-    _role    = rd.role    || "employee";
-    _isAdmin = rd.isAdmin || false;   // ← comes from backend now
-    _period  = pd.period  || "";
-
-    document.getElementById("headerSub").textContent = `Annual Performance Review — ${_period}`;
-    _renderRoleBadge();
-    _buildNav();
-    _buildTabContents();
->>>>>>> origin/main
   } catch(e) {
     showPopup("Session error — please login again.", true);
     setTimeout(() => window.location.href = "/static/login.html", 2000);
@@ -330,7 +301,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-<<<<<<< HEAD
 // ── Cycle open/close bar ─────────────────────────────────────────────────────
 function _renderCycleBar() {
   const bar = document.getElementById("cycleStatusBar");
@@ -448,8 +418,6 @@ async function toggleCycle(open) {
   }
 }
 
-=======
->>>>>>> origin/main
 // ── Role badge ────────────────────────────────────────────────────────────────
 function _renderRoleBadge() {
   const el = document.getElementById("roleBadge");
@@ -490,10 +458,7 @@ function _buildNav() {
   if (_CP_ADMIN) {
     links.push(
       `<a href="#" onclick="showSection('analysis')" id="nt_analysis"><i class="fas fa-chart-bar"></i> Analysis</a>`,
-<<<<<<< HEAD
       `<a href="/appraisal/admin"><i class="fas fa-calendar-check"></i> Quarter Management</a>`,
-=======
->>>>>>> origin/main
       `<a href="/control-panel"><i class="fas fa-cogs"></i> Control Panel</a>`,
       `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
     );
@@ -546,7 +511,6 @@ function _buildNav() {
     );
   }
 
-<<<<<<< HEAD
   // ── Quarter Management — visible to any admin (pure admin or senior partner) ──
   if (_isAdmin) {
     links.push(
@@ -554,8 +518,6 @@ function _buildNav() {
     );
   }
 
-=======
->>>>>>> origin/main
   links.push(
     `<a href="/modules"><i class="fas fa-th-large"></i> Modules</a>`,
     `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
@@ -583,15 +545,7 @@ function _buildTabContents() {
   if (showOwnKRA) {
     secs.push(
       `<div class="tab-content" id="sec_form">
-<<<<<<< HEAD
         <div id="formSectionRoot"><p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p></div>
-=======
-        <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
-          <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
-          <strong style="font-size:1.3rem;margin-bottom:.5rem;">KRA Form has been closed</strong>
-          <p style="font-size:.95rem;color:#7d5a00;">The submission window is closed. Contact HR for details.</p>
-        </div>
->>>>>>> origin/main
       </div>`,
       `<div class="tab-content" id="sec_history" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-history"></i> Past KRA</p><div id="historyContent"><p class="empty-msg">Loading…</p></div></div></div>`,
       `<div class="tab-content" id="sec_status"  style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-info-circle"></i> Approval Status</p><div id="statusContent"><p class="empty-msg">Loading…</p></div></div></div>`,
@@ -663,10 +617,7 @@ async function _loadSection(name) {
   if (_loaded.has(name)) return;
   _loaded.add(name);
   const m = {
-<<<<<<< HEAD
     form:         loadFormSection,
-=======
->>>>>>> origin/main
     history:      loadStatusHistory,
     status:       loadStatusDetail,
     tl_pending:   () => _loadList("tl/pending",   "tl_pending_content",   "tl_pending"),
@@ -688,11 +639,7 @@ async function _loadList(endpoint, elId, context) {
   const el = document.getElementById(elId);
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-<<<<<<< HEAD
     const d = await (await fetch(`${API}/appraisal/${endpoint}${_qs()}`, {headers:H()})).json();
-=======
-    const d = await (await fetch(`${API}/appraisal/${endpoint}`, {headers:H()})).json();
->>>>>>> origin/main
     const rows = d.data || [];
     el.innerHTML = rows.length
       ? _buildApprovalTable(rows, context)
@@ -830,7 +777,6 @@ async function _populateAnswerView(rid, container) {
   } catch { container.textContent = "Failed to load answers."; }
 }
 
-<<<<<<< HEAD
 // ── Form tab (fill / submit own KRA) ─────────────────────────────────────────
 let _formQuestions      = null;   // { common: [], role: [] }
 let _formDraftAnswers   = {};
@@ -1275,8 +1221,6 @@ function doFormSubmit() {
   saveFormAppraisal("submitted");
 }
 
-=======
->>>>>>> origin/main
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _pctPill(v) {
   if (v == null) return "—";
@@ -1332,11 +1276,7 @@ async function loadPNDPending() {
   const el = document.getElementById("pnd_pending_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-<<<<<<< HEAD
     const d = await (await fetch(`${API}/appraisal/pnd/pending${_qs()}`, {headers:H()})).json();
-=======
-    const d = await (await fetch(`${API}/appraisal/pnd/pending`, {headers:H()})).json();
->>>>>>> origin/main
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_pending_tl") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No TL appraisals pending</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
@@ -1349,11 +1289,7 @@ async function loadPNDApproved() {
   const el = document.getElementById("pnd_approved_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-<<<<<<< HEAD
     const d = await (await fetch(`${API}/appraisal/pnd/approved${_qs()}`, {headers:H()})).json();
-=======
-    const d = await (await fetch(`${API}/appraisal/pnd/approved`, {headers:H()})).json();
->>>>>>> origin/main
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_approved") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
@@ -1366,11 +1302,7 @@ async function loadPNDRejected() {
   const el = document.getElementById("pnd_rejected_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-<<<<<<< HEAD
     const d = await (await fetch(`${API}/appraisal/pnd/rejected${_qs()}`, {headers:H()})).json();
-=======
-    const d = await (await fetch(`${API}/appraisal/pnd/rejected`, {headers:H()})).json();
->>>>>>> origin/main
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_rejected") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
@@ -1534,11 +1466,7 @@ async function loadAnalysis() {
   const el = document.getElementById("analysis_content");
   el.innerHTML = `<div class="an-loading"><div class="an-spinner"></div><span>Loading analysis…</span></div>`;
   try {
-<<<<<<< HEAD
     const r = await fetch(`${API}/appraisal/analysis${_qs()}`, {headers:H()});
-=======
-    const r = await fetch(`${API}/appraisal/analysis`, {headers:H()});
->>>>>>> origin/main
     const d = await r.json();
     if (!d.success) throw new Error(d.detail || "Failed");
     _analysisData = d;
@@ -1979,11 +1907,7 @@ function closeAnModal(){document.getElementById("anModal").style.display="none";
 async function openKRAModal(empId){
   showLoading("Loading KRA…");
   try {
-<<<<<<< HEAD
     const r = await fetch(`${API}/appraisal/analysis/kra/${empId}${_qs()}`,{headers:H()});
-=======
-    const r = await fetch(`${API}/appraisal/analysis/kra/${empId}`,{headers:H()});
->>>>>>> origin/main
     const d = await r.json();
     if(!d.success) throw new Error(d.detail||"Not found");
     const rec = d.data;

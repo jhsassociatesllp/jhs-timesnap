@@ -23,7 +23,6 @@ class AppraisalReviewRequest(BaseModel):
     tl_responses: Optional[Dict[str, Any]] = None
     pnd_responses: Optional[Dict[str, Any]] = None
     remarks: Optional[str] = None
-<<<<<<< HEAD
 
 
 class CycleToggleRequest(BaseModel):
@@ -40,6 +39,3 @@ class UpdateCycleRequest(BaseModel):
     """Admin request to rename a KRA quarter's display label."""
     quarter_label: str
 
-=======
- 
->>>>>>> origin/main
