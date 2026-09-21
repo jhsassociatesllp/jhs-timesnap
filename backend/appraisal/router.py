@@ -623,7 +623,7 @@ async def save_appraisal(data: AppraisalSaveRequest, current_user: str = Depends
     designation = emp.get("Designation Name", "") if emp else ""
     emp_name    = emp.get("Emp Name") or emp.get("Name") or "" if emp else ""
     partner     = emp.get("PartnerEmpCode") or "" if emp else ""
-    partner_name= emp.get("PartnerEmpName") or "" if emp else ""
+    partner_name= emp.get("Partner") or "" if emp else ""
     reporting   = emp.get("ReportingEmpCode") or "" if emp else ""
     reporting_name = emp.get("ReportingEmpName") or "" if emp else ""
 
@@ -759,7 +759,7 @@ async def get_my_status_detail(emp_id: str, current_user: str = Depends(get_curr
     tl_code      = emp.get("ReportingEmpCode", "") if emp else ""
     tl_name      = emp.get("ReportingEmpName", "") if emp else ""
     partner_code = emp.get("PartnerEmpCode",   "") if emp else ""
-    partner_name = emp.get("PartnerEmpName",   "") if emp else ""
+    partner_name = emp.get("Partner",          "") if emp else ""
 
     tl_is_partner = tl_code and partner_code and tl_code.upper() == partner_code.upper()
 
@@ -1341,7 +1341,7 @@ async def get_analysis(quarter_id: Optional[str] = None, current_user: str = Dep
     if approved_ids_needing_enrich:
         for emp in employee_details_collection.find(
             {"EmpID": {"$in": [e.upper() for e in approved_ids_needing_enrich]}},
-            {"EmpID": 1, "PartnerEmpCode": 1, "PartnerEmpName": 1}
+            {"EmpID": 1, "PartnerEmpCode": 1, "Partner": 1}
         ):
             approved_emp_lookup[emp["EmpID"].upper()] = emp
 
@@ -1353,7 +1353,7 @@ async def get_analysis(quarter_id: Optional[str] = None, current_user: str = Dep
             r["partnerEmpCode"] = emp_data.get("PartnerEmpCode", "") or ""
         if not r.get("partnerEmpName"):
             # Try employee_details, then legacy "partner" field stored in appraisal doc
-            r["partnerEmpName"] = (emp_data.get("PartnerEmpName", "") or
+            r["partnerEmpName"] = (emp_data.get("Partner", "") or
                                    r.get("partner", "") or "")
 
     # 1. Overall top 5
@@ -1453,7 +1453,7 @@ async def get_analysis(quarter_id: Optional[str] = None, current_user: str = Dep
         for emp in employee_details_collection.find(
             {"EmpID": {"$in": [e.upper() for e in needs_enrichment]}},
             {"EmpID": 1, "ReportingEmpCode": 1, "ReportingEmpName": 1,
-             "PartnerEmpCode": 1, "PartnerEmpName": 1}
+             "PartnerEmpCode": 1, "Partner": 1}
         ):
             emp_lookup[emp["EmpID"].upper()] = emp
 
@@ -1469,7 +1469,7 @@ async def get_analysis(quarter_id: Optional[str] = None, current_user: str = Dep
             r["partnerEmpCode"] = emp_data.get("PartnerEmpCode", "") or ""
         if not r.get("partnerEmpName"):
             # Try employee_details first, then fall back to legacy "partner" field
-            r["partnerEmpName"] = (emp_data.get("PartnerEmpName", "") or
+            r["partnerEmpName"] = (emp_data.get("Partner", "") or
                                    r.get("partner", "") or "")
         # Also backfill selfPercentage from legacy fields
         if r.get("selfPercentage") is None:
@@ -1596,7 +1596,7 @@ async def analysis_kra_detail(emp_id: str, quarter_id: Optional[str] = None, cur
     # Backfill legacy name fields
     if not result.get("partnerEmpName"):
         result["partnerEmpName"] = (result.get("partner", "") or
-                                    (emp.get("PartnerEmpName", "") if emp else ""))
+                                    (emp.get("Partner", "") if emp else ""))
     if not result.get("reportingEmpName"):
         result["reportingEmpName"] = (result.get("reportingManager", "") or
                                       (emp.get("ReportingEmpName", "") if emp else ""))
