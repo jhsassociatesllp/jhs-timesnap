@@ -59,6 +59,18 @@ router = APIRouter(prefix="/timesheet", tags=["Timesheet"])
 # aren't required to follow the PL-prefix convention.
 FREE_TEXT_PARTNER_CODE = "JHS01"
 
+# Individual employees exempted the same way regardless of their actual
+# partner — e.g. because they do shared-services-style work under a partner
+# who otherwise uses the fixed client/project list.
+FREE_TEXT_EMPLOYEE_CODES = {"JHS1562"}
+
+
+def _is_free_text_employee(emp_code: str, partner_code: str) -> bool:
+    return (
+        (partner_code or "").strip().upper() == FREE_TEXT_PARTNER_CODE
+        or (emp_code or "").strip().upper() in FREE_TEXT_EMPLOYEE_CODES
+    )
+
 # Locations that mean "not a working day" — lunch time / project code aren't
 # applicable for rows marked with these.
 DAY_OFF_LOCATIONS = {"Leave", "PHY", "Week Off"}
@@ -416,7 +428,7 @@ async def submit_timesheet(
     # project in their assigned list) is exempt from the PL-prefix rule too,
     # but must have its Project Code literally set to "Other".
     submit_partner_code = (submit_employee.get("PartnerEmpCode", "") if submit_employee else "").strip().upper()
-    if submit_partner_code != FREE_TEXT_PARTNER_CODE:
+    if not _is_free_text_employee(emp_id, submit_partner_code):
         code_errors = []
         for i, entry in enumerate(validation_entries):
             if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
@@ -457,7 +469,7 @@ async def submit_timesheet(
     is_tl = bool(reporting_managers_collection.find_one({"ReportingEmpCode": emp_id.strip().upper()}))
     employee = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()}, {"_id": 0, "PartnerEmpCode": 1})
     partner_code = (employee.get("PartnerEmpCode", "") if employee else "").strip().upper()
-    if is_tl and partner_code != FREE_TEXT_PARTNER_CODE:
+    if is_tl and not _is_free_text_employee(emp_id, partner_code):
         plan_cache = {}
         plan_errors = []
         for entry in validation_entries:
