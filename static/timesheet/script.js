@@ -30,6 +30,9 @@ let employeeProjects = {
 // of dropdowns, everywhere (table rows, the entry modal, and the downloaded
 // template). Everything else about them works exactly like any other user.
 const FREE_TEXT_PARTNER_CODE = "JHS01";
+// Individual employees exempted the same way regardless of their actual
+// partner — keep in sync with FREE_TEXT_EMPLOYEE_CODES in backend/timesheet/router.py.
+const FREE_TEXT_EMPLOYEE_CODES = new Set(["JHS1562"]);
 window._freeTextClientProject = false;
 
 // Shared-services (JHS01) employees pick Project Code from this fixed list
@@ -149,7 +152,8 @@ async function loadEmployeeProjects() {
     if (res.ok) {
       employeeProjects = await res.json();
       window._freeTextClientProject =
-        (employeeProjects.partner_emp_code || "").trim().toUpperCase() === FREE_TEXT_PARTNER_CODE;
+        (employeeProjects.partner_emp_code || "").trim().toUpperCase() === FREE_TEXT_PARTNER_CODE ||
+        FREE_TEXT_EMPLOYEE_CODES.has((loggedInEmployeeId || "").trim().toUpperCase());
       console.log("✅ Employee projects loaded:", employeeProjects);
        console.log("📊 Clients:", employeeProjects.clients);
   console.log("📊 Projects by client:", employeeProjects.projects_by_client);
