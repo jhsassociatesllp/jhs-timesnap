@@ -381,6 +381,18 @@
         if (res.ok) apprAccess = await res.json();
       } catch(e) {}
 
+      // Managers / TLs / Partners always get into KRA (to approve their team's KRAs),
+      // even when they are not eligible to fill their own.
+      try {
+        const rr = await fetch('/appraisal/my_role', {headers:{'Authorization':`Bearer ${token}`}});
+        if (rr.ok) {
+          const rd = await rr.json();
+          if (rd.role === 'tl' || rd.role === 'partner' || rd.isTl) {
+            apprAccess = { ...(apprAccess || {}), approver: true };
+          }
+        }
+      } catch(e) {}
+
       // Check HR Policy Quiz admin access
       let hrQuizAccess = false;
       try {
@@ -417,7 +429,8 @@
       grid.innerHTML += CARD_CB;
 
       // KRA
-      grid.innerHTML += buildAppraisalCard(apprAccess?.eligible || false, apprAccess?.reason || '');
+      const apprOpen = !!(apprAccess?.eligible || apprAccess?.approver);
+      grid.innerHTML += buildAppraisalCard(apprOpen, apprAccess?.eligible ? '' : (apprAccess?.approver ? 'Team KRA approvals' : (apprAccess?.reason || '')));
 
       // Quality Audit — only if user has access
       if (qaAccess?.has_access) {

@@ -129,8 +129,72 @@ def _get_partner_for_employee(emp_id: str) -> Optional[str]:
 def _employees_under_tl(tl_id: str) -> list[dict]:
     return list(employee_details_collection.find(
         {"ReportingEmpCode": tl_id.strip().upper()},
-        {"EmpID": 1, "Emp Name": 1, "Designation Name": 1}
+        {"EmpID": 1, "Emp Name": 1, "Designation Name": 1, "PartnerEmpCode": 1}
     ))
+
+
+# ── Approval routing (Manager → Partner) ─────────────────────────────────────
+# Identity is compared on the employee codes (EmpID / ReportingEmpCode /
+# PartnerEmpCode) — never on display names.
+
+def _norm(code) -> str:
+    return (code or "").strip().upper()
+
+
+def _approval_route(emp_id: str) -> dict:
+    """Manager / Partner codes for an employee and whether ONE approval suffices.
+
+    single_stage is True when the Reporting Manager and the Partner are the same
+    person, or when the employee has no Reporting Manager (nobody to do the
+    manager stage, so it must not block the Partner forever).
+    """
+    emp = employee_details_collection.find_one(
+        {"EmpID": _norm(emp_id)}, {"ReportingEmpCode": 1, "PartnerEmpCode": 1}
+    ) or {}
+    mgr, partner = _norm(emp.get("ReportingEmpCode")), _norm(emp.get("PartnerEmpCode"))
+    return {"manager": mgr, "partner": partner, "single_stage": (not mgr) or mgr == partner}
+
+
+def _partner_stage_reached(status: str, single_stage: bool) -> bool:
+    """A Partner may see/act on a KRA only once the manager stage is complete
+    (TL_approved), or from the start when a single approval is enough."""
+    if status in ("TL_approved", "PnD_approved", "PnD_rejected"):
+        return True
+    return status == "submitted" and single_stage
+
+
+def _load_record(record_id: str) -> dict:
+    try:
+        oid = ObjectId(record_id)
+    except Exception:
+        raise HTTPException(400, "Invalid record id")
+    record = appraisal_collection.find_one({"_id": oid})
+    if not record:
+        raise HTTPException(404, "Record not found")
+    return record
+
+
+def _assert_is_manager_of(user: str, record: dict) -> dict:
+    """403 unless `user` is the record employee's Reporting Manager (any role)."""
+    route = _approval_route(record["employeeId"])
+    if not route["manager"] or route["manager"] != _norm(user):
+        raise HTTPException(403, "You are not the Reporting Manager for this employee")
+    if record.get("status") == "draft":
+        raise HTTPException(403, "KRA has not been submitted")
+    return route
+
+
+def _assert_is_partner_of(user: str, record: dict, *, allow_admin_read: bool = False) -> dict:
+    """403 unless `user` is the employee's Partner AND the manager stage is done
+    (or unnecessary). Admins may optionally get read-only access."""
+    route = _approval_route(record["employeeId"])
+    if route["partner"] and route["partner"] == _norm(user):
+        if not _partner_stage_reached(record.get("status"), route["single_stage"]):
+            raise HTTPException(403, "Reporting Manager approval is pending; Partner access is not yet available")
+        return route
+    if allow_admin_read and _is_admin(user):
+        return route
+    raise HTTPException(403, "You are not the Partner for this employee")
 
 
 def _employees_under_partner(partner_id: str) -> list[dict]:
@@ -141,12 +205,15 @@ def _employees_under_partner(partner_id: str) -> list[dict]:
 
 
 def _tls_under_partner(partner_id: str) -> list[str]:
+    """Managers among this partner's own employees (their KRAs are shown in the
+    'TLs / Managers' group). Restricted to the partner's hierarchy."""
     emps = _employees_under_partner(partner_id)
+    in_scope = {e["EmpID"].upper() for e in emps}
     tl_codes = set()
     for e in emps:
-        rc = e.get("ReportingEmpCode", "")
-        if rc:
-            tl_codes.add(rc.upper())
+        rc = (e.get("ReportingEmpCode", "") or "").upper()
+        if rc and rc in in_scope:
+            tl_codes.add(rc)
     return list(tl_codes)
 
 
@@ -345,6 +412,7 @@ async def get_my_role(current_user: str = Depends(get_current_user)):
     return {
         "role":        role,
         "isAdmin":     is_admin,   # ← NEW: frontend uses this for extra tabs
+        "isTl":        _is_tl(current_user),   # has direct reports → Manager approval tabs
         "empId":       current_user.upper(),
         "name":        emp.get("Emp Name", "") if emp else "",
         "designation": emp.get("Designation Name", "") if emp else "",
@@ -814,7 +882,8 @@ def _build_pipeline(status, tl_name, partner_name, tl_is_partner):
 
     levels = [
         {"label": "Self Submission", "actor": "You",           "state": _step_state("submitted")},
-        {"label": "TL Approval",     "actor": tl_name or "TL", "state": _step_state("TL_approved", "TL_rejected")},
+        {"label": "Manager & Partner Approval" if tl_is_partner else "TL Approval",
+         "actor": tl_name or "TL", "state": _step_state("TL_approved", "TL_rejected")},
     ]
     if not tl_is_partner:
         levels.append(
@@ -835,7 +904,12 @@ async def tl_pending(quarter_id: Optional[str] = None, current_user: str = Depen
     if not qid:
         return {"success": True, "data": []}
     emps = _employees_under_tl(current_user)
-    emp_ids = [e["EmpID"].upper() for e in emps]
+    me = current_user.strip().upper()
+    # Manager == Partner for an employee → one approval only. A Partner sees
+    # that KRA once, in their Partner Pending list, so leave it out here.
+    skip_single = _is_partner(me)
+    emp_ids = [e["EmpID"].upper() for e in emps
+               if not (skip_single and _norm(e.get("PartnerEmpCode")) == me)]
     records = list(appraisal_collection.find({
         "employeeId": {"$in": emp_ids},
         "quarter_id": qid,
@@ -884,20 +958,8 @@ async def tl_rejected(quarter_id: Optional[str] = None, current_user: str = Depe
 @router.get("/tl/record/{record_id}")
 async def tl_get_record(record_id: str, current_user: str = Depends(get_current_user)):
     _require_tl_or_above(current_user)
-    try:
-        oid = ObjectId(record_id)
-    except Exception:
-        raise HTTPException(400, "Invalid record id")
-    record = appraisal_collection.find_one({"_id": oid})
-    if not record:
-        raise HTTPException(404, "Record not found")
-
-    role = _resolve_role(current_user)
-    if role == "tl":
-        emps    = _employees_under_tl(current_user)
-        emp_ids = [e["EmpID"].upper() for e in emps]
-        if record["employeeId"].upper() not in emp_ids:
-            raise HTTPException(403, "Not your employee")
+    record = _load_record(record_id)
+    _assert_is_manager_of(current_user, record)
 
     emp         = employee_details_collection.find_one({"EmpID": record["employeeId"].upper()})
     designation = emp.get("Designation Name", "") if emp else ""
@@ -918,14 +980,9 @@ async def tl_action(
     if data.action not in ("approve", "reject"):
         raise HTTPException(400, "action must be 'approve' or 'reject'")
 
-    try:
-        oid = ObjectId(record_id)
-    except Exception:
-        raise HTTPException(400, "Invalid record id")
-
-    record = appraisal_collection.find_one({"_id": oid})
-    if not record:
-        raise HTTPException(404, "Record not found")
+    record = _load_record(record_id)
+    oid    = record["_id"]
+    route  = _assert_is_manager_of(current_user, record)
     if record["status"] not in ("submitted", "TL_rejected"):
         raise HTTPException(400, f"Cannot action a record with status '{record['status']}'")
 
@@ -935,14 +992,11 @@ async def tl_action(
         if not rec_cycle or rec_cycle.get("status") != "live":
             raise HTTPException(403, "This quarter is closed; approvals are disabled.")
 
-    role = _resolve_role(current_user)
-    if role == "tl":
-        emps    = _employees_under_tl(current_user)
-        emp_ids = [e["EmpID"].upper() for e in emps]
-        if record["employeeId"].upper() not in emp_ids:
-            raise HTTPException(403, "Not your employee")
-
     new_status = "TL_approved" if data.action == "approve" else "TL_rejected"
+    # Manager == Partner: this single approval is the final one (no second
+    # Partner task is created).
+    if data.action == "approve" and route["single_stage"] and route["partner"]:
+        new_status = "PnD_approved"
     now_iso    = datetime.utcnow().isoformat()
 
     update = {
@@ -969,6 +1023,16 @@ async def tl_action(
     if data.remarks:
         update["tlRemarks"] = data.remarks
 
+    if new_status == "PnD_approved":
+        update["pndActionBy"]   = current_user.upper()
+        update["pndActionAt"]   = now_iso
+        update["pnd_responses"] = update["tl_responses"]
+        update["pndScore"]      = update["tlScore"]
+        update["pndMaxScore"]   = update["tlMaxScore"]
+        update["pndPercentage"] = update["tlPercentage"]
+        if data.remarks:
+            update["pndRemarks"] = data.remarks
+
     appraisal_collection.update_one({"_id": oid}, {"$set": update})
     return {"success": True, "message": f"Record {new_status}", "status": new_status}
 
@@ -991,65 +1055,38 @@ async def tl_action(
 #         "percentage": 1, "score": 1, "maxScore": 1}))
 #     return [_serialize(r) for r in records]
 
-def _pnd_pending_employees(partner_id: str, qid: str):
-    emps     = _employees_under_partner(partner_id)
-    emp_ids  = [e["EmpID"].upper() for e in emps]
-    tl_codes = set(
-        e.get("ReportingEmpCode", "").upper()
-        for e in emps if e.get("ReportingEmpCode")
-    )
-    emp_ids_excl_tls = [eid for eid in emp_ids if eid not in tl_codes]
+def _pnd_pending_records(partner_id: str, qid: str):
+    """Records awaiting THIS partner's approval, split (employees, tls).
 
-    # Employees whose TL IS the partner themselves — no separate TL step needed
-    direct_ids = [
-        e["EmpID"].upper() for e in emps
-        if e.get("ReportingEmpCode", "").upper() == partner_id.strip().upper()
-        and e["EmpID"].upper() not in tl_codes
-    ]
-    # Everyone else must pass through TL approval first
-    indirect_ids = [eid for eid in emp_ids_excl_tls if eid not in direct_ids]
+    Only employees in the partner's hierarchy (PartnerEmpCode) are considered.
+    A KRA is Partner-pending only after the Reporting Manager approved it
+    (TL_approved), or straight from 'submitted' when Manager == Partner (one
+    approval). 'submitted' with a different manager stays in the Manager stage.
+    """
+    emps    = _employees_under_partner(partner_id)
+    emp_ids = [e["EmpID"].upper() for e in emps]
+    me      = partner_id.strip().upper()
+    single  = {e["EmpID"].upper() for e in emps
+               if (not _norm(e.get("ReportingEmpCode")))
+               or _norm(e.get("ReportingEmpCode")) == me}
+    tl_ids  = set(_tls_under_partner(partner_id))
 
     projection = {
         "_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
         "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
         "percentage": 1, "score": 1, "maxScore": 1,
     }
-
-    records = []
-    if direct_ids:
-        records += list(appraisal_collection.find(
-            {"employeeId": {"$in": direct_ids}, "quarter_id": qid, "status": "submitted"},
-            projection
-        ))
-    if indirect_ids:
-        records += list(appraisal_collection.find(
-            {"employeeId": {"$in": indirect_ids}, "quarter_id": qid, "status": "TL_approved"},
-            projection
-        ))
-
-    return [_serialize(r) for r in records]
-
-
-# def _pnd_pending_tls(partner_id: str, p: str):
-#     tl_codes = _tls_under_partner(partner_id)
-#     records = list(appraisal_collection.find({
-#         "employeeId": {"$in": tl_codes},
-#         "period":     p,
-#         "status":     "submitted",
-#     }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
-#         "status": 1, "updatedAt": 1, "selfPercentage": 1, "percentage": 1, "score": 1, "maxScore": 1}))
-#     return [_serialize(r) for r in records]
-
-def _pnd_pending_tls(partner_id: str, qid: str):
-    tl_codes = _tls_under_partner(partner_id)
     records = list(appraisal_collection.find({
-        "employeeId": {"$in": tl_codes},
+        "employeeId": {"$in": emp_ids},
         "quarter_id": qid,
-        "status":     {"$in": ["submitted", "TL_approved"]},  # ← add TL_approved
-    }, {"_id": 1, "employeeId": 1, "employeeName": 1, "designation": 1,
-        "status": 1, "updatedAt": 1, "selfPercentage": 1, "tlPercentage": 1,
-        "percentage": 1, "score": 1, "maxScore": 1}))
-    return [_serialize(r) for r in records]
+        "status":     {"$in": ["submitted", "TL_approved"]},
+    }, projection))
+    records = [r for r in records
+               if r["status"] == "TL_approved" or r["employeeId"].upper() in single]
+
+    emps_out = [_serialize(r) for r in records if r["employeeId"].upper() not in tl_ids]
+    tls_out  = [_serialize(r) for r in records if r["employeeId"].upper() in tl_ids]
+    return emps_out, tls_out
 
 
 @router.get("/pnd/pending")
@@ -1058,11 +1095,8 @@ async def pnd_pending(quarter_id: Optional[str] = None, current_user: str = Depe
     qid = _resolve_quarter_id(quarter_id)
     if not qid:
         return {"success": True, "employees": [], "tls": []}
-    return {
-        "success":   True,
-        "employees": _pnd_pending_employees(current_user, qid),
-        "tls":       _pnd_pending_tls(current_user, qid),
-    }
+    employees, tls = _pnd_pending_records(current_user, qid)
+    return {"success": True, "employees": employees, "tls": tls}
 
 
 @router.get("/pnd/approved")
@@ -1140,13 +1174,8 @@ async def pnd_rejected(quarter_id: Optional[str] = None, current_user: str = Dep
 @router.get("/pnd/record/{record_id}")
 async def pnd_get_record(record_id: str, current_user: str = Depends(get_current_user)):
     _require_partner_or_above(current_user)
-    try:
-        oid = ObjectId(record_id)
-    except Exception:
-        raise HTTPException(400, "Invalid record id")
-    record = appraisal_collection.find_one({"_id": oid})
-    if not record:
-        raise HTTPException(404, "Record not found")
+    record = _load_record(record_id)
+    _assert_is_partner_of(current_user, record, allow_admin_read=True)
 
     emp         = employee_details_collection.find_one({"EmpID": record["employeeId"].upper()})
     designation = emp.get("Designation Name", "") if emp else ""
@@ -1167,14 +1196,10 @@ async def pnd_action(
     if data.action not in ("approve", "reject"):
         raise HTTPException(400, "action must be 'approve' or 'reject'")
 
-    try:
-        oid = ObjectId(record_id)
-    except Exception:
-        raise HTTPException(400, "Invalid record id")
-
-    record = appraisal_collection.find_one({"_id": oid})
-    if not record:
-        raise HTTPException(404, "Record not found")
+    record = _load_record(record_id)
+    oid    = record["_id"]
+    # Must be this employee's Partner AND Manager stage complete (or Manager == Partner).
+    _assert_is_partner_of(current_user, record)
 
     allowed_statuses = ("TL_approved", "submitted", "PnD_rejected")
     if record["status"] not in allowed_statuses:
@@ -1587,6 +1612,11 @@ async def analysis_kra_detail(emp_id: str, quarter_id: Optional[str] = None, cur
     if not record:
         raise HTTPException(404, "No KRA record found for this employee.")
 
+    # Admins see everything (Analysis); a non-admin Partner only their own
+    # hierarchy and only once the Manager stage is complete.
+    if not is_admin:
+        _assert_is_partner_of(current_user, record)
+
     emp         = employee_details_collection.find_one({"EmpID": emp_id.strip().upper()})
     designation = emp.get("Designation Name", "") if emp else record.get("designation", "")
     questions   = get_questions_for_employee(emp_id, designation)
@@ -1622,5 +1652,17 @@ async def review_appraisal(emp_id: str, current_user: str = Depends(get_current_
         )
     if not record:
         raise HTTPException(404, "No appraisal found for this employee.")
+
+    me    = _norm(current_user)
+    route = _approval_route(record["employeeId"])
+    allowed = (
+        me == _norm(record["employeeId"])
+        or _is_admin(me)
+        or (route["manager"] == me and record.get("status") != "draft")
+        or (route["partner"] == me
+            and _partner_stage_reached(record.get("status"), route["single_stage"]))
+    )
+    if not allowed:
+        raise HTTPException(403, "Unauthorized")
     result = _serialize(record)
     return {"success": True, **result}

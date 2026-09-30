@@ -259,6 +259,8 @@ const H = () => ({"Content-Type":"application/json",Authorization:`Bearer ${TOK}
 // ── Global state ──────────────────────────────────────────────────────────────
 let _role       = "employee";  // natural role: employee | tl | partner | admin
 let _isAdmin    = false;       // true if user is in admin list (regardless of natural role)
+let _eligible   = false;       // eligible to fill own KRA this quarter
+let _isTl       = false;       // has direct reports → Manager approval tabs
 let _period     = "";
 let _cycleOpen  = false;       // whether the KRA submission window is open
 let _modalRecord = null, _editMode = false, _editedAnswers = {};
@@ -272,15 +274,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sv = await fetch(`${API}/verify_session`,{method:"POST",headers:H()});
     if (!sv.ok) throw new Error("Session invalid");
 
-    const [rr, pr, cr] = await Promise.all([
+    const [rr, pr, cr, er] = await Promise.all([
       fetch(`${API}/appraisal/my_role`,{headers:H()}),
       fetch(`${API}/appraisal/period`,{headers:H()}),
       fetch(`${API}/appraisal/cycle_status`,{headers:H()}),
+      fetch(`${API}/appraisal/eligibility/${EID}`,{headers:H()}),
     ]);
     const rd = await rr.json(), pd = await pr.json(), cd = await cr.json();
+    try { _eligible = !!(await er.json()).eligible; } catch(e) { _eligible = false; }
 
     _role      = rd.role    || "employee";
     _isAdmin   = rd.isAdmin || false;   // ← comes from backend now
+    _isTl      = !!rd.isTl;
     _period    = pd.period  || "";
     _cycleOpen = !!cd.open;
 
@@ -440,6 +445,11 @@ function _renderRoleBadge() {
   el.className   = `role-badge ${clsMap[_role] || ""}`;
 }
 
+// Separate Manager tabs are for TLs only. A Partner who is also someone's Reporting Manager
+// gets ONE Pending / Approved / Rejected set with a Manager section merged into each
+// (where Manager == Partner for an employee, that KRA appears only in the Partner section).
+function _showMgrTabs() { return _role === "tl"; }
+
 // ── Nav builder ───────────────────────────────────────────────────────────────
 /*
   Nav logic by role + isAdmin:
@@ -468,7 +478,7 @@ function _buildNav() {
 
   // ── Own KRA tabs (Form / History / Status) ──
   // Show for: employee, tl, pure admin, AND admin+partner (senior partner)
-  const showOwnKRA = (_role !== "partner") || _isAdmin;
+  const showOwnKRA = _role !== "partner" && (_role === "employee" || _role === "admin" || _isAdmin || _eligible);
   if (showOwnKRA) {
     links.push(
       `<a href="#" onclick="showSection('form')"    id="nt_form"   ><i class="fas fa-file-alt"></i> Form</a>`,
@@ -478,11 +488,12 @@ function _buildNav() {
   }
 
   // ── TL approval tabs ──
-  if (_role === "tl") {
+  if (_showMgrTabs()) {
+    const pre = "";
     links.push(
-      `<a href="#" onclick="showSection('tl_pending')"  id="nt_tl_pending" ><i class="fas fa-clock"></i> Pending</a>`,
-      `<a href="#" onclick="showSection('tl_approved')" id="nt_tl_approved"><i class="fas fa-check-circle"></i> Approved</a>`,
-      `<a href="#" onclick="showSection('tl_rejected')" id="nt_tl_rejected"><i class="fas fa-times-circle"></i> Rejected</a>`,
+      `<a href="#" onclick="showSection('tl_pending')"  id="nt_tl_pending" ><i class="fas fa-clock"></i> ${pre}Pending</a>`,
+      `<a href="#" onclick="showSection('tl_approved')" id="nt_tl_approved"><i class="fas fa-check-circle"></i> ${pre}Approved</a>`,
+      `<a href="#" onclick="showSection('tl_rejected')" id="nt_tl_rejected"><i class="fas fa-times-circle"></i> ${pre}Rejected</a>`,
     );
   }
 
@@ -541,7 +552,7 @@ function _buildTabContents() {
   }
 
   // Own KRA sections — same condition as nav
-  const showOwnKRA = (_role !== "partner") || _isAdmin;
+  const showOwnKRA = _role !== "partner" && (_role === "employee" || _role === "admin" || _isAdmin || _eligible);
   if (showOwnKRA) {
     secs.push(
       `<div class="tab-content" id="sec_form">
@@ -553,7 +564,7 @@ function _buildTabContents() {
   }
 
   // TL sections
-  if (_role === "tl") {
+  if (_showMgrTabs()) {
     secs.push(
       `<div class="tab-content" id="sec_tl_pending"  style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-clock"></i> Pending Approvals</p><div id="tl_pending_content"></div></div></div>`,
       `<div class="tab-content" id="sec_tl_approved" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-check-circle"></i> Approved</p><div id="tl_approved_content"></div></div></div>`,
@@ -589,10 +600,11 @@ function _buildTabContents() {
   c.innerHTML = secs.join("\n");
 
   // Default section per role
+  // Approvers who cannot fill their own KRA land on their approvals list.
   const defaultSection = {
     employee: "form",
-    tl:       "form",
-    partner:  _isAdmin ? "form" : "pnd_pending",   // senior partner lands on Form
+    tl:       _eligible ? "form" : "tl_pending",
+    partner:  "pnd_pending",
     admin:    "analysis",
   }[_role] || "form";
 
@@ -1272,6 +1284,17 @@ function _buildActions(r, ctx) {
 }
 
 // ── PnD loaders ───────────────────────────────────────────────────────────────
+// Partner who is also a Reporting Manager: append the "as Manager" list to the same tab.
+async function _mgrSection(kind, ctx) {
+  if (!(_role === "partner" && _isTl)) return "";
+  try {
+    const d = await (await fetch(`${API}/appraisal/tl/${kind}${_qs()}`, {headers:H()})).json();
+    const rows = d.data || [];
+    return `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-user-check"></i> As Reporting Manager <span class="count-badge">${rows.length}</span></div>`
+      + (rows.length ? _buildApprovalTable(rows, ctx) : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No records</div>`);
+  } catch { return ""; }
+}
+
 async function loadPNDPending() {
   const el = document.getElementById("pnd_pending_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
@@ -1280,7 +1303,8 @@ async function loadPNDPending() {
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_pending_tl") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No TL appraisals pending</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
-    html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_pending_emp") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No employees ready (awaiting TL approval)</div>`;
+    html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_pending_emp") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No employees ready (awaiting Manager approval)</div>`;
+    html += await _mgrSection("pending", "tl_pending");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -1294,6 +1318,7 @@ async function loadPNDApproved() {
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_approved") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
     html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_approved") : `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += await _mgrSection("approved", "tl_approved");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -1307,6 +1332,7 @@ async function loadPNDRejected() {
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_rejected") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
     html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_rejected") : `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += await _mgrSection("rejected", "tl_rejected");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -1320,7 +1346,7 @@ async function tlAction(rid, action) {
     const d = await r.json();
     if (!d.success) throw new Error(d.detail||"Failed");
     showPopup(d.message);
-    ["tl_pending","tl_approved","tl_rejected"].forEach(k => _loaded.delete(k));
+    ["tl_pending","tl_approved","tl_rejected","pnd_pending","pnd_approved","pnd_rejected"].forEach(k => _loaded.delete(k));
     const sec = document.querySelector(".tab-content.active");
     if (sec) { const n = sec.id.replace("sec_",""); _loaded.delete(n); _loadSection(n); }
   } catch(e) { showPopup(e.message, true); } finally { hideLoading(); }
@@ -1435,7 +1461,7 @@ async function modalTLAction(rid, action) {
     const r = await fetch(`${API}/appraisal/tl/action/${rid}`,{method:"POST",headers:H(),body:JSON.stringify({action,tl_responses:_editedAnswers,remarks:rem})});
     const d = await r.json(); if (!d.success) throw new Error(d.detail||"Failed");
     showPopup(d.message);
-    ["tl_pending","tl_approved","tl_rejected"].forEach(k => _loaded.delete(k));
+    ["tl_pending","tl_approved","tl_rejected","pnd_pending","pnd_approved","pnd_rejected"].forEach(k => _loaded.delete(k));
     closeModal();
     const sec = document.querySelector(".tab-content.active"); if (sec) { const n=sec.id.replace("sec_",""); _loaded.delete(n); _loadSection(n); }
   } catch(e) { showPopup(e.message, true); } finally { hideLoading(); }
