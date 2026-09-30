@@ -254,6 +254,13 @@ async def save_draft(
     if metadata:
         metadata = _trusted_metadata(current_user, metadata)
 
+    # Entries carrying an employee ID (Excel uploads do) must be the caller's own.
+    me = (current_user or "").strip().upper()
+    for e in entries:
+        eid = str((e or {}).get("employeeId") or "").strip().upper()
+        if eid and eid != me:
+            raise HTTPException(403, f"Entries belong to {eid}, but you are logged in as {me}")
+
     # Assign IDs to entries
     new_entries = []
     for e in entries:

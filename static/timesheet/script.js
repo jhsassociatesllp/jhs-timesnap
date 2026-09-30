@@ -4742,15 +4742,20 @@ async function handleExcelUpload(event) {
                 return;
             }
 
-            // The file must belong to the logged-in employee — otherwise one
-            // person's timesheet gets saved (and later submitted) under another's ID.
+            // Every real entry row (rows with a Date; blank template buffer rows are
+            // ignored) must carry the logged-in employee's own Employee ID —
+            // otherwise one person's timesheet gets saved under another's ID.
             const me = String(loggedInEmployeeId || "").trim().toUpperCase();
-            const foreignIds = [...new Set(
-                jsonData.map(r => String(r['Employee ID'] ?? '').trim().toUpperCase())
-                        .filter(id => id && id !== me)
-            )];
-            if (foreignIds.length > 0) {
-                showPopup(`This Excel belongs to ${foreignIds.join(', ')}, but you are logged in as ${me}. Please log in with your own ID to upload it.`, true);
+            const badRows = [];
+            jsonData.forEach((r, i) => {
+                if (!String(r['Date'] ?? '').trim()) return;
+                const id = String(r['Employee ID'] ?? '').trim().toUpperCase();
+                if (id !== me) badRows.push({ row: i + 2, id: id || '(blank)' });
+            });
+            if (badRows.length > 0) {
+                const ids = [...new Set(badRows.map(b => b.id))].join(', ');
+                const rows = badRows.slice(0, 5).map(b => b.row).join(', ') + (badRows.length > 5 ? ` and ${badRows.length - 5} more` : '');
+                showPopup(`Upload rejected: Employee ID in the Excel (${ids}) does not match your login (${me}). Check row(s) ${rows}.`, true);
                 event.target.value = "";
                 return;
             }
