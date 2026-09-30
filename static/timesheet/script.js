@@ -4742,6 +4742,19 @@ async function handleExcelUpload(event) {
                 return;
             }
 
+            // The file must belong to the logged-in employee — otherwise one
+            // person's timesheet gets saved (and later submitted) under another's ID.
+            const me = String(loggedInEmployeeId || "").trim().toUpperCase();
+            const foreignIds = [...new Set(
+                jsonData.map(r => String(r['Employee ID'] ?? '').trim().toUpperCase())
+                        .filter(id => id && id !== me)
+            )];
+            if (foreignIds.length > 0) {
+                showPopup(`This Excel belongs to ${foreignIds.join(', ')}, but you are logged in as ${me}. Please log in with your own ID to upload it.`, true);
+                event.target.value = "";
+                return;
+            }
+
             showLoading("Uploading Excel data");
             const toStr = v =>
               v instanceof Date

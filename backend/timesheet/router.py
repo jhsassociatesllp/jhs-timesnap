@@ -219,6 +219,20 @@ def _get_or_create_payroll(payrolls: list, cycle_id: str, cycle_label: str) -> d
     return new_payroll
 
 
+def _trusted_metadata(emp_id: str, meta: dict) -> dict:
+    """Metadata with the identity fields taken from Employee_details, never from
+    the client — otherwise a payload/Excel built for another person would be
+    stored (and shown to the approver) under this employee's ID."""
+    meta = dict(meta or {})
+    emp = employee_details_collection.find_one({"EmpID": (emp_id or "").strip().upper()})
+    if emp:
+        for key, src in (("employeeName", "Emp Name"), ("designation", "Designation Name"),
+                         ("partner", "Partner"), ("reportingManager", "ReportingEmpName")):
+            if emp.get(src):
+                meta[key] = emp[src]
+    return meta
+
+
 # ───────────────────────────── routes ────────────────────────────────────────
 
 @router.post("/save-draft")
@@ -237,6 +251,8 @@ async def save_draft(
     never block saving progress.
     """
     now_iso = datetime.utcnow().isoformat()
+    if metadata:
+        metadata = _trusted_metadata(current_user, metadata)
 
     # Assign IDs to entries
     new_entries = []
@@ -353,7 +369,7 @@ async def submit_timesheet(
         raise HTTPException(404, "No draft found for this cycle")
 
     emp_id = current_user
-    meta = temp_payroll.get("metadata") or metadata or {}
+    meta = _trusted_metadata(current_user, temp_payroll.get("metadata") or metadata or {})
     temp_entries = _get_payroll_entries(temp_payroll)
 
     # Keep not-applicable time fields consistently empty in both the submitted
