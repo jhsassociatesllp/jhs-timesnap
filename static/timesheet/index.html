@@ -35,6 +35,9 @@
         <a href="#" id="rejectedBtn" class="manager-only" onclick="showSection('rejected')">
           <i class="fas fa-times-circle"></i> Rejected
         </a>
+        <a href="#" id="calendarBtn" onclick="openLdCalendar(); return false;">
+          <i class="fas fa-calendar-days"></i> Calendar
+        </a>
         <!-- Back to modules -->
         <a href="/modules">
           <i class="fas fa-th-large"></i> Modules
@@ -277,6 +280,7 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <!-- Timesheet-specific script -->
     <script src="/static/timesheet/script.js"></script>
+    <script src="/static/timesheet/calendar-modal.js"></script>
       <script src="/static/chatbot/chat-core.js"></script>
       <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
