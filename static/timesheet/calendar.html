@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JHS Associates LLP — L&D Calendar FY 2026–27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#12203d;
+  --ink-soft:#3b4a68;
+  --paper:#f5f4ef;
+  --paper-2:#ffffff;
+  --line:#e2ded2;
+  --muted:#6c7280;
+
+  --c-holiday:#b3271a;
+  --c-activity:#a9740c;
+  --c-online:#5b3e96;
+  --c-physical:#b9440e;
+  --c-hof:#9c1247;
+  --c-star:#1d5b9b;
+  --c-chai:#0e6e5f;
+  --c-extra:#4b5a63;
+  --c-knowledge:#0b7a9e;
+  --c-excellencia:#2f7d32;
+
+  --radius: 14px;
+  box-sizing:border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:inherit;}
+html{scroll-padding-top: env(safe-area-inset-top, 0px); scroll-behavior:smooth;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#eef1f7; --ink-soft:#b7bfd1; --paper:#0f1420; --paper-2:#161d2c; --line:#2a3346; --muted:#8a92a6;
+    --c-holiday:#ff8a75; --c-activity:#e8b23d; --c-online:#b39ce6; --c-physical:#ff9a63; --c-hof:#f477a8; --c-star:#7cb2f0; --c-chai:#5fd6bd; --c-extra:#a6b0bd; --c-knowledge:#5ac8e8; --c-excellencia:#6fd47a;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#eef1f7; --ink-soft:#b7bfd1; --paper:#0f1420; --paper-2:#161d2c; --line:#2a3346; --muted:#8a92a6;
+  --c-holiday:#ff8a75; --c-activity:#e8b23d; --c-online:#b39ce6; --c-physical:#ff9a63; --c-hof:#f477a8; --c-star:#7cb2f0; --c-chai:#5fd6bd; --c-extra:#a6b0bd; --c-knowledge:#5ac8e8; --c-excellencia:#6fd47a;
+}
+
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;}
+a{color:inherit;}
+.wrap{max-width:1080px; margin:0 auto; padding:0 28px;}
+
+/* ============ HERO ============ */
+.hero{
+  background: linear-gradient(160deg, #101a30 0%, #16233f 55%, #1c2c4d 100%);
+  color:#f2f0e6;
+  padding: 48px 0 40px;
+  position:relative;
+  overflow:hidden;
+}
+.hero::before{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    radial-gradient(560px 320px at 88% -10%, rgba(200,150,30,0.18), transparent 60%),
+    radial-gradient(420px 260px at 8% 110%, rgba(14,110,95,0.20), transparent 60%);
+  pointer-events:none;
+}
+.hero .wrap{position:relative;}
+.brandrow{
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  margin-bottom:26px;
+}
+.brand{
+  font-family:'Fraunces',serif; font-weight:600; font-size:17px; letter-spacing:0.2px;
+  color:#f2f0e6;
+}
+.brand span{color:#c9a34a;}
+.today-chip{
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18);
+  padding:7px 14px; border-radius:100px; font-size:12.5px; color:#e9e6da;
+  cursor:pointer; transition:background .15s ease;
+}
+.today-chip:hover{background:rgba(255,255,255,0.14);}
+.today-dot{width:7px; height:7px; border-radius:50%; background:#5fd6bd; flex:none;}
+
+.hero h1{
+  font-family:'Fraunces',serif; font-weight:600; font-size:clamp(34px,5.4vw,58px);
+  line-height:1.04; margin:0 0 16px; letter-spacing:-0.5px; max-width:11ch;
+}
+.hero p.sub{
+  font-size:16.5px; line-height:1.55; max-width:52ch; color:#c9cadb; margin:0 0 34px;
+}
+.stats{display:flex; gap:38px; flex-wrap:wrap; border-top:1px solid rgba(255,255,255,0.14); padding-top:26px;}
+.stats > div{display:flex; flex-direction:column; gap:3px;}
+.stats strong{font-family:'Fraunces',serif; font-size:28px; font-weight:600; color:#f2f0e6;}
+.stats span{font-size:12.5px; color:#9fa4b8;}
+
+/* ============ RHYTHM ============ */
+.rhythm{padding:44px 0 8px;}
+.section-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;}
+.section-head h2{font-family:'Fraunces',serif; font-weight:600; font-size:23px; margin:0;}
+.section-head p{margin:0; font-size:13px; color:var(--muted); max-width:38ch;}
+
+.rhythm-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:14px;
+}
+@media(max-width:760px){.rhythm-grid{grid-template-columns:repeat(2,1fr);}}
+.rcard{
+  background:var(--paper-2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 16px 16px;
+}
+.rcard .ic{font-size:20px; margin-bottom:10px; display:block;}
+.rcard h3{margin:0 0 4px; font-size:14px; font-weight:700;}
+.rcard p{margin:0 0 12px; font-size:12px; color:var(--muted);}
+.weekmap{display:flex; gap:4px;}
+.weekmap i{
+  flex:1; height:8px; border-radius:3px; background:var(--line); display:block;
+}
+.weekmap i.on{background:var(--dot,#111);}
+
+/* ============ FILTERS ============ */
+.filters{padding:36px 0 0;}
+.chiprow{display:flex; flex-wrap:wrap; gap:8px;}
+.chip{
+  border:1px solid var(--line); background:var(--paper-2); color:var(--ink-soft);
+  font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:100px;
+  cursor:pointer; display:inline-flex; align-items:center; gap:7px; user-select:none;
+  transition:all .15s ease;
+}
+.chip .sw{width:9px; height:9px; border-radius:50%; flex:none;}
+.chip.active{background:var(--ink); border-color:var(--ink); color:var(--paper);}
+:root[data-theme="dark"] .chip.active, @media (prefers-color-scheme:dark){ .chip.active{color:var(--paper);} }
+.chip:hover{border-color:var(--ink-soft);}
+
+/* ============ MONTHS ============ */
+.months{padding:40px 0 8px;}
+.monthtabs{
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:14px; margin-bottom:6px;
+  scrollbar-width:thin;
+}
+.monthtabs::-webkit-scrollbar{height:5px;}
+.monthtabs::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+.mtab{
+  flex:none; padding:9px 16px; border-radius:10px; border:1px solid var(--line);
+  background:var(--paper-2); font-size:13px; font-weight:600; color:var(--ink-soft);
+  cursor:pointer; white-space:nowrap; position:relative;
+}
+.mtab.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+.mtab.istoday::after{
+  content:""; position:absolute; top:6px; right:7px; width:6px; height:6px; border-radius:50%;
+  background:#c9962a;
+}
+
+.calwrap{
+  background:var(--paper-2); border:1px solid var(--line); border-radius:18px; padding:22px;
+}
+.calhead{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px;}
+.calhead h3{font-family:'Fraunces',serif; font-size:22px; font-weight:600; margin:0;}
+.calhead .count{font-size:12.5px; color:var(--muted);}
+
+.dowrow{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px;}
+.dowrow div{font-size:10.5px; font-weight:700; letter-spacing:.4px; color:var(--muted); text-align:center; padding:4px 0;}
+
+.calgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+.day{
+  min-height:96px; border-radius:10px; padding:7px 7px 6px; background:var(--paper);
+  border:1px solid var(--line); display:flex; flex-direction:column; gap:4px;
+}
+.day.empty{background:transparent; border-color:transparent;}
+.day.weekend{background:color-mix(in srgb, var(--paper) 82%, #cbb35a 18%);}
+.day.today{border-color:#c9962a; box-shadow:0 0 0 1px #c9962a inset;}
+.daynum{font-size:12px; font-weight:700; color:var(--ink-soft);}
+.day.today .daynum{color:#a5760f;}
+.pill{
+  font-size:10px; line-height:1.25; font-weight:700; padding:3px 6px; border-radius:6px;
+  display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pilltime{font-size:9px; font-weight:500; opacity:.85; display:block; margin-top:-2px;}
+
+/* ============ AGENDA ============ */
+.agenda{padding:46px 0 8px;}
+.searchrow{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+.searchrow input{
+  flex:1; min-width:220px; padding:11px 16px; border-radius:10px; border:1px solid var(--line);
+  background:var(--paper-2); color:var(--ink); font-size:14px; font-family:inherit;
+}
+.searchrow input:focus{outline:2px solid #c9962a; outline-offset:1px;}
+.agendalist{border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--paper-2);}
+.arow{
+  display:grid; grid-template-columns:96px 20px 1fr auto; gap:14px; align-items:center;
+  padding:13px 18px; border-bottom:1px solid var(--line); font-size:13.5px;
+}
+.arow:last-child{border-bottom:none;}
+.arow .dt{font-weight:700; color:var(--ink-soft); font-size:12.5px;}
+.arow .dt small{display:block; font-weight:500; color:var(--muted); font-size:10.5px;}
+.arow .dot{width:9px; height:9px; border-radius:50%;}
+.arow .title{color:var(--ink);}
+.arow .cat{font-size:11px; color:var(--muted); text-align:right; white-space:nowrap;}
+.arow.hidden{display:none;}
+.emptystate{padding:30px; text-align:center; color:var(--muted); font-size:13.5px;}
+
+/* ============ NOTES ============ */
+.notes{padding:46px 0;}
+details{background:var(--paper-2); border:1px solid var(--line); border-radius:14px; padding:4px 18px;}
+summary{cursor:pointer; padding:16px 0; font-weight:700; font-size:14px; list-style:none; display:flex; align-items:center; justify-content:space-between;}
+summary::-webkit-details-marker{display:none;}
+summary::after{content:"+"; font-size:18px; font-weight:400; color:var(--muted);}
+details[open] summary::after{content:"–";}
+.notelist{padding:0 0 18px; font-size:13px; color:var(--ink-soft); line-height:1.6;}
+.notelist li{margin-bottom:10px;}
+.notelist b{color:var(--ink);}
+
+footer{padding:30px 0 50px; text-align:center; font-size:12px; color:var(--muted); border-top:1px solid var(--line); margin-top:20px;}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brandrow">
+      <div class="brand">JHS <span>Associates</span> LLP</div>
+      <div class="today-chip" id="todayChip"><span class="today-dot"></span><span id="todayText">Loading…</span></div>
+    </div>
+    <h1>Learning &amp;<br>Development Calendar</h1>
+    <p class="sub">A full year of training, recognition and shared moments — one steady rhythm running from April 2026 through March 2027.</p>
+    <div class="stats">
+      <div><strong id="statEvents">–</strong><span>scheduled events</span></div>
+      <div><strong>12</strong><span>months, one recurring pattern</span></div>
+      <div><strong id="statHolidays">–</strong><span>public holidays observed</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="rhythm wrap">
+  <div class="section-head">
+    <h2>The rhythm</h2>
+    <p>Four fixed slots repeat every month, so the same Wednesday and the same three Fridays always mean the same thing.</p>
+  </div>
+  <div class="rhythm-grid" id="rhythmGrid"></div>
+</section>
+
+<section class="filters wrap">
+  <div class="section-head">
+    <h2>Browse by type</h2>
+    <p>Filter the calendar and the list below by event category.</p>
+  </div>
+  <div class="chiprow" id="chipRow"></div>
+</section>
+
+<section class="months wrap">
+  <div class="section-head" style="margin-bottom:14px;">
+    <h2>Month by month</h2>
+  </div>
+  <div class="monthtabs" id="monthTabs"></div>
+  <div class="calwrap">
+    <div class="calhead">
+      <h3 id="calTitle" class="serif"></h3>
+      <span class="count" id="calCount"></span>
+    </div>
+    <div class="dowrow"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
+    <div class="calgrid" id="calGrid"></div>
+  </div>
+</section>
+
+<section class="agenda wrap">
+  <div class="section-head">
+    <h2>Full event list</h2>
+    <p>Every event for the year, chronologically — search or filter to find anything fast.</p>
+  </div>
+  <div class="searchrow">
+    <input type="text" id="searchBox" placeholder="Search by event name…">
+  </div>
+  <div class="agendalist" id="agendaList"></div>
+</section>
+
+<section class="notes wrap">
+  <details>
+    <summary>Data notes — how a few conflicts in the source file were resolved</summary>
+    <ul class="notelist" id="notesList"></ul>
+  </details>
+</section>
+
+<footer class="wrap">
+  JHS Associates LLP · Learning &amp; Development Calendar · FY 2026–27 · A companion Excel workbook holds the full reconciliation log.
+</footer>
+
+<script>
+const CAL_DATA = {"events": [{"d": "2026-04-03", "cat": "online", "title": "AI Training", "time": "5:00–6:30 PM"}, {"d": "2026-04-08", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-04-17", "cat": "physical", "title": "AI Training (Hands-on)", "time": "4:30–7:00 PM"}, {"d": "2026-04-24", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-05-01", "cat": "holiday", "title": "May Day (Maharashtra Day)"}, {"d": "2026-05-13", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-05-22", "cat": "online", "title": "Power BI Training", "time": "5:00–6:30 PM"}, {"d": "2026-05-28", "cat": "holiday", "title": "Bakri Id (Id-Ul-Zuha)"}, {"d": "2026-05-29", "cat": "online", "title": "NFRA Training – Tasnim Ma'am / Samad Dhanani", "time": "4:00–6:00 PM"}, {"d": "2026-05-29", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-06-04", "cat": "extra", "title": "Annual Client Meet"}, {"d": "2026-06-10", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-06-12", "cat": "online", "title": "Excel Training (External)", "time": "5:00–6:30 PM"}, {"d": "2026-06-19", "cat": "online", "title": "Power BI Session (Internal)", "time": "4:00–6:00 PM"}, {"d": "2026-06-19", "cat": "physical", "title": "Employee Power Dressing – Dipika Ma'am", "time": "4:30–7:00 PM"}, {"d": "2026-06-26", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": null, "cat": "activity", "title": "JHS Bollywood Day", "notes": "Date to be confirmed — June 2026"}, {"d": "2026-07-03", "cat": "online", "title": "Income Tax Laws", "time": "5:00–6:30 PM"}, {"d": "2026-07-08", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-07-17", "cat": "hof", "title": "🏆 Hall of Fame 1", "time": "4:30–7:00 PM"}, {"d": "2026-07-24", "cat": "physical", "title": "Employee Code of Conduct – Dipika Ma'am", "time": "4:30–7:00 PM"}, {"d": "2026-07-31", "cat": "activity", "title": "Annual Picnic – Shared Services"}, {"d": "2026-07-31", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-08-03", "cat": "extra", "title": "AI Fundamentals – S. Bhaskar"}, {"d": "2026-08-07", "cat": "online", "title": "AI Training", "time": "5:00–6:30 PM"}, {"d": "2026-08-12", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-08-14", "cat": "activity", "title": "JHS Memory Wall Day"}, {"d": "2026-08-15", "cat": "holiday", "title": "Independence Day"}, {"d": "2026-08-21", "cat": "physical", "title": "Power of Writing", "time": "4:30–7:00 PM"}, {"d": "2026-08-28", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-09-04", "cat": "online", "title": "Motivation – HIU Sir", "time": "5:00–6:30 PM"}, {"d": "2026-09-09", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-09-14", "cat": "holiday", "title": "Ganesh Chaturthi"}, {"d": "2026-09-18", "cat": "physical", "title": "Physical Training – Topic TBC", "time": "4:30–7:00 PM", "notes": "Source listed \"Finance for Non-Finance – Sahil Sir\", which duplicates the December online session — likely a copy-paste error. Please confirm actual topic."}, {"d": "2026-09-25", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-09-26", "cat": "activity", "title": "Pickle Ball Tournament"}, {"d": "2026-10-02", "cat": "online", "title": "IT Laws – Taher Sir", "time": "5:00–6:30 PM"}, {"d": "2026-10-14", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-10-16", "cat": "hof", "title": "🏆 Hall of Fame 2", "time": "4:30–7:00 PM"}, {"d": "2026-10-20", "cat": "holiday", "title": "Dasara (Dussehra)"}, {"d": "2026-10-30", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-11-06", "cat": "activity", "title": "Diwali Party"}, {"d": "2026-11-08", "cat": "holiday", "title": "Diwali Amavasya (Laxmi Pujan)"}, {"d": "2026-11-09", "cat": "holiday", "title": "Kartik Amavasya"}, {"d": "2026-11-10", "cat": "holiday", "title": "Diwali (Bali Pratipada)"}, {"d": "2026-11-11", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-11-20", "cat": "physical", "title": "Teamwork & Collaboration / Soft Skills – Dipika Bisawa", "time": "5:00–6:30 PM", "notes": "Source used two different labels for this session (\"Teamwork & Collaboration\" and \"Soft Skills Training\") — merged here; please confirm final title."}, {"d": "2026-11-27", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-12-04", "cat": "online", "title": "Finance for Non-Finance – Sahil Sir", "time": "5:00–6:30 PM"}, {"d": "2026-12-09", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2026-12-18", "cat": "physical", "title": "Physical Training – Topic TBC", "time": "4:30–7:00 PM"}, {"d": "2026-12-24", "cat": "activity", "title": "Christmas Party"}, {"d": "2026-12-25", "cat": "holiday", "title": "Christmas"}, {"d": "2026-12-31", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations", "notes": "Moved from the usual last Friday (25-Dec) because it falls on Christmas Day."}, {"d": "2027-01-01", "cat": "online", "title": "POSH Training", "time": "5:00–6:30 PM"}, {"d": "2027-01-13", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2027-01-15", "cat": "hof", "title": "🏆 Hall of Fame 3", "time": "4:30–7:00 PM"}, {"d": "2027-01-29", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": null, "cat": "activity", "title": "Annual Cricket", "notes": "Date to be confirmed — February 2027 (source file conflicted with Hall of Fame 3 date)."}, {"d": "2027-02-05", "cat": "online", "title": "Audit Planning & Quality Control", "time": "5:00–6:30 PM"}, {"d": "2027-02-10", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2027-02-19", "cat": "physical", "title": "Critical Thinking & Decision-Making", "time": "4:30–7:00 PM"}, {"d": "2027-02-26", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2027-03-05", "cat": "online", "title": "Public Speaking", "time": "5:00–6:30 PM"}, {"d": "2027-03-10", "cat": "chai", "title": "Chai Pe Charcha"}, {"d": "2027-03-19", "cat": "physical", "title": "Attention to Detail & Quality Mindset", "time": "4:30–7:00 PM"}, {"d": "2027-03-26", "cat": "starbday", "title": "⭐ Star Performer  &  🎂 Birthday Celebrations"}, {"d": "2026-10-15", "cat": "knowledge", "title": "Knowledge Setu"}, {"d": "2026-10-22", "cat": "excellencia", "title": "Excellencia"}, {"d": "2026-11-19", "cat": "knowledge", "title": "Knowledge Setu"}, {"d": "2026-11-26", "cat": "excellencia", "title": "Excellencia"}, {"d": "2026-12-17", "cat": "knowledge", "title": "Knowledge Setu"}, {"d": "2026-12-23", "cat": "excellencia", "title": "Excellencia"}], "cat_label": {"holiday": "Public Holiday", "activity": "Activity / Fun Event", "online": "💻 Online Training", "physical": "🏢 Physical / Offline Training", "hof": "🏆 Hall of Fame", "starbday": "⭐ Star Performer & 🎂 Birthday", "chai": "☕ Chai Pe Charcha", "extra": "Other Engagement", "knowledge": "📚 Knowledge Setu", "excellencia": "🌟 Excellencia"}};
+
+const RECON_NOTES = [
+  ["June — Chai Pe Charcha", "Placed on the 24th with no date text; the pattern and the Summary tab both point to the 2nd Wednesday.", "Corrected to 10 June 2026."],
+  ["July — Physical Training", "Cell sat under 30 July but its own text read \"24-07-2026\".", "Moved to 24 July 2026 — the 3rd Friday was already taken by Hall of Fame 1."],
+  ["October — Hall of Fame 2", "Placed on a Saturday (24 Oct) — every other Hall of Fame session falls on a Friday.", "Corrected to 16 Oct 2026 (3rd Friday), matching the Summary tab."],
+  ["May — Chai Pe Charcha", "Placed on the 20th but its own text read \"13-05-2026\".", "Used 13 May 2026 (2nd Wednesday), matching the cell's own text."],
+  ["September — Physical Training topic", "Named \"Finance for Non-Finance – Sahil Sir\", identical to December's online session.", "Listed as \"Topic TBC\" rather than guessed — please confirm."],
+  ["November — training topic", "Summary tab says \"Teamwork & Collaboration\"; the monthly tab says \"Soft Skills Training – Dipika Bisawa\".", "Merged both labels onto the single 20-Nov session."],
+  ["December — Star Performer & Birthday", "The usual last Friday (25 Dec) is Christmas Day.", "Moved to 31 December 2026."],
+  ["Annual Cricket", "Summary tab assigns it to February 2027; the January tab placed it on 15 Jan — the same day as Hall of Fame 3.", "Kept Hall of Fame 3 on 15 Jan (matches the Jul/Oct/Jan pattern); listed Cricket under February, date to be confirmed."],
+];
+
+const CAT_HEX = {
+  holiday:'var(--c-holiday)', activity:'var(--c-activity)', online:'var(--c-online)',
+  physical:'var(--c-physical)', hof:'var(--c-hof)', starbday:'var(--c-star)',
+  chai:'var(--c-chai)', extra:'var(--c-extra)',
+  knowledge:'var(--c-knowledge)', excellencia:'var(--c-excellencia)'
+};
+const CAT_SHORT = {
+  holiday:'Holiday', activity:'Activity', online:'Online Training', physical:'Physical Training',
+  hof:'Hall of Fame', starbday:'Star / Birthday', chai:'Chai Pe Charcha', extra:'Other',
+  knowledge:'Knowledge Setu', excellencia:'Excellencia'
+};
+
+const events = CAL_DATA.events.map(e => ({...e, dateObj: e.d ? new Date(e.d+'T00:00:00') : null}));
+const MONTHS = [[2026,4],[2026,5],[2026,6],[2026,7],[2026,8],[2026,9],[2026,10],[2026,11],[2026,12],[2027,1],[2027,2],[2027,3]];
+const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const today = new Date();
+today.setHours(0,0,0,0);
+
+let activeFilters = new Set(Object.keys(CAT_HEX));
+let activeMonthIdx = 0;
+
+// determine current month index within FY, else default to first
+MONTHS.forEach((m,i)=>{ if(m[0]===today.getFullYear() && m[1]===today.getMonth()+1) activeMonthIdx = i; });
+
+// ---------- TODAY CHIP ----------
+const todayText = document.getElementById('todayText');
+const inFY = MONTHS.some(m => m[0]===today.getFullYear() && m[1]===today.getMonth()+1);
+todayText.textContent = today.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}) + (inFY ? ' — click to jump to this month' : '');
+document.getElementById('todayChip').addEventListener('click', ()=>{ if(inFY){ selectMonth(activeMonthIdx); document.getElementById('monthTabs').scrollIntoView({behavior:'smooth', block:'center'}); }});
+
+// ---------- STATS ----------
+document.getElementById('statEvents').textContent = events.length;
+document.getElementById('statHolidays').textContent = events.filter(e=>e.cat==='holiday').length;
+
+// ---------- RHYTHM CARDS ----------
+const rhythm = [
+  {ic:'💻', name:'Online Training', cadence:'1st Friday', dow:4, week:1, cat:'online'},
+  {ic:'☕', name:'Chai Pe Charcha', cadence:'2nd Wednesday', dow:2, week:2, cat:'chai'},
+  {ic:'🏢', name:'Physical Training', cadence:'3rd Friday', dow:4, week:3, cat:'physical'},
+  {ic:'⭐', name:'Star Performer & Birthdays', cadence:'Last Friday', dow:4, week:5, cat:'starbday'},
+];
+const rhythmGrid = document.getElementById('rhythmGrid');
+rhythm.forEach(r=>{
+  const card = document.createElement('div');
+  card.className='rcard';
+  const dots = [0,1,2,3,4,5,6].map(d => `<i class="${d===r.dow?'on':''}" style="--dot:${CAT_HEX[r.cat]}"></i>`).join('');
+  card.innerHTML = `<span class="ic">${r.ic}</span><h3>${r.name}</h3><p>${r.cadence} of every month</p><div class="weekmap">${dots}</div>`;
+  rhythmGrid.appendChild(card);
+});
+
+// ---------- FILTER CHIPS ----------
+const chipRow = document.getElementById('chipRow');
+Object.keys(CAT_HEX).forEach(cat=>{
+  const chip = document.createElement('div');
+  chip.className='chip active';
+  chip.dataset.cat = cat;
+  chip.innerHTML = `<span class="sw" style="background:${CAT_HEX[cat]}"></span>${CAT_SHORT[cat]}`;
+  chip.addEventListener('click', ()=>{
+    if(activeFilters.has(cat)){ activeFilters.delete(cat); chip.classList.remove('active'); }
+    else { activeFilters.add(cat); chip.classList.add('active'); }
+    renderCalendar(); renderAgenda();
+  });
+  chipRow.appendChild(chip);
+});
+
+// ---------- MONTH TABS ----------
+const monthTabs = document.getElementById('monthTabs');
+MONTHS.forEach((m,i)=>{
+  const tab = document.createElement('div');
+  const isToday = m[0]===today.getFullYear() && m[1]===today.getMonth()+1;
+  tab.className = 'mtab' + (isToday ? ' istoday':'');
+  tab.textContent = MONTH_NAMES[m[1]].slice(0,3) + " '" + String(m[0]).slice(2);
+  tab.addEventListener('click', ()=>selectMonth(i));
+  monthTabs.appendChild(tab);
+});
+function selectMonth(i){
+  activeMonthIdx = i;
+  [...monthTabs.children].forEach((t,idx)=>t.classList.toggle('active', idx===i));
+  renderCalendar();
+}
+
+// ---------- CALENDAR RENDER ----------
+function renderCalendar(){
+  const [y,m] = MONTHS[activeMonthIdx];
+  document.getElementById('calTitle').textContent = MONTH_NAMES[m] + ' ' + y;
+
+  const firstOfMonth = new Date(y, m-1, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday=0
+  const daysInMonth = new Date(y, m, 0).getDate();
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  let shown = 0;
+
+  for(let i=0;i<startOffset;i++){
+    const d = document.createElement('div'); d.className='day empty'; grid.appendChild(d);
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const cellDate = new Date(y, m-1, day);
+    const dow = (cellDate.getDay()+6)%7; // 0=mon..6=sun
+    const isWeekend = dow===5 || dow===6;
+    const isToday = cellDate.getTime()===today.getTime();
+
+    const cell = document.createElement('div');
+    cell.className = 'day' + (isWeekend?' weekend':'') + (isToday?' today':'');
+
+    const num = document.createElement('div'); num.className='daynum'; num.textContent=day;
+    cell.appendChild(num);
+
+    const dayEvents = events.filter(e => e.dateObj && e.dateObj.getFullYear()===y && e.dateObj.getMonth()===m-1 && e.dateObj.getDate()===day && activeFilters.has(e.cat));
+    dayEvents.forEach(e=>{
+      shown++;
+      const pill = document.createElement('div');
+      pill.className='pill';
+      pill.style.background = `color-mix(in srgb, ${CAT_HEX[e.cat]} 16%, var(--paper-2))`;
+      pill.style.color = CAT_HEX[e.cat];
+      pill.title = e.title + (e.time ? ' · ' + e.time : '');
+      pill.textContent = e.title.replace(/^[⭐🎂💻🏢☕🏆]\s*/,'');
+      cell.appendChild(pill);
+      if(e.time){
+        const t = document.createElement('span'); t.className='pilltime'; t.style.color=CAT_HEX[e.cat]; t.textContent=e.time;
+        cell.appendChild(t);
+      }
+    });
+    grid.appendChild(cell);
+  }
+  const totalInMonth = events.filter(e=>e.dateObj && e.dateObj.getFullYear()===y && e.dateObj.getMonth()===m-1).length;
+  document.getElementById('calCount').textContent = totalInMonth + ' event' + (totalInMonth!==1?'s':'') + ' this month';
+}
+
+// ---------- AGENDA RENDER ----------
+const agendaList = document.getElementById('agendaList');
+const dated = events.filter(e=>e.dateObj).sort((a,b)=>a.dateObj-b.dateObj);
+const undated = events.filter(e=>!e.dateObj);
+
+function buildAgenda(){
+  agendaList.innerHTML = '';
+  [...dated, ...undated].forEach(e=>{
+    const row = document.createElement('div');
+    row.className = 'arow';
+    row.dataset.cat = e.cat;
+    row.dataset.title = e.title.toLowerCase();
+    const dateStr = e.dateObj
+      ? `${String(e.dateObj.getDate()).padStart(2,'0')} ${MONTH_NAMES[e.dateObj.getMonth()+1].slice(0,3)} '${String(e.dateObj.getFullYear()).slice(2)}<small>${e.dateObj.toLocaleDateString('en-IN',{weekday:'long'})}</small>`
+      : `TBC<small>date pending</small>`;
+    row.innerHTML = `
+      <div class="dt">${dateStr}</div>
+      <div class="dot" style="background:${CAT_HEX[e.cat]}"></div>
+      <div class="title">${e.title}${e.notes ? ` <span style="color:var(--muted); font-weight:400;">— ${e.notes}</span>` : ''}</div>
+      <div class="cat">${CAT_SHORT[e.cat]}${e.time ? ' · '+e.time : ''}</div>`;
+    agendaList.appendChild(row);
+  });
+}
+buildAgenda();
+
+function renderAgenda(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  let anyVisible = false;
+  [...agendaList.children].forEach(row=>{
+    const matchesFilter = activeFilters.has(row.dataset.cat);
+    const matchesSearch = !q || row.dataset.title.includes(q);
+    const visible = matchesFilter && matchesSearch;
+    row.classList.toggle('hidden', !visible);
+    if(visible) anyVisible = true;
+  });
+}
+document.getElementById('searchBox').addEventListener('input', renderAgenda);
+
+// ---------- NOTES ----------
+const notesList = document.getElementById('notesList');
+RECON_NOTES.forEach(([item,conflict,res])=>{
+  const li = document.createElement('li');
+  li.innerHTML = `<b>${item}.</b> ${conflict} <span style="color:var(--c-chai);">${res}</span>`;
+  notesList.appendChild(li);
+});
+
+// ---------- INIT ----------
+selectMonth(activeMonthIdx);
+renderAgenda();
+</script>
+</body>
+</html>

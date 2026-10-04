@@ -138,6 +138,7 @@
       <div class="navbar-right">
         <span class="emp-badge" id="empBadge"></span>
         <button class="cp-btn" id="cpBtn" style="display:none" onclick="openCpModal()"><i class="fas fa-cogs"></i> Switch to Control Panel</button>
+        <button class="logout-btn" id="calendarBtn" onclick="openLdCalendar()"><i class="fas fa-calendar-days"></i> Calendar</button>
         <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
     </nav>
@@ -443,6 +444,7 @@
 
     initModules();
   </script>
+    <script src="/static/timesheet/calendar-modal.js"></script>
     <script src="/static/chatbot/chat-core.js"></script>
     <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
