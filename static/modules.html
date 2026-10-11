@@ -53,9 +53,13 @@
     .card-ed{border-left-color:#c0392b}
     .card-eda{border-left-color:#8e44ad}
     .card-cb{border-left-color:#4a6fa5}
+    .card-cv{border-left-color:#16a085}
+    .card-br{border-left-color:#e84393}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
+    .card-br .card-icon{background:rgba(232,67,147,.12);color:#e84393}
+    .card-cv .card-icon{background:rgba(22,160,133,.12);color:#16a085}
     .card-ts .card-icon{background:rgba(102,126,234,.12);color:#667eea}
     .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
@@ -89,6 +93,8 @@
     .card-hr .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
     .card-ed .card-btn{background:linear-gradient(135deg,#c0392b,#922b21);color:white}
     .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-br .card-btn{background:linear-gradient(135deg,#e84393,#b2246d);color:white}
+    .card-cv .card-btn{background:linear-gradient(135deg,#16a085,#0e6655);color:white}
     .card-cb .card-btn{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:white}
     .card-btn.locked-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:not-allowed;box-shadow:none;opacity:.65}
     .card-btn.checking-btn{background:white;color:var(--text-light);border:1px solid var(--border);cursor:default;box-shadow:none}
@@ -250,6 +256,43 @@
         </div>
         <div class="card-footer">
           <span class="card-footer-label">Sourced answers, saved history</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    const CARD_CV = `
+      <a href="/cv-builder" class="module-card card-cv clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-id-card"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">CV Builder</h2>
+        <p class="card-desc">Build your professional profile, choose from 5 templates, preview it and download your CV as Word or PDF.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-user-tie"></i> Profile</span>
+          <span class="chip"><i class="fas fa-layer-group"></i> Sections</span>
+          <span class="chip"><i class="fas fa-file-pdf"></i> Word &amp; PDF</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">5 ready templates</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
+    const CARD_BR = `
+      <a href="/buddy-referral" class="module-card card-br clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-user-friends"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Buddy Referral</h2>
+        <p class="card-desc">Refer a colleague or a candidate for an open position, and upload their resume for HR.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-user-tie"></i> Existing Employee</span>
+          <span class="chip"><i class="fas fa-file-upload"></i> Referral + Resume</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Refer &amp; grow the team</span>
           <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
         </div>
       </a>`;
@@ -445,6 +488,12 @@
 
       // Employee Declaration Form — always shown, like Timesheet
       grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
+
+      // CV Builder — always shown
+      grid.innerHTML += CARD_CV;
+
+      // Buddy Referral — always shown
+      grid.innerHTML += CARD_BR;
 
       // Employee Declaration Admin now lives in the Control Panel only
       // (see cpBtn above) — not shown as its own card here.

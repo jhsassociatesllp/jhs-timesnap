@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>Buddy Referral Admin — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:2px solid var(--border);background:#fff;color:var(--accent);cursor:pointer;transition:var(--tr);font-size:.9rem}
+    .icon-btn:hover{border-color:var(--accent);background:#f0f4ff;transform:translateY(-1px)}
+    .icon-btn.dl{color:#0f766e}
+    .vw-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:900;display:none;align-items:flex-start;justify-content:center;padding:1.2rem}
+    .vw-bg.open{display:flex}
+    .vw{background:#fff;border-radius:16px;width:100%;max-width:980px;height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.4)}
+    .vw-head{background:var(--pg);color:#fff;padding:.9rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .vw-head h3{font-size:.95rem;margin:0;display:flex;align-items:center;gap:.5rem}
+    .vw-body{flex:1;overflow:auto;background:#d9dde6;position:relative}
+    .vw-body iframe{width:100%;height:100%;border:0;background:#fff}
+    .vw-body .docx-wrapper{background:transparent!important;padding:1rem!important}
+    .vw-msg{padding:3rem 1rem;text-align:center;color:#555}
+    .x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+
+<div id="ls" class="loader"><div class="spin"></div> Loading…</div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-user-friends"></i> Buddy Referral — Admin</div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <a href="/control-panel" class="nav-btn"><i class="fas fa-sliders-h"></i> Control Panel</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="wrap" style="max-width:1280px">
+    <div class="hdr">
+      <h1>Buddy Referral</h1>
+      <p>Referrals received from employees</p>
+    </div>
+
+    <div class="body">
+      <div class="tabs">
+        <button class="tab active" id="tab-existing" onclick="switchTab('existing')"><i class="fas fa-user-tie"></i> Existing Employee <span class="chip" id="c_ex">0</span></button>
+        <button class="tab" id="tab-referral" onclick="switchTab('referral')"><i class="fas fa-file-upload"></i> Referral <span class="chip" id="c_rr">0</span></button>
+      </div>
+
+      <!-- Existing employee -->
+      <div class="tc active" id="tc-existing">
+        <div class="toolbar">
+          <input class="fi" id="exSearch" placeholder="Search…" oninput="renderExisting()" />
+          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/existing/export','Existing_Employee_Referrals.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
+        </div>
+        <div class="tbl-wrap"><table class="t">
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Date of Joining</th><th>Manager</th><th>Partner</th><th>Referral From</th><th>Position</th></tr></thead>
+          <tbody id="exBody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- Referral -->
+      <div class="tc" id="tc-referral">
+        <div class="toolbar">
+          <input class="fi" id="rrSearch" placeholder="Search…" oninput="renderReferrals()" />
+          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/referrals/export','Referrals.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
+        </div>
+        <div class="tbl-wrap"><table class="t">
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th></tr></thead>
+          <tbody id="rrBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- resume viewer -->
+<div class="vw-bg" id="vwBg">
+  <div class="vw">
+    <div class="vw-head">
+      <h3><i class="fas fa-file-alt"></i> <span id="vwTitle">Resume</span></h3>
+      <button class="x" onclick="closeView()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="vw-body" id="vwBody"></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+<script>
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = empId;
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t); setTimeout(()=>t.remove(),3500);
+}
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tc-'+name).classList.add('active');
+}
+async function getJSON(url){
+  const r = await fetch(url,{headers:AUTH});
+  if (r.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (r.status===403){ window.location.href='/control-panel'; throw new Error('No access'); }
+  if (!r.ok) throw new Error('Request failed');
+  return r.json();
+}
+async function fetchBlob(url){
+  const r = await fetch(url,{headers:AUTH});
+  if(!r.ok){ let d=null; try{d=await r.json();}catch(e){} throw new Error((d&&d.detail)||'Request failed'); }
+  const cd = r.headers.get('Content-Disposition')||''; const m = /filename="?([^";]+)"?/.exec(cd);
+  return {blob:await r.blob(), name:m?m[1]:'file'};
+}
+async function download(url, fallbackName){
+  try{
+    const {blob,name}=await fetchBlob(url), u=URL.createObjectURL(blob);
+    const a=Object.assign(document.createElement('a'),{href:u,download:name==='file'?fallbackName:name});
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),2000);
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── resume viewer: PDF in an iframe, DOCX rendered in the page ───────────────
+let vwUrl=null;
+async function viewResume(id, filename){
+  const bg=document.getElementById('vwBg'), body=document.getElementById('vwBody');
+  document.getElementById('vwTitle').textContent='Resume';
+  body.innerHTML='<div class="vw-msg"><div class="spin spin-dark"></div> Loading…</div>'; bg.classList.add('open');
+  try{
+    const {blob}=await fetchBlob(`/buddy-referral/admin/referrals/${id}/resume?inline=1`);
+    if(vwUrl){URL.revokeObjectURL(vwUrl);vwUrl=null;}
+    if((filename||'').toLowerCase().endsWith('.pdf')){
+      vwUrl=URL.createObjectURL(new Blob([blob],{type:'application/pdf'}));
+      body.innerHTML=`<iframe src="${vwUrl}"></iframe>`;
+    }else{
+      if(!window.docx||!window.docx.renderAsync) throw new Error('Viewer could not load (check your internet connection). Use the download button instead.');
+      body.innerHTML='';
+      await window.docx.renderAsync(await blob.arrayBuffer(), body, null, {className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,useBase64URL:true});
+    }
+  }catch(e){ body.innerHTML=`<div class="vw-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(e.message)}</div>`; }
+}
+function closeView(){
+  document.getElementById('vwBg').classList.remove('open'); document.getElementById('vwBody').innerHTML='';
+  if(vwUrl){URL.revokeObjectURL(vwUrl);vwUrl=null;}
+}
+document.getElementById('vwBg').addEventListener('mousedown',e=>{ if(e.target.id==='vwBg') closeView(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeView(); });
+
+let exRows=[], rrRows=[];
+const match=(obj,q)=>!q||Object.values(obj).some(v=>String(v==null?'':v).toLowerCase().includes(q));
+const dash=v=>v?esc(v):'—';
+
+function renderExisting(){
+  const q=document.getElementById('exSearch').value.trim().toLowerCase();
+  const rows=exRows.filter(r=>match(r,q));
+  document.getElementById('exBody').innerHTML = rows.length ? rows.map(r=>`<tr>
+    <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.date_of_joining)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td>
+    <td><b>${esc(r.referral_from)}</b> — ${dash(r.referral_from_name)}</td><td>${dash(r.position)}</td>
+  </tr>`).join('') : '<tr><td colspan="7"><div class="empty"><i class="fas fa-inbox"></i>No existing-employee referrals yet.</div></td></tr>';
+}
+function renderReferrals(){
+  const q=document.getElementById('rrSearch').value.trim().toLowerCase();
+  const rows=rrRows.filter(r=>match(r,q));
+  document.getElementById('rrBody').innerHTML = rows.length ? rows.map(r=>`<tr>
+    <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td><td>${dash(r.role)}</td>
+    <td style="white-space:nowrap">
+      <button class="icon-btn" title="View resume" onclick="viewResume('${esc(r.id)}','${esc(r.resume_filename)}')"><i class="fas fa-eye"></i></button>
+      <button class="icon-btn dl" title="Download resume" onclick="download('/buddy-referral/admin/referrals/${esc(r.id)}/resume','${esc(r.resume_filename)}')"><i class="fas fa-download"></i></button>
+    </td>
+    <td>${dash(r.date_of_joining)}</td>
+  </tr>`).join('') : '<tr><td colspan="7"><div class="empty"><i class="fas fa-inbox"></i>No referrals yet.</div></td></tr>';
+}
+
+async function init(){
+  try{
+    const [ex, rr] = await Promise.all([getJSON('/buddy-referral/admin/existing'), getJSON('/buddy-referral/admin/referrals')]);
+    exRows=ex.rows; rrRows=rr.rows;
+    document.getElementById('c_ex').textContent=exRows.length; document.getElementById('c_rr').textContent=rrRows.length;
+    renderExisting(); renderReferrals();
+    document.getElementById('ls').style.display='none';
+    document.getElementById('app').style.display='block';
+  }catch(e){ document.getElementById('ls').innerHTML='Could not load: '+esc(e.message); }
+}
+init();
+</script>
+</body>
+</html>

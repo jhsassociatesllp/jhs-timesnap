@@ -207,6 +207,10 @@ jobs:
                 -e LIBRARY_PINECONE_API_KEY="${{ secrets.LIBRARY_PINECONE_API_KEY }}" \
                 -e RCM_PINECONE_API_KEY="${{ secrets.RCM_PINECONE_API_KEY }}" \
                 -e RCM_OPENAI_API_KEY="${{ secrets.RCM_OPENAI_API_KEY }}" \
+                -e OUTLOOK_EMAIL="${{ secrets.OUTLOOK_EMAIL }}" \
+                -e OUTLOOK_PASSWORD="${{ secrets.OUTLOOK_PASSWORD }}" \
+                -e HR_NOTIFY_EMAIL="${{ secrets.HR_NOTIFY_EMAIL }}" \
+                -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
                 "$IMAGE"
 
               echo "🧹 Cleaning dangling images..."
