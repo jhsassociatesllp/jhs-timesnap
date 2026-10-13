@@ -32,14 +32,14 @@
 
     <div class="body">
       <div class="tabs" role="tablist">
-        <button class="tab active" id="tab-existing" onclick="switchTab('existing')" role="tab"><i class="fas fa-user-tie"></i> Existing Employee</button>
-        <button class="tab" id="tab-referral" onclick="switchTab('referral')" role="tab"><i class="fas fa-file-upload"></i> Referral</button>
+        <button class="tab active" id="tab-existing" onclick="switchTab('existing')" role="tab"><i class="fas fa-user-tie"></i> Referred by a JHS Employee</button>
+        <button class="tab" id="tab-referral" onclick="switchTab('referral')" role="tab"><i class="fas fa-file-upload"></i> Refer Someone</button>
       </div>
 
       <!-- ══ Tab 1: Existing employee ══ -->
       <div class="tc active" id="tc-existing">
         <form class="card" id="existingForm" onsubmit="submitExisting(event)" autocomplete="off">
-          <div class="card-title"><i class="fas fa-user-tie"></i> Existing Employee Referral</div>
+          <div class="card-title"><i class="fas fa-user-tie"></i> Referred by a JHS Employee</div>
           <div class="g2">
             <div class="form-group">
               <label><i class="fas fa-id-badge"></i> Employee</label>
@@ -73,7 +73,7 @@
       <!-- ══ Tab 2: Referral ══ -->
       <div class="tc" id="tc-referral">
         <form class="card" id="referralForm" onsubmit="submitReferral(event)">
-          <div class="card-title"><i class="fas fa-file-upload"></i> Referral</div>
+          <div class="card-title"><i class="fas fa-file-upload"></i> Refer Someone</div>
           <div class="g2">
             <div class="form-group full">
               <label><i class="fas fa-user-tag"></i> Role</label>
