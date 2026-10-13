@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>JHS L&D Calendar FY 2026-27</title>
+<title>JHS L&D and Compliance Calendar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
@@ -43,7 +43,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .iconbtn{border:1px solid var(--line);background:var(--paper);border-radius:12px;width:38px;height:38px;display:grid;place-items:center}
 
 /* month strip */
-.strip{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-bottom:18px}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px;margin-bottom:18px}
 .chip{border:0;border-radius:12px;padding:8px 4px 7px;background:var(--paper);display:flex;flex-direction:column;align-items:center;gap:4px;border-bottom:4px solid var(--c);transition:transform .15s}
 .chip b{font-family:var(--display);font-size:14px;font-weight:700}
 .chip small{font-size:11px;color:var(--muted)}
@@ -184,12 +184,12 @@ button{font:inherit;color:inherit;cursor:pointer}
   <header class="top">
     <div class="brand">
       <div class="logo" aria-hidden="true">JHS</div>
-      <div><h1>Learning &amp; Development Calendar</h1><p>JHS Associates LLP, FY 2026-27 (April 2026 to March 2027)</p></div>
+      <div><h1>L&amp;D and Compliance Calendar</h1><p>JHS Associates LLP, April 2026 to December 2027</p></div>
     </div>
     <div class="tools">
       <div class="search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="q" type="search" placeholder="Search events or speakers" aria-label="Search events or speakers">
+        <input id="q" type="search" placeholder="Search events, speakers or compliance" aria-label="Search events, speakers or compliance">
       </div>
       <div class="seg" role="group" aria-label="View">
         <button data-view="month" aria-pressed="true">Month</button>
@@ -218,7 +218,7 @@ button{font:inherit;color:inherit;cursor:pointer}
       </div>
     </aside>
   </div>
-  <p class="foot">Dashed outline means the event is still to be confirmed. Use the ← and → keys to change month.</p>
+  <p class="foot">Dashed outline means the event is still to be confirmed. Compliance due dates come from the JHS compliance calendar. Use the ← and → keys to change month.</p>
 </div>
 
 <script>
@@ -234,10 +234,11 @@ const CATS = {
  "Star Performer":["⭐","#1E88E5","#DCEBFB","#0D47A1"],
  "Chai Pe Charcha":["☕","#00897B","#D4EFEB","#004D40"],
  "Knowledge Setu":["📚","#455A64","#E1E8EB","#1F2D33"],
- "Excellencia":["🌟","#6D4C41","#EBE0DB","#3E2723"]
+ "Excellencia":["🌟","#6D4C41","#EBE0DB","#3E2723"],
+ "Compliance Due":["⚖️","#B71C1C","#FDE3E1","#7F0000"]
 };
 const THEME={3:"#00897B",4:"#EF6C00",5:"#3949AB",6:"#0097A7",7:"#E53935",8:"#689F38",9:"#8E24AA",10:"#F57C00",11:"#C62828",0:"#1E88E5",1:"#D81B60",2:"#43A047"};
-const MONTHS=[];for(let i=0;i<12;i++){const d=new Date(2026,3+i,1);MONTHS.push({y:d.getFullYear(),m:d.getMonth()})}
+const MONTHS=[];for(let i=0;i<21;i++){const d=new Date(2026,3+i,1);MONTHS.push({y:d.getFullYear(),m:d.getMonth()})}
 const MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const pad=n=>String(n).padStart(2,"0");
@@ -255,10 +256,10 @@ const savedTheme=store("jhs-theme");if(savedTheme)document.documentElement.datas
 
 function visible(){
   const q=state.q.trim().toLowerCase();
-  return EVENTS.filter(e=>!state.off.has(e.c)&&(!q||(e.t+" "+e.f+" "+e.c).toLowerCase().includes(q)));
+  return EVENTS.filter(e=>!state.off.has(e.c)&&(!q||(e.t+" "+e.f+" "+e.c+" "+(e.l||"")).toLowerCase().includes(q)));
 }
 function byDate(list){const m={};list.forEach(e=>(m[e.d]=m[e.d]||[]).push(e));return m}
-function title(e){return (e.c==="Online Training"||e.c==="Physical Training"||e.c==="Guest Session")&&e.t!==e.c?e.t:e.t}
+function title(e){return e.c==="Compliance Due"?`${e.l}: ${e.t}`:e.t}
 function setMonthColor(){const c=THEME[MONTHS[state.idx].m];document.documentElement.style.setProperty("--m",c);document.documentElement.style.setProperty("--m-soft",`color-mix(in srgb, ${c} 12%, var(--paper))`)}
 
 function renderStrip(){
@@ -282,17 +283,18 @@ function renderMonth(){
     const shown=evs.slice(0,3).map(e=>`<span class="ev${e.s==="TBC"?" tbc":""}" style="${vars(e.c)}"><span class="e">${CATS[e.c][0]}</span><span class="t">${esc(title(e))}</span></span>`).join("");
     const more=evs.length>3?`<span class="more">+${evs.length-3} more</span>`:"";
     const dots=`<span class="dotrow">${evs.map(e=>`<i style="${vars(e.c)}"></i>`).join("")}</span>`;
-    cells+=`<button class="${cls}" data-d="${k}" aria-label="${d} ${MN[m]}${evs.length?", "+evs.map(e=>e.t).join(", "):", no events"}"><span class="n">${d}</span>${shown}${more}${dots}</button>`;
+    cells+=`<button class="${cls}" data-d="${k}" aria-label="${d} ${MN[m]}${evs.length?", "+evs.map(title).join(", "):", no events"}"><span class="n">${d}</span>${shown}${more}${dots}</button>`;
   }
   const tail=(7-(lead+days)%7)%7;for(let i=0;i<tail;i++)cells+=`<div class="day off" aria-hidden="true"></div>`;
   document.getElementById("stage").innerHTML=`
    <div class="hero"><div class="big" aria-hidden="true">${pad(m+1)}</div>
      <h2>${MN[m]}<span>${y}</span></h2>
-     <div class="nav"><button id="prev" aria-label="Previous month" ${state.idx===0?"disabled":""}>‹</button><button id="todayBtn">Today</button><button id="next" aria-label="Next month" ${state.idx===11?"disabled":""}>›</button></div>
+     <div class="nav"><button id="prev" aria-label="Previous month" ${state.idx===0?"disabled":""}>‹</button><button id="todayBtn">Today</button><button id="next" aria-label="Next month" ${state.idx===MONTHS.length-1?"disabled":""}>›</button></div>
    </div>
    <div class="stats">
      <span>${pl(cnt(e=>/Training|Guest/.test(e.c)),"training","trainings")}</span>
-     <span>${pl(cnt(e=>!/Training|Guest|Holiday/.test(e.c)),"event or celebration","events &amp; celebrations")}</span>
+     <span>${pl(cnt(e=>!/Training|Guest|Holiday|Compliance/.test(e.c)),"event or celebration","events &amp; celebrations")}</span>
+     <span>${pl(cnt(e=>e.c==="Compliance Due"),"compliance due","compliance due")}</span>
      <span>${pl(cnt(e=>e.c==="Public Holiday"),"holiday","holidays")}</span>
      <span>${pl(cnt(e=>e.s==="TBC"),"to be confirmed","to be confirmed")}</span>
    </div>
@@ -306,7 +308,7 @@ function renderYear(){
     const lead=(new Date(x.y,x.m,1).getDay()+6)%7,days=new Date(x.y,x.m+1,0).getDate();
     let g="MTWTFSS".split("").map(c=>`<span class="h">${c}</span>`).join("")+"<span></span>".repeat(lead);let n=0;
     for(let d=1;d<=days;d++){const k=key(x.y,x.m,d),e=map[k];if(e)n+=e.length;const dow=(lead+d-1)%7;
-      g+=`<span class="${e?"has":""} ${dow===6&&!e?"su":""} ${k===TODAY?"td":""}" ${e?`style="${vars(e[0].c)}" title="${esc(e.map(z=>z.t).join(", "))}"`:""}>${d}</span>`}
+      g+=`<span class="${e?"has":""} ${dow===6&&!e?"su":""} ${k===TODAY?"td":""}" ${e?`style="${vars(e[0].c)}" title="${esc(e.map(title).join(", "))}"`:""}>${d}</span>`}
     return `<button class="mini" style="--c:${THEME[x.m]}" data-i="${i}" aria-label="Open ${MN[x.m]} ${x.y}"><h4>${MN[x.m]} <small>${n} events</small></h4><div class="mg">${g}</div></button>`}).join("")}</div>`;
 }
 
@@ -317,7 +319,7 @@ function renderList(){
   list.forEach(e=>{const d=new Date(e.d+"T00:00");const mk=e.d.slice(0,7);
     if(mk!==cur){cur=mk;html+=`<h4 style="--c:${THEME[d.getMonth()]}">${MN[d.getMonth()]} ${d.getFullYear()}</h4>`}
     html+=`<div class="lrow${e.d<TODAY?" past":""}" style="${vars(e.c)}"><div class="ld">${d.getDate()} ${MN[d.getMonth()].slice(0,3)}<small>${WD[d.getDay()]}</small></div>
-      <div><div class="lt">${CATS[e.c][0]} ${esc(e.t)}${e.s==="TBC"?'<span class="badge tbc">TBC</span>':""}</div><div class="lm">${[e.f,e.tm].filter(Boolean).map(esc).join(", ")||"&nbsp;"}</div></div>
+      <div><div class="lt">${CATS[e.c][0]} ${esc(title(e))}${e.s==="TBC"?'<span class="badge tbc">TBC</span>':""}</div><div class="lm">${[e.f,e.tm].filter(Boolean).map(esc).join(", ")||"&nbsp;"}</div></div>
       <span class="pill">${esc(e.c)}</span></div>`});
   document.getElementById("stage").innerHTML=`<div class="list">${html}</div>`;
 }
@@ -328,14 +330,14 @@ function renderDetail(){
   const d=new Date(state.sel+"T00:00");const evs=visible().filter(e=>e.d===state.sel);
   el.innerHTML=`<p class="date">${d.getDate()} ${MN[d.getMonth()]}</p><p class="wd">${WD[d.getDay()]}, ${d.getFullYear()}</p>`+
    (evs.length?evs.map(e=>`<div class="card" style="${vars(e.c)}"><div class="cat">${CATS[e.c][0]} ${esc(e.c)}${e.s==="TBC"?'<span class="badge tbc">To be confirmed</span>':""}</div>
-     <div class="ttl">${esc(e.t)}</div>${e.f||e.tm?`<div class="meta">${[e.f&&("By "+e.f),e.tm].filter(Boolean).map(esc).join("<br>")}</div>`:""}
+     <div class="ttl">${esc(e.t)}</div>${e.l?`<div class="meta">Law: ${esc(e.l)}</div>`:""}${e.f||e.tm?`<div class="meta">${[e.f&&("By "+e.f),e.tm].filter(Boolean).map(esc).join("<br>")}</div>`:""}
      ${e.r&&e.s==="TBC"?`<div class="note">${esc(e.r)}</div>`:""}</div>`).join(""):`<p class="empty">Nothing planned on this day.</p>`);
 }
 
 function renderUp(){
   const nx=visible().filter(e=>e.d>=TODAY).slice(0,6);
   document.getElementById("up").innerHTML=nx.length?nx.map(e=>{const d=new Date(e.d+"T00:00");
-    return `<li><button data-go="${e.d}" style="${vars(e.c)}"><span class="cal"><i>${MN[d.getMonth()].slice(0,3)}</i><b>${d.getDate()}</b></span><span><div class="ut">${CATS[e.c][0]} ${esc(e.t)}${e.s==="TBC"?'<span class="badge tbc">TBC</span>':""}</div><div class="us">${WD[d.getDay()]}${e.tm?", "+esc(e.tm):""}</div></span></button></li>`}).join("")
+    return `<li><button data-go="${e.d}" style="${vars(e.c)}"><span class="cal"><i>${MN[d.getMonth()].slice(0,3)}</i><b>${d.getDate()}</b></span><span><div class="ut">${CATS[e.c][0]} ${esc(title(e))}${e.s==="TBC"?'<span class="badge tbc">TBC</span>':""}</div><div class="us">${WD[d.getDay()]}${e.tm?", "+esc(e.tm):""}</div></span></button></li>`}).join("")
    :`<li class="empty">No more events this financial year.</li>`;
 }
 
@@ -357,7 +359,7 @@ document.addEventListener("click",e=>{
   if(t.dataset.view){state.view=t.dataset.view;render()}
   else if(t.classList.contains("chip")||t.classList.contains("mini")){state.idx=+t.dataset.i;state.view="month";render()}
   else if(t.id==="prev"&&state.idx>0){state.idx--;render()}
-  else if(t.id==="next"&&state.idx<11){state.idx++;render()}
+  else if(t.id==="next"&&state.idx<MONTHS.length-1){state.idx++;render()}
   else if(t.id==="todayBtn"){const i=MONTHS.findIndex(x=>x.y===today.getFullYear()&&x.m===today.getMonth());if(i>=0){state.idx=i;state.sel=TODAY;render()}}
   else if(t.dataset.d){state.sel=t.dataset.d;render();if(innerWidth<1000)document.getElementById("detail").scrollIntoView({behavior:"smooth",block:"start"})}
   else if(t.dataset.go){goDate(t.dataset.go)}
@@ -367,8 +369,16 @@ document.addEventListener("click",e=>{
 document.getElementById("legend").addEventListener("change",e=>{const c=e.target.value;e.target.checked?state.off.delete(c):state.off.add(c);store("jhs-off",JSON.stringify([...state.off]));render()});
 document.getElementById("q").addEventListener("input",e=>{state.q=e.target.value;if(state.q&&state.view==="month")state.view="list";render()});
 document.addEventListener("keydown",e=>{if(e.target.tagName==="INPUT"||state.view!=="month")return;
-  if(e.key==="ArrowLeft"&&state.idx>0){state.idx--;render()}if(e.key==="ArrowRight"&&state.idx<11){state.idx++;render()}});
+  if(e.key==="ArrowLeft"&&state.idx>0){state.idx--;render()}if(e.key==="ArrowRight"&&state.idx<MONTHS.length-1){state.idx++;render()}});
 renderLegend();render();
+
+// Compliance due dates (Excel import + dates added in the Control Panel) — same-origin API, needs the login token.
+fetch("/compliance-calendar/items",{headers:{Authorization:"Bearer "+(store("access_token")||"")}})
+  .then(r=>r.ok?r.json():{items:[]}).then(d=>{
+    (d.items||[]).forEach(i=>EVENTS.push({d:i.date,c:"Compliance Due",t:i.compliance,l:i.law,f:"",tm:"",s:"Confirmed",r:""}));
+    EVENTS.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+    renderLegend();render();
+  }).catch(()=>{});
 </script>
 </body>
 </html>

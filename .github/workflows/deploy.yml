@@ -209,6 +209,11 @@ jobs:
                 -e RCM_OPENAI_API_KEY="${{ secrets.RCM_OPENAI_API_KEY }}" \
                 -e OUTLOOK_EMAIL="${{ secrets.OUTLOOK_EMAIL }}" \
                 -e OUTLOOK_PASSWORD="${{ secrets.OUTLOOK_PASSWORD }}" \
+                -e OUTLOOK_APP_PASSWORD="${{ secrets.OUTLOOK_APP_PASSWORD }}" \
+                -e GRAPH_TENANT_ID="${{ secrets.GRAPH_TENANT_ID }}" \
+                -e GRAPH_CLIENT_ID="${{ secrets.GRAPH_CLIENT_ID }}" \
+                -e GRAPH_CLIENT_SECRET="${{ secrets.GRAPH_CLIENT_SECRET }}" \
+                -e GRAPH_SENDER="${{ secrets.GRAPH_SENDER }}" \
                 -e HR_NOTIFY_EMAIL="${{ secrets.HR_NOTIFY_EMAIL }}" \
                 -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
                 "$IMAGE"

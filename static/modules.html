@@ -148,6 +148,7 @@
         <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
     </nav>
+    <div id="complianceMarquee" role="region" aria-label="Compliance due within 5 days"></div>
 
     <div class="page-wrapper">
       <div class="container">
@@ -172,6 +173,23 @@
     </div>
   </div>
 
+  <!-- Logout / back-to-login confirmation -->
+  <div class="cp-modal-backdrop" id="logoutModalBackdrop">
+    <div class="cp-modal">
+      <div class="cp-modal-head">
+        <i class="fas fa-sign-out-alt"></i>
+        <h3>Go back to Login?</h3>
+      </div>
+      <div class="cp-modal-body">
+        <p>You will be logged out and taken to the login page. Do you want to continue?</p>
+        <div class="cp-modal-actions">
+          <button class="cp-btn-confirm" onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> &nbsp;Yes, Logout</button>
+          <button class="cp-btn-cancel" onclick="closeLogoutModal()">Stay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Control Panel Switch Popup -->
   <div class="cp-modal-backdrop" id="cpModalBackdrop">
     <div class="cp-modal">
@@ -189,6 +207,7 @@
     </div>
   </div>
 
+  <script src="/static/timesheet/compliance-due.js"></script>
   <script>
     const empId  = localStorage.getItem('loggedInEmployeeId') || '';
     const token  = localStorage.getItem('access_token')       || '';
@@ -198,10 +217,27 @@
     document.getElementById('empBadge').textContent = empId;
     document.getElementById('empName').textContent  = empId;
 
+    // Leaving for the login page (Logout button or browser Back) asks first.
     function handleLogout() {
+      document.getElementById('logoutModalBackdrop').classList.add('open');
+    }
+    function closeLogoutModal() {
+      document.getElementById('logoutModalBackdrop').classList.remove('open');
+    }
+    function confirmLogout() {
+      window.removeEventListener('popstate', onBackToLogin);
       localStorage.clear(); sessionStorage.clear();
       window.location.href = '/login';
     }
+    function onBackToLogin() {
+      history.pushState({ modules: true }, '', location.href);   // stay here until confirmed
+      handleLogout();
+    }
+    history.pushState({ modules: true }, '', location.href);
+    window.addEventListener('popstate', onBackToLogin);
+    document.getElementById('logoutModalBackdrop').addEventListener('click', function(e) {
+      if (e.target === this) closeLogoutModal();
+    });
 
     // ── Control Panel modal ──
     function openCpModal() {
@@ -502,6 +538,10 @@
       document.getElementById('loading-screen').style.display = 'none';
       const mc = document.getElementById('main-content');
       mc.style.display = 'flex';
+
+      // Compliance reminders: marquee for dates due within 5 days + this-week popup once per login
+      if (window.initComplianceMarquee) initComplianceMarquee();
+      if (window.showWeeklyComplianceOnLogin) showWeeklyComplianceOnLogin();
     }
 
     initModules();

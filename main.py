@@ -78,6 +78,7 @@ from backend.rcm_chatbot.router        import router as rcm_chatbot_router      
 from backend.cv_builder.router         import router as cv_builder_router           # ← CV Builder
 from backend.buddy_referral.router     import router as buddy_referral_router       # ← Buddy Referral
 from backend.access_manager.router     import router as access_manager_router       # ← Control-panel access manager
+from backend.compliance_calendar.router import router as compliance_calendar_router  # ← Compliance Calendar
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -98,7 +99,7 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
                          "/employee-declaration", "/employee-declaration/admin",
-                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin"}
+                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -125,6 +126,7 @@ app.include_router(rcm_chatbot_router)     # prefix: /chatbot/rcm
 app.include_router(cv_builder_router)      # prefix: /cv-builder
 app.include_router(buddy_referral_router)  # prefix: /buddy-referral
 app.include_router(access_manager_router)  # prefix: /access-manager
+app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
 
 # ── Chatbot warm-up on startup ────────────────────────────────────────────────
 # Pre-loads the sentence-transformer embedding model into memory so the FIRST
@@ -260,6 +262,10 @@ async def cv_admin_page():
 @app.get("/referral-admin", response_class=FileResponse)   # ← Buddy Referral admin (control panel)
 async def referral_admin_page():
     return FileResponse(os.path.join(static_root, "buddy_referral", "admin.html"))
+
+@app.get("/compliance-admin", response_class=FileResponse)   # ← Compliance Calendar admin (control panel)
+async def compliance_admin_page():
+    return FileResponse(os.path.join(static_root, "compliance_calendar", "admin.html"))
 
 @app.get("/buddy-referral", response_class=FileResponse)   # ← Buddy Referral
 async def buddy_referral_page():

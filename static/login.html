@@ -185,6 +185,7 @@
                     // Fresh login = fresh budget for the chatbot's "N follow-up
                     // suggestions shown" cap (static/chatbot/chat-core.js).
                     localStorage.removeItem('chatbot_followup_shown_count');
+                    sessionStorage.removeItem('complianceWeekShown');   // show this week's due dates again after each login
                     window.location.href = '/modules';
                 } else {
                     showMessage(result.detail || 'Invalid credentials', 'error');

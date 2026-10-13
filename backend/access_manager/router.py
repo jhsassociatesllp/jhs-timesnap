@@ -29,6 +29,7 @@ MODULES = {
     "chatbot":       "JHS Chatbot",
     "cv":            "CV Builder",
     "buddy_referral": "Buddy Referral",
+    "compliance_calendar": "Compliance Calendar",
     "declaration":   "Employee Declaration",
 }
 _COLLECTION_MODULES = [m for m in MODULES if m != "declaration"]
@@ -60,6 +61,16 @@ def is_cv_admin(empid: str) -> bool:
 
 def is_referral_admin(empid: str) -> bool:
     return has_admin_module(empid, "buddy_referral")
+
+
+def is_compliance_admin(empid: str) -> bool:
+    return has_admin_module(empid, "compliance_calendar")
+
+
+def require_compliance_admin(current_user: str = Depends(get_current_user)) -> str:
+    if not is_compliance_admin(current_user):
+        raise HTTPException(403, "Compliance Calendar admin access required")
+    return current_user
 
 
 def require_cv_admin(current_user: str = Depends(get_current_user)) -> str:

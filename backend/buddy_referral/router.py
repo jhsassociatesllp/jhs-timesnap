@@ -145,7 +145,7 @@ def submit_existing(body: ExistingReferralBody, background: BackgroundTasks,
         "submitted_at": datetime.now(timezone.utc),
     })
     background.add_task(send_referral_email, me_["empid"], me_["name"], "existing", position,
-                        f"{ref_id} {_name(ref, ref_id)}")          # HR acknowledgement mail, after the response
+                        _name(ref, ""))                             # HR acknowledgement mail (names only, no codes), after the response
     return {"success": True}
 
 

@@ -371,6 +371,26 @@
         </div>`;
     }
 
+    function buildComplianceAdminCard() {
+      return `
+        <div class="module-card card-bradm" onclick="window.location.href='/compliance-admin'">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-calendar-check"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Compliance Calendar</h2>
+          <p class="card-desc">Add compliance due dates that are not in the imported calendar. They show on the calendar and in the due-date reminders.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-gavel"></i> Law</span>
+            <span class="chip"><i class="fas fa-calendar-day"></i> Due Dates</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Compliance admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
     function buildChatbotAdminCard() {
       return `
         <div class="module-card card-cb" onclick="goToChatbotAdmin()">
@@ -531,6 +551,7 @@
       let declIsAdmin = false;
       let cvIsAdmin = false;
       let referralIsAdmin = false;
+      let complianceIsAdmin = false;
       let isManager = false;
 
       try {
@@ -562,6 +583,13 @@
       } catch(e) {}
 
       try {
+        const res = await fetch('/compliance-calendar/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) complianceIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      try {
         const res = await fetch('/access-manager/check', { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const d = await res.json();
@@ -572,7 +600,7 @@
 
       // If no admin access at all (neither module access nor declaration
       // admin access), redirect back to modules
-      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin && !cvIsAdmin && !referralIsAdmin && !isManager) {
+      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin && !cvIsAdmin && !referralIsAdmin && !complianceIsAdmin && !isManager) {
         window.location.href = '/modules';
         return;
       }
@@ -598,6 +626,9 @@
       }
       if (referralIsAdmin) {
         grid.innerHTML += buildReferralAdminCard();
+      }
+      if (complianceIsAdmin) {
+        grid.innerHTML += buildComplianceAdminCard();
       }
       if (modules.includes('chatbot')) {
         grid.innerHTML += buildChatbotAdminCard();
