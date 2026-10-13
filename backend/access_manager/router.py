@@ -64,7 +64,29 @@ def is_referral_admin(empid: str) -> bool:
 
 
 def is_compliance_admin(empid: str) -> bool:
-    return has_admin_module(empid, "compliance_calendar")
+    """Explicit grant only (via Manage Module Access): access managers and super admins
+    do NOT get the Compliance Calendar admin automatically."""
+    doc = module_admin_collection.find_one({"empid": (empid or "").strip().upper()})
+    return "compliance_calendar" in (doc.get("modules", []) if doc else [])
+
+
+COMPLIANCE_FIRST_ADMIN = "JHS1485"
+
+
+def seed_compliance_admin() -> None:
+    """One-time: give COMPLIANCE_FIRST_ADMIN the module on first start. A marker stops it
+    re-granting later, so revoking in Manage Module Access sticks."""
+    try:
+        flags = db["app_flags"]
+        if flags.find_one({"_id": "compliance_calendar_admin_seeded"}):
+            return
+        module_admin_collection.update_one(
+            {"empid": COMPLIANCE_FIRST_ADMIN},
+            {"$set": {"empid": COMPLIANCE_FIRST_ADMIN}, "$addToSet": {"modules": "compliance_calendar"}},
+            upsert=True)
+        flags.insert_one({"_id": "compliance_calendar_admin_seeded"})
+    except Exception:
+        pass   # never block start-up; grant it from Manage Module Access instead
 
 
 def require_compliance_admin(current_user: str = Depends(get_current_user)) -> str:

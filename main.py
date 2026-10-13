@@ -127,6 +127,8 @@ app.include_router(cv_builder_router)      # prefix: /cv-builder
 app.include_router(buddy_referral_router)  # prefix: /buddy-referral
 app.include_router(access_manager_router)  # prefix: /access-manager
 app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
+from backend.access_manager.router import seed_compliance_admin
+seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 
 # ── Chatbot warm-up on startup ────────────────────────────────────────────────
 # Pre-loads the sentence-transformer embedding model into memory so the FIRST
