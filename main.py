@@ -43,6 +43,8 @@ from backend.appraisal.router          import router as appraisal_router
 from backend.quality_audit.router      import router as quality_audit_router   # ← NEW
 from backend.timesheet.timesheet_admin import admin_router
 from backend.hr_policy_quiz.router     import router as hr_quiz_router         # ← NEW
+from backend.resume_ranker.router      import router as resume_ranker_router        # ← RESUME RANKER
+from backend.resume_ranker.router      import startup as resume_ranker_startup
 from backend.employee_declaration.router import router as employee_declaration_router  # ← NEW
 from backend.chatbot.router            import router as chatbot_router             # ← CHATBOT
 from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
@@ -66,7 +68,8 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/control-panel", "/admin-dashboard",
                          "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
-                         "/employee-declaration", "/employee-declaration/admin"}
+                         "/employee-declaration", "/employee-declaration/admin",
+                         "/resume-ranker"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -86,6 +89,18 @@ app.include_router(appraisal_router)
 app.include_router(quality_audit_router)   # prefix: /quality-audit
 app.include_router(admin_router)
 app.include_router(hr_quiz_router)         # prefix: /hr-quiz
+app.include_router(resume_ranker_router)   # prefix: /resume-ranker
+
+
+@app.on_event("startup")
+async def start_resume_ranker():
+    # indexes + the background worker threads that parse/score uploaded CVs
+    try:
+        resume_ranker_startup()
+    except Exception as e:
+        import logging
+        logging.warning(f"[ResumeRanker] startup skipped: {e}")
+
 app.include_router(employee_declaration_router)  # prefix: /employee-declaration
 app.include_router(chatbot_router)         # prefix: /chatbot
 app.include_router(library_chatbot_router) # prefix: /chatbot/library
@@ -209,6 +224,10 @@ async def employee_declaration_page():
 @app.get("/employee-declaration/admin", response_class=FileResponse)   # ← NEW
 async def employee_declaration_admin_page():
     return FileResponse(os.path.join(static_root, "employee_declaration", "admin.html"))
+
+@app.get("/resume-ranker", response_class=FileResponse)   # ← RESUME RANKER
+async def resume_ranker_page():
+    return FileResponse(os.path.join(static_root, "resume_ranker", "index.html"))
 
 @app.get("/jhs-chatbot", response_class=FileResponse)   # ← NEW
 async def jhs_chatbot_page():
@@ -493,20 +512,11 @@ async def get_par_current_status(current_user: str = Depends(get_current_user)):
 @app.get("/get-module-access")
 async def get_module_access(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
-    print(f"[ModuleAccess] Looking up empid: '{empid}' (len={len(empid)})")
-    doc = module_admin_collection.find_one({"empid": empid})
-    print(f"[ModuleAccess] Found doc: {doc}")
-    if not doc:
-        # Also try case-insensitive search to help debug
-        doc_ci = module_admin_collection.find_one({"empid": {"$regex": f"^{empid}$", "$options": "i"}})
-        print(f"[ModuleAccess] Case-insensitive fallback: {doc_ci}")
-        if doc_ci:
-            modules = doc_ci.get("modules", [])
-            print(f"[ModuleAccess] Using case-insensitive match, modules: {modules}")
-            return {"modules": modules, "is_admin": len(modules) > 0}
-        return {"modules": [], "is_admin": False}
-    modules = doc.get("modules", [])
-    print(f"[ModuleAccess] Returning modules: {modules}")
+    doc = module_admin_collection.find_one({"empid": empid}) or module_admin_collection.find_one(
+        {"empid": {"$regex": f"^{re.escape(empid)}$", "$options": "i"}})
+    # Resume Ranker lives on the main modules page and is governed only by the
+    # Resume_Ranker.Holders collection, so it never counts as a control-panel module.
+    modules = [m for m in (doc.get("modules", []) if doc else []) if m != "resume_ranker"]
     return {"modules": modules, "is_admin": len(modules) > 0}
 
 
@@ -523,7 +533,7 @@ async def set_module_access(
     """
     Set module admin access for a user.
     Only callable by users who themselves have all-module access (super admin).
-    modules: list of strings from ["timesheet", "quality_audit", "kra", "chatbot"]
+    modules: list of strings from ["timesheet", "quality_audit", "kra", "chatbot", "resume_ranker"]
     """
     # Check caller is a super admin (has at least the core 3 modules) —
     # "chatbot" is additive and deliberately not required to already be a
@@ -534,7 +544,7 @@ async def set_module_access(
     if not {"timesheet", "quality_audit", "kra"}.issubset(caller_modules):
         raise HTTPException(403, "Only super admins can assign module access")
 
-    valid = {"timesheet", "quality_audit", "kra", "chatbot"}
+    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker"}
     modules = [m for m in request.modules if m in valid]
     empid = request.empid.strip().upper()
 
