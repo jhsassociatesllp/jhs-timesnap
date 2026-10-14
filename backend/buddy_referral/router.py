@@ -3,7 +3,7 @@
 Buddy Referral module.
 
   1. Existing employee referral - an employee records which colleague (picked
-     via a JHS-code / name search) referred someone, for a position.
+     via a JHS-code / name search) refer someone, for a position.
   2. Referral - an employee submits a role plus the candidate's resume
      (.pdf / .docx only), stored in MongoDB GridFS.
 
@@ -28,13 +28,13 @@ from pydantic import BaseModel
 from backend.access_manager.router import is_referral_admin, require_referral_admin
 from backend.auth import get_current_user
 from backend.buddy_referral.notify import send_referral_email
-from backend.database import db, employee_details_collection
+from backend.database import referral_db, employee_details_collection
 
 router = APIRouter(prefix="/buddy-referral", tags=["Buddy Referral"])
 
-existing_referrals = db["buddy_existing_referrals"]
-resume_referrals = db["buddy_referrals"]
-_fs = gridfs.GridFS(db, collection="buddy_referral_resumes")
+existing_referrals = referral_db["buddy_existing_referrals"]
+resume_referrals = referral_db["buddy_referrals"]
+_fs = gridfs.GridFS(referral_db, collection="buddy_referral_resumes")
 
 MAX_RESUME_BYTES = 10 * 1024 * 1024
 _ALLOWED = {

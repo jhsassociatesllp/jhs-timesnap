@@ -19,11 +19,11 @@ from pydantic import BaseModel, Field
 from backend.access_manager.router import is_compliance_admin, require_compliance_admin
 from backend.auth import get_current_user
 from backend.compliance_calendar.build_seed import group_key
-from backend.database import db
+from backend.database import compliance_db
 
 router = APIRouter(prefix="/compliance-calendar", tags=["Compliance Calendar"])
 
-custom_items = db["compliance_calendar_items"]
+custom_items = compliance_db["compliance_calendar_items"]
 
 _SEED_PATH = os.path.join(os.path.dirname(__file__), "seed.json")
 with open(_SEED_PATH, encoding="utf-8") as _fh:

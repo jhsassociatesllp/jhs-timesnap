@@ -18,6 +18,12 @@ _client = MongoClient(MONGO_CONNECTION_STRING)
 db = _client["Timesheets"]
 appraisal_db = _client["Appraisal"]
 
+# ── per-module databases (split out of "Timesheets") ──────────────────────────
+# Mongo database names cannot contain spaces, hence the underscores.
+cv_db         = _client["CV_Builder"]         # cv_profiles, cv_custom_options, cv_experience
+referral_db   = _client["Buddy_Referral"]     # buddy_* collections + buddy_referral_resumes GridFS
+compliance_db = _client["Compliance_Table"]   # compliance_calendar_items
+
 # ── shared collections ────────────────────────────────────────────────────────
 sessions_collection           = db["sessions"]
 employee_details_collection   = db["Employee_details"]

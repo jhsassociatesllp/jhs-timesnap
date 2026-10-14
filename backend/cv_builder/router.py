@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
-from backend.database import employee_details_collection, db
+from backend.database import employee_details_collection, cv_db
 from backend.cv_builder.convert import docx_to_pdf, pdf_available
 from backend.cv_builder.docx_fill import SECTIONS, render_docx, section_spec
 from backend.cv_builder.ppt_profile import build_profile_ppt
@@ -27,8 +27,8 @@ from backend.cv_builder.resume_parser import extract_texts, parse_resume_texts
 
 router = APIRouter(prefix="/cv-builder", tags=["CV Builder"])
 
-cv_profiles_collection   = db["cv_profiles"]
-cv_options_collection    = db["cv_custom_options"]     # values employees added to the dropdowns
+cv_profiles_collection   = cv_db["cv_profiles"]
+cv_options_collection    = cv_db["cv_custom_options"]     # values employees added to the dropdowns
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 # Template preview images (rendered from the Word templates)
