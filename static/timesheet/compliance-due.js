@@ -1,7 +1,7 @@
 /* Compliance due-date reminders: scrolling marquee (due within 5 days), the due-dates modal
    (all dates of one compliance, or everything due this week) and the once-per-login popup. */
 (function () {
-  var MARQUEE_DAYS = 5, WEEK_DAYS = 7;
+  var MARQUEE_DAYS = 7, WEEK_DAYS = 7;
   var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var itemsPromise = null;
 

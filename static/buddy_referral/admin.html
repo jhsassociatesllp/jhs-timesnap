@@ -47,18 +47,18 @@
 
     <div class="body">
       <div class="tabs">
-        <button class="tab active" id="tab-existing" onclick="switchTab('existing')"><i class="fas fa-user-tie"></i> Existing Employee <span class="chip" id="c_ex">0</span></button>
-        <button class="tab" id="tab-referral" onclick="switchTab('referral')"><i class="fas fa-file-upload"></i> Referral <span class="chip" id="c_rr">0</span></button>
+        <button class="tab active" id="tab-existing" onclick="switchTab('existing')"><i class="fas fa-user-tie"></i> Referred by a JHS Employee <span class="chip" id="c_ex">0</span></button>
+        <button class="tab" id="tab-referral" onclick="switchTab('referral')"><i class="fas fa-file-upload"></i> Referred Someone <span class="chip" id="c_rr">0</span></button>
       </div>
 
       <!-- Existing employee -->
       <div class="tc active" id="tc-existing">
         <div class="toolbar">
           <input class="fi" id="exSearch" placeholder="Search…" oninput="renderExisting()" />
-          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/existing/export','Existing_Employee_Referrals.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
+          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/existing/export','Referred_by_JHS_Employee.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
-          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Date of Joining</th><th>Manager</th><th>Partner</th><th>Referral From</th><th>Position</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Date of Joining</th><th>Manager</th><th>Partner</th><th>Referred By</th><th>Position</th></tr></thead>
           <tbody id="exBody"></tbody>
         </table></div>
       </div>
@@ -67,7 +67,7 @@
       <div class="tc" id="tc-referral">
         <div class="toolbar">
           <input class="fi" id="rrSearch" placeholder="Search…" oninput="renderReferrals()" />
-          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/referrals/export','Referrals.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
+          <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/referrals/export','Referred_Someone.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
           <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th></tr></thead>
