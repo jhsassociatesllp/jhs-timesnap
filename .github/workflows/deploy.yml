@@ -182,6 +182,7 @@ jobs:
               docker run -d \
                 --name "$APP_NAME" \
                 -p "$PORT:8000" \
+                -v "${APP_NAME}_resume_uploads:/app/data/resume_ranker/uploads" \
                 -e APP_ENV="$ENV" \
                 -e MONGO_CONNECTION_STRING="${{ secrets.MONGO_CONNECTION_STRING }}" \
                 -e SMTP_KEY="$SMTP" \
