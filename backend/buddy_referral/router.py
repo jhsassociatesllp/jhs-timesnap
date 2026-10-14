@@ -127,8 +127,7 @@ class ExistingReferralBody(BaseModel):
 
 
 @router.post("/existing")
-def submit_existing(body: ExistingReferralBody, background: BackgroundTasks,
-                    current_user: str = Depends(get_current_user)):
+def submit_existing(body: ExistingReferralBody, current_user: str = Depends(get_current_user)):
     position = body.position.strip()
     if not position:
         raise HTTPException(400, "Position is required")
@@ -144,8 +143,7 @@ def submit_existing(body: ExistingReferralBody, background: BackgroundTasks,
         "position": position,
         "submitted_at": datetime.now(timezone.utc),
     })
-    background.add_task(send_referral_email, me_["empid"], me_["name"], "existing", position,
-                        _name(ref, ""))                             # HR acknowledgement mail (names only, no codes), after the response
+    # No HR mail for this one: only "Referred Someone" (a candidate + resume) notifies HR.
     return {"success": True}
 
 
@@ -181,7 +179,7 @@ async def submit_referral(
         "role": role, "resume_file_id": file_id, "resume_filename": safe_name,
         "resume_size": len(data), "submitted_at": datetime.now(timezone.utc),
     })
-    background.add_task(send_referral_email, me_["empid"], me_["name"], "referral", role)   # HR acknowledgement mail
+    background.add_task(send_referral_email, me_["empid"], me_["name"], "referral", role)   # HR acknowledgement mail (only "Referred Someone" sends one)
     return {"success": True}
 
 
@@ -290,21 +288,21 @@ _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 @router.get("/admin/existing/export")
 def export_existing(_: str = Depends(require_referral_admin)):
     rows = _existing_rows()
-    data = _xlsx("Existing Employee Referrals",
+    data = _xlsx("Referred by a JHS Employee",
                  ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner",
                   "Referral From (Code)", "Referral From (Name)", "Position", "Submitted On"],
                  [[r["empid"], r["name"], r["date_of_joining"], r["manager"], r["partner"],
                    r["referral_from"], r["referral_from_name"], r["position"], _ist_text(r["submitted_at"])] for r in rows])
     return Response(content=data, media_type=_XLSX,
-                    headers={"Content-Disposition": "attachment; filename=Existing_Employee_Referrals.xlsx"})
+                    headers={"Content-Disposition": "attachment; filename=Referred_by_JHS_Employee.xlsx"})
 
 
 @router.get("/admin/referrals/export")
 def export_referrals(_: str = Depends(require_referral_admin)):
     rows = _referral_rows()
-    data = _xlsx("Referrals",
+    data = _xlsx("Referred Someone",
                  ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner", "Role", "Resume File", "Submitted On"],
                  [[r["empid"], r["name"], r["date_of_joining"], r["manager"], r["partner"],
                    r["role"], r["resume_filename"], _ist_text(r["submitted_at"])] for r in rows])
     return Response(content=data, media_type=_XLSX,
-                    headers={"Content-Disposition": "attachment; filename=Referrals.xlsx"})
+                    headers={"Content-Disposition": "attachment; filename=Referred_Someone.xlsx"})

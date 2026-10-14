@@ -1,9 +1,13 @@
 # backend/compliance_calendar/build_seed.py
 """
-Builds seed.json (the Excel-sourced compliance due dates) from the two source
-workbooks. Run manually whenever the Excel files change:
+Loads the Excel-sourced compliance due dates into MongoDB (database Compliance_Table,
+collection compliance_calendar_items, source="excel"). Run whenever the Excel files change:
 
-    python -m backend.compliance_calendar.build_seed [input_dir]
+    python -m backend.compliance_calendar.build_seed [input_dir]           # import
+    python -m backend.compliance_calendar.build_seed [input_dir] --dry-run  # parse only
+
+Re-running replaces only the source="excel" rows; dates added by admins in the Control
+Panel (source="manual") are never touched.
 
 Sources:
   * compliance-26-27.xlsx  - one sheet, real dates (Sep-Dec 2026).
@@ -24,7 +28,6 @@ from datetime import date, datetime, timedelta
 import openpyxl
 
 DEFAULT_INPUT = r"F:\osama\JHS Projects\compliance calender\input"
-OUT = os.path.join(os.path.dirname(__file__), "seed.json")
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 _MONTH_WORDS = r"(january|february|march|april|may|june|july|august|september|october|november|december)"
 
@@ -54,7 +57,7 @@ def clean(v) -> str:
     return re.sub(r"\s+", " ", str(v or "")).strip()
 
 
-def main(input_dir: str):
+def main(input_dir: str, dry_run: bool = False):
     items, skipped = [], []
 
     def add(law, comp, d, src):
@@ -97,12 +100,19 @@ def main(input_dir: str):
         if k not in seen:
             seen.add(k)
             out.append(it)
-    with open(OUT, "w", encoding="utf-8") as fh:
-        json.dump(out, fh, ensure_ascii=False, indent=1)
-    print(f"{len(out)} items written to {OUT}; {len(items) - len(out)} duplicates dropped")
+    if dry_run:
+        print(f"{len(out)} items parsed ({len(items) - len(out)} duplicates dropped); nothing written")
+    else:
+        from backend.database import compliance_db
+        coll = compliance_db["compliance_calendar_items"]
+        coll.delete_many({"source": "excel"})
+        if out:
+            coll.insert_many([dict(it, source="excel") for it in out])
+        print(f"{len(out)} items stored in Compliance_Table.compliance_calendar_items ({len(items) - len(out)} duplicates dropped)")
     for s in skipped:
         print("SKIPPED:", s)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    main(args[0] if args else DEFAULT_INPUT, "--dry-run" in sys.argv)
