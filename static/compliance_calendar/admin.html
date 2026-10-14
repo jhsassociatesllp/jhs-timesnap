@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>Compliance Calendar Admin — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .form-row{display:grid;grid-template-columns:200px 1fr 190px auto;gap:1rem;align-items:end}
+    .del-btn{width:34px;height:34px;border-radius:9px;border:2px solid var(--border);background:#fff;color:#c0392b;cursor:pointer;transition:var(--tr)}
+    .del-btn:hover{border-color:#c0392b;background:#fdecea}
+    .law-tag{display:inline-block;font-size:.72rem;font-weight:700;padding:.15rem .6rem;border-radius:20px;background:rgba(102,126,234,.12);color:#667eea;white-space:nowrap}
+    @media(max-width:900px){.form-row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div id="ls" class="loader"><div class="spin"></div> Loading…</div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-calendar-check"></i> Compliance Calendar — Admin</div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <a href="/control-panel" class="nav-btn"><i class="fas fa-sliders-h"></i> Control Panel</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <div class="hdr">
+      <h1>Compliance Calendar</h1>
+      <p>Add due dates that are not in the imported Excel calendar</p>
+    </div>
+    <div class="body">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-plus-circle"></i> Add a due date</div>
+        <div class="form-row">
+          <div class="form-group"><label for="law"><i class="fas fa-gavel"></i> Law</label>
+            <input class="fi" id="law" list="lawList" maxlength="60" placeholder="e.g. GST, SEBI, MCA" autocomplete="off" />
+            <datalist id="lawList"></datalist></div>
+          <div class="form-group"><label for="comp"><i class="fas fa-file-alt"></i> Compliance</label>
+            <input class="fi" id="comp" maxlength="500" placeholder="e.g. GSTR-9 annual return" autocomplete="off" /></div>
+          <div class="form-group"><label for="due"><i class="fas fa-calendar-day"></i> Due date</label>
+            <input class="fi" id="due" type="date" /></div>
+          <button class="btn btn-pri" id="addBtn" onclick="addItem()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">Reuse the same law and compliance wording to add another date for an existing compliance — its dates are then listed together in the "all due dates" popup.</p>
+      </div>
+
+      <div class="toolbar">
+        <input class="fi" id="search" placeholder="Search added due dates…" oninput="render()" />
+      </div>
+      <div class="tbl-wrap">
+        <table class="t">
+          <thead><tr><th>Due date</th><th>Law</th><th>Compliance</th><th>Added by</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = localStorage.getItem('loggedInEmployeeId') || '';
+const AUTH = {Authorization:`Bearer ${token}`};
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t); setTimeout(()=>t.remove(),3500);
+}
+async function api(url, opts={}){
+  const r = await fetch(url, {...opts, headers:{...AUTH, ...(opts.body?{'Content-Type':'application/json'}:{})}});
+  if (r.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (r.status===403){ window.location.href='/control-panel'; throw new Error('No access'); }
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(typeof d.detail==='string' ? d.detail : 'Request failed');
+  return d;
+}
+const fmt = iso => new Date(iso+'T00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
+let items = [];
+
+async function load(){
+  const d = await api('/compliance-calendar/admin/items');
+  items = d.items;
+  document.getElementById('lawList').innerHTML = d.laws.map(l=>`<option value="${esc(l)}">`).join('');
+  render();
+}
+function render(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const list = items.filter(i => !q || (i.law+' '+i.compliance+' '+i.date).toLowerCase().includes(q));
+  document.getElementById('rows').innerHTML = list.length ? list.map(i=>`<tr>
+    <td style="white-space:nowrap">${esc(fmt(i.date))}</td>
+    <td><span class="law-tag">${esc(i.law)}</span></td>
+    <td>${esc(i.compliance)}</td>
+    <td>${esc(i.added_by)}</td>
+    <td><button class="del-btn" title="Delete" onclick="delItem('${esc(i.id)}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')
+    : `<tr><td colspan="5"><div class="empty"><i class="fas fa-calendar-plus"></i>${items.length?'No matches.':'No due dates added manually yet.'}</div></td></tr>`;
+}
+async function addItem(){
+  const law=document.getElementById('law').value.trim(), comp=document.getElementById('comp').value.trim(), due=document.getElementById('due').value;
+  if (!law||!comp||!due){ toast('Law, compliance and due date are all required','error'); return; }
+  const b=document.getElementById('addBtn'); b.disabled=true;
+  try{
+    await api('/compliance-calendar/admin/items',{method:'POST',body:JSON.stringify({law,compliance:comp,date:due})});
+    toast('Due date added — it now shows on the calendar');
+    document.getElementById('comp').value=''; document.getElementById('due').value='';
+    await load();
+  }catch(e){ toast(e.message,'error'); }
+  b.disabled=false;
+}
+async function delItem(id){
+  if (!confirm('Delete this due date?')) return;
+  try{ await api('/compliance-calendar/admin/items/'+encodeURIComponent(id),{method:'DELETE'}); toast('Deleted'); await load(); }
+  catch(e){ toast(e.message,'error'); }
+}
+load().then(()=>{document.getElementById('ls').style.display='none';document.getElementById('app').style.display='block';}).catch(()=>{});
+</script>
+</body>
+</html>

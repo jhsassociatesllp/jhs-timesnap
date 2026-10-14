@@ -23,4 +23,19 @@ class AppraisalReviewRequest(BaseModel):
     tl_responses: Optional[Dict[str, Any]] = None
     pnd_responses: Optional[Dict[str, Any]] = None
     remarks: Optional[str] = None
- 
+
+
+class CycleToggleRequest(BaseModel):
+    """Admin request to open/close the KRA submission window."""
+    open: bool
+
+
+class CreateCycleRequest(BaseModel):
+    """Admin request to create a new KRA quarter."""
+    quarter_label: str                  # e.g. "Q2 2026-27"
+
+
+class UpdateCycleRequest(BaseModel):
+    """Admin request to rename a KRA quarter's display label."""
+    quarter_label: str
+

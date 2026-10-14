@@ -219,6 +219,20 @@ def _get_or_create_payroll(payrolls: list, cycle_id: str, cycle_label: str) -> d
     return new_payroll
 
 
+def _trusted_metadata(emp_id: str, meta: dict) -> dict:
+    """Metadata with the identity fields taken from Employee_details, never from
+    the client — otherwise a payload/Excel built for another person would be
+    stored (and shown to the approver) under this employee's ID."""
+    meta = dict(meta or {})
+    emp = employee_details_collection.find_one({"EmpID": (emp_id or "").strip().upper()})
+    if emp:
+        for key, src in (("employeeName", "Emp Name"), ("designation", "Designation Name"),
+                         ("partner", "Partner"), ("reportingManager", "ReportingEmpName")):
+            if emp.get(src):
+                meta[key] = emp[src]
+    return meta
+
+
 # ───────────────────────────── routes ────────────────────────────────────────
 
 @router.post("/save-draft")
@@ -237,6 +251,15 @@ async def save_draft(
     never block saving progress.
     """
     now_iso = datetime.utcnow().isoformat()
+    if metadata:
+        metadata = _trusted_metadata(current_user, metadata)
+
+    # Entries carrying an employee ID (Excel uploads do) must be the caller's own.
+    me = (current_user or "").strip().upper()
+    for e in entries:
+        eid = str((e or {}).get("employeeId") or "").strip().upper()
+        if eid and eid != me:
+            raise HTTPException(403, f"Entries belong to {eid}, but you are logged in as {me}")
 
     # Assign IDs to entries
     new_entries = []
@@ -353,7 +376,7 @@ async def submit_timesheet(
         raise HTTPException(404, "No draft found for this cycle")
 
     emp_id = current_user
-    meta = temp_payroll.get("metadata") or metadata or {}
+    meta = _trusted_metadata(current_user, temp_payroll.get("metadata") or metadata or {})
     temp_entries = _get_payroll_entries(temp_payroll)
 
     # Keep not-applicable time fields consistently empty in both the submitted
@@ -801,9 +824,11 @@ async def get_employee_projects(employee_id: str, current_user: str = Depends(ge
     if not employee:
         return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
+    # partner_code only decides dropdown vs. free-text mode (shared services,
+    # matched against FREE_TEXT_PARTNER_CODE on the frontend) — it must NOT
+    # gate the company-wide list below, which every employee should see
+    # regardless of whether PartnerEmpCode happens to be populated for them.
     partner_code = employee.get("PartnerEmpCode", "").strip().upper()
-    if not partner_code:
-        return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
 
     # Company-wide: every client/project is available to every dropdown-mode
     # employee, not just the ones belonging to their own partner — they pick

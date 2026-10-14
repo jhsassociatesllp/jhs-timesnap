@@ -18,6 +18,12 @@ _client = MongoClient(MONGO_CONNECTION_STRING)
 db = _client["Timesheets"]
 appraisal_db = _client["Appraisal"]
 
+# ── per-module databases (split out of "Timesheets") ──────────────────────────
+# Mongo database names cannot contain spaces, hence the underscores.
+cv_db         = _client["CV_Builder"]         # cv_profiles, cv_custom_options, cv_experience
+referral_db   = _client["Buddy_Referral"]     # buddy_* collections + buddy_referral_resumes GridFS
+compliance_db = _client["Compliance_Table"]   # compliance_calendar_items
+
 # ── shared collections ────────────────────────────────────────────────────────
 sessions_collection           = db["sessions"]
 employee_details_collection   = db["Employee_details"]
@@ -25,7 +31,7 @@ users_collection              = db["users"]
 
 # ── timesheet collections ─────────────────────────────────────────────────────
 timesheets_collection         = db["Timesheet_data"]
-client_details_collection     = db["Client_details"]
+client_details_collection     = db["Projects"]
 reporting_managers_collection = db["Reporting_managers"]
 pending_collection            = db["Pending"]
 approved_collection           = db["Approved"]
@@ -49,6 +55,31 @@ module_admin_collection       = db["module_admin_access"]
 
 # ── appraisal collections (add when ready) ────────────────────────────────────
 appraisal_collection          = appraisal_db["Appraisal_data"]
+
+# ── appraisal (KRA) quarter/cycle collections ─────────────────────────────────
+# Document shape:
+# {
+#   "quarter_id": "KRA_Q2_2026_27",     # stable, slugified from the label at creation
+#   "quarter_label": "Q2 2026-27",      # display value, editable
+#   "status": "draft" | "live" | "closed",
+#   "created_at": datetime, "created_by": str,
+#   "updated_at": datetime, "updated_by": str,
+# }
+# Only one cycle may be "live" at a time — activating one auto-closes the rest.
+appraisal_cycles_collection   = appraisal_db["Appraisal_cycles"]
+
+# One doc per (quarter, employee) — who is allowed to fill the KRA for that
+# quarter. An Excel upload for a quarter fully REPLACES its rows.
+# { "quarter_id": str, "employee_code": str, "employee_name": str,
+#   "uploaded_at": datetime, "uploaded_by": str }
+appraisal_eligibility_collection = appraisal_db["Appraisal_eligibility"]
+
+# Audit log, one doc per eligibility-list upload — powers the Admin Panel's
+# validation report and upload history.
+# { "quarter_id": str, "uploaded_by": str, "uploaded_at": datetime,
+#   "filename": str, "total_records": int, "valid_count": int,
+#   "invalid_count": int, "duplicate_count": int, "invalid_rows": [...] }
+appraisal_upload_history_collection = appraisal_db["Appraisal_upload_history"]
 
 # ── payroll cycles collection ─────────────────────────────────────────────────
 # Document shape:

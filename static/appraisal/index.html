@@ -217,6 +217,8 @@
   <div class="header">
     <h1><i class="fas fa-chart-line"></i> JHS KRA <span id="roleBadge" class="role-badge"></span></h1>
     <p id="headerSub">Annual Performance Review</p>
+    <div id="cycleStatusBar" style="display:none;margin-top:.8rem;align-items:center;justify-content:center;gap:.8rem;flex-wrap:wrap;position:relative;z-index:2;"></div>
+    <div id="quarterSwitcherBar" style="display:none;margin-top:.6rem;align-items:center;justify-content:center;gap:.8rem;flex-wrap:wrap;position:relative;z-index:2;"></div>
   </div>
   <div id="tabContents"></div>
 </div>
@@ -227,6 +229,17 @@
   <p>Do you want to logout?</p>
   <button class="confirm-btn" onclick="doLogout()">Yes</button>
   <button class="cancel-btn" onclick="document.getElementById('logoutConfirm').style.display='none'">No</button>
+</div>
+<div class="exit-confirmation" id="submitConfirm">
+  <p><i class="fas fa-exclamation-triangle" style="color:#e67e22;font-size:1.5rem;margin-bottom:.5rem;display:block"></i>
+     Once submitted, your KRA <strong>cannot be edited</strong>.<br>Are you sure you want to submit?</p>
+  <button class="confirm-btn" onclick="doFormSubmit()">Yes, Submit</button>
+  <button class="cancel-btn" onclick="closeFormSubmitConfirm()">Cancel</button>
+</div>
+<div class="exit-confirmation" id="cycleConfirm">
+  <p id="cycleConfirmMsg"></p>
+  <button class="confirm-btn" id="cycleConfirmYesBtn" onclick="doToggleCycle()">Yes</button>
+  <button class="cancel-btn" onclick="closeCycleConfirm()">Cancel</button>
 </div>
 
 <div class="modal-overlay" id="kraModal">
@@ -244,9 +257,12 @@ if (!TOK) window.location.href = "/static/login.html";
 const H = () => ({"Content-Type":"application/json",Authorization:`Bearer ${TOK}`});
 
 // ── Global state ──────────────────────────────────────────────────────────────
-let _role    = "employee";  // natural role: employee | tl | partner | admin
-let _isAdmin = false;       // true if user is in admin list (regardless of natural role)
-let _period  = "";
+let _role       = "employee";  // natural role: employee | tl | partner | admin
+let _isAdmin    = false;       // true if user is in admin list (regardless of natural role)
+let _eligible   = false;       // eligible to fill own KRA this quarter
+let _isTl       = false;       // has direct reports → Manager approval tabs
+let _period     = "";
+let _cycleOpen  = false;       // whether the KRA submission window is open
 let _modalRecord = null, _editMode = false, _editedAnswers = {};
 const _loaded = new Set();
 const _CP_ADMIN = sessionStorage.getItem('cp_admin') === '1' && sessionStorage.getItem('admin_mode') === 'kra';
@@ -258,20 +274,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sv = await fetch(`${API}/verify_session`,{method:"POST",headers:H()});
     if (!sv.ok) throw new Error("Session invalid");
 
-    const [rr, pr] = await Promise.all([
+    const [rr, pr, cr, er] = await Promise.all([
       fetch(`${API}/appraisal/my_role`,{headers:H()}),
       fetch(`${API}/appraisal/period`,{headers:H()}),
+      fetch(`${API}/appraisal/cycle_status`,{headers:H()}),
+      fetch(`${API}/appraisal/eligibility/${EID}`,{headers:H()}),
     ]);
-    const rd = await rr.json(), pd = await pr.json();
+    const rd = await rr.json(), pd = await pr.json(), cd = await cr.json();
+    try { _eligible = !!(await er.json()).eligible; } catch(e) { _eligible = false; }
 
-    _role    = rd.role    || "employee";
-    _isAdmin = rd.isAdmin || false;   // ← comes from backend now
-    _period  = pd.period  || "";
+    _role      = rd.role    || "employee";
+    _isAdmin   = rd.isAdmin || false;   // ← comes from backend now
+    _isTl      = !!rd.isTl;
+    _period    = pd.period  || "";
+    _cycleOpen = !!cd.open;
 
     document.getElementById("headerSub").textContent = `Annual Performance Review — ${_period}`;
     _renderRoleBadge();
+    _renderCycleBar();
     _buildNav();
     _buildTabContents();
+    if (!_CP_ADMIN && (_role === "tl" || _role === "partner" || _isAdmin)) {
+      await _fetchQuarterList();
+      _renderQuarterSwitcher();
+    }
   } catch(e) {
     showPopup("Session error — please login again.", true);
     setTimeout(() => window.location.href = "/static/login.html", 2000);
@@ -279,6 +305,123 @@ document.addEventListener("DOMContentLoaded", async () => {
     hideLoading();
   }
 });
+
+// ── Cycle open/close bar ─────────────────────────────────────────────────────
+function _renderCycleBar() {
+  const bar = document.getElementById("cycleStatusBar");
+  if (!bar || _CP_ADMIN) return;
+
+  bar.style.display = "flex";
+  const pill = `<span class="pill ${_cycleOpen ? "pill-submitted" : "pill-pending"}">
+      <i class="fas ${_cycleOpen ? "fa-lock-open" : "fa-lock"}"></i> KRA Window: ${_cycleOpen ? "OPEN — " + _period : "CLOSED"}
+    </span>`;
+
+  let adminBtn = "";
+  if (_isAdmin) {
+    // Opening a specific quarter is ambiguous from this bar — that's handled
+    // in Quarter Management. "Close" remains here as a quick kill-switch.
+    const closeBtn = _cycleOpen
+      ? `<button class="export-btn" style="padding:.5rem 1.2rem;font-size:.85rem;background:#c0392b" onclick="confirmToggleCycle(false)"><i class="fas fa-lock"></i> Close KRA</button>`
+      : "";
+    adminBtn = closeBtn + `<a class="export-btn" style="padding:.5rem 1.2rem;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem" href="/appraisal/admin"><i class="fas fa-calendar-check"></i> Manage Quarters</a>`;
+  }
+  bar.innerHTML = pill + adminBtn;
+}
+
+// ── Quarter switcher (TL / Partner / Admin read-only history view) ────────────
+let _selectedQuarterId = "";
+let _quarterList = [];
+
+function _qs() {
+  return _selectedQuarterId ? `?quarter_id=${encodeURIComponent(_selectedQuarterId)}` : "";
+}
+
+async function _fetchQuarterList() {
+  try {
+    const r = await fetch(`${API}/appraisal/cycles`, {headers:H()});
+    const d = await r.json();
+    _quarterList = d.data || [];
+  } catch (e) { _quarterList = []; }
+}
+
+function _renderQuarterSwitcher() {
+  const bar = document.getElementById("quarterSwitcherBar");
+  if (!bar || !_quarterList.length) return;
+  bar.style.display = "flex";
+  const opts = _quarterList.map(q => {
+    const isSelected = _selectedQuarterId ? _selectedQuarterId === q.quarter_id : q.status === "live";
+    return `<option value="${q.quarter_id}" ${isSelected ? "selected" : ""}>${q.quarter_label} (${q.status})</option>`;
+  }).join("");
+  bar.innerHTML = `<label style="font-size:.82rem;color:var(--text-light);display:flex;align-items:center;gap:.5rem;">
+      <i class="fas fa-calendar-alt"></i> Viewing Quarter:
+      <select id="quarterSelect" onchange="_onQuarterChange(this.value)" style="padding:.4rem .7rem;border-radius:8px;border:1px solid var(--border-color);font-size:.85rem;">${opts}</select>
+    </label>`;
+}
+
+function _onQuarterChange(qid) {
+  _selectedQuarterId = qid;
+  _loaded.clear();
+  const activeSec = document.querySelector(".tab-content.active");
+  if (activeSec) _loadSection(activeSec.id.replace("sec_", ""));
+}
+
+// ── Confirmation step before actually toggling ───────────────────────────────
+let _pendingCycleOpen = null;
+
+function confirmToggleCycle(open) {
+  _pendingCycleOpen = open;
+  document.getElementById("cycleConfirmMsg").innerHTML = open
+    ? `<i class="fas fa-lock-open" style="color:#27ae60;font-size:1.8rem;margin-bottom:.6rem;display:block"></i>
+       Are you sure you want to <strong>OPEN</strong> the KRA submission window?<br><span style="font-weight:400;font-size:.9rem;color:var(--text-light)">Everyone will be able to fill and submit their KRA.</span>`
+    : `<i class="fas fa-lock" style="color:#c0392b;font-size:1.8rem;margin-bottom:.6rem;display:block"></i>
+       Are you sure you want to <strong>CLOSE</strong> the KRA submission window?<br><span style="font-weight:400;font-size:.9rem;color:var(--text-light)">No one will be able to submit their KRA until it is reopened.</span>`;
+  const yesBtn = document.getElementById("cycleConfirmYesBtn");
+  yesBtn.textContent = open ? "Yes, Open It" : "Yes, Close It";
+  yesBtn.style.background = open ? "var(--success-gradient)" : "var(--danger-gradient)";
+  document.getElementById("cycleConfirm").style.display = "block";
+}
+
+function closeCycleConfirm() {
+  document.getElementById("cycleConfirm").style.display = "none";
+  _pendingCycleOpen = null;
+}
+
+function doToggleCycle() {
+  const open = _pendingCycleOpen;
+  closeCycleConfirm();
+  if (open !== null) toggleCycle(open);
+}
+
+async function toggleCycle(open) {
+  showLoading(open ? "Opening KRA…" : "Closing KRA…");
+  try {
+    const r = await fetch(`${API}/appraisal/admin/cycle`, {
+      method: "POST", headers: H(), body: JSON.stringify({ open }),
+    });
+    let d = {};
+    try { d = await r.json(); } catch (parseErr) {
+      showPopup(`Failed to update KRA status (HTTP ${r.status}).`, true);
+      return;
+    }
+
+    if (!r.ok || !d.success) {
+      showPopup(d.detail || d.message || `Failed to update KRA status (HTTP ${r.status}).`, true);
+      return;
+    }
+
+    _cycleOpen = open;
+    _renderCycleBar();
+    showPopup(d.message || "KRA status updated.");
+
+    // Refresh the Form section if it's currently visible
+    _loaded.delete("form");
+    if (document.getElementById("sec_form")?.classList.contains("active")) loadFormSection();
+  } catch (e) {
+    showPopup("Network error. Please try again.", true);
+  } finally {
+    hideLoading();
+  }
+}
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 function _renderRoleBadge() {
@@ -302,6 +445,11 @@ function _renderRoleBadge() {
   el.className   = `role-badge ${clsMap[_role] || ""}`;
 }
 
+// Separate Manager tabs are for TLs only. A Partner who is also someone's Reporting Manager
+// gets ONE Pending / Approved / Rejected set with a Manager section merged into each
+// (where Manager == Partner for an employee, that KRA appears only in the Partner section).
+function _showMgrTabs() { return _role === "tl"; }
+
 // ── Nav builder ───────────────────────────────────────────────────────────────
 /*
   Nav logic by role + isAdmin:
@@ -320,6 +468,7 @@ function _buildNav() {
   if (_CP_ADMIN) {
     links.push(
       `<a href="#" onclick="showSection('analysis')" id="nt_analysis"><i class="fas fa-chart-bar"></i> Analysis</a>`,
+      `<a href="/appraisal/admin"><i class="fas fa-calendar-check"></i> Quarter Management</a>`,
       `<a href="/control-panel"><i class="fas fa-cogs"></i> Control Panel</a>`,
       `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
     );
@@ -329,7 +478,7 @@ function _buildNav() {
 
   // ── Own KRA tabs (Form / History / Status) ──
   // Show for: employee, tl, pure admin, AND admin+partner (senior partner)
-  const showOwnKRA = (_role !== "partner") || _isAdmin;
+  const showOwnKRA = _role !== "partner" && (_role === "employee" || _role === "admin" || _isAdmin || _eligible);
   if (showOwnKRA) {
     links.push(
       `<a href="#" onclick="showSection('form')"    id="nt_form"   ><i class="fas fa-file-alt"></i> Form</a>`,
@@ -339,11 +488,12 @@ function _buildNav() {
   }
 
   // ── TL approval tabs ──
-  if (_role === "tl") {
+  if (_showMgrTabs()) {
+    const pre = "";
     links.push(
-      `<a href="#" onclick="showSection('tl_pending')"  id="nt_tl_pending" ><i class="fas fa-clock"></i> Pending</a>`,
-      `<a href="#" onclick="showSection('tl_approved')" id="nt_tl_approved"><i class="fas fa-check-circle"></i> Approved</a>`,
-      `<a href="#" onclick="showSection('tl_rejected')" id="nt_tl_rejected"><i class="fas fa-times-circle"></i> Rejected</a>`,
+      `<a href="#" onclick="showSection('tl_pending')"  id="nt_tl_pending" ><i class="fas fa-clock"></i> ${pre}Pending</a>`,
+      `<a href="#" onclick="showSection('tl_approved')" id="nt_tl_approved"><i class="fas fa-check-circle"></i> ${pre}Approved</a>`,
+      `<a href="#" onclick="showSection('tl_rejected')" id="nt_tl_rejected"><i class="fas fa-times-circle"></i> ${pre}Rejected</a>`,
     );
   }
 
@@ -372,6 +522,13 @@ function _buildNav() {
     );
   }
 
+  // ── Quarter Management — visible to any admin (pure admin or senior partner) ──
+  if (_isAdmin) {
+    links.push(
+      `<a href="/appraisal/admin"><i class="fas fa-calendar-check"></i> Quarter Management</a>`,
+    );
+  }
+
   links.push(
     `<a href="/modules"><i class="fas fa-th-large"></i> Modules</a>`,
     `<button onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>`,
@@ -395,15 +552,11 @@ function _buildTabContents() {
   }
 
   // Own KRA sections — same condition as nav
-  const showOwnKRA = (_role !== "partner") || _isAdmin;
+  const showOwnKRA = _role !== "partner" && (_role === "employee" || _role === "admin" || _isAdmin || _eligible);
   if (showOwnKRA) {
     secs.push(
       `<div class="tab-content" id="sec_form">
-        <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
-          <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
-          <strong style="font-size:1.3rem;margin-bottom:.5rem;">KRA Form has been closed</strong>
-          <p style="font-size:.95rem;color:#7d5a00;">The submission window is closed. Contact HR for details.</p>
-        </div>
+        <div id="formSectionRoot"><p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p></div>
       </div>`,
       `<div class="tab-content" id="sec_history" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-history"></i> Past KRA</p><div id="historyContent"><p class="empty-msg">Loading…</p></div></div></div>`,
       `<div class="tab-content" id="sec_status"  style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-info-circle"></i> Approval Status</p><div id="statusContent"><p class="empty-msg">Loading…</p></div></div></div>`,
@@ -411,7 +564,7 @@ function _buildTabContents() {
   }
 
   // TL sections
-  if (_role === "tl") {
+  if (_showMgrTabs()) {
     secs.push(
       `<div class="tab-content" id="sec_tl_pending"  style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-clock"></i> Pending Approvals</p><div id="tl_pending_content"></div></div></div>`,
       `<div class="tab-content" id="sec_tl_approved" style="display:none"><div class="body-content"><p class="section-label"><i class="fas fa-check-circle"></i> Approved</p><div id="tl_approved_content"></div></div></div>`,
@@ -447,10 +600,11 @@ function _buildTabContents() {
   c.innerHTML = secs.join("\n");
 
   // Default section per role
+  // Approvers who cannot fill their own KRA land on their approvals list.
   const defaultSection = {
     employee: "form",
-    tl:       "form",
-    partner:  _isAdmin ? "form" : "pnd_pending",   // senior partner lands on Form
+    tl:       _eligible ? "form" : "tl_pending",
+    partner:  "pnd_pending",
     admin:    "analysis",
   }[_role] || "form";
 
@@ -475,6 +629,7 @@ async function _loadSection(name) {
   if (_loaded.has(name)) return;
   _loaded.add(name);
   const m = {
+    form:         loadFormSection,
     history:      loadStatusHistory,
     status:       loadStatusDetail,
     tl_pending:   () => _loadList("tl/pending",   "tl_pending_content",   "tl_pending"),
@@ -496,7 +651,7 @@ async function _loadList(endpoint, elId, context) {
   const el = document.getElementById(elId);
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-    const d = await (await fetch(`${API}/appraisal/${endpoint}`, {headers:H()})).json();
+    const d = await (await fetch(`${API}/appraisal/${endpoint}${_qs()}`, {headers:H()})).json();
     const rows = d.data || [];
     el.innerHTML = rows.length
       ? _buildApprovalTable(rows, context)
@@ -634,6 +789,450 @@ async function _populateAnswerView(rid, container) {
   } catch { container.textContent = "Failed to load answers."; }
 }
 
+// ── Form tab (fill / submit own KRA) ─────────────────────────────────────────
+let _formQuestions      = null;   // { common: [], role: [] }
+let _formDraftAnswers   = {};
+let _formReadOnly       = false;
+
+const FORM_YES_NO_TYPES = new Set([
+  "yes_no", "yes_no_example", "yes_no_reason", "yes_no_description",
+  "yes_no_details", "yes_no_justification", "yes_no_notes",
+  "yes_no_explanation", "yes_no_comments", "yes_no_number",
+]);
+const FORM_YES_NO_HINTS = {
+  "yes_no_example":       "Please provide an example if Yes.",
+  "yes_no_reason":        "If No, please state the reason.",
+  "yes_no_description":   "If Yes, please describe briefly.",
+  "yes_no_details":       "If Yes, please provide details.",
+  "yes_no_justification": "Please provide a brief justification.",
+  "yes_no_notes":         "Add notes if there are any gaps.",
+  "yes_no_explanation":   "Please explain briefly.",
+  "yes_no_comments":      "Please add any comments.",
+};
+
+async function loadFormSection() {
+  const root = document.getElementById("formSectionRoot");
+  root.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
+
+  try {
+    const cr = await fetch(`${API}/appraisal/cycle_status`, {headers:H()});
+    const cd = await cr.json();
+    _cycleOpen = !!cd.open;
+    _renderCycleBar();
+
+    if (!_cycleOpen) {
+      root.innerHTML = `
+        <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
+          <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
+          <strong style="font-size:1.3rem;margin-bottom:.5rem;">KRA Form is Closed</strong>
+          <p style="font-size:.95rem;color:#7d5a00;">The submission window is currently closed. Please check back once it is reopened, or contact HR.</p>
+        </div>`;
+      return;
+    }
+
+    const [eligR, statR] = await Promise.all([
+      fetch(`${API}/appraisal/eligibility/${EID}`, {headers:H()}),
+      fetch(`${API}/appraisal/status/${EID}`,      {headers:H()}),
+    ]);
+    const elig = await eligR.json(), stat = await statR.json();
+
+    if (!elig.eligible) {
+      root.innerHTML = `
+        <div class="info-strip info-warning" style="margin:3rem 3rem 2rem;justify-content:center;text-align:center;flex-direction:column;align-items:center;padding:3rem 2rem;">
+          <i class="fas fa-lock" style="font-size:2.5rem;margin-bottom:1rem;color:#f39c12;"></i>
+          <strong style="font-size:1.3rem;margin-bottom:.5rem;">Not Eligible</strong>
+          <p style="font-size:.95rem;color:#7d5a00;">${elig.reason || ""}</p>
+        </div>`;
+      return;
+    }
+
+    _formDraftAnswers = stat.answers || {};
+    _formReadOnly     = stat.status && stat.status !== "draft" && stat.status !== "not_started";
+
+    const qr = await fetch(`${API}/appraisal/questions/${EID}`, {headers:H()});
+    _formQuestions = await qr.json();
+    window._questions = _formQuestions; // reused by History tab's answer viewer
+
+    root.innerHTML = `
+      ${_formReadOnly ? `
+        <div class="info-strip info-success" style="margin:0 0 1.5rem;">
+          <i class="fas fa-check-circle"></i>
+          <div><strong>KRA Submitted</strong><p>Your KRA for ${_period} has been submitted and is under review. No further edits are allowed.</p></div>
+        </div>` : ""}
+      <div id="formSections"></div>
+      ${!_formReadOnly ? `
+      <div class="export-section" id="formActions">
+        <button class="export-btn" onclick="saveFormAppraisal('draft')"><i class="fas fa-save"></i> Save Draft</button>
+        <button class="export-btn btn-submit" onclick="confirmFormSubmit()"><i class="fas fa-paper-plane"></i> Submit KRA</button>
+      </div>` : ""}
+    `;
+    _buildFormUI(_formQuestions, _formDraftAnswers, _formReadOnly);
+
+  } catch (e) {
+    root.innerHTML = `<p class="empty-msg">Failed to load form.</p>`;
+  }
+}
+
+function _buildFormUI(questions, savedAnswers, readOnly) {
+  const container = document.getElementById("formSections");
+  container.innerHTML = "";
+
+  const commonGroups = _formGroupBySection(questions.common);
+  const roleGroups   = _formGroupBySection(questions.role);
+
+  Object.entries(commonGroups).forEach(([section, qs]) => {
+    container.appendChild(_buildFormSection(section, qs, savedAnswers, readOnly, false));
+  });
+
+  if (questions.role && questions.role.length > 0) {
+    const sep = document.createElement("div");
+    sep.style.cssText = "margin:2rem 0 1.5rem;padding:.8rem 1.2rem;background:linear-gradient(135deg,#11998e,#38ef7d);border-radius:10px;color:white;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:.6rem;";
+    sep.innerHTML = `<i class="fas fa-user-tag"></i> Role-Specific Questions`;
+    container.appendChild(sep);
+
+    Object.entries(roleGroups).forEach(([section, qs]) => {
+      container.appendChild(_buildFormSection(section, qs, savedAnswers, readOnly, true));
+    });
+  }
+}
+
+function _formGroupBySection(questions) {
+  const groups = {};
+  (questions || []).forEach(q => {
+    const s = q.section || "General";
+    if (!groups[s]) groups[s] = [];
+    groups[s].push(q);
+  });
+  return groups;
+}
+
+function _buildFormSection(sectionName, questions, savedAnswers, readOnly, isRole) {
+  const div = document.createElement("div");
+  div.className = "q-section" + (isRole ? " role-section" : "");
+
+  const titleIcon = isRole ? "fas fa-user-tag" : "fas fa-clipboard-list";
+  const title = document.createElement("div");
+  title.className = "q-section-title";
+  title.innerHTML = `<i class="${titleIcon}"></i> ${sectionName}`;
+  div.appendChild(title);
+
+  questions.forEach(q => div.appendChild(_buildFormQuestion(q, savedAnswers[q.id], readOnly)));
+  return div;
+}
+
+function _buildFormQuestion(q, savedValue, readOnly) {
+  const block = document.createElement("div");
+  block.className = "question-block";
+
+  const label = document.createElement("label");
+  label.className = "q-label";
+  label.setAttribute("for", "q_" + q.id);
+  label.innerHTML = q.question + (q.required ? ' <span class="required-star">*</span>' : "");
+  if (q.response_hint) label.innerHTML += ` <span class="q-hint">(${q.response_hint})</span>`;
+  block.appendChild(label);
+
+  if (q.type === "textarea" || q.type === "text") {
+    const ta = document.createElement("textarea");
+    ta.className   = "q-textarea";
+    ta.id          = "q_" + q.id;
+    ta.name        = q.id;
+    ta.rows        = q.type === "text" ? 1 : 4;
+    ta.placeholder = readOnly ? "—" : "Write your answer here…";
+    ta.value       = savedValue || "";
+    ta.disabled    = readOnly;
+    block.appendChild(ta);
+
+  } else if (q.type === "rating") {
+    const outer = document.createElement("div");
+    outer.style.cssText = "display:flex;flex-direction:column;gap:.5rem;";
+
+    const scaleLabel = document.createElement("p");
+    scaleLabel.className = "rating-scale-label";
+    scaleLabel.innerHTML = `<span class="scale-low">0 — Lowest</span><span class="scale-high">5 — Highest</span>`;
+    outer.appendChild(scaleLabel);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "star-rating" + (readOnly ? " disabled" : "");
+    wrapper.setAttribute("data-qid", q.id);
+
+    for (let i = 5; i >= 0; i--) {
+      const radio = document.createElement("input");
+      radio.type     = "radio";
+      radio.name     = "q_" + q.id;
+      radio.id       = `q_${q.id}_${i}`;
+      radio.value    = i;
+      radio.disabled = readOnly;
+      if (String(savedValue) === String(i)) radio.checked = true;
+
+      const lbl = document.createElement("label");
+      lbl.setAttribute("for", `q_${q.id}_${i}`);
+      lbl.innerHTML = i === 0 ? "☆" : "★";
+      lbl.title     = i === 0 ? "0 — Lowest" : `${i} out of 5`;
+      wrapper.appendChild(radio);
+      wrapper.appendChild(lbl);
+    }
+
+    const val = document.createElement("span");
+    val.className   = "rating-value";
+    val.id          = "rval_" + q.id;
+    val.textContent = savedValue !== undefined && savedValue !== "" ? `${savedValue}/5` : "";
+    wrapper.appendChild(val);
+
+    wrapper.addEventListener("change", e => {
+      if (e.target.type === "radio") document.getElementById("rval_" + q.id).textContent = `${e.target.value}/5`;
+    });
+
+    outer.appendChild(wrapper);
+    block.appendChild(outer);
+
+  } else if (q.type === "yes_no_number") {
+    const radioWrapper = document.createElement("div");
+    radioWrapper.className = "yes-no-wrapper";
+    let yesRadio = null, noRadio = null;
+
+    ["Yes", "No"].forEach(choice => {
+      const rb = document.createElement("input");
+      rb.type     = "radio";
+      rb.name     = `q_${q.id}_yn`;
+      rb.id       = `q_${q.id}_${choice}`;
+      rb.value    = choice;
+      rb.disabled = readOnly;
+
+      const savedStr = String(savedValue || "").toLowerCase();
+      if (savedStr.startsWith(choice.toLowerCase())) rb.checked = true;
+
+      if (choice === "Yes") yesRadio = rb; else noRadio = rb;
+
+      const lbl = document.createElement("label");
+      lbl.setAttribute("for", `q_${q.id}_${choice}`);
+      lbl.textContent = choice;
+      lbl.className   = "yn-label";
+
+      radioWrapper.appendChild(rb);
+      radioWrapper.appendChild(lbl);
+    });
+    block.appendChild(radioWrapper);
+
+    const countWrapper = document.createElement("div");
+    countWrapper.className = "yn-count-wrapper";
+    countWrapper.id        = `q_${q.id}_count_wrapper`;
+
+    const countLabel = document.createElement("label");
+    countLabel.textContent = "If Yes, enter the number:";
+    countLabel.className   = "yn-hint";
+    countLabel.setAttribute("for", `q_${q.id}_count`);
+
+    const countInput = document.createElement("input");
+    countInput.type        = "number";
+    countInput.className   = "q-input yn-count-input";
+    countInput.id          = `q_${q.id}_count`;
+    countInput.name        = `q_${q.id}_count`;
+    countInput.min         = 0;
+    countInput.placeholder = "Enter count";
+    countInput.disabled    = readOnly;
+
+    const savedCount = String(savedValue || "").match(/\d+/);
+    if (savedCount) countInput.value = savedCount[0];
+
+    countWrapper.appendChild(countLabel);
+    countWrapper.appendChild(countInput);
+    block.appendChild(countWrapper);
+
+    const savedYes = String(savedValue || "").toLowerCase().startsWith("yes");
+    countWrapper.style.display = savedYes ? "flex" : "none";
+
+    yesRadio.addEventListener("change", () => { countWrapper.style.display = "flex"; countInput.focus(); });
+    noRadio.addEventListener("change",  () => { countWrapper.style.display = "none"; countInput.value  = ""; });
+
+  } else if (q.type === "number") {
+    const inp = document.createElement("input");
+    inp.type        = "number";
+    inp.className   = "q-input";
+    inp.id          = "q_" + q.id;
+    inp.name        = q.id;
+    inp.min         = 0;
+    inp.placeholder = "Enter a number";
+    inp.value       = savedValue ?? "";
+    inp.disabled    = readOnly;
+    block.appendChild(inp);
+
+  } else if (q.type === "number_dropdown" || q.type === "dropdown") {
+    const sel = document.createElement("select");
+    sel.className = "q-select";
+    sel.id        = "q_" + q.id;
+    sel.name      = q.id;
+    sel.disabled  = readOnly;
+
+    const def = document.createElement("option");
+    def.value = ""; def.textContent = "— Select —";
+    sel.appendChild(def);
+
+    (q.options || []).forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt; o.textContent = opt;
+      if (String(savedValue) === String(opt)) o.selected = true;
+      sel.appendChild(o);
+    });
+    block.appendChild(sel);
+
+  } else if (FORM_YES_NO_TYPES.has(q.type)) {
+    const radioWrapper = document.createElement("div");
+    radioWrapper.className = "yes-no-wrapper";
+
+    ["Yes", "No"].forEach(choice => {
+      const rb = document.createElement("input");
+      rb.type     = "radio";
+      rb.name     = `q_${q.id}_yn`;
+      rb.id       = `q_${q.id}_${choice}`;
+      rb.value    = choice;
+      rb.disabled = readOnly;
+
+      const savedStr = String(savedValue || "").toLowerCase();
+      if (savedStr.startsWith(choice.toLowerCase())) rb.checked = true;
+
+      const lbl = document.createElement("label");
+      lbl.setAttribute("for", `q_${q.id}_${choice}`);
+      lbl.textContent = choice;
+      lbl.className   = "yn-label";
+
+      radioWrapper.appendChild(rb);
+      radioWrapper.appendChild(lbl);
+    });
+    block.appendChild(radioWrapper);
+
+    if (q.type !== "yes_no") {
+      const hint = FORM_YES_NO_HINTS[q.type] || "Please elaborate if needed.";
+      const hintEl = document.createElement("p");
+      hintEl.className   = "yn-hint";
+      hintEl.textContent = hint;
+      block.appendChild(hintEl);
+
+      const ta = document.createElement("textarea");
+      ta.className   = "q-textarea yn-textarea";
+      ta.id          = `q_${q.id}_reason`;
+      ta.name        = `q_${q.id}_reason`;
+      ta.rows        = 2;
+      ta.placeholder = readOnly ? "—" : hint;
+      ta.disabled    = readOnly;
+
+      const savedReason = String(savedValue || "").replace(/^(yes|no)\s*[—-]?\s*/i, "");
+      ta.value = savedReason;
+      block.appendChild(ta);
+    }
+  }
+
+  return block;
+}
+
+function _collectFormAnswers() {
+  const answers = {};
+  if (!_formQuestions) return answers;
+  const allQs = [...(_formQuestions.common||[]), ...(_formQuestions.role||[])];
+
+  allQs.forEach(q => {
+    const qtype = q.type;
+    if (qtype === "rating") {
+      const checked = document.querySelector(`input[name="q_${q.id}"]:checked`);
+      if (checked) answers[q.id] = Number(checked.value);
+    } else if (qtype === "textarea" || qtype === "text") {
+      const el = document.getElementById("q_" + q.id);
+      if (el) answers[q.id] = el.value.trim();
+    } else if (qtype === "number") {
+      const el = document.getElementById("q_" + q.id);
+      if (el && el.value !== "") answers[q.id] = Number(el.value);
+    } else if (qtype === "number_dropdown" || qtype === "dropdown") {
+      const el = document.getElementById("q_" + q.id);
+      if (el && el.value !== "") answers[q.id] = el.value;
+    } else if (FORM_YES_NO_TYPES.has(qtype)) {
+      const checked = document.querySelector(`input[name="q_${q.id}_yn"]:checked`);
+      if (checked) {
+        let val = checked.value;
+        if (qtype === "yes_no_number") {
+          const countEl = document.getElementById(`q_${q.id}_count`);
+          const countVal = countEl?.value?.trim();
+          if (val === "Yes" && countVal) val = `Yes — ${countVal}`;
+        } else if (qtype !== "yes_no") {
+          const reason = document.getElementById(`q_${q.id}_reason`);
+          const reasonText = reason?.value?.trim();
+          if (reasonText) val = `${val} — ${reasonText}`;
+        }
+        answers[q.id] = val;
+      }
+    }
+  });
+  return answers;
+}
+
+function _validateFormAnswers(answers) {
+  if (!_formQuestions) return [];
+  const allQs   = [...(_formQuestions.common||[]), ...(_formQuestions.role||[])];
+  const missing = [];
+
+  allQs.filter(q => q.required).forEach(q => {
+    const ans = answers[q.id];
+    const isEmpty = ans === undefined || ans === null || ans === ""
+      || (typeof ans === "string" && !ans.trim());
+    if (isEmpty) missing.push(q.question.substring(0, 55) + "…");
+  });
+  return missing;
+}
+
+async function saveFormAppraisal(status) {
+  if (_formReadOnly) { showPopup("KRA already submitted.", true); return; }
+
+  const answers = _collectFormAnswers();
+  if (status === "submitted") {
+    const missing = _validateFormAnswers(answers);
+    if (missing.length > 0) {
+      showPopup(`Please answer all required questions before submitting.\nMissing: ${missing.slice(0,3).join("; ")}${missing.length > 3 ? "…" : ""}`, true);
+      return;
+    }
+  }
+
+  showLoading(status === "submitted" ? "Submitting…" : "Saving draft…");
+  try {
+    const res = await fetch(`${API}/appraisal/save`, {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ employeeId: EID, period: _period, answers, status }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showPopup(data.detail || data.message || "Save failed.", true);
+      return;
+    }
+    showPopup(data.message);
+    _formDraftAnswers = answers;
+
+    if (status === "submitted") {
+      _formReadOnly = true;
+      _loaded.delete("form");
+      loadFormSection();
+    }
+  } catch (e) {
+    showPopup("Network error. Please try again.", true);
+  } finally {
+    hideLoading();
+  }
+}
+
+function confirmFormSubmit() {
+  if (_formReadOnly) return;
+  const answers = _collectFormAnswers();
+  const missing = _validateFormAnswers(answers);
+  if (missing.length > 0) {
+    showPopup(`Please answer all required questions.\nMissing: ${missing.slice(0,3).join("; ")}${missing.length > 3 ? "…" : ""}`, true);
+    return;
+  }
+  document.getElementById("submitConfirm").style.display = "block";
+}
+function closeFormSubmitConfirm() {
+  document.getElementById("submitConfirm").style.display = "none";
+}
+function doFormSubmit() {
+  closeFormSubmitConfirm();
+  saveFormAppraisal("submitted");
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _pctPill(v) {
   if (v == null) return "—";
@@ -685,15 +1284,27 @@ function _buildActions(r, ctx) {
 }
 
 // ── PnD loaders ───────────────────────────────────────────────────────────────
+// Partner who is also a Reporting Manager: append the "as Manager" list to the same tab.
+async function _mgrSection(kind, ctx) {
+  if (!(_role === "partner" && _isTl)) return "";
+  try {
+    const d = await (await fetch(`${API}/appraisal/tl/${kind}${_qs()}`, {headers:H()})).json();
+    const rows = d.data || [];
+    return `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-user-check"></i> As Reporting Manager <span class="count-badge">${rows.length}</span></div>`
+      + (rows.length ? _buildApprovalTable(rows, ctx) : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No records</div>`);
+  } catch { return ""; }
+}
+
 async function loadPNDPending() {
   const el = document.getElementById("pnd_pending_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-    const d = await (await fetch(`${API}/appraisal/pnd/pending`, {headers:H()})).json();
+    const d = await (await fetch(`${API}/appraisal/pnd/pending${_qs()}`, {headers:H()})).json();
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_pending_tl") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No TL appraisals pending</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
-    html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_pending_emp") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No employees ready (awaiting TL approval)</div>`;
+    html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_pending_emp") : `<div class="empty-state" style="padding:1rem"><i class="fas fa-inbox"></i> No employees ready (awaiting Manager approval)</div>`;
+    html += await _mgrSection("pending", "tl_pending");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -702,11 +1313,12 @@ async function loadPNDApproved() {
   const el = document.getElementById("pnd_approved_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-    const d = await (await fetch(`${API}/appraisal/pnd/approved`, {headers:H()})).json();
+    const d = await (await fetch(`${API}/appraisal/pnd/approved${_qs()}`, {headers:H()})).json();
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_approved") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
     html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_approved") : `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += await _mgrSection("approved", "tl_approved");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -715,11 +1327,12 @@ async function loadPNDRejected() {
   const el = document.getElementById("pnd_rejected_content");
   el.innerHTML = `<p class="empty-msg"><i class="fas fa-spinner fa-spin"></i></p>`;
   try {
-    const d = await (await fetch(`${API}/appraisal/pnd/rejected`, {headers:H()})).json();
+    const d = await (await fetch(`${API}/appraisal/pnd/rejected${_qs()}`, {headers:H()})).json();
     let html = `<div class="section-divider"><i class="fas fa-user-tie"></i> TLs / Managers <span class="count-badge">${d.tls?.length||0}</span></div>`;
     html += d.tls?.length ? _buildApprovalTable(d.tls,"pnd_rejected") : `<div class="empty-state" style="padding:1rem">No records</div>`;
     html += `<div class="section-divider" style="margin-top:1.5rem"><i class="fas fa-users"></i> Employees <span class="count-badge">${d.employees?.length||0}</span></div>`;
     html += d.employees?.length ? _buildApprovalTable(d.employees,"pnd_rejected") : `<div class="empty-state" style="padding:1rem">No records</div>`;
+    html += await _mgrSection("rejected", "tl_rejected");
     el.innerHTML = html;
   } catch { el.innerHTML = `<p class="empty-msg">Failed to load.</p>`; }
 }
@@ -733,7 +1346,7 @@ async function tlAction(rid, action) {
     const d = await r.json();
     if (!d.success) throw new Error(d.detail||"Failed");
     showPopup(d.message);
-    ["tl_pending","tl_approved","tl_rejected"].forEach(k => _loaded.delete(k));
+    ["tl_pending","tl_approved","tl_rejected","pnd_pending","pnd_approved","pnd_rejected"].forEach(k => _loaded.delete(k));
     const sec = document.querySelector(".tab-content.active");
     if (sec) { const n = sec.id.replace("sec_",""); _loaded.delete(n); _loadSection(n); }
   } catch(e) { showPopup(e.message, true); } finally { hideLoading(); }
@@ -848,7 +1461,7 @@ async function modalTLAction(rid, action) {
     const r = await fetch(`${API}/appraisal/tl/action/${rid}`,{method:"POST",headers:H(),body:JSON.stringify({action,tl_responses:_editedAnswers,remarks:rem})});
     const d = await r.json(); if (!d.success) throw new Error(d.detail||"Failed");
     showPopup(d.message);
-    ["tl_pending","tl_approved","tl_rejected"].forEach(k => _loaded.delete(k));
+    ["tl_pending","tl_approved","tl_rejected","pnd_pending","pnd_approved","pnd_rejected"].forEach(k => _loaded.delete(k));
     closeModal();
     const sec = document.querySelector(".tab-content.active"); if (sec) { const n=sec.id.replace("sec_",""); _loaded.delete(n); _loadSection(n); }
   } catch(e) { showPopup(e.message, true); } finally { hideLoading(); }
@@ -879,7 +1492,7 @@ async function loadAnalysis() {
   const el = document.getElementById("analysis_content");
   el.innerHTML = `<div class="an-loading"><div class="an-spinner"></div><span>Loading analysis…</span></div>`;
   try {
-    const r = await fetch(`${API}/appraisal/analysis`, {headers:H()});
+    const r = await fetch(`${API}/appraisal/analysis${_qs()}`, {headers:H()});
     const d = await r.json();
     if (!d.success) throw new Error(d.detail || "Failed");
     _analysisData = d;
@@ -1320,7 +1933,7 @@ function closeAnModal(){document.getElementById("anModal").style.display="none";
 async function openKRAModal(empId){
   showLoading("Loading KRA…");
   try {
-    const r = await fetch(`${API}/appraisal/analysis/kra/${empId}`,{headers:H()});
+    const r = await fetch(`${API}/appraisal/analysis/kra/${empId}${_qs()}`,{headers:H()});
     const d = await r.json();
     if(!d.success) throw new Error(d.detail||"Not found");
     const rec = d.data;

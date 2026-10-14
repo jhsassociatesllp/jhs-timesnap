@@ -1,8 +1,25 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+
+# LibreOffice (headless) turns the filled CV Word files into PDFs for the CV
+# Builder. Carlito/Liberation are metric-compatible with Calibri/Arial/Times so
+# the PDF lays out like the Word file. Kept in its own early layer: it is large
+# and rarely changes.
+RUN apt-get update     && apt-get install -y --no-install-recommends libreoffice-writer fonts-crosextra-carlito fonts-liberation fonts-dejavu-core     && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+# CPU-only PyTorch: sentence-transformers pulls in torch, but the default
+# PyPI wheel bundles CUDA support this CPU-only deploy server never uses,
+# which roughly triples image size (and build/push/pull time) for nothing.
+RUN pip install --no-cache-dir torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copied last so editing app code doesn't bust the (heavy, slow-to-rebuild)
+# dependency layers above — only a requirements.txt change should do that.
 COPY . .
-RUN pip install -r requirements.txt
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

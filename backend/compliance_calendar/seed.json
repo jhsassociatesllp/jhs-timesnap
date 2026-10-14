@@ -1,0 +1,2096 @@
+[
+ {
+  "law": "SEBI",
+  "compliance": "Closure of Trading Window",
+  "date": "2026-09-30",
+  "group": "SEBI|closure trading window"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 74(5) DP Regulations",
+  "date": "2026-10-15",
+  "group": "SEBI|regulation 74 dp regulations"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 31 (1)(b)",
+  "date": "2026-10-21",
+  "group": "SEBI|regulation 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI Circular",
+  "date": "2026-10-21",
+  "group": "SEBI|sebi circular"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 121(1) and Rule 31(2) of the Companies (Management and Administration) Rules, 2014",
+  "date": "2026-10-30",
+  "group": "MCA|section 121 and rule 31 companies rules"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 34(2) and 34(3) of The Limited Liability Partnership Act, 2008",
+  "date": "2026-10-30",
+  "group": "MCA|section 34 and 34 limited liability partnership act"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 27(2)(a)",
+  "date": "2026-10-30",
+  "group": "SEBI|regulation 27"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 55A of DP Regulations",
+  "date": "2026-10-30",
+  "group": "SEBI|regulation 55a dp regulations"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 76 of DP Regulations",
+  "date": "2026-10-30",
+  "group": "SEBI|regulation 76 dp regulations"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Vide Gazette notification S.O. 5622(E) dated 02.11.2018",
+  "date": "2026-10-31",
+  "group": "MCA|vide gazette notification s o 5622 dated 02 11"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 173",
+  "date": "2026-11-07",
+  "group": "MCA|section 173"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 29 (1)(a) and Regulation 29(2)",
+  "date": "2026-11-11",
+  "group": "SEBI|regulation 29 and regulation 29"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 30 (6)",
+  "date": "2026-11-14",
+  "group": "SEBI|regulation 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 33",
+  "date": "2026-11-14",
+  "group": "SEBI|regulation 33"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 33 (3)(a)",
+  "date": "2026-11-14",
+  "group": "SEBI|regulation 33"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "Regulation 47",
+  "date": "2026-11-16",
+  "group": "SEBI|regulation 47"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 92",
+  "date": "2026-11-28",
+  "group": "MCA|section 92"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 29 and Rule 9 of the Companies (Prospectus and Allotment of Securities) Second Amendment Rules, 2023",
+  "date": "2026-11-29",
+  "group": "MCA|section 29 and rule 9 companies second amendment rules"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 117",
+  "date": "2026-12-13",
+  "group": "MCA|section 117"
+ },
+ {
+  "law": "MCA",
+  "compliance": "Section 118",
+  "date": "2026-12-13",
+  "group": "MCA|section 118"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-01-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "Deposit of TDS when Assessing Officer has permitted quarterly deposit of TDS (quarter ended December 2026).",
+  "date": "2027-01-07",
+  "group": "IT|deposit tds when assessing officer has permitted quarterly deposit tds"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly statement of declarations received in Form 15G/15H (Form 121 under the Income-tax Act, 2025) for 1 October - 31 December 2026.",
+  "date": "2027-01-07",
+  "group": "IT|quarterly statement declarations received in form 15g 15h 1 31"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during December 2026).",
+  "date": "2027-01-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-01-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-01-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-01-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-01-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-01-11",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-01-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (quarterly filers under QRMP) for the preceding quarter.",
+  "date": "2027-01-13",
+  "group": "GST|gstr 1 statement outward supplies preceding"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-01-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-01-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in November 2026.",
+  "date": "2027-01-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during December 2026.",
+  "date": "2027-01-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for December 2026 has been paid without a challan.",
+  "date": "2027-01-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for December 2026.",
+  "date": "2027-01-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for December 2026.",
+  "date": "2027-01-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for December 2026.",
+  "date": "2027-01-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 74(5): Certificate from RTA/Compliance Officer on dematerialisation requests for the quarter ended 31 December 2026.",
+  "date": "2027-01-15",
+  "group": "SEBI|sebi regulations reg 74 certificate from rta compliance officer on dematerialisation requests 31"
+ },
+ {
+  "law": "GST",
+  "compliance": "CMP-08: Quarterly statement-cum-challan for payment of tax by composition taxpayers.",
+  "date": "2027-01-18",
+  "group": "GST|cmp 08 quarterly statement cum challan payment tax by composition taxpayers"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-01-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-01-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 31(1)(b): Shareholding pattern for the quarter ended 31 December 2026.",
+  "date": "2027-01-21",
+  "group": "SEBI|sebi regulations reg 31 shareholding pattern 31"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-01-22",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-01-24",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in December 2026.",
+  "date": "2027-01-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 76: Reconciliation of Share Capital Audit Report for the quarter ended 31 December 2026.",
+  "date": "2027-01-30",
+  "group": "SEBI|sebi regulations reg 76 reconciliation share capital audit report 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 13(3): Statement of investor complaints for the quarter ended 31 December 2026.",
+  "date": "2027-01-30",
+  "group": "SEBI|sebi regulations reg 13 statement investor complaints 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 27(2): Corporate governance compliance report for the quarter ended 31 December 2026.",
+  "date": "2027-01-30",
+  "group": "SEBI|sebi regulations reg 27 corporate governance compliance report 31"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly TDS and TCS statements for Q3 (October - December 2026).",
+  "date": "2027-01-31",
+  "group": "IT|quarterly tds and tcs statements q3"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-02-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during January 2027).",
+  "date": "2027-02-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-02-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-02-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-02-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-02-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-02-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-02-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-02-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-02-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-02-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in December 2026.",
+  "date": "2027-02-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 33: Unaudited financial results for the quarter ended 31 December 2026 (within 45 days).",
+  "date": "2027-02-14",
+  "group": "SEBI|sebi regulations reg 33 unaudited results 31"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during January 2027.",
+  "date": "2027-02-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for January 2027 has been paid without a challan.",
+  "date": "2027-02-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of quarterly TDS/TCS certificates (non-salary TDS and TCS) for Q3 (October - December 2026).",
+  "date": "2027-02-15",
+  "group": "IT|issue quarterly tds tcs certificates q3"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for January 2027.",
+  "date": "2027-02-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for January 2027.",
+  "date": "2027-02-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for January 2027.",
+  "date": "2027-02-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-02-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-02-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-02-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in January 2027.",
+  "date": "2027-03-02",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-03-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during February 2027).",
+  "date": "2027-03-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-03-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-03-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-03-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-03-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-03-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-03-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-03-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-03-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-03-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during February 2027.",
+  "date": "2027-03-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for February 2027 has been paid without a challan.",
+  "date": "2027-03-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Fourth (final) instalment of advance tax for the tax year 2026-27 (100% of estimated tax liability).",
+  "date": "2027-03-15",
+  "group": "IT|fourth instalment advance tax tax"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for February 2027.",
+  "date": "2027-03-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for February 2027.",
+  "date": "2027-03-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for February 2027.",
+  "date": "2027-03-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in January 2027.",
+  "date": "2027-03-17",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-03-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-03-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-03-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in February 2027.",
+  "date": "2027-03-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-04-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-04-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-04-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (SAST) Regulations, 2011 - Reg. 30(1)/(2): Annual disclosure of shareholding / voting rights as on 31 March 2027.",
+  "date": "2027-04-09",
+  "group": "SEBI|sebi regulations reg 30 annual disclosure shareholding voting rights as on 31"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-04-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-04-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-04-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-04-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (quarterly filers under QRMP) for the preceding quarter.",
+  "date": "2027-04-13",
+  "group": "GST|gstr 1 statement outward supplies preceding"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-04-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-04-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in February 2027.",
+  "date": "2027-04-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during March 2027.",
+  "date": "2027-04-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for March 2027 has been paid without a challan.",
+  "date": "2027-04-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for March 2027.",
+  "date": "2027-04-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for March 2027.",
+  "date": "2027-04-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for March 2027.",
+  "date": "2027-04-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 74(5): Certificate from RTA/Compliance Officer on dematerialisation requests for the quarter ended 31 March 2027.",
+  "date": "2027-04-15",
+  "group": "SEBI|sebi regulations reg 74 certificate from rta compliance officer on dematerialisation requests 31"
+ },
+ {
+  "law": "GST",
+  "compliance": "CMP-08: Quarterly statement-cum-challan for payment of tax by composition taxpayers.",
+  "date": "2027-04-18",
+  "group": "GST|cmp 08 quarterly statement cum challan payment tax by composition taxpayers"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-04-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-04-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 13(3): Statement of investor complaints for the quarter ended 31 March 2027.",
+  "date": "2027-04-21",
+  "group": "SEBI|sebi regulations reg 13 statement investor complaints 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 27(2): Corporate governance compliance report for the quarter ended 31 March 2027.",
+  "date": "2027-04-21",
+  "group": "SEBI|sebi regulations reg 27 corporate governance compliance report 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 31(1)(b): Shareholding pattern for the quarter ended 31 March 2027.",
+  "date": "2027-04-21",
+  "group": "SEBI|sebi regulations reg 31 shareholding pattern 31"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-04-22",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-04-24",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "MSME-1: Half-yearly return of outstanding payments to MSME suppliers (October 2026 - March 2027).",
+  "date": "2027-04-30",
+  "group": "CO. ACT|msme 1 half yearly return outstanding payments to msme suppliers"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "NDH-3: Half-yearly return by Nidhi companies (October 2026 - March 2027).",
+  "date": "2027-04-30",
+  "group": "CO. ACT|ndh 3 half yearly return by nidhi companies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-4: Annual return by composition taxpayers for FY 2026-27.",
+  "date": "2027-04-30",
+  "group": "GST|gstr 4 annual return by composition taxpayers fy"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in March 2027.",
+  "date": "2027-04-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Deposit of TDS when Assessing Officer has permitted quarterly deposit of TDS (quarter ended March 2027).",
+  "date": "2027-04-30",
+  "group": "IT|deposit tds when assessing officer has permitted quarterly deposit tds"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly statement of declarations received in Form 15G/15H (Form 121 under the Income-tax Act, 2025) for 1 January - 31 March 2027.",
+  "date": "2027-04-30",
+  "group": "IT|quarterly statement declarations received in form 15g 15h 1 31"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during March 2027).",
+  "date": "2027-04-30",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 76: Reconciliation of Share Capital Audit Report for the quarter ended 31 March 2027.",
+  "date": "2027-04-30",
+  "group": "SEBI|sebi regulations reg 76 reconciliation share capital audit report 31"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 40(9): Half-yearly certificate on share transfer (October 2026 - March 2027).",
+  "date": "2027-04-30",
+  "group": "SEBI|sebi regulations reg 40 half yearly certificate on share transfer"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-05-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during April 2027).",
+  "date": "2027-05-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-05-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-05-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-05-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-05-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-05-11",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-05-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-05-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-05-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-05-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during April 2027.",
+  "date": "2027-05-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for April 2027 has been paid without a challan.",
+  "date": "2027-05-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in March 2027.",
+  "date": "2027-05-15",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for April 2027.",
+  "date": "2027-05-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for April 2027.",
+  "date": "2027-05-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for April 2027.",
+  "date": "2027-05-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-05-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-05-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-05-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "LLP Form 11: Annual return of LLP for FY 2026-27.",
+  "date": "2027-05-30",
+  "group": "CO. ACT|llp form 11 annual return llp fy"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in April 2027.",
+  "date": "2027-05-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 24A: Annual Secretarial Compliance Report for FY 2026-27 (within 60 days).",
+  "date": "2027-05-30",
+  "group": "SEBI|sebi regulations reg 24a annual secretarial compliance report fy"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 33(3)(d): Audited financial results for the quarter / year ended 31 March 2027 (within 60 days).",
+  "date": "2027-05-30",
+  "group": "SEBI|sebi regulations reg 33 audited results 31"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly TDS and TCS statements for Q4 (January - March 2027).",
+  "date": "2027-05-31",
+  "group": "IT|quarterly tds and tcs statements q4"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-06-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during May 2027).",
+  "date": "2027-06-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-06-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-06-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-06-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-06-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-06-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-06-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-06-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-06-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-06-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in April 2027.",
+  "date": "2027-06-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "IT",
+  "compliance": "First instalment of advance tax for the tax year 2027-28 (at least 15% of estimated tax liability).",
+  "date": "2027-06-15",
+  "group": "IT|first instalment advance tax tax"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during May 2027.",
+  "date": "2027-06-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for May 2027 has been paid without a challan.",
+  "date": "2027-06-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of Form 16 (salary TDS) for the tax year 2026-27 and quarterly TDS/TCS certificates for Q4 (January - March 2027).",
+  "date": "2027-06-15",
+  "group": "IT|issue form 16 tax and quarterly tds tcs certificates q4"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for May 2027.",
+  "date": "2027-06-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for May 2027.",
+  "date": "2027-06-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for May 2027.",
+  "date": "2027-06-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-06-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-06-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-06-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "DPT-3: Return of deposits / outstanding receipt of money not considered as deposits.",
+  "date": "2027-06-30",
+  "group": "CO. ACT|dpt 3 return deposits outstanding receipt money not considered as deposits"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in May 2027.",
+  "date": "2027-06-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 1 (for CTT return).",
+  "date": "2027-06-30",
+  "group": "IT|form 1"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-07-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "Deposit of TDS when Assessing Officer has permitted quarterly deposit of TDS (quarter ended June 2027).",
+  "date": "2027-07-07",
+  "group": "IT|deposit tds when assessing officer has permitted quarterly deposit tds"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly statement of declarations received in Form 15G/15H (Form 121 under the Income-tax Act, 2025) for 1 April - 30 June 2027.",
+  "date": "2027-07-07",
+  "group": "IT|quarterly statement declarations received in form 15g 15h 1 30"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during June 2027).",
+  "date": "2027-07-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-07-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-07-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-07-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-07-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-07-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-07-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (quarterly filers under QRMP) for the preceding quarter.",
+  "date": "2027-07-13",
+  "group": "GST|gstr 1 statement outward supplies preceding"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-07-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-07-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "Annual Return on Foreign Liabilities and Assets (FLA) by Indian entities that have received FDI or made overseas investment.",
+  "date": "2027-07-15",
+  "group": "FEMA|annual return on foreign liabilities and assets by indian entities that have received fdi or made overseas investment"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during June 2027.",
+  "date": "2027-07-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for June 2027 has been paid without a challan.",
+  "date": "2027-07-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in May 2027.",
+  "date": "2027-07-15",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for June 2027.",
+  "date": "2027-07-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for June 2027.",
+  "date": "2027-07-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for June 2027.",
+  "date": "2027-07-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 74(5): Certificate from RTA/Compliance Officer on dematerialisation requests for the quarter ended 30 June 2027.",
+  "date": "2027-07-15",
+  "group": "SEBI|sebi regulations reg 74 certificate from rta compliance officer on dematerialisation requests 30"
+ },
+ {
+  "law": "GST",
+  "compliance": "CMP-08: Quarterly statement-cum-challan for payment of tax by composition taxpayers.",
+  "date": "2027-07-18",
+  "group": "GST|cmp 08 quarterly statement cum challan payment tax by composition taxpayers"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-07-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-07-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 13(3): Statement of investor complaints for the quarter ended 30 June 2027.",
+  "date": "2027-07-21",
+  "group": "SEBI|sebi regulations reg 13 statement investor complaints 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 27(2): Corporate governance compliance report for the quarter ended 30 June 2027.",
+  "date": "2027-07-21",
+  "group": "SEBI|sebi regulations reg 27 corporate governance compliance report 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 31(1)(b): Shareholding pattern for the quarter ended 30 June 2027.",
+  "date": "2027-07-21",
+  "group": "SEBI|sebi regulations reg 31 shareholding pattern 30"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-07-22",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-07-24",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in June 2027.",
+  "date": "2027-07-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 76: Reconciliation of Share Capital Audit Report for the quarter ended 30 June 2027.",
+  "date": "2027-07-30",
+  "group": "SEBI|sebi regulations reg 76 reconciliation share capital audit report 30"
+ },
+ {
+  "law": "IT",
+  "compliance": "Filing of return of income for the tax year 2026-27 - assessees not requiring audit and not subject to transfer pricing.",
+  "date": "2027-07-31",
+  "group": "IT|filing return income tax assessees not requiring audit and not subject to transfer pricing"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly TDS and TCS statements for Q1 (April - June 2027).",
+  "date": "2027-07-31",
+  "group": "IT|quarterly tds and tcs statements q1"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-08-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during July 2027).",
+  "date": "2027-08-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-08-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-08-10",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-08-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-08-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-08-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-08-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-08-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-08-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-08-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in June 2027.",
+  "date": "2027-08-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 33: Unaudited financial results for the quarter ended 30 June 2027 (within 45 days).",
+  "date": "2027-08-14",
+  "group": "SEBI|sebi regulations reg 33 unaudited results 30"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during July 2027.",
+  "date": "2027-08-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for July 2027 has been paid without a challan.",
+  "date": "2027-08-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of quarterly TDS/TCS certificates (non-salary TDS and TCS) for Q1 (April - June 2027).",
+  "date": "2027-08-15",
+  "group": "IT|issue quarterly tds tcs certificates q1"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for July 2027.",
+  "date": "2027-08-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for July 2027.",
+  "date": "2027-08-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for July 2027.",
+  "date": "2027-08-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-08-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-08-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-08-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in July 2027.",
+  "date": "2027-08-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-09-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during August 2027).",
+  "date": "2027-09-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-09-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-09-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-09-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-09-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-09-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-09-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-09-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-09-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-09-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in July 2027.",
+  "date": "2027-09-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during August 2027.",
+  "date": "2027-09-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for August 2027 has been paid without a challan.",
+  "date": "2027-09-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Second instalment of advance tax for the tax year 2027-28 (at least 45% of estimated tax liability).",
+  "date": "2027-09-15",
+  "group": "IT|second instalment advance tax tax"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for August 2027.",
+  "date": "2027-09-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for August 2027.",
+  "date": "2027-09-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for August 2027.",
+  "date": "2027-09-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-09-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-09-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-09-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "Last date to hold the Annual General Meeting (AGM) for FY 2026-27 (Section 96).",
+  "date": "2027-09-30",
+  "group": "CO. ACT|last date to hold annual general meeting fy"
+ },
+ {
+  "law": "EP",
+  "compliance": "Form V: Environmental Statement for FY 2026-27 to the State Pollution Control Board.",
+  "date": "2027-09-30",
+  "group": "EP|form v environmental statement fy to state pollution control board"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in August 2027.",
+  "date": "2027-09-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Furnishing of tax audit report for the tax year 2026-27.",
+  "date": "2027-09-30",
+  "group": "IT|furnishing tax audit report tax"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-10-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "Deposit of TDS when Assessing Officer has permitted quarterly deposit of TDS (quarter ended September 2027).",
+  "date": "2027-10-07",
+  "group": "IT|deposit tds when assessing officer has permitted quarterly deposit tds"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly statement of declarations received in Form 15G/15H (Form 121 under the Income-tax Act, 2025) for 1 July - 30 September 2027.",
+  "date": "2027-10-07",
+  "group": "IT|quarterly statement declarations received in form 15g 15h 1 30"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during September 2027).",
+  "date": "2027-10-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-10-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-10-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-10-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-10-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-10-11",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-10-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (quarterly filers under QRMP) for the preceding quarter.",
+  "date": "2027-10-13",
+  "group": "GST|gstr 1 statement outward supplies preceding"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-10-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-10-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "ADT-1: Intimation of appointment of auditor to the Registrar.",
+  "date": "2027-10-15",
+  "group": "CO. ACT|adt 1 intimation appointment auditor to registrar"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during September 2027.",
+  "date": "2027-10-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for September 2027 has been paid without a challan.",
+  "date": "2027-10-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in August 2027.",
+  "date": "2027-10-15",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for September 2027.",
+  "date": "2027-10-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for September 2027.",
+  "date": "2027-10-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for September 2027.",
+  "date": "2027-10-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 74(5): Certificate from RTA/Compliance Officer on dematerialisation requests for the quarter ended 30 September 2027.",
+  "date": "2027-10-15",
+  "group": "SEBI|sebi regulations reg 74 certificate from rta compliance officer on dematerialisation requests 30"
+ },
+ {
+  "law": "GST",
+  "compliance": "CMP-08: Quarterly statement-cum-challan for payment of tax by composition taxpayers.",
+  "date": "2027-10-18",
+  "group": "GST|cmp 08 quarterly statement cum challan payment tax by composition taxpayers"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-10-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-10-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 13(3): Statement of investor complaints for the quarter ended 30 September 2027.",
+  "date": "2027-10-21",
+  "group": "SEBI|sebi regulations reg 13 statement investor complaints 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 27(2): Corporate governance compliance report for the quarter ended 30 September 2027.",
+  "date": "2027-10-21",
+  "group": "SEBI|sebi regulations reg 27 corporate governance compliance report 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 31(1)(b): Shareholding pattern for the quarter ended 30 September 2027.",
+  "date": "2027-10-21",
+  "group": "SEBI|sebi regulations reg 31 shareholding pattern 30"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-10-22",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B (QRMP): Quarterly summary return and tax payment - 22nd for Category I and 24th for Category II States/UTs.",
+  "date": "2027-10-24",
+  "group": "GST|gstr 3b quarterly summary return and tax payment 22nd category i and 24th category ii states uts"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "AOC-4: Filing of financial statements with the Registrar; and LLP Form 8 (Statement of Account and Solvency) for FY 2026-27.",
+  "date": "2027-10-30",
+  "group": "CO. ACT|aoc 4 filing statements with registrar and llp form 8 fy"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "NDH-3: Half-yearly return by Nidhi companies (April - September 2027).",
+  "date": "2027-10-30",
+  "group": "CO. ACT|ndh 3 half yearly return by nidhi companies"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in September 2027.",
+  "date": "2027-10-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (Depositories and Participants) Regulations, 2018 - Reg. 76: Reconciliation of Share Capital Audit Report for the quarter ended 30 September 2027.",
+  "date": "2027-10-30",
+  "group": "SEBI|sebi regulations reg 76 reconciliation share capital audit report 30"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 40(9): Half-yearly certificate on share transfer (April - September 2027).",
+  "date": "2027-10-30",
+  "group": "SEBI|sebi regulations reg 40 half yearly certificate on share transfer"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "MSME-1: Half-yearly return of outstanding payments to MSME suppliers (April - September 2027).",
+  "date": "2027-10-31",
+  "group": "CO. ACT|msme 1 half yearly return outstanding payments to msme suppliers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Filing of return of income for the tax year 2026-27 - assessees requiring audit; and transfer pricing report (Form 3CEB equivalent) for international / specified domestic transactions.",
+  "date": "2027-10-31",
+  "group": "IT|filing return income tax assessees requiring audit and transfer pricing report international specified domestic transactions"
+ },
+ {
+  "law": "IT",
+  "compliance": "Quarterly TDS and TCS statements for Q2 (July - September 2027).",
+  "date": "2027-10-31",
+  "group": "IT|quarterly tds and tcs statements q2"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-11-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during October 2027).",
+  "date": "2027-11-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-11-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-11-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-11-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-11-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-11-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-11-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-11-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-11-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-11-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in September 2027.",
+  "date": "2027-11-14",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "SEBI",
+  "compliance": "SEBI (LODR) Regulations, 2015 - Reg. 33: Unaudited financial results for the quarter ended 30 September 2027 (within 45 days).",
+  "date": "2027-11-14",
+  "group": "SEBI|sebi regulations reg 33 unaudited results 30"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during October 2027.",
+  "date": "2027-11-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for October 2027 has been paid without a challan.",
+  "date": "2027-11-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of quarterly TDS/TCS certificates (non-salary TDS and TCS) for Q2 (July - September 2027).",
+  "date": "2027-11-15",
+  "group": "IT|issue quarterly tds tcs certificates q2"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for October 2027.",
+  "date": "2027-11-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for October 2027.",
+  "date": "2027-11-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for October 2027.",
+  "date": "2027-11-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-11-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-11-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-11-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "Co. Act",
+  "compliance": "MGT-7 / MGT-7A: Annual return of the company.",
+  "date": "2027-11-29",
+  "group": "CO. ACT|mgt 7 mgt 7a annual return company"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in October 2027.",
+  "date": "2027-11-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Filing of return of income for the tax year 2026-27 - assessees with international / specified domestic transactions (transfer pricing cases).",
+  "date": "2027-11-30",
+  "group": "IT|filing return income tax assessees with international specified domestic transactions"
+ },
+ {
+  "law": "SEZ",
+  "compliance": "SEZ Monthly Progress Report (MPR): To monitor operations and ensure compliance with the SEZ Act.",
+  "date": "2027-12-05",
+  "group": "SEZ|sez monthly progress report to monitor operations and ensure compliance with sez act"
+ },
+ {
+  "law": "IT",
+  "compliance": "TDS/TCS - Deposit (tax deducted/collected during November 2027).",
+  "date": "2027-12-07",
+  "group": "IT|tds tcs deposit"
+ },
+ {
+  "law": "STPI",
+  "compliance": "STPI MPR: To monitor software exports and operational performance.",
+  "date": "2027-12-07",
+  "group": "STPI|stpi mpr to monitor software exports and operational performance"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "ECB-2 Return: To report all actual ECB transactions, a nil return is to be filed if there are no transactions.",
+  "date": "2027-12-09",
+  "group": "FEMA|ecb 2 return to report all actual ecb transactions a nil return is to be filed if there are no transactions"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-7: Tax deducted at source (TDS).",
+  "date": "2027-12-10",
+  "group": "GST|gstr 7 tax deducted at source"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-8: Tax collected at source (TCS) by e-commerce operators.",
+  "date": "2027-12-10",
+  "group": "GST|gstr 8 tax collected at source by e commerce operators"
+ },
+ {
+  "law": "GST",
+  "compliance": "SRM-II: Details of input used and final goods by manufacturers of specified goods.",
+  "date": "2027-12-10",
+  "group": "GST|srm ii details input used and final goods by manufacturers specified goods"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-1: Statement of outward supplies (monthly filers).",
+  "date": "2027-12-11",
+  "group": "GST|gstr 1 statement outward supplies"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5: Return by non-resident taxable persons.",
+  "date": "2027-12-13",
+  "group": "GST|gstr 5 return by non resident taxable persons"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-6: Return by Input Service Distributors (ISD).",
+  "date": "2027-12-13",
+  "group": "GST|gstr 6 return by input service distributors"
+ },
+ {
+  "law": "GST",
+  "compliance": "IFF: Optional Invoice Furnishing Facility for QRMP taxpayers (B2B invoices).",
+  "date": "2027-12-13",
+  "group": "GST|iff optional invoice furnishing facility qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form - 27C: Uploading of declarations received from the buyer of specified goods (to inform the seller not to collect TCS) during November 2027.",
+  "date": "2027-12-15",
+  "group": "IT|form 27c uploading declarations received from buyer specified goods"
+ },
+ {
+  "law": "IT",
+  "compliance": "Form 24G: Statement by an office of the Government where TDS/TCS for November 2027 has been paid without a challan.",
+  "date": "2027-12-15",
+  "group": "IT|form 24g statement by an office government where tds tcs has been paid without a challan"
+ },
+ {
+  "law": "IT",
+  "compliance": "Issue of TDS certificate for tax deducted under sections 194-IA, 194-IB, 194M and 194S (by specified person) in October 2027.",
+  "date": "2027-12-15",
+  "group": "IT|issue tds certificate tax deducted under sections 194 ia 194 ib 194m and 194s in"
+ },
+ {
+  "law": "IT",
+  "compliance": "Third instalment of advance tax for the tax year 2027-28 (at least 75% of estimated tax liability).",
+  "date": "2027-12-15",
+  "group": "IT|third instalment advance tax tax"
+ },
+ {
+  "law": "Labour",
+  "compliance": "EPF: Payment of monthly contribution and filing of ECR for November 2027.",
+  "date": "2027-12-15",
+  "group": "LABOUR|epf payment monthly contribution and filing ecr"
+ },
+ {
+  "law": "Labour",
+  "compliance": "ESIC: Payment of monthly contribution for November 2027.",
+  "date": "2027-12-15",
+  "group": "LABOUR|esic payment monthly contribution"
+ },
+ {
+  "law": "PMLA",
+  "compliance": "FIU-IND: Cash Transaction Report (CTR) and other periodic reports by reporting entities for November 2027.",
+  "date": "2027-12-15",
+  "group": "PMLA|fiu ind cash transaction report and other periodic reports by reporting entities"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-3B: Monthly summary return and payment of tax.",
+  "date": "2027-12-20",
+  "group": "GST|gstr 3b monthly summary return and payment tax"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-5A: Return by OIDAR service providers (non-resident).",
+  "date": "2027-12-20",
+  "group": "GST|gstr 5a return by oidar service providers"
+ },
+ {
+  "law": "GST",
+  "compliance": "PMT-06: Monthly payment of tax by QRMP taxpayers.",
+  "date": "2027-12-25",
+  "group": "GST|pmt 06 monthly payment tax by qrmp taxpayers"
+ },
+ {
+  "law": "IT",
+  "compliance": "Challan-cum-statement for TDS under sections 194-IA, 194-IB, 194M and 194S (by specified person) deducted in November 2027.",
+  "date": "2027-12-30",
+  "group": "IT|challan cum statement tds under sections 194 ia 194 ib 194m and 194s deducted in"
+ },
+ {
+  "law": "FEMA",
+  "compliance": "Annual Performance Report (APR) on overseas investment (Overseas Investment Rules, 2022).",
+  "date": "2027-12-31",
+  "group": "FEMA|annual performance report on overseas investment"
+ },
+ {
+  "law": "GST",
+  "compliance": "GSTR-9 / GSTR-9C: Annual return and reconciliation statement for FY 2026-27.",
+  "date": "2027-12-31",
+  "group": "GST|gstr 9 gstr 9c annual return and reconciliation statement fy"
+ },
+ {
+  "law": "IT",
+  "compliance": "Filing of belated / revised return of income for the tax year 2026-27.",
+  "date": "2027-12-31",
+  "group": "IT|filing belated revised return income tax"
+ }
+]

@@ -17,7 +17,7 @@
     const modal = document.createElement("div");
     modal.id = "ldCalendarModal";
     modal.innerHTML =
-      '<div class="ldc-box"><div class="ldc-bar"><span><i class="fas fa-calendar-days"></i> L&amp;D Calendar FY 2026–27</span>' +
+      '<div class="ldc-box"><div class="ldc-bar"><span><i class="fas fa-calendar-days"></i> L&amp;D and Compliance Calendar</span>' +
       '<button class="ldc-close" type="button" aria-label="Close calendar"><i class="fas fa-times"></i></button></div>' +
       '<iframe title="L&D Calendar" loading="lazy"></iframe></div>';
     document.body.appendChild(modal);

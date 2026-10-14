@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>Buddy Referral — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+</head>
+<body>
+
+<div id="ls" class="loader"><div class="spin"></div> Loading Buddy Referral…</div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-user-friends"></i> JHS Buddy Referral</div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <a href="/modules" class="nav-btn"><i class="fas fa-th-large"></i> Modules</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <div class="hdr">
+      <h1><i class="fas fa-user-friends"></i> Buddy Referral</h1>
+      <p>Refer a colleague or a candidate and help JHS grow</p>
+    </div>
+
+    <div class="body">
+      <div class="tabs" role="tablist">
+        <button class="tab active" id="tab-existing" onclick="switchTab('existing')" role="tab"><i class="fas fa-user-tie"></i> Referred by a JHS Employee</button>
+        <button class="tab" id="tab-referral" onclick="switchTab('referral')" role="tab"><i class="fas fa-file-upload"></i> Refer Someone</button>
+      </div>
+
+      <!-- ══ Tab 1: Existing employee ══ -->
+      <div class="tc active" id="tc-existing">
+        <form class="card" id="existingForm" onsubmit="submitExisting(event)" autocomplete="off">
+          <div class="card-title"><i class="fas fa-user-tie"></i> Referred by a JHS Employee</div>
+          <div class="g2">
+            <div class="form-group">
+              <label><i class="fas fa-id-badge"></i> Employee</label>
+              <input class="fi" type="text" id="me_emp" readonly />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-calendar-alt"></i> Date of Joining</label>
+              <input class="fi" type="text" id="me_doj" readonly />
+            </div>
+            <div class="form-group full">
+              <label><i class="fas fa-search"></i> Referral From <span class="hint">(start typing a JHS code or name, then pick from the list)</span></label>
+              <input class="fi" type="text" id="rf_input" placeholder="e.g. JHS1283 or Rahul" />
+              <div class="sugg" id="rf_sugg"></div>
+              <div class="picked" id="rf_picked" style="display:none">
+                <i class="fas fa-user-check" style="color:var(--accent)"></i>
+                <div><div class="pk-main" id="rf_pk_main"></div><div class="pk-sub" id="rf_pk_sub"></div></div>
+                <button type="button" onclick="clearPick()" title="Change"><i class="fas fa-times-circle"></i></button>
+              </div>
+            </div>
+            <div class="form-group full">
+              <label><i class="fas fa-briefcase"></i> Position</label>
+              <input class="fi" type="text" id="ex_position" placeholder="e.g. Audit Associate" required maxlength="120" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-pri" id="exBtn"><i class="fas fa-paper-plane"></i> Submit</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ══ Tab 2: Referral ══ -->
+      <div class="tc" id="tc-referral">
+        <form class="card" id="referralForm" onsubmit="submitReferral(event)">
+          <div class="card-title"><i class="fas fa-file-upload"></i> Refer Someone</div>
+          <div class="g2">
+            <div class="form-group full">
+              <label><i class="fas fa-user-tag"></i> Role</label>
+              <input class="fi" type="text" id="rr_role" placeholder="Role the candidate is referred for" required maxlength="120" />
+            </div>
+            <div class="form-group full">
+              <label><i class="fas fa-file-alt"></i> Resume <span class="hint">(.pdf or .docx, max 10 MB)</span></label>
+              <div class="drop" id="drop" onclick="document.getElementById('rr_file').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <div>Click to choose a file, or drag &amp; drop it here</div>
+                <div class="fname" id="fname"></div>
+              </div>
+              <input type="file" id="rr_file" accept=".pdf,.docx" style="display:none" onchange="fileChosen(this.files[0])" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-pri" id="rrBtn"><i class="fas fa-paper-plane"></i> Submit Referral</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = empId;
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t);
+  setTimeout(()=>{t.style.cssText='opacity:0;transform:translateX(30px);transition:all .3s';setTimeout(()=>t.remove(),320);},3500);
+}
+async function api(url, opts={}){
+  const res = await fetch(url, Object.assign({headers:AUTH}, opts));
+  let data = null; try { data = await res.json(); } catch(e) {}
+  if (res.status === 401) { window.location.href = '/login'; throw new Error('Session expired'); }
+  if (!res.ok) throw new Error((data && data.detail) || 'Request failed');
+  return data;
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tc-'+name).classList.add('active');
+}
+
+// ── Employee type-ahead ───────────────────────────────────────────────────────
+let picked = null, timer = null, items = [], hl = -1, reqSeq = 0;
+const inp = document.getElementById('rf_input'), sugg = document.getElementById('rf_sugg');
+
+function hi(text, q){
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0 || !q) return esc(text);
+  return esc(text.slice(0,i)) + '<b>' + esc(text.slice(i,i+q.length)) + '</b>' + esc(text.slice(i+q.length));
+}
+function renderSugg(q){
+  if (!items.length) { sugg.innerHTML = '<div class="sugg-none">No matching employee</div>'; }
+  else sugg.innerHTML = items.map((e,i)=>`
+    <div class="sugg-item ${i===hl?'hl':''}" data-i="${i}">
+      <span class="sugg-main">${hi(e.empid,q)} — ${hi(e.name,q)}</span>
+      <span class="sugg-sub">${esc([e.designation,e.department].filter(Boolean).join(' · '))}</span>
+    </div>`).join('');
+  sugg.classList.add('open');
+}
+sugg.addEventListener('mousedown', ev => {
+  const it = ev.target.closest('.sugg-item'); if (!it) return;
+  ev.preventDefault(); pick(items[+it.dataset.i]);
+});
+inp.addEventListener('input', () => {
+  clearTimeout(timer);
+  const q = inp.value.trim();
+  if (!q) { sugg.classList.remove('open'); return; }
+  timer = setTimeout(async () => {
+    const my = ++reqSeq;
+    try {
+      const d = await api('/buddy-referral/employees/search?q=' + encodeURIComponent(q));
+      if (my !== reqSeq) return;          // a newer keystroke superseded this
+      items = d.results || []; hl = -1; renderSugg(q);
+    } catch(e) { sugg.innerHTML = '<div class="sugg-none">Search failed</div>'; sugg.classList.add('open'); }
+  }, 180);
+});
+inp.addEventListener('keydown', ev => {
+  if (!sugg.classList.contains('open') || !items.length) return;
+  if (ev.key === 'ArrowDown') { hl = (hl+1) % items.length; renderSugg(inp.value.trim()); ev.preventDefault(); }
+  else if (ev.key === 'ArrowUp') { hl = (hl-1+items.length) % items.length; renderSugg(inp.value.trim()); ev.preventDefault(); }
+  else if (ev.key === 'Enter' && hl >= 0) { pick(items[hl]); ev.preventDefault(); }
+  else if (ev.key === 'Escape') sugg.classList.remove('open');
+});
+inp.addEventListener('blur', () => setTimeout(() => sugg.classList.remove('open'), 150));
+function pick(e){
+  picked = e;
+  inp.style.display = 'none'; sugg.classList.remove('open');
+  document.getElementById('rf_pk_main').textContent = `${e.empid} — ${e.name}`;
+  document.getElementById('rf_pk_sub').textContent = [e.designation,e.department].filter(Boolean).join(' · ');
+  document.getElementById('rf_picked').style.display = 'flex';
+}
+function clearPick(){
+  picked = null; inp.value = ''; inp.style.display = '';
+  document.getElementById('rf_picked').style.display = 'none'; inp.focus();
+}
+
+async function submitExisting(ev){
+  ev.preventDefault();
+  if (!picked) { toast('Please search and select the referring employee','error'); inp.focus(); return; }
+  const btn = document.getElementById('exBtn'); btn.disabled = true;
+  btn.innerHTML = '<div class="spin spin-dark"></div> Submitting…';
+  try {
+    await api('/buddy-referral/existing', {method:'POST', headers:Object.assign({'Content-Type':'application/json'},AUTH),
+      body: JSON.stringify({referral_from:picked.empid, position:document.getElementById('ex_position').value.trim()})});
+    toast('Referral submitted. Thank you!');
+    document.getElementById('existingForm').reset(); clearPick(); showMe();          // fresh entry
+  } catch(e) { toast(e.message,'error'); }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit';
+}
+
+// ── Referral with resume ──────────────────────────────────────────────────────
+let file = null;
+const MAX = 10*1024*1024;
+function fileChosen(f){
+  if (!f) return;
+  const name = f.name.toLowerCase();
+  if (!(name.endsWith('.pdf') || name.endsWith('.docx'))) { toast('Only .pdf and .docx files are allowed','error'); resetFile(); return; }
+  if (f.size > MAX) { toast('Resume must be 10 MB or smaller','error'); resetFile(); return; }
+  file = f; document.getElementById('fname').innerHTML = '<i class="fas fa-paperclip" style="display:inline;font-size:.9rem"></i> ' + esc(f.name);
+}
+function resetFile(){ file = null; document.getElementById('rr_file').value = ''; document.getElementById('fname').textContent = ''; }
+const drop = document.getElementById('drop');
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', ev => fileChosen(ev.dataTransfer.files[0]));
+
+async function submitReferral(ev){
+  ev.preventDefault();
+  if (!file) { toast('Please choose a resume (.pdf or .docx)','error'); return; }
+  const btn = document.getElementById('rrBtn'); btn.disabled = true;
+  btn.innerHTML = '<div class="spin spin-dark"></div> Uploading…';
+  const fd = new FormData();
+  fd.append('role', document.getElementById('rr_role').value.trim());
+  fd.append('resume', file);
+  try {
+    await api('/buddy-referral/referral', {method:'POST', body: fd});   // browser sets the multipart boundary
+    toast('Referral submitted. Thank you!');
+    document.getElementById('referralForm').reset(); resetFile();        // fresh entry
+  } catch(e) { toast(e.message,'error'); }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Referral';
+}
+
+let meInfo = null;
+function showMe(){
+  if(!meInfo) return;
+  document.getElementById('me_emp').value = `${meInfo.empid} — ${meInfo.name}`;
+  document.getElementById('me_doj').value = meInfo.date_of_joining || '—';
+}
+api('/buddy-referral/me').then(d=>{ meInfo=d; showMe(); }).catch(()=>{});
+document.getElementById('ls').style.display = 'none';
+document.getElementById('app').style.display = 'block';
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ Entry point — mounts static files and includes all module routers.
 Auth update: login accepts Employee Code OR JHS Email (either match = success).
 Session stores both empid & email.
 """
+
 import os, re, json, secrets
 from datetime import datetime, timedelta
 import jwt, requests
@@ -19,6 +20,33 @@ from pydantic import BaseModel
 from typing import Optional
 
 load_dotenv()
+
+
+def _wait_for_mongo(attempts: int = 8, delay: float = 3.0) -> None:
+    """
+    Many modules open their own MongoDB connection and create indexes while
+    they are imported, so a momentary "connection closed" from the Mongo server
+    used to crash startup (AutoReconnect traceback). Wait for the server to
+    answer first; if it never does, carry on and let the original error show.
+    """
+    import time
+    uri = os.getenv("MONGO_CONNECTION_STRING")
+    if not uri:
+        return
+    from pymongo import MongoClient
+    for i in range(1, attempts + 1):
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        try:
+            client.admin.command("ping")
+            return
+        except Exception as e:
+            print(f"[Startup] MongoDB not ready (attempt {i}/{attempts}): {type(e).__name__}")
+            time.sleep(delay)
+        finally:
+            client.close()
+
+
+_wait_for_mongo()
 
 # ── internal imports ──────────────────────────────────────────────────────────
 from backend.database import (
@@ -49,6 +77,10 @@ from backend.employee_declaration.router import router as employee_declaration_r
 from backend.chatbot.router            import router as chatbot_router             # ← CHATBOT
 from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
 from backend.rcm_chatbot.router        import router as rcm_chatbot_router          # ← CHATBOT (RCM)
+from backend.cv_builder.router         import router as cv_builder_router           # ← CV Builder
+from backend.buddy_referral.router     import router as buddy_referral_router       # ← Buddy Referral
+from backend.access_manager.router     import router as access_manager_router       # ← Control-panel access manager
+from backend.compliance_calendar.router import router as compliance_calendar_router  # ← Compliance Calendar
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -69,7 +101,8 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
                          "/employee-declaration", "/employee-declaration/admin",
-                         "/resume-ranker"}
+                         "/resume-ranker",
+                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -105,6 +138,12 @@ app.include_router(employee_declaration_router)  # prefix: /employee-declaration
 app.include_router(chatbot_router)         # prefix: /chatbot
 app.include_router(library_chatbot_router) # prefix: /chatbot/library
 app.include_router(rcm_chatbot_router)     # prefix: /chatbot/rcm
+app.include_router(cv_builder_router)      # prefix: /cv-builder
+app.include_router(buddy_referral_router)  # prefix: /buddy-referral
+app.include_router(access_manager_router)  # prefix: /access-manager
+app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
+from backend.access_manager.router import seed_compliance_admin
+seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 
 # ── Chatbot warm-up on startup ────────────────────────────────────────────────
 # Pre-loads the sentence-transformer embedding model into memory so the FIRST
@@ -193,6 +232,10 @@ async def timesheet_page():
 async def appraisal_page():
     return FileResponse(os.path.join(static_root, "appraisal", "index.html"))
 
+@app.get("/appraisal/admin", response_class=FileResponse)
+async def appraisal_admin_page():
+    return FileResponse(os.path.join(static_root, "appraisal", "admin_dashboard.html"))
+
 @app.get("/quality-audit", response_class=FileResponse)         # ← NEW
 async def quality_audit_page():
     return FileResponse(os.path.join(static_root, "quality_audit", "index.html"))
@@ -228,6 +271,26 @@ async def employee_declaration_admin_page():
 @app.get("/resume-ranker", response_class=FileResponse)   # ← RESUME RANKER
 async def resume_ranker_page():
     return FileResponse(os.path.join(static_root, "resume_ranker", "index.html"))
+
+@app.get("/cv-builder", response_class=FileResponse)   # ← CV Builder
+async def cv_builder_page():
+    return FileResponse(os.path.join(static_root, "cv_builder", "index.html"))
+
+@app.get("/cv-admin", response_class=FileResponse)   # ← CV / Buddy Referral admin (control panel)
+async def cv_admin_page():
+    return FileResponse(os.path.join(static_root, "cv_builder", "admin.html"))
+
+@app.get("/referral-admin", response_class=FileResponse)   # ← Buddy Referral admin (control panel)
+async def referral_admin_page():
+    return FileResponse(os.path.join(static_root, "buddy_referral", "admin.html"))
+
+@app.get("/compliance-admin", response_class=FileResponse)   # ← Compliance Calendar admin (control panel)
+async def compliance_admin_page():
+    return FileResponse(os.path.join(static_root, "compliance_calendar", "admin.html"))
+
+@app.get("/buddy-referral", response_class=FileResponse)   # ← Buddy Referral
+async def buddy_referral_page():
+    return FileResponse(os.path.join(static_root, "buddy_referral", "index.html"))
 
 @app.get("/jhs-chatbot", response_class=FileResponse)   # ← NEW
 async def jhs_chatbot_page():
@@ -544,7 +607,7 @@ async def set_module_access(
     if not {"timesheet", "quality_audit", "kra"}.issubset(caller_modules):
         raise HTTPException(403, "Only super admins can assign module access")
 
-    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker"}
+    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker", "cv", "buddy_referral"}
     modules = [m for m in request.modules if m in valid]
     empid = request.empid.strip().upper()
 

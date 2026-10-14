@@ -176,6 +176,7 @@
                     localStorage.setItem('access_token', result.access_token);
                     localStorage.setItem('loggedInEmployeeId', empid);
                     // ── redirect to module selector ──
+                    sessionStorage.removeItem('complianceWeekShown');
                     window.location.href = '/modules';
                 } else {
                     showMessage(result.detail || 'Invalid Employee Code or Password', 'error');

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>CV Builder Admin — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:2px solid var(--border);background:#fff;color:var(--accent);cursor:pointer;transition:var(--tr);font-size:.9rem}
+    .icon-btn:hover{border-color:var(--accent);background:#f0f4ff;transform:translateY(-1px)}
+    .icon-btn.w{color:#2b579a}.icon-btn.p{color:#c0392b}.icon-btn.o{color:#c8102e}
+    .acts{display:flex;gap:.35rem;white-space:nowrap}
+    .vw-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:900;display:none;align-items:flex-start;justify-content:center;padding:1.2rem}
+    .vw-bg.open{display:flex}
+    .vw{background:#fff;border-radius:16px;width:100%;max-width:980px;height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.4)}
+    .vw-head{background:var(--pg);color:#fff;padding:.9rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .vw-head h3{font-size:.95rem;margin:0;display:flex;align-items:center;gap:.5rem}
+    .vw-body{flex:1;overflow:auto;background:#d9dde6}
+    .vw-body .docx-wrapper{background:transparent!important;padding:1rem!important}
+    .vw-msg{padding:3rem 1rem;text-align:center;color:#555}
+    .x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+
+<div id="ls" class="loader"><div class="spin"></div> Loading…</div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-id-card"></i> CV Builder — Admin</div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <a href="/control-panel" class="nav-btn"><i class="fas fa-sliders-h"></i> Control Panel</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="wrap" style="max-width:1200px">
+    <div class="hdr">
+      <h1>CV Builder</h1>
+      <p>Which employees have filled in their CV</p>
+    </div>
+
+    <div class="body">
+      <div class="stats">
+        <div class="stat"><b id="s_total">0</b><span>Employees</span></div>
+        <div class="stat" style="border-left-color:#11998e"><b id="s_filled">0</b><span>CV filled</span></div>
+        <div class="stat" style="border-left-color:#ef4444"><b id="s_pending">0</b><span>Not filled</span></div>
+      </div>
+      <div class="toolbar">
+        <input class="fi" id="cvSearch" placeholder="Search code, name, manager, partner…" oninput="renderCV()" />
+        <select class="fi" id="cvFilter" style="max-width:200px" onchange="renderCV()">
+          <option value="all">All employees</option>
+          <option value="filled">CV filled</option>
+          <option value="pending">Not filled</option>
+        </select>
+      </div>
+      <div class="tbl-wrap"><table class="t">
+        <thead><tr><th>Code</th><th>Name</th><th>Manager</th><th>Partner</th><th>CV</th><th>Status</th><th>Last updated</th><th>Actions</th></tr></thead>
+        <tbody id="cvBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+<div class="vw-bg" id="vwBg">
+  <div class="vw">
+    <div class="vw-head">
+      <h3><i class="fas fa-id-card"></i> <span id="vwTitle">CV</span></h3>
+      <button class="x" onclick="closeView()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="vw-body" id="vwBody"></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+
+<script>
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = empId;
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t); setTimeout(()=>t.remove(),3500);
+}
+function fmt(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?'—':x.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+async function getJSON(url){
+  const r = await fetch(url,{headers:AUTH});
+  if (r.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (r.status===403){ window.location.href='/control-panel'; throw new Error('No access'); }
+  if (!r.ok) throw new Error('Request failed');
+  return r.json();
+}
+async function download(url, fallbackName){
+  try{
+    const r = await fetch(url,{headers:AUTH});
+    if(!r.ok){ let d=null; try{d=await r.json();}catch(e){} throw new Error((d&&d.detail)||'Download failed'); }
+    const cd = r.headers.get('Content-Disposition')||''; const m = /filename="?([^";]+)"?/.exec(cd);
+    const blob = await r.blob(), u = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'),{href:u,download:m?m[1]:fallbackName});
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+  }catch(e){ toast(e.message,'error'); }
+}
+
+let cvRows=[];
+function renderCV(){
+  const q=document.getElementById('cvSearch').value.trim().toLowerCase(), f=document.getElementById('cvFilter').value;
+  const rows=cvRows.filter(r=>(f==='all'||(f==='filled')===r.filled) &&
+    (!q || [r.empid,r.name,r.manager,r.partner].some(v=>String(v||'').toLowerCase().includes(q))));
+  document.getElementById('cvBody').innerHTML = rows.length ? rows.map(r=>{
+    const e=encodeURIComponent(r.empid), t=esc(r.template||'1');
+    return `<tr>
+    <td><b>${esc(r.empid)}</b></td><td>${esc(r.name)}</td><td>${esc(r.manager)||'—'}</td><td>${esc(r.partner)||'—'}</td>
+    <td>${r.filled?'<span class="pill pill-yes"><i class="fas fa-check"></i>&nbsp;Filled</span>':'<span class="pill pill-no">Not filled</span>'}</td>
+    <td>${esc(r.profile_status)||'—'}</td><td>${fmt(r.updated_at)}</td>
+    <td>${r.filled?`<div class="acts">
+      <button class="icon-btn" title="Preview CV" onclick="previewCV('${e}','${t}','${esc(r.name)}')"><i class="fas fa-eye"></i></button>
+      <button class="icon-btn w" title="Download Word" onclick="download('/cv-builder/admin/download/${e}/${t}?fmt=docx','CV_${esc(r.empid)}.docx')"><i class="fas fa-file-word"></i></button>
+      <button class="icon-btn p" title="Download PDF" onclick="download('/cv-builder/admin/download/${e}/${t}?fmt=pdf','CV_${esc(r.empid)}.pdf')"><i class="fas fa-file-pdf"></i></button>
+      ${r.ppt?`<button class="icon-btn o" title="Download profile PPT" onclick="download('/cv-builder/admin/ppt/${e}','Profile_${esc(r.empid)}.pptx')"><i class="fas fa-file-powerpoint"></i></button>`:''}
+    </div>`:''}</td>
+  </tr>`;}).join('') : '<tr><td colspan="8"><div class="empty"><i class="fas fa-user-slash"></i>No employees match.</div></td></tr>';
+}
+
+// ── CV preview (renders the employee's saved CV from its Word file) ──────────
+async function previewCV(e,t,name){
+  const bg=document.getElementById('vwBg'), body=document.getElementById('vwBody');
+  document.getElementById('vwTitle').textContent='CV — '+name;
+  body.innerHTML='<div class="vw-msg"><div class="spin spin-dark"></div> Loading…</div>'; bg.classList.add('open');
+  try{
+    const r=await fetch(`/cv-builder/admin/download/${e}/${t}?fmt=docx`,{headers:AUTH});
+    if(!r.ok){ let d=null; try{d=await r.json();}catch(x){} throw new Error((d&&d.detail)||'Could not load the CV'); }
+    const buf=await r.arrayBuffer();
+    if(!window.docx||!window.docx.renderAsync) throw new Error('Viewer could not load (check your internet connection). Use the download buttons instead.');
+    body.innerHTML='';
+    await window.docx.renderAsync(buf, body, null, {className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,useBase64URL:true});
+  }catch(err){ body.innerHTML=`<div class="vw-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}</div>`; }
+}
+function closeView(){ document.getElementById('vwBg').classList.remove('open'); document.getElementById('vwBody').innerHTML=''; }
+document.getElementById('vwBg').addEventListener('mousedown',ev=>{ if(ev.target.id==='vwBg') closeView(); });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') closeView(); });
+
+async function init(){
+  try{
+    const cv = await getJSON('/cv-builder/admin/status');
+    cvRows=cv.rows;
+    document.getElementById('s_total').textContent=cv.total;
+    document.getElementById('s_filled').textContent=cv.filled;
+    document.getElementById('s_pending').textContent=cv.total-cv.filled;
+    renderCV();
+    document.getElementById('ls').style.display='none';
+    document.getElementById('app').style.display='block';
+  }catch(e){ document.getElementById('ls').innerHTML='Could not load: '+esc(e.message); }
+}
+init();
+</script>
+</body>
+</html>

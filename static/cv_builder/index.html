@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>CV Builder — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --pg:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      --sg:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);
+      --success:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);
+      --dark:#2c3e50;--light:#f8f9fa;--text:#2c3e50;--muted:#7f8c8d;
+      --border:#e1e8ed;--accent:#667eea;
+      --sh-s:0 4px 6px rgba(0,0,0,.1);--sh-m:0 10px 25px rgba(0,0,0,.15);
+      --sh-l:0 20px 40px rgba(0,0,0,.2);--tr:all .3s cubic-bezier(.4,0,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:100vh;color:var(--text);line-height:1.6}
+
+    /* Navbar */
+    .navbar{background:var(--dark);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh-m);position:sticky;top:0;z-index:200}
+    .brand{font-size:1.1rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:.55rem}
+    .brand i{color:#a78bfa}
+    .nav-r{display:flex;align-items:center;gap:.75rem}
+    .emp-badge{color:rgba(255,255,255,.6);font-size:.82rem;padding:.28rem .75rem;background:rgba(255,255,255,.07);border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    .nav-btn{display:flex;align-items:center;gap:.4rem;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.65);padding:.45rem 1rem;border-radius:8px;font-size:.85rem;font-family:inherit;font-weight:500;cursor:pointer;transition:var(--tr);text-decoration:none}
+    .nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+    .last-saved{font-size:.78rem;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:.4rem}
+    .last-saved i{color:#38ef7d}
+
+    /* Container */
+    .wrap{max-width:1080px;margin:2rem auto;background:#fff;border-radius:20px;box-shadow:var(--sh-l);overflow:hidden;animation:fadeUp .6s ease-out}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+    /* Header */
+    .hdr{background:var(--pg);color:#fff;padding:2.4rem 2rem;text-align:center;border-radius:0 0 20px 20px}
+    .hdr h1{font-size:2.6rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-shadow:2px 2px 8px rgba(0,0,0,.3);margin:0}
+    .hdr p{opacity:.85;font-size:.95rem;margin:.4rem 0 0;font-weight:300}
+
+    .body{padding:2rem 2.5rem 2.5rem}
+
+    /* Emp info strip */
+    .emp-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-bottom:2rem;padding:1.5rem;background:var(--light);border-radius:15px;border-left:5px solid var(--accent);box-shadow:var(--sh-s)}
+
+    /* Form */
+    .form-group{display:flex;flex-direction:column;gap:.45rem}
+    .form-group label{font-weight:600;color:var(--text);font-size:.82rem;text-transform:uppercase;letter-spacing:.5px}
+    .form-group label i{color:var(--accent);margin-right:.3rem;font-size:.78rem}
+    .fi{width:100%;padding:.72rem 1rem;border:2px solid var(--border);border-radius:10px;font-size:.92rem;font-family:inherit;color:var(--text);background:#fff;outline:none;transition:var(--tr)}
+    .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,126,234,.12);transform:translateY(-1px)}
+    .fi[readonly]{background:#eef0f5;color:var(--muted);cursor:not-allowed;transform:none!important}
+    textarea.fi{resize:vertical;min-height:82px;line-height:1.55}
+    select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23667eea' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px;padding-right:2.5rem;cursor:pointer}
+
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+    .full{grid-column:1/-1}
+
+    .card{margin-bottom:1.8rem;padding:1.8rem;background:var(--light);border-radius:15px;border-left:5px solid var(--accent);box-shadow:var(--sh-s)}
+    .card-title{font-size:1rem;font-weight:700;color:var(--text);margin:0 0 1.2rem;display:flex;align-items:center;gap:.5rem;padding-bottom:.75rem;border-bottom:2px solid #e8ecf9}
+    .card-title i{color:var(--accent)}
+
+    /* Tabs */
+    .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:2rem}
+    .tab{padding:.85rem 1.6rem;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;transition:var(--tr);display:flex;align-items:center;gap:.45rem;border-bottom:3px solid transparent;margin-bottom:-2px}
+    .tab:hover{color:var(--accent)}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .tc{display:none;animation:fadeIn .3s ease}
+    .tc.active{display:block}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+    /* Multi-select */
+    .ms-box{position:relative;border:2px solid var(--border);border-radius:10px;background:#fff;padding:.4rem .6rem;min-height:48px;cursor:text;transition:var(--tr)}
+    .ms-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,126,234,.12)}
+    .ms-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.3rem}
+    .ms-tag{display:inline-flex;align-items:center;gap:.3rem;background:var(--pg);color:#fff;font-size:.73rem;font-weight:600;padding:.22rem .6rem;border-radius:20px}
+    .ms-tag-rm{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:0;font-size:.68rem;line-height:1}
+    .ms-tag-rm:hover{color:#fff}
+    .ms-input{border:none;outline:none;background:transparent;font-family:inherit;font-size:.9rem;color:var(--text);width:100%;min-width:120px;padding:.2rem .3rem}
+    .ms-drop{position:absolute;top:100%;left:-2px;right:-2px;background:#fff;border:2px solid var(--accent);border-top:none;border-radius:0 0 10px 10px;max-height:210px;overflow-y:auto;z-index:300;display:none;box-shadow:var(--sh-m)}
+    .ms-drop.open{display:block}
+    .ms-opt{padding:.55rem 1rem;font-size:.88rem;cursor:pointer;color:var(--text);transition:background .12s}
+    .ms-opt:hover{background:#f0f4ff;color:var(--accent)}
+    .ms-none{padding:.55rem 1rem;font-size:.82rem;color:var(--muted);font-style:italic}
+
+    /* Sector widget */
+    .sector-picker{border:2px solid var(--border);border-radius:10px;background:#fff;overflow:hidden;transition:var(--tr)}
+    .sector-picker:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,126,234,.12)}
+    .sector-add-row{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;border-bottom:1px solid var(--border)}
+    .sector-add-row select{flex:1;border:none;outline:none;font-family:inherit;font-size:.88rem;color:var(--text);cursor:pointer;background:transparent}
+    .sector-add-btn{display:flex;align-items:center;gap:.3rem;background:var(--pg);color:#fff;border:none;padding:.38rem .9rem;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+    .sector-rows{padding:.4rem .6rem .6rem}
+    .sector-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.55rem;background:#f8f9fa;border-radius:8px;padding:.45rem .65rem;border:1px solid var(--border)}
+    .sector-row-name{font-size:.88rem;font-weight:600;color:var(--text);flex:1.4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sector-row-dur{flex:1;min-width:90px}
+    .sector-row-dur input{width:100%;border:1.5px solid var(--border);border-radius:7px;padding:.32rem .6rem;font-size:.82rem;font-family:inherit;outline:none;transition:border-color .2s}
+    .sector-row-dur input:focus{border-color:var(--accent)}
+    .sector-row-rm{background:none;border:none;color:#ef4444;cursor:pointer;font-size:.85rem;padding:.2rem;flex-shrink:0}
+    .sector-empty{padding:.6rem .6rem .8rem;font-size:.82rem;color:var(--muted);font-style:italic;text-align:center}
+
+    /* Status pill */
+    .pill{display:inline-flex;align-items:center;padding:.28rem .85rem;border-radius:20px;font-size:.76rem;font-weight:700;letter-spacing:.04em;margin-top:.4rem}
+    .pill-Draft{background:rgba(245,158,11,.12);color:#b45309}
+    .pill-Approved{background:rgba(17,153,142,.12);color:#0f766e}
+    .pill-Inactive{background:rgba(127,140,141,.12);color:#64748b}
+    .pill-default{background:rgba(102,126,234,.12);color:var(--accent)}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.72rem 1.55rem;border:none;border-radius:10px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:var(--tr);box-shadow:var(--sh-s)}
+    .btn-pri{background:var(--pg);color:#fff}
+    .btn-pri:hover{transform:translateY(-2px);box-shadow:var(--sh-m)}
+    .btn-pri:disabled{opacity:.55;cursor:not-allowed;transform:none}
+    .btn-suc{background:var(--success);color:#fff}
+    .btn-suc:hover{transform:translateY(-2px);box-shadow:var(--sh-m)}
+    .btn-ghost{background:#fff;color:var(--muted);border:2px solid var(--border);box-shadow:none}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-del{background:#fff5f5;color:#dc2626;border:1.5px solid #fecaca;box-shadow:none}
+    .btn-del:hover{background:#dc2626;color:#fff}
+    .btn-sm{padding:.42rem .95rem;font-size:.8rem;border-radius:8px}
+    .btn-icon{padding:.4rem .6rem;border-radius:8px}
+
+    .actions{display:flex;align-items:center;justify-content:flex-end;gap:.8rem;margin-top:1.4rem;padding-top:1.2rem;border-top:2px solid var(--border);flex-wrap:wrap}
+
+    /* ── Template selector strip ── */
+    .tpl-strip{margin-bottom:2rem;padding:1.5rem;background:linear-gradient(135deg,#f0f4ff,#e8f4ff);border-radius:15px;border-left:5px solid var(--accent)}
+    .tpl-strip-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem}
+    .tpl-strip-header h4{font-size:.95rem;font-weight:700;color:var(--text);margin:0}
+    .tpl-strip-header h4 i{color:var(--accent);margin-right:.4rem}
+    .tpl-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.9rem}
+    .tpl-card{border-radius:10px;overflow:hidden;border:3px solid transparent;cursor:pointer;transition:var(--tr);position:relative;background:#fff;box-shadow:var(--sh-s)}
+    .tpl-card:hover{transform:translateY(-4px);box-shadow:var(--sh-m);border-color:var(--accent)}
+    .tpl-card.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,126,234,.2)}
+    .tpl-card img{width:100%;height:140px;object-fit:cover;object-position:top;display:block}
+    .tpl-card-foot{padding:.45rem .5rem;text-align:center;background:#fff}
+    .tpl-card-foot span{font-size:.75rem;font-weight:600;color:var(--muted)}
+    .tpl-check{position:absolute;top:6px;right:6px;width:22px;height:22px;background:var(--accent);border-radius:50%;display:none;align-items:center;justify-content:center;color:#fff;font-size:.65rem}
+    .tpl-card.selected .tpl-check{display:flex}
+    .tpl-dl-row{display:flex;align-items:center;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
+    .tpl-sel-label{font-size:.85rem;color:var(--muted)}
+    .tpl-sel-label strong{color:var(--text)}
+
+    /* Experience */
+    .exp-list{display:flex;flex-direction:column;gap:1rem}
+    .exp-card{background:#fff;border-radius:12px;border:2px solid var(--border);padding:1.1rem 1.3rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;transition:var(--tr)}
+    .exp-card:hover{border-color:var(--accent);box-shadow:var(--sh-s);transform:translateY(-2px)}
+    .exp-employer{font-size:.98rem;font-weight:700;color:var(--text);margin:0 0 .2rem}
+    .exp-desig{font-size:.85rem;color:var(--accent);font-weight:600;margin:0 0 .45rem}
+    .exp-meta{display:flex;flex-wrap:wrap;gap:.45rem}
+    .chip{font-size:.72rem;color:var(--muted);background:var(--light);border:1px solid var(--border);padding:.16rem .55rem;border-radius:20px;display:inline-flex;align-items:center;gap:.28rem}
+    .exp-resp{font-size:.8rem;color:var(--muted);margin:.5rem 0 0;line-height:1.5}
+    .exp-empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+    .exp-empty i{font-size:2.4rem;color:#d1d5db;margin-bottom:.7rem;display:block}
+
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(44,62,80,.6);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center;padding:1rem}
+    .modal-bg.open{display:flex}
+    .modal{background:#fff;border-radius:18px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;box-shadow:0 30px 70px rgba(0,0,0,.25);animation:mIn .3s cubic-bezier(.34,1.56,.64,1)}
+    @keyframes mIn{from{opacity:0;transform:scale(.92) translateY(16px)}to{opacity:1;transform:none}}
+    .modal-head{background:var(--pg);color:#fff;padding:1.3rem 1.8rem;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0}
+    .modal-head h3{font-size:1rem;font-weight:700;margin:0;display:flex;align-items:center;gap:.5rem}
+    .modal-x{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:.9rem;transition:var(--tr);display:grid;place-items:center}
+    .modal-x:hover{background:rgba(255,255,255,.28)}
+    .modal-body{padding:1.8rem}
+    .modal-foot{padding:1rem 1.8rem 1.5rem;display:flex;gap:.75rem;justify-content:flex-end;border-top:2px solid var(--border)}
+
+    /* ── Template preview fullscreen modal ── */
+    .preview-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:800;display:none;align-items:flex-start;justify-content:center;padding:1.5rem;overflow-y:auto}
+    .preview-modal-bg.open{display:flex}
+    .preview-modal{background:#fff;border-radius:20px;width:100%;max-width:1050px;box-shadow:0 40px 80px rgba(0,0,0,.4);animation:mIn .3s cubic-bezier(.34,1.56,.64,1);overflow:hidden}
+    .preview-modal-head{background:var(--pg);color:#fff;padding:1.2rem 1.8rem;display:flex;align-items:center;justify-content:space-between}
+    .preview-modal-head h3{font-size:1rem;font-weight:700;margin:0;display:flex;align-items:center;gap:.5rem}
+    .preview-templates-wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;padding:1.5rem;background:#f8f9fa}
+    .preview-tpl{border-radius:12px;overflow:hidden;cursor:pointer;border:3px solid transparent;transition:var(--tr);background:#fff;box-shadow:var(--sh-s);position:relative}
+    .preview-tpl:hover{transform:translateY(-4px);box-shadow:var(--sh-m);border-color:var(--accent)}
+    .preview-tpl.selected{border-color:var(--accent);box-shadow:0 0 0 4px rgba(102,126,234,.2)}
+    .preview-tpl img{width:100%;height:180px;object-fit:cover;object-position:top;display:block}
+    .preview-tpl-label{text-align:center;padding:.6rem .4rem;font-size:.78rem;font-weight:600;color:var(--text)}
+    .preview-tpl-check{position:absolute;top:8px;right:8px;width:26px;height:26px;background:var(--accent);border-radius:50%;display:none;align-items:center;justify-content:center;color:#fff;font-size:.75rem}
+    .preview-tpl.selected .preview-tpl-check{display:flex}
+    .preview-foot{padding:1.2rem 1.8rem;display:flex;align-items:center;justify-content:space-between;border-top:2px solid var(--border);flex-wrap:wrap;gap:.75rem}
+    .preview-foot .sel-info{font-size:.9rem;color:var(--muted)}
+    .preview-foot .sel-info strong{color:var(--text)}
+    .preview-foot-btns{display:flex;gap:.75rem;flex-wrap:wrap}
+
+    /* Toast */
+    .toast-wrap{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.6rem;z-index:9000}
+    .toast{display:flex;align-items:center;gap:.65rem;background:#fff;border-radius:12px;padding:.8rem 1.2rem;box-shadow:0 8px 30px rgba(0,0,0,.18);font-size:.87rem;font-weight:500;color:var(--text);animation:tIn .3s ease-out;min-width:270px;border-left:4px solid var(--accent)}
+    .toast.success{border-left-color:#11998e}
+    .toast.error{border-left-color:#ff6b6b}
+    .toast.success i{color:#11998e}
+    .toast.error i{color:#ff6b6b}
+    @keyframes tIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+
+    /* Loader */
+    .loader{display:flex;align-items:center;justify-content:center;min-height:100vh;color:#fff;font-size:1.1rem;gap:.8rem}
+    .spin{display:inline-block;width:1.1rem;height:1.1rem;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+    .spin-dark{border-color:rgba(102,126,234,.3);border-top-color:var(--accent)}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .hint{font-size:.72rem;color:var(--muted);font-weight:400;font-style:italic;margin-left:.35rem}
+
+    @media(max-width:900px){.tpl-grid,.preview-templates-wrap{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:600px){
+      .navbar{padding:.9rem 1rem}.wrap{margin:1rem}.body{padding:1rem}
+      .g2{grid-template-columns:1fr}.tabs{overflow-x:auto}
+      .tpl-grid,.preview-templates-wrap{grid-template-columns:repeat(2,1fr)}
+    }
+      .det-row{display:grid;grid-template-columns:150px 1fr 110px;gap:.6rem;align-items:center;margin-top:.5rem}
+    .det-row.mem{grid-template-columns:150px 1fr 1fr}
+    .det-row .det-name{font-size:.8rem;font-weight:600;color:var(--text)}
+    .det-hint{font-size:.78rem;color:var(--muted);margin-top:.35rem}
+    .asg-row{display:grid;grid-template-columns:1.2fr 1.5fr 1fr 1fr 34px;gap:.5rem;margin-bottom:.5rem;align-items:center}
+    @media(max-width:720px){.det-row,.det-row.mem,.asg-row{grid-template-columns:1fr}}
+      .doc-bar{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem}
+    .doc-bar .left,.doc-bar .right{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+    .doc-host{background:#d9dde6;border-radius:14px;padding:1rem;overflow:auto;max-height:82vh;min-height:300px;position:relative}
+    .doc-host .docx-wrapper{background:transparent!important;padding:0!important}
+    .doc-host .docx-wrapper>section.docx{margin:0 auto 1rem!important;box-shadow:0 4px 18px rgba(0,0,0,.2)}
+    .doc-msg{padding:3rem 1rem;text-align:center;color:var(--muted)}
+    .saved-note{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:.6rem 1rem;font-size:.85rem;margin-bottom:1rem;display:none}
+      .tpl-off{display:none!important}
+    #memDet.no-level .det-row.mem{grid-template-columns:150px 1fr}
+    #memDet.no-level .mem-level{display:none}
+    #asgRows.no-role .asg-row{grid-template-columns:1.2fr 1.5fr 1fr 34px}
+    #asgRows.no-role .asg-role{display:none}
+    .tpl-note{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:.65rem 1rem;font-size:.83rem;margin-bottom:1.4rem;display:flex;gap:.6rem;align-items:flex-start}
+    .tpl-note i{margin-top:.15rem}
+      .sec-off{display:none!important}
+    .sec-list{display:flex;flex-direction:column;gap:.55rem}
+    .sec-row{display:grid;grid-template-columns:auto 190px 1fr;gap:.8rem;align-items:center;background:#fff;border:2px solid var(--border);border-radius:12px;padding:.6rem .9rem;transition:var(--tr)}
+    .sec-row.off{opacity:.55;background:#f3f4f6}
+    .sec-row .sec-name{font-weight:600;font-size:.88rem}
+    .sec-row .sec-name small{display:block;font-weight:400;color:var(--muted);font-size:.72rem}
+    .sw{position:relative;display:inline-block;width:42px;height:24px}
+    .sw input{opacity:0;width:0;height:0}
+    .sw span{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;cursor:pointer;transition:.2s}
+    .sw span:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+    .sw input:checked+span{background:var(--accent)}
+    .sw input:checked+span:before{transform:translateX(18px)}
+    .cs-card{background:#fff;border:2px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.8rem}
+    .cs-card.off{opacity:.55}
+    .cs-head{display:flex;gap:.7rem;align-items:center;margin-bottom:.6rem}
+    @media(max-width:720px){.sec-row{grid-template-columns:auto 1fr}.sec-row .sec-title{grid-column:1/-1}}
+      .ms-opt.ms-add{color:var(--accent);font-weight:600;border-top:1px solid var(--border)}
+    .sector-in{flex:1;border:none;outline:none;font-family:inherit;font-size:.88rem;color:var(--text);background:transparent;min-width:0}
+    .layout-pick{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:.9rem}
+    .layout-pick label.rad{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;font-weight:600;cursor:pointer;padding:.35rem .8rem;border:2px solid var(--border);border-radius:9px;background:#fff}
+    .layout-pick label.rad:has(input:checked){border-color:var(--accent);background:#f0f4ff;color:var(--accent)}
+    .layout-pick small{font-weight:400;color:var(--muted)}
+      .rs-drop{border:2px dashed var(--border);border-radius:12px;background:#fff;padding:1.2rem 1rem;text-align:center;cursor:pointer;transition:var(--tr);color:var(--muted);font-size:.9rem}
+    .rs-drop:hover,.rs-drop.over{border-color:var(--accent);background:#f6f8ff;color:var(--accent)}
+    .rs-drop i{font-size:1.6rem;display:block;margin-bottom:.35rem}
+    .rs-chip{display:none;align-items:center;gap:.6rem;background:#fff;border:2px solid var(--accent);border-radius:10px;padding:.55rem .9rem;margin-top:.2rem}
+    .rs-chip .nm{font-weight:600;font-size:.88rem;word-break:break-all}
+    .rs-chip button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:1.05rem}
+    .rs-chip .nm{flex:1}
+    .rs-chip button.rs-keep{background:var(--pg);color:#fff;font-size:.78rem;font-weight:600;padding:.35rem .8rem;border-radius:8px}
+    .rs-msg{font-size:.82rem;margin-top:.7rem;line-height:1.5;display:none;padding:.6rem .85rem;border-radius:9px}
+    .rs-msg.ok{display:block;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .rs-msg.err{display:block;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .rs-opt{display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--muted);margin-top:.7rem;cursor:pointer}
+  </style>
+</head>
+<body>
+
+<div id="ls" class="loader"><div class="spin"></div> Loading CV Builder…</div>
+
+<div id="app" style="display:none">
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-id-card"></i> JHS CV Builder</div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <span class="last-saved" id="lastSaved"></span>
+      <a href="/modules" class="nav-btn"><i class="fas fa-th-large"></i> Modules</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <div class="hdr">
+      <h1><i class="fas fa-id-card"></i> CV Builder</h1>
+      <p>Build your professional profile — choose a template and download</p>
+    </div>
+
+    <div class="body">
+
+      <!-- Employee strip -->
+      <div class="emp-info">
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input class="fi" type="text" id="f_empid" readonly />
+        </div>
+        <div class="form-group">
+          <label>Employee Name</label>
+          <input class="fi" type="text" id="f_name" readonly />
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>Profile Status</label>
+          <span id="statusPill" class="pill pill-Draft">Draft</span>
+        </div>
+      </div>
+
+      <!-- ══ Template Selector Strip ══ -->
+      <div class="tpl-strip">
+        <div class="tpl-strip-header">
+          <h4><i class="fas fa-palette"></i> Choose Your CV Template</h4>
+          <button class="btn btn-ghost btn-sm" onclick="openPreviewModal()">
+            <i class="fas fa-expand-alt"></i> Browse Full Preview
+          </button>
+        </div>
+        <div class="tpl-grid" id="tplGrid">
+          <!-- injected by JS -->
+        </div>
+        <div class="tpl-dl-row">
+          <span class="tpl-sel-label">Selected: <strong id="tplSelLabel">Template 1</strong></span>
+          <span style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-pri btn-sm" id="dlDocx" onclick="downloadCV('docx')">
+              <i class="fas fa-file-word"></i> Download Word
+            </button>
+            <button class="btn btn-pri btn-sm" id="dlPdf" onclick="downloadCV('pdf')">
+              <i class="fas fa-file-pdf"></i> Download PDF
+            </button>
+            <button class="btn btn-ghost btn-sm ppt-btn" onclick="downloadPpt(this)">
+              <i class="fas fa-file-powerpoint"></i> Profile PPT
+            </button>
+          </span>
+        </div>
+        <div class="layout-pick">
+          <span class="tpl-sel-label">CV length:</span>
+          <label class="rad"><input type="radio" name="pgl" value="2" checked onchange="setLayout('2')"> 2 pages</label>
+          <label class="rad"><input type="radio" name="pgl" value="1" onchange="setLayout('1')"> 1 page <small>(compact)</small></label>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" role="tablist">
+        <button class="tab active" id="tab-profile"    onclick="switchTab('profile')"    role="tab"><i class="fas fa-user-circle"></i> Profile Details</button>
+        <button class="tab"        id="tab-preview"    onclick="switchTab('preview')"    role="tab"><i class="fas fa-eye"></i> Preview &amp; Download</button>
+      </div>
+
+      <!-- ════ TAB: PROFILE ════ -->
+      <div class="tc active" id="tc-profile">
+        <div class="tpl-note"><i class="fas fa-info-circle"></i><span id="tplNote"></span></div>
+        <div class="card" id="resumeCard">
+          <div class="card-title"><i class="fas fa-file-import"></i> Auto-fill from your old resume <span class="hint">(optional)</span></div>
+          <p style="font-size:.83rem;color:var(--muted);margin-bottom:.9rem">
+            Upload a PDF or Word resume and the details we can find <strong>replace what is in the form</strong> &mdash; even fields you already filled &mdash; then review and edit them as you like.
+            The file is only read to fill the form: it is <strong>never stored</strong>, and removing it undoes the auto-fill. Auto-save waits while a resume is attached: press <strong>Keep these details</strong> to save them.
+          </p>
+          <div class="rs-drop" id="rsDrop" onclick="document.getElementById('rsFile').click()">
+            <i class="fas fa-cloud-upload-alt"></i>
+            Click to choose a resume, or drop it here <span class="hint">(.pdf or .docx, up to 5 MB)</span>
+          </div>
+          <input type="file" id="rsFile" accept=".pdf,.docx" style="display:none" onchange="resumeChosen(this.files[0])" />
+          <div class="rs-chip" id="rsChip"><i class="fas fa-paperclip" style="color:var(--accent)"></i><span class="nm" id="rsName"></span>
+            <button type="button" class="rs-keep" onclick="keepResumeDetails()"><i class="fas fa-check"></i> Keep these details</button>
+            <button type="button" title="Remove resume and undo the auto-fill" onclick="removeResume()"><i class="fas fa-times-circle"></i></button></div>
+          <div class="rs-msg" id="rsMsg"></div>
+        </div>
+
+        <form id="pForm" onsubmit="saveProfile(event)">
+
+          <div class="card">
+            <div class="card-title"><i class="fas fa-info-circle"></i> Basic Information</div>
+            <div class="g2">
+              <div class="form-group">
+                <label><i class="fas fa-briefcase"></i> Designation</label>
+                <input class="fi" type="text" id="f_desig" placeholder="Type your designation" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-building"></i> Department / Team</label>
+                <input class="fi" type="text" id="f_dept" placeholder="Type your department / team" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-clock"></i> Total Experience (Years)</label>
+                <input class="fi" type="text" id="f_exp" placeholder="Type your total experience in years" />
+              </div>
+              <div class="form-group" data-tpl="" data-label="Photo">
+                <label><i class="fas fa-image"></i> Professional Photo URL</label>
+                <input class="fi" type="text" id="f_photo" placeholder="Paste your photo link (optional)" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email</label>
+                <input class="fi" type="email" id="f_email" placeholder="Type your email address" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-phone"></i> Phone</label>
+                <input class="fi" type="text" id="f_phone" placeholder="Type your phone number" />
+              </div>
+              <div class="form-group" data-tpl="1,2,3" data-label="Location">
+                <label><i class="fas fa-map-marker-alt"></i> Location</label>
+                <input class="fi" type="text" id="f_loc" placeholder="Type your city / location" />
+              </div>
+              <div class="form-group full" data-sec="summary">
+                <label><i class="fas fa-align-left"></i> Professional Summary</label>
+                <textarea class="fi" id="f_summary" rows="4" placeholder="Type a short summary about yourself (2-4 lines)"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><i class="fas fa-graduation-cap"></i> Qualifications & Memberships</div>
+            <div class="g2">
+              <div class="form-group" data-sec="education">
+                <label><i class="fas fa-graduation-cap"></i> Qualification <span class="hint">(multi-select)</span></label>
+                <div class="ms-box" id="ms-qual" data-field="qualification"></div>
+              </div>
+              <div class="form-group" data-sec="memberships">
+                <label><i class="fas fa-certificate"></i> Institute Membership <span class="hint">(multi-select)</span></label>
+                <div class="ms-box" id="ms-mem" data-field="membership"></div>
+              </div>
+              <div class="form-group full" id="qualDetBox" style="display:none" data-sec="education" data-tpl="1,2,3,4" data-label="Qualification institute &amp; year">
+                <label><i class="fas fa-university"></i> Qualification details <span class="hint">(institute &amp; year - shown on the CV)</span></label>
+                <div id="qualDet"></div>
+              </div>
+              <div class="form-group full" id="memDetBox" style="display:none" data-sec="memberships">
+                <label><i class="fas fa-id-badge"></i> Membership details <span class="hint">(level &amp; number - shown on the CV)</span></label>
+                <div id="memDet"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" data-sec="sectors">
+            <div class="card-title"><i class="fas fa-industry"></i> Sector Experience</div>
+            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem;">Select each sector and enter your years/months of experience in that sector.</p>
+            <div class="sector-picker" id="sectorPicker">
+              <div class="sector-add-row">
+                <input class="sector-in" id="sectorAddSelect" list="sectorOptions" placeholder="Type or select a sector (add your own if it isn't listed)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();addSector();}">
+                <datalist id="sectorOptions"></datalist>
+                <button type="button" class="sector-add-btn" onclick="addSector()"><i class="fas fa-plus"></i> Add</button>
+              </div>
+              <div class="sector-rows" id="sectorRows">
+                <div class="sector-empty">No sectors added yet. Select a sector above.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" data-sec="expertise,other_skills">
+            <div class="card-title"><i class="fas fa-tools"></i> Skills / Areas of Expertise</div>
+            <div class="form-group">
+              <label><i class="fas fa-tools"></i> Skills <span class="hint">(multi-select, type to search)</span></label>
+              <div class="ms-box" id="ms-skills" data-field="skills_expertise"></div>
+            </div>
+            <div class="form-group" style="margin-top:1.1rem" data-sec="expertise">
+              <label><i class="fas fa-bullseye"></i> Key Skills to Highlight <span class="hint">(pick from your skills above - shown as Core Expertise; first 6 skills used if empty)</span></label>
+              <div class="ms-box" id="ms-key" data-field="key_skills"></div>
+            </div>
+            <div class="form-group" style="margin-top:1.1rem;max-width:260px">
+              <label><i class="fas fa-star"></i> Skills to be Highlighted</label>
+              <select class="fi" id="f_hl">
+                <option value="">— Select —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><i class="fas fa-trophy"></i> Achievements, Certifications & Social</div>
+            <div class="g2">
+              <div class="form-group full" data-sec="achievements">
+                <label><i class="fas fa-trophy"></i> Achievements / Awards</label>
+                <textarea class="fi" id="f_ach" rows="3" placeholder="Type your achievements or awards (one per line)"></textarea>
+              </div>
+              <div class="form-group full" data-sec="certifications">
+                <label><i class="fas fa-award"></i> Certifications</label>
+                <textarea class="fi" id="f_certs" rows="3" placeholder="Type your certifications (one per line)"></textarea>
+              </div>
+              <div class="form-group">
+                <label><i class="fab fa-linkedin"></i> LinkedIn</label>
+                <input class="fi" type="text" id="f_li" placeholder="Type or paste your LinkedIn link" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-link"></i> Portfolio Link</label>
+                <input class="fi" type="text" id="f_pf" placeholder="Type or paste your portfolio link" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card" data-sec="assignments">
+            <div class="card-title"><i class="fas fa-project-diagram"></i> Key Assignments <span class="hint" style="font-weight:400">(optional)</span></div>
+            <div id="asgRows"></div>
+            <button type="button" class="sector-add-btn" onclick="addAsg()"><i class="fas fa-plus"></i> Add assignment</button>
+          </div>
+
+          <div class="card" id="sectionsCard">
+            <div class="card-title"><i class="fas fa-layer-group"></i> Sections in your CV <span class="hint" id="secTplName"></span></div>
+            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">
+              Switch a section off to remove it from the CV (its inputs are hidden too), or rename its heading.
+              The CV adjusts to match. You can also add sections of your own below.
+            </p>
+            <div class="sec-list" id="secList"></div>
+            <div class="card-title" style="margin-top:1.4rem"><i class="fas fa-plus-circle"></i> Your own sections</div>
+            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">Add anything the template doesn't have, such as Languages or Publications. Each line becomes a bullet.</p>
+            <div id="csList"></div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;align-items:center">
+              <button type="button" class="sector-add-btn" onclick="addCustomSection()"><i class="fas fa-plus"></i> Add section</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="resetSections()"><i class="fas fa-undo"></i> Reset to template default</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><i class="fas fa-tasks"></i> Profile Status</div>
+            <div class="g2" style="max-width:640px;margin-bottom:1rem">
+              <div class="form-group">
+                <label><i class="fas fa-file-powerpoint"></i> PPT Profile Required</label>
+                <select class="fi" id="f_ppt" onchange="updatePptButtons()"><option value="">- Select -</option></select>
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-calendar-check"></i> Next Review Date</label>
+                <input class="fi" type="date" id="f_review" />
+              </div>
+            </div>
+            <div style="max-width:300px">
+              <div class="form-group">
+                <label><i class="fas fa-flag"></i> Status</label>
+                <select class="fi" id="f_status" onchange="updatePill(this.value)">
+                  <option value="Draft">Draft</option>
+                  <option value="Pending Employee Update">Pending Employee Update</option>
+                  <option value="Pending HR Review">Pending HR Review</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Update Required">Update Required</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-del" id="clearBtn" onclick="clearAllDetails()" title="Delete everything you entered, here and in the database"><i class="fas fa-eraser"></i> Clear all</button>
+              <button type="button" class="btn btn-ghost" onclick="resetForm()"><i class="fas fa-undo"></i> Reset</button>
+              <button type="button" class="btn btn-ghost" onclick="switchTab('preview')"><i class="fas fa-eye"></i> Preview</button>
+              <button type="submit" class="btn btn-ghost" id="saveBtn"><i class="fas fa-save"></i> Save Profile</button>
+              <button type="button" class="btn btn-pri" id="saveBtn2" onclick="saveProfile(null,true)"><i class="fas fa-check-circle"></i> Save &amp; Preview</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- ════ TAB: PREVIEW ════ -->
+      <div class="tc" id="tc-preview">
+        <div class="saved-note" id="savedNote"><i class="fas fa-check-circle"></i> This is your saved CV. Use <strong>Edit</strong> to change your details &mdash; the preview updates to match.</div>
+        <div class="doc-bar">
+          <div class="left">
+            <span class="tpl-sel-label">Template: <strong id="pvTplLabel">Template 1</strong> <span class="hint">(change it from the selector above)</span></span>
+          </div>
+          <div class="right">
+            <button class="btn btn-ghost btn-sm" onclick="switchTab('profile')"><i class="fas fa-pen"></i> Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="renderPreview()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button class="btn btn-pri btn-sm" onclick="downloadCV('docx')"><i class="fas fa-file-word"></i> Word</button>
+            <button class="btn btn-pri btn-sm" onclick="downloadCV('pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+            <button class="btn btn-ghost btn-sm ppt-btn" onclick="downloadPpt(this)"><i class="fas fa-file-powerpoint"></i> Profile PPT</button>
+          </div>
+        </div>
+        <div class="saved-note" id="pageNote" style="background:#fff7ed;border-color:#fed7aa;color:#9a3412"></div>
+        <div class="doc-host" id="docHost"><div class="doc-msg"><i class="fas fa-file-alt" style="font-size:2rem;display:block;margin-bottom:.6rem"></i>Fill in your details, then open this tab to see your CV.</div></div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ Template Full Preview Modal ══ -->
+<div class="preview-modal-bg" id="previewBg">
+  <div class="preview-modal">
+    <div class="preview-modal-head">
+      <h3><i class="fas fa-palette"></i> Select a CV Template</h3>
+      <button class="modal-x" onclick="closePreviewModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="preview-templates-wrap" id="previewGrid">
+      <!-- injected by JS -->
+    </div>
+    <div class="preview-foot">
+      <div class="sel-info">Selected: <strong id="previewSelLabel">Template 1</strong></div>
+      <div class="preview-foot-btns">
+        <button class="btn btn-ghost" onclick="closePreviewModal()">Cancel</button>
+        <button class="btn btn-pri" id="previewDlBtn" onclick="closePreviewModal(); downloadCV('docx')">
+          <i class="fas fa-file-word"></i> Download Selected (Word)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token  = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = empId;
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='success'){
+  const w = document.getElementById('toastWrap');
+  const t = document.createElement('div'); t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${msg}`;
+  w.appendChild(t);
+  setTimeout(()=>{ t.style.cssText='opacity:0;transform:translateX(30px);transition:all .3s'; setTimeout(()=>t.remove(),320); },3500);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tc-'+name).classList.add('active');
+  if(name==='preview') renderPreview();
+}
+
+// ── Status pill ───────────────────────────────────────────────────────────────
+function updatePill(s){
+  const p=document.getElementById('statusPill'); p.textContent=s||'—';
+  const m={Approved:'Approved',Inactive:'Inactive',Draft:'Draft'};
+  p.className='pill pill-'+(m[s]||'default');
+}
+
+// ── Template selector ─────────────────────────────────────────────────────────
+const TPL_NAMES = ['Executive Sidebar','Classic Corporate','Modern Banner','Timeline','Proposal Profile'];
+let selectedTpl = '1';
+
+function buildTplGrid(containerId, cardClass, imgH){
+  const grid = document.getElementById(containerId);
+  grid.innerHTML = '';
+  for(let i=1;i<=5;i++){
+    const card = document.createElement('div');
+    card.className = cardClass + (i===parseInt(selectedTpl)?' selected':'');
+    card.id = containerId+'_tpl'+i;
+    card.onclick = () => selectTemplate(String(i));
+    card.innerHTML = `
+      <img src="/cv-builder/template-preview/${i}?t=${Date.now()}"
+           alt="Template ${i}" loading="lazy"
+           onerror="this.style.background='#e8ecf9';this.alt='Template ${i}'"
+           style="height:${imgH}px" />
+      <div class="${cardClass==='tpl-card'?'tpl-card-foot':'preview-tpl-label'}">
+        <span style="font-size:.74rem;font-weight:600;color:#555">T${i}: ${TPL_NAMES[i-1]}</span>
+      </div>
+      <div class="${cardClass==='tpl-card'?'tpl-check':'preview-tpl-check'}"><i class="fas fa-check"></i></div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+// Which template shows which optional inputs. Anything not listed is used by every template.
+const TPL_RULES = {
+  memLevel: {tpls:['1','2','3','4'], label:'Membership level'},
+  asgRole:  {tpls:['5'],             label:'Assignment role'},
+};
+function applyTemplateFields(id){
+  const off=[];
+  document.querySelectorAll('[data-tpl]').forEach(el=>{
+    const on=el.dataset.tpl.split(',').filter(Boolean).includes(id);
+    el.classList.toggle('tpl-off',!on);
+    if(!on) off.push(el.dataset.label);
+  });
+  const mem=document.getElementById('memDet'), asg=document.getElementById('asgRows');
+  const noLevel=!TPL_RULES.memLevel.tpls.includes(id), noRole=!TPL_RULES.asgRole.tpls.includes(id);
+  mem.classList.toggle('no-level',noLevel); asg.classList.toggle('no-role',noRole);
+  if(noLevel) off.push(TPL_RULES.memLevel.label);
+  if(noRole)  off.push(TPL_RULES.asgRole.label);
+  const name=TPL_NAMES[parseInt(id)-1];
+  document.getElementById('tplNote').innerHTML = off.length
+    ? `<strong>Template ${id} &mdash; ${esc(name)}</strong> doesn't use: ${off.map(esc).join(', ')}. Those inputs are hidden (anything you saved is kept). Switch template above to see them.`
+    : `<strong>Template ${id} &mdash; ${esc(name)}</strong> uses every input on this page.`;
+}
+
+function selectTemplate(id, silent){
+  selectedTpl = id; if(!silent) scheduleAutosave();
+  applyTemplateFields(id);
+  if(typeof loadSecSpec==='function') loadSecSpec();
+  // Update strip grid
+  document.querySelectorAll('.tpl-card').forEach((c,idx)=>{
+    c.classList.toggle('selected', String(idx+1)===id);
+  });
+  // Update preview grid
+  document.querySelectorAll('.preview-tpl').forEach((c,idx)=>{
+    c.classList.toggle('selected', String(idx+1)===id);
+  });
+  const label = `Template ${id}: ${TPL_NAMES[parseInt(id)-1]}`;
+  document.getElementById('tplSelLabel').textContent = label;
+  document.getElementById('previewSelLabel').textContent = label;
+  if(document.getElementById('tc-preview').classList.contains('active')) renderPreview();
+  if(!silent) toast(`Template ${id} selected: ${TPL_NAMES[parseInt(id)-1]}`);
+}
+
+function openPreviewModal(){
+  document.getElementById('previewBg').classList.add('open');
+}
+function closePreviewModal(){
+  document.getElementById('previewBg').classList.remove('open');
+}
+document.getElementById('previewBg').addEventListener('click', e=>{
+  if(e.target===document.getElementById('previewBg')) closePreviewModal();
+});
+
+// ── Dropdowns ─────────────────────────────────────────────────────────────────
+let DD = {};
+const msState = {};
+
+function initMS(cid, field, opts){
+  msState[field]=[];
+  const box=document.getElementById(cid);
+  box.innerHTML=''; box.style.position='relative';
+  const td=Object.assign(document.createElement('div'),{className:'ms-tags',id:cid+'-tags'});
+  const inp=Object.assign(document.createElement('input'),{type:'text',className:'ms-input',id:cid+'-inp',autocomplete:'off',placeholder:'Type to search or add your own…'});
+  const drop=Object.assign(document.createElement('div'),{className:'ms-drop',id:cid+'-drop'});
+  box.append(td,inp,drop);
+
+  function renderTags(){
+    td.innerHTML='';
+    msState[field].forEach(v=>{
+      const t=document.createElement('span'); t.className='ms-tag';
+      t.innerHTML=`${esc(v)} <button class="ms-tag-rm" type="button"><i class="fas fa-times"></i></button>`;
+      t.querySelector('.ms-tag-rm').onclick=e=>{e.stopPropagation();msState[field]=msState[field].filter(x=>x!==v);renderTags();renderDrop(inp.value);onMSChange(field);};
+      td.appendChild(t);
+    });
+  }
+  const API_FIELD={qualification:'qualification',membership:'membership',skills_expertise:'skills',key_skills:'skills'};
+  const has=(arr,v)=>arr.some(x=>x.toLowerCase()===v.toLowerCase());
+  async function addCustom(raw){
+    const q=raw.replace(/\s+/g,' ').trim();
+    if(!q) return;
+    try{
+      const res=await fetch('/cv-builder/options',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({field:API_FIELD[field],value:q})});
+      const d=await res.json();
+      if(!res.ok) throw new Error(typeof d.detail==='string'?d.detail:'Could not add that value');
+      const v=d.value;                                           // stored spelling (case-insensitive match)
+      if(!has(opts,v)) opts.push(v);                             // suggest it from now on
+      if(!has(msState[field],v)) msState[field].push(v);
+      if(field==='key_skills' && !has(msState.skills_expertise||[],v)){ msState.skills_expertise=(msState.skills_expertise||[]).concat(v); setMS('skills_expertise',msState.skills_expertise); }
+      inp.value=''; renderTags(); renderDrop(); onMSChange(field);
+    }catch(err){ toast(err.message,'error'); }
+  }
+  function renderDrop(q=''){
+    drop.innerHTML='';
+    const qt=q.trim(), ql=qt.toLowerCase();
+    const hits=opts.filter(o=>o.toLowerCase().includes(ql)&&!has(msState[field],o));
+    hits.forEach(o=>{
+      const d=document.createElement('div');d.className='ms-opt';d.textContent=o;
+      d.onmousedown=e=>{e.preventDefault();msState[field].push(o);inp.value='';renderTags();renderDrop();onMSChange(field);};
+      drop.appendChild(d);
+    });
+    if(qt && !has(opts,qt)){                                     // nothing identical in the list: offer to add it
+      const d=document.createElement('div');d.className='ms-opt ms-add';d.innerHTML='<i class="fas fa-plus-circle"></i> Add “'+esc(qt)+'”';
+      d.onmousedown=e=>{e.preventDefault();addCustom(qt);};
+      drop.appendChild(d);
+    }
+    if(!drop.children.length) drop.innerHTML='<div class="ms-none">Type to search or add your own</div>';
+  }
+  inp.addEventListener('focus',()=>{drop.classList.add('open');renderDrop(inp.value);});
+  inp.addEventListener('blur', ()=>setTimeout(()=>drop.classList.remove('open'),180));
+  inp.addEventListener('input',()=>renderDrop(inp.value));
+  inp.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    e.preventDefault();                                          // Enter must not submit the form
+    const q=inp.value.trim(); if(!q) return;
+    const exact=opts.find(o=>o.toLowerCase()===q.toLowerCase());
+    if(exact){ if(!has(msState[field],exact)){msState[field].push(exact);inp.value='';renderTags();renderDrop();onMSChange(field);} }
+    else addCustom(q);
+  });
+  box.addEventListener('click',()=>inp.focus());
+}
+
+function setMS(field, vals){
+  msState[field]=vals||[];
+  const cm={qualification:'ms-qual',membership:'ms-mem',skills_expertise:'ms-skills',key_skills:'ms-key'};
+  const cid=cm[field];if(!cid)return;
+  const td=document.getElementById(cid+'-tags');if(!td)return;
+  td.innerHTML='';
+  msState[field].forEach(v=>{
+    const t=document.createElement('span');t.className='ms-tag';
+    t.innerHTML=`${esc(v)} <button class="ms-tag-rm" type="button"><i class="fas fa-times"></i></button>`;
+    t.querySelector('.ms-tag-rm').onclick=e=>{e.stopPropagation();msState[field]=msState[field].filter(x=>x!==v);setMS(field,msState[field]);};
+    td.appendChild(t);
+  });
+  onMSChange(field);
+}
+
+// ── Qualification / membership details + assignments ────────────────────────
+let qualDet={}, memDet={}, asgItems=[];
+function onMSChange(field){
+  scheduleAutosave();
+  if(field==='qualification') renderQualDet();
+  if(field==='membership') renderMemDet();
+}
+function renderQualDet(){
+  const box=document.getElementById('qualDet'), wrap=document.getElementById('qualDetBox');
+  const q=msState['qualification']||[];
+  wrap.style.display=q.length?'':'none';
+  box.innerHTML=q.map((n,i)=>{const d=qualDet[n]||{};return `<div class="det-row">
+    <span class="det-name">${esc(n)}</span>
+    <input class="fi" type="text" placeholder="Type the institute / university" value="${esc(d.institute)}" oninput="qd(${i},'institute',this.value)">
+    <input class="fi" type="text" placeholder="Type the year" value="${esc(d.year)}" oninput="qd(${i},'year',this.value)"></div>`;}).join('');
+}
+function qd(i,k,v){const n=msState['qualification'][i];qualDet[n]=Object.assign(qualDet[n]||{},{[k]:v});}
+function renderMemDet(){
+  const box=document.getElementById('memDet'), wrap=document.getElementById('memDetBox');
+  const m=msState['membership']||[];
+  wrap.style.display=m.length?'':'none';
+  box.innerHTML=m.map((n,i)=>{const d=memDet[n]||{};return `<div class="det-row mem">
+    <span class="det-name">${esc(n)}</span>
+    <input class="fi mem-level" type="text" placeholder="Type your membership level" value="${esc(d.level)}" oninput="md(${i},'level',this.value)">
+    <input class="fi" type="text" placeholder="Type your membership number" value="${esc(d.number)}" oninput="md(${i},'number',this.value)"></div>`;}).join('');
+}
+function md(i,k,v){const n=msState['membership'][i];memDet[n]=Object.assign(memDet[n]||{},{[k]:v});}
+
+function renderAsg(){
+  document.getElementById('asgRows').innerHTML=asgItems.map((a,i)=>`<div class="asg-row">
+    <input class="fi" type="text" placeholder="Type the assignment" value="${esc(a.assignment)}" oninput="asgItems[${i}].assignment=this.value">
+    <input class="fi" type="text" placeholder="Type the client / scope" value="${esc(a.client)}" oninput="asgItems[${i}].client=this.value">
+    <input class="fi" type="text" placeholder="Type the sector" value="${esc(a.sector)}" oninput="asgItems[${i}].sector=this.value">
+    <input class="fi asg-role" type="text" placeholder="Type your role" value="${esc(a.role)}" oninput="asgItems[${i}].role=this.value">
+    <button type="button" class="sector-row-rm" onclick="removeAsg(${i})" title="Remove"><i class="fas fa-times-circle"></i></button></div>`).join('');
+}
+function addAsg(){asgItems.push({assignment:'',client:'',sector:'',role:''});renderAsg();scheduleAutosave();}
+function removeAsg(i){asgItems.splice(i,1);renderAsg();scheduleAutosave();}
+
+// ── Sector widget ─────────────────────────────────────────────────────────────
+let sectorItems=[];
+
+function initSectorWidget(list){
+  document.getElementById('sectorOptions').innerHTML=list.map(v=>`<option value="${esc(v)}">`).join('');
+}
+
+async function addSector(){
+  const inp=document.getElementById('sectorAddSelect');
+  const typed=inp.value.replace(/\s+/g,' ').trim();
+  if(!typed){toast('Type or pick a sector first','error');return;}
+  let sec=(DD.sector_experience||[]).find(o=>o.toLowerCase()===typed.toLowerCase());
+  if(!sec){                                                      // custom sector: store once (case-insensitive) and suggest it next time
+    try{
+      const res=await fetch('/cv-builder/options',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({field:'sector',value:typed})});
+      const d=await res.json();
+      if(!res.ok) throw new Error(typeof d.detail==='string'?d.detail:'Could not add that sector');
+      sec=d.value;
+      if(!DD.sector_experience.some(o=>o.toLowerCase()===sec.toLowerCase())) DD.sector_experience.push(sec);
+      initSectorWidget(DD.sector_experience);
+    }catch(err){toast(err.message,'error');return;}
+  }
+  if(sectorItems.find(i=>i.sector.toLowerCase()===sec.toLowerCase())){toast('Sector already added','error');return;}
+  sectorItems.push({sector:sec,duration:''});inp.value='';renderSectors();scheduleAutosave();
+}
+
+function removeSector(sec){sectorItems=sectorItems.filter(i=>i.sector!==sec);renderSectors();scheduleAutosave();}
+
+function renderSectors(){
+  const rows=document.getElementById('sectorRows');
+  rows.innerHTML='';
+  if(!sectorItems.length){
+    rows.innerHTML='<div class="sector-empty">No sectors added yet. Type or pick one above.</div>';return;
+  }
+  sectorItems.forEach((item,idx)=>{
+    const row=document.createElement('div');row.className='sector-row';
+    row.innerHTML=`
+      <span class="sector-row-name" title="${esc(item.sector)}"><i class="fas fa-industry" style="color:var(--accent);margin-right:.35rem;font-size:.75rem"></i>${esc(item.sector)}</span>
+      <div class="sector-row-dur">
+        <input type="text" placeholder="Type the time spent here"
+          value="${esc(item.duration)}"
+          oninput="sectorItems[${idx}].duration=this.value"
+          onfocus="this.style.borderColor='var(--accent)'"
+          onblur="this.style.borderColor='var(--border)'"
+          title="Duration in this sector" />
+      </div>
+      <button type="button" class="sector-row-rm" onclick="removeSector('${esc(item.sector)}')" title="Remove"><i class="fas fa-times-circle"></i></button>
+    `;
+    rows.appendChild(row);
+  });
+}
+
+function setSectors(data){
+  sectorItems=(data||[]).map(d=>typeof d==='string'?{sector:d,duration:''}:{sector:d.sector||'',duration:d.duration||''});
+  renderSectors();
+}
+
+// ── Load dropdowns ────────────────────────────────────────────────────────────
+async function loadDropdowns(){
+  const res=await fetch('/cv-builder/dropdowns',{headers:{Authorization:`Bearer ${token}`}});
+  DD=await res.json();
+  initMS('ms-qual',   'qualification',    DD.qualifications);
+  initMS('ms-mem',    'membership',       DD.memberships);
+  initMS('ms-skills', 'skills_expertise', DD.skills_expertise);
+  initMS('ms-key',    'key_skills',       DD.skills_expertise);
+  const pp=document.getElementById('f_ppt');(DD.ppt_required||[]).forEach(v=>pp.add(new Option(v,v)));
+  initSectorWidget(DD.sector_experience);
+}
+
+// ── Load profile ──────────────────────────────────────────────────────────────
+async function loadProfile(){
+  const res=await fetch('/cv-builder/profile',{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok){toast('Failed to load profile','error');return;}
+  const p=await res.json();
+  document.getElementById('f_empid').value  =p.empid||empId;
+  document.getElementById('f_name').value   =p.employee_name||'';
+  document.getElementById('f_desig').value  =p.designation||'';
+  document.getElementById('f_dept').value   =p.department||'';
+  document.getElementById('f_exp').value    =p.total_experience||'';
+  document.getElementById('f_photo').value  =p.professional_photo||'';
+  document.getElementById('f_ach').value    =p.achievements||'';
+  document.getElementById('f_certs').value  =p.certifications||'';
+  document.getElementById('f_li').value     =p.linkedin||'';
+  document.getElementById('f_pf').value     =p.portfolio||'';
+  document.getElementById('f_hl').value     =p.skills_highlighted||'';
+  document.getElementById('f_email').value  =p.email||'';
+  document.getElementById('f_phone').value  =p.phone||'';
+  document.getElementById('f_loc').value    =p.location||'';
+  document.getElementById('f_summary').value=p.summary||'';
+  document.getElementById('f_ppt').value    =p.ppt_required||'';
+  document.getElementById('f_review').value =p.next_review_date||'';
+  if(p.selected_template && ['1','2','3','4','5'].includes(p.selected_template)){ selectTemplate(p.selected_template, true); }
+  hasSaved=!!p.updated_at;
+  rsUndo=null; $id('rsChip').style.display='none';
+  const sc=p.section_config||{};
+  secCfg={hidden:sc.hidden||[],titles:sc.titles||{},custom:(sc.custom||[]).map(c=>Object.assign({id:'',title:'',text:'',visible:true},c))};
+  pageLayout=p.page_layout==='1'?'1':'2';
+  document.querySelectorAll('input[name=pgl]').forEach(r=>r.checked=(r.value===pageLayout));
+  qualDet=p.qualification_details||{}; memDet=p.membership_details||{};
+  // older profiles kept one membership number on its own: show it against the first membership
+  if(p.membership_id && (p.membership||[]).length){
+    const first=p.membership[0];
+    if(!(memDet[first]&&memDet[first].number)) memDet[first]=Object.assign({},memDet[first]||{},{number:p.membership_id});
+  }
+  asgItems=(p.key_assignments||[]).map(a=>Object.assign({assignment:'',client:'',sector:'',role:''},a));
+  renderAsg();
+  loadSecSpec();
+  updatePptButtons();
+  document.getElementById('f_status').value =p.profile_status||'Draft';
+  setMS('qualification',    p.qualification||[]);
+  setMS('membership',       p.membership||[]);
+  setMS('skills_expertise', p.skills_expertise||[]);
+  setMS('key_skills',       p.key_skills||[]);
+  setSectors(p.sector_experience||[]);
+  updatePill(p.profile_status||'Draft');
+  if(p.updated_at) setSaveState('saved');
+}
+
+// ── Save profile ──────────────────────────────────────────────────────────────
+// ── Sections (show / hide / rename / add) ────────────────────────────────────
+let secCfg = {hidden:[], titles:{}, custom:[]};
+let secSpec = [];                       // sections of the selected template
+const secSpecCache = {};
+
+async function loadSecSpec(){
+  const id = selectedTpl;
+  if(!secSpecCache[id]){
+    try{ secSpecCache[id] = (await (await fetch('/cv-builder/sections/'+id)).json()).sections || []; }
+    catch(e){ secSpecCache[id] = []; }
+  }
+  if(id !== selectedTpl) return;
+  secSpec = secSpecCache[id];
+  renderSections();
+}
+function secKeys(){ return secSpec.map(x=>x.key); }
+function isHidden(k){ return secCfg.hidden.includes(k) && secKeys().includes(k); }
+
+function renderSections(){
+  document.getElementById('secTplName').textContent = `Template ${selectedTpl}: ${TPL_NAMES[parseInt(selectedTpl)-1]}`;
+  document.getElementById('secList').innerHTML = secSpec.map(sp=>{
+    const off = secCfg.hidden.includes(sp.key);
+    return `<div class="sec-row ${off?'off':''}">
+      <label class="sw" title="Show / hide this section"><input type="checkbox" ${off?'':'checked'} onchange="toggleSection('${sp.key}',this.checked)"><span></span></label>
+      <div class="sec-name">${esc(sp.label)}<small>${sp.title?'Heading: '+esc(sp.title):'Part of another heading'}</small></div>
+      <div class="sec-title">${sp.editable
+        ? `<input class="fi" type="text" maxlength="60" placeholder="${esc(sp.title)}" value="${esc(secCfg.titles[sp.key]||'')}" ${off?'disabled':''} oninput="setSecTitle('${sp.key}',this.value)">`
+        : '<span class="hint">No separate heading in this template</span>'}</div>
+    </div>`;}).join('');
+  renderCustom();
+  applySectionVisibility();
+}
+function toggleSection(k,on){
+  secCfg.hidden = secCfg.hidden.filter(x=>x!==k);
+  if(!on) secCfg.hidden.push(k);
+  renderSections(); scheduleAutosave();
+}
+function setSecTitle(k,v){ if(v.trim()) secCfg.titles[k]=v; else delete secCfg.titles[k]; }
+
+function renderCustom(){
+  document.getElementById('csList').innerHTML = secCfg.custom.map((c,i)=>`<div class="cs-card ${c.visible===false?'off':''}">
+    <div class="cs-head">
+      <label class="sw" title="Show / hide"><input type="checkbox" ${c.visible===false?'':'checked'} onchange="secCfg.custom[${i}].visible=this.checked;renderCustom();scheduleAutosave()"><span></span></label>
+      <input class="fi" type="text" maxlength="60" placeholder="Type the section heading" value="${esc(c.title)}" oninput="secCfg.custom[${i}].title=this.value">
+      <button type="button" class="sector-row-rm" title="Delete section" onclick="deleteCustom(${i})"><i class="fas fa-trash"></i></button>
+    </div>
+    <textarea class="fi" rows="3" placeholder="Type one item per line" oninput="secCfg.custom[${i}].text=this.value">${esc(c.text)}</textarea>
+  </div>`).join('') || '<p class="hint" style="margin:0 0 .8rem">No custom sections yet.</p>';
+}
+function addCustomSection(){
+  secCfg.custom.push({id:'c'+Date.now().toString(36),title:'',text:'',visible:true});
+  renderCustom(); scheduleAutosave();
+  const t=document.querySelectorAll('#csList .cs-card input.fi'); if(t.length) t[t.length-1].focus();
+}
+function deleteCustom(i){
+  if(!confirm('Delete this section?')) return;
+  secCfg.custom.splice(i,1); renderCustom(); scheduleAutosave();
+}
+function resetSections(){
+  if(!confirm('Reset the template to its default? All hidden sections, renamed headings and your own sections will be cleared.')) return;
+  secCfg={hidden:[],titles:{},custom:[]}; renderSections(); scheduleAutosave(); toast('Template reset to default');
+}
+// hide the inputs of switched-off sections
+function applySectionVisibility(){
+  document.querySelectorAll('[data-sec]').forEach(el=>{
+    const keys=el.dataset.sec.split(',');
+    el.classList.toggle('sec-off', keys.every(k=>isHidden(k)));
+  });
+}
+
+function collectPayload(){
+  return {
+    designation:document.getElementById('f_desig').value.trim(),
+    department:document.getElementById('f_dept').value.trim(),
+    professional_photo:document.getElementById('f_photo').value.trim(),
+    qualification:msState['qualification']||[],
+    membership:msState['membership']||[],
+    membership_id:'',
+    total_experience:document.getElementById('f_exp').value.trim(),
+    sector_experience:sectorItems.map(i=>({sector:i.sector,duration:i.duration})),
+    skills_expertise:msState['skills_expertise']||[],
+    skills_highlighted:document.getElementById('f_hl').value,
+    achievements:document.getElementById('f_ach').value.trim(),
+    certifications:document.getElementById('f_certs').value.trim(),
+    linkedin:document.getElementById('f_li').value.trim(),
+    portfolio:document.getElementById('f_pf').value.trim(),
+    profile_status:document.getElementById('f_status').value,
+    email:document.getElementById('f_email').value.trim(),
+    phone:document.getElementById('f_phone').value.trim(),
+    location:document.getElementById('f_loc').value.trim(),
+    summary:document.getElementById('f_summary').value.trim(),
+    key_skills:msState['key_skills']||[],
+    qualification_details:Object.fromEntries((msState['qualification']||[]).map(n=>[n,qualDet[n]||{}])),
+    membership_details:Object.fromEntries((msState['membership']||[]).map(n=>[n,memDet[n]||{}])),
+    key_assignments:asgItems.filter(a=>Object.values(a).some(v=>(v||'').trim())),
+    ppt_required:document.getElementById('f_ppt').value,
+    next_review_date:document.getElementById('f_review').value,
+    selected_template:selectedTpl,
+    page_layout:pageLayout,
+    section_config:{
+      hidden:secCfg.hidden,
+      titles:secCfg.titles,
+      custom:secCfg.custom.filter(c=>(c.title||'').trim()||(c.text||'').trim()),
+    },
+  };
+}
+
+let hasSaved=false;
+async function saveProfile(e,thenPreview=false,silent=false){
+  if(e) e.preventDefault();
+  clearTimeout(autosaveTimer); autosaveTimer=null;
+  const btns=[document.getElementById('saveBtn'),document.getElementById('saveBtn2')];
+  const origs=btns.map(b=>b.innerHTML);
+  btns.forEach(b=>{b.disabled=true;b.innerHTML='<div class="spin spin-dark"></div> Saving…';});
+  const payload=collectPayload();
+  let ok=false;
+  try{
+    const res=await fetch('/cv-builder/profile',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await res.json();
+    if(!res.ok) throw new Error(typeof d.detail==='string'?d.detail:'Save failed');
+    if(!silent) toast('Profile saved!','success'); ok=true; hasSaved=true; resumeDone();
+    updatePill(payload.profile_status);
+    setSaveState('saved');
+  }catch(err){toast('Error: '+err.message,'error');}
+  btns.forEach((b,i)=>{b.disabled=false;b.innerHTML=origs[i];});
+  if(ok&&thenPreview) switchTab('preview');
+  return ok;
+}
+
+// ── Auto-save: everything the user types is saved a moment after they stop ───
+let autosaveTimer=null, autosaveReady=false, autosaving=false, autosaveAgain=false;
+function setSaveState(kind){
+  const el=$id('lastSaved'); if(!el) return;
+  const map={saving:'<div class="spin spin-dark" style="width:.8rem;height:.8rem"></div> Saving…',
+    saved:'<i class="fas fa-check-circle"></i> All changes saved',
+    error:'<i class="fas fa-exclamation-triangle" style="color:#f59e0b"></i> Could not save — will retry',
+    paused:'<i class="fas fa-pause-circle" style="color:#f59e0b"></i> Auto-save paused (resume attached)'};
+  el.innerHTML=map[kind]||'';
+}
+function scheduleAutosave(){
+  if(!autosaveReady) return;                                   // still loading / clearing
+  if(rsUndo){ setSaveState('paused'); return; }                // details from a resume wait for "Keep" or "Remove"
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(runAutosave,1200);
+}
+async function runAutosave(keepalive=false){
+  clearTimeout(autosaveTimer); autosaveTimer=null;
+  if(!autosaveReady || rsUndo) return;
+  if(autosaving){ autosaveAgain=true; return; }
+  autosaving=true; setSaveState('saving');
+  try{
+    const res=await fetch('/cv-builder/profile',{method:'POST',keepalive,
+      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(collectPayload())});
+    if(!res.ok) throw new Error('save failed');
+    hasSaved=true; setSaveState('saved');
+  }catch(e){ setSaveState('error'); autosaveAgain=true; setTimeout(()=>{ if(autosaveAgain){autosaveAgain=false; scheduleAutosave();} },4000); }
+  autosaving=false;
+  if(autosaveAgain && !autosaveTimer){ autosaveAgain=false; scheduleAutosave(); }
+}
+(()=>{
+  const userEdit=e=>{ if(e.target && (e.target.id==='rsFile')) return; scheduleAutosave(); };
+  ['tc-profile','tc-preview'].forEach(id=>{ const el=document.getElementById(id); if(!el) return;
+    el.addEventListener('input',userEdit); el.addEventListener('change',userEdit); });
+  const flush=()=>{ if(autosaveTimer) runAutosave(true); };       // do not lose the last few characters when the page closes
+  window.addEventListener('pagehide',flush);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flush(); });
+})();
+async function keepResumeDetails(){
+  if(!(await saveProfile(null,false,false))) return;               // saveProfile() detaches the resume and keeps the details
+}
+
+// ── Auto-fill from an old resume (file is never stored) ──────────────────────
+let rsUndo=null;            // values the auto-fill overwrote, so removing the resume can restore them
+const $id=i=>document.getElementById(i);
+const textIO=id=>({get:()=>$id(id).value, set:v=>{$id(id).value=v;}, isEmpty:()=>!$id(id).value.trim()});
+const RS_FIELDS={
+  designation:textIO('f_desig'), department:textIO('f_dept'),
+  email:textIO('f_email'), phone:textIO('f_phone'), location:textIO('f_loc'), linkedin:textIO('f_li'), portfolio:textIO('f_pf'),
+  summary:textIO('f_summary'), total_experience:textIO('f_exp'),
+  certifications:textIO('f_certs'), achievements:textIO('f_ach'),
+  qualification:{get:()=>[...(msState.qualification||[])], set:v=>setMS('qualification',v)},
+  membership:{get:()=>[...(msState.membership||[])], set:v=>setMS('membership',v)},
+  skills_expertise:{get:()=>[...(msState.skills_expertise||[])], set:v=>setMS('skills_expertise',v)},
+  qualification_details:{get:()=>JSON.parse(JSON.stringify(qualDet)), set:v=>{qualDet=v; renderQualDet();}},
+  membership_details:{get:()=>JSON.parse(JSON.stringify(memDet)), set:v=>{memDet=v; renderMemDet();}},
+  sector_experience:{get:()=>sectorItems.map(x=>({...x})), set:v=>{sectorItems=v; renderSectors();}},
+};
+const RS_LABELS={designation:'designation',department:'department',email:'email',phone:'phone',location:'location',linkedin:'LinkedIn',portfolio:'portfolio link',summary:'summary',
+  total_experience:'total experience',membership_details:'membership number',certifications:'certifications',achievements:'achievements',
+  qualification:'qualifications',membership:'memberships',skills_expertise:'skills',qualification_details:'institute & year',sector_experience:'sectors'};
+const RS_ORDER=['designation','department','qualification','qualification_details','membership','skills_expertise','sector_experience',
+  'email','phone','location','linkedin','portfolio','summary','total_experience','membership_details','certifications','achievements'];
+const unionCI=(a,b)=>{const out=[...a]; b.forEach(x=>{ if(!out.some(y=>y.toLowerCase()===x.toLowerCase())) out.push(x); }); return out;};
+
+function rsMessage(kind,html){ const m=$id('rsMsg'); m.className='rs-msg '+kind; m.innerHTML=html; if(!html) m.style.display='none'; }
+
+async function resumeChosen(file){
+  if(!file) return;
+  $id('rsFile').value='';
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(!['pdf','docx'].includes(ext)){ rsMessage('err','Only .pdf and .docx resumes are supported.'); return; }
+  if(file.size>5*1024*1024){ rsMessage('err','Resume must be 5 MB or smaller.'); return; }
+  if(rsUndo && !confirm('Replace the resume you already attached? Its auto-fill will be undone first.')) return;
+  if(rsUndo) undoAutofill();
+  rsMessage('ok','<div class="spin spin-dark"></div> Reading your resume…');
+  try{
+    const res=await fetch('/cv-builder/parse-resume?name='+encodeURIComponent(file.name),
+      {method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/octet-stream'},body:file});
+    let d=null; try{d=await res.json();}catch(x){}
+    if(!res.ok) throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Could not read that resume');
+    const n=applyParsed(d.fields||{});
+    $id('rsName').textContent=file.name; $id('rsChip').style.display='flex';
+    const extra=(d.extra_skills||[]).length?` Skills found but not in our list: <em>${(d.extra_skills).map(esc).join(', ')}</em> &mdash; type them into the skills box if you want them.`:'';
+    const miss=(d.missing||[]).length?` <strong>Not found in this resume</strong> (left as they were): ${d.missing.join(', ')} &mdash; fill those in yourself.`:'';
+    rsMessage('ok',`<i class="fas fa-check-circle"></i> Filled ${n.length} item${n.length===1?'':'s'}: ${n.join(', ')}. Please review everything below &mdash; it is not saved until you press <strong>Keep these details</strong> (or remove the resume to undo).${miss}${extra}`);
+  }catch(err){
+    $id('rsChip').style.display='none'; rsUndo=null;
+    rsMessage('err','<i class="fas fa-exclamation-circle"></i> '+esc(err.message));
+  }
+}
+
+function applyParsed(fields){
+  // Every value found in the resume replaces the matching field, filled or not. Fields the
+  // resume says nothing about are left alone. The old values are kept in rsUndo so removing
+  // the attachment can restore them.
+  rsUndo={}; const filled=[];
+  if(fields.membership_id && (fields.membership||[]).length){            // a number found on the resume goes against the first membership
+    const first=fields.membership[0];
+    fields.membership_details={[first]:Object.assign({},memDet[first]||{},{number:fields.membership_id})};
+  }
+  RS_ORDER.forEach(key=>{
+    if(!(key in fields) || !RS_FIELDS[key]) return;
+    const io=RS_FIELDS[key]; let v=fields[key];
+    if(key==='sector_experience') v=v.map(x=>({sector:x,duration:''}));
+    if(key==='membership_details') v=Object.assign({},io.get(),v);
+    rsUndo[key]=io.get();
+    io.set(v); filled.push(RS_LABELS[key]);
+  });
+  if(!filled.length) rsUndo=null;
+  return filled;
+}
+
+function undoAutofill(){
+  if(!rsUndo) return;
+  RS_ORDER.slice().reverse().forEach(k=>{ if(k in rsUndo) RS_FIELDS[k].set(rsUndo[k]); });
+  rsUndo=null;
+}
+function removeResume(){
+  if(rsUndo && !confirm('Remove the resume and undo the details it filled in?')) return;
+  undoAutofill();
+  $id('rsChip').style.display='none'; $id('rsName').textContent='';
+  rsMessage('ok','Resume removed. Nothing from it has been kept.');
+}
+// the resume itself is never kept; once the employee saves, the details are simply their own
+function resumeDone(){ if($id('rsChip').style.display!=='none'){ $id('rsChip').style.display='none'; rsUndo=null; rsMessage('ok','Details saved. The resume file itself was never stored.'); } }
+(()=>{ const d=$id('rsDrop');
+  ['dragenter','dragover'].forEach(e=>d.addEventListener(e,ev=>{ev.preventDefault();d.classList.add('over');}));
+  ['dragleave','drop'].forEach(e=>d.addEventListener(e,ev=>{ev.preventDefault();d.classList.remove('over');}));
+  d.addEventListener('drop',ev=>resumeChosen(ev.dataTransfer.files[0])); })();
+
+// ── CV length (1 or 2 pages) and the optional profile PPT ────────────────────
+let pageLayout='2';
+function setLayout(v){
+  pageLayout=v; scheduleAutosave();
+  if(document.getElementById('tc-preview').classList.contains('active')) renderPreview();
+}
+function updatePptButtons(){ /* the Profile PPT button is always shown; downloadPpt() turns the option on when needed */ }
+async function saveBlob(res, fallbackName){
+  const blob=await res.blob(), u=URL.createObjectURL(blob);
+  const cd=res.headers.get('Content-Disposition')||''; const m=/filename="?([^";]+)"?/.exec(cd);
+  const a=Object.assign(document.createElement('a'),{href:u,download:m?m[1]:fallbackName});
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
+}
+async function downloadPpt(btn){
+  const sel=document.getElementById('f_ppt');
+  if(sel.value!=='Yes'){
+    if(!confirm('Create a red & white Profile PPT?\n\nThis sets "PPT Profile Required" to Yes on your profile.')) return;
+    sel.value='Yes';
+  }
+  const orig=btn.innerHTML; btn.disabled=true; btn.innerHTML='<div class="spin spin-dark"></div> Preparing…';
+  try{
+    if(!(await saveProfile(null,false,true))) throw new Error('Could not save your profile');
+    const res=await fetch('/cv-builder/download/ppt',{headers:{Authorization:`Bearer ${token}`}});
+    if(!res.ok){let d=null;try{d=await res.json();}catch(x){} throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Failed');}
+    await saveBlob(res,'Profile.pptx'); toast('Profile PPT downloaded','success');
+  }catch(err){toast('Download failed: '+err.message,'error');}
+  btn.disabled=false; btn.innerHTML=orig;
+}
+
+// ── Live preview (renders the real Word output in the browser) ───────────────
+let pvSeq=0;
+async function renderPreview(){
+  const host=document.getElementById('docHost'), my=++pvSeq;
+  document.getElementById('pvTplLabel').textContent=`Template ${selectedTpl}: ${TPL_NAMES[parseInt(selectedTpl)-1]}`;
+  host.innerHTML='<div class="doc-msg"><div class="spin spin-dark"></div> Building your CV…</div>';
+  try{
+    const res=await fetch(`/cv-builder/preview/docx/${selectedTpl}`,{method:'POST',
+      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(collectPayload())});
+    if(!res.ok){let d=null;try{d=await res.json();}catch(x){} throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Preview failed');}
+    const buf=await res.arrayBuffer();
+    if(my!==pvSeq) return;                      // a newer render superseded this one
+    if(!window.docx||!window.docx.renderAsync) throw new Error('Preview library could not be loaded (check your internet connection). You can still download the Word file.');
+    host.innerHTML='';
+    await window.docx.renderAsync(buf,host,null,{className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,useBase64URL:true});
+    const pages=host.querySelectorAll('section.docx').length, note=document.getElementById('pageNote');
+    if(pageLayout==='1'&&pages>1){note.style.display='block';note.innerHTML=`<i class="fas fa-exclamation-triangle"></i> Your CV is longer than one page (${pages} pages). Hide a section or shorten some text in the <strong>Sections</strong> tab to fit on one page.`;}
+    else note.style.display='none';
+  }catch(err){
+    if(my===pvSeq) host.innerHTML=`<div class="doc-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}</div>`;
+  }
+}
+
+// ── Clear all: empties every input and deletes the saved profile ─────────────
+async function clearAllDetails(){
+  const wasReady=autosaveReady; autosaveReady=false; clearTimeout(autosaveTimer); autosaveTimer=null;
+  if(!confirm('Clear ALL your CV details? Everything you entered is removed from this page AND permanently deleted from your saved profile, so you can start fresh. This cannot be undone.')) return;
+  const btn=document.getElementById('clearBtn'); const orig=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<div class="spin spin-dark"></div> Clearing…';
+  try{
+    const res=await fetch('/cv-builder/profile',{method:'DELETE',headers:{Authorization:`Bearer ${token}`}});
+    let d=null; try{d=await res.json();}catch(x){}
+    if(!res.ok) throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Could not clear your saved details');
+    // database is clean -> empty the page too
+    ['f_desig','f_dept','f_exp','f_photo','f_email','f_phone','f_loc','f_summary','f_ach','f_certs','f_li','f_pf','f_review']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    ['f_hl','f_ppt'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('f_status').value='Draft'; updatePill('Draft');
+    ['qualification','membership','skills_expertise','key_skills'].forEach(f=>setMS(f,[]));
+    qualDet={}; memDet={}; renderQualDet(); renderMemDet();
+    setSectors([]); asgItems=[]; renderAsg();
+    secCfg={hidden:[],titles:{},custom:[]}; renderSections();
+    rsUndo=null; document.getElementById('rsChip').style.display='none'; rsMessage('',''); 
+    pageLayout='2'; document.querySelectorAll('input[name=pgl]').forEach(r=>r.checked=(r.value==='2'));
+    hasSaved=false; setSaveState(''); document.getElementById('savedNote').style.display='none';
+    document.getElementById('docHost').innerHTML='<div class="doc-msg"><i class="fas fa-file-alt" style="font-size:2rem;display:block;margin-bottom:.6rem"></i>Fill in your details, then open this tab to see your CV.</div>';
+    switchTab('profile'); window.scrollTo({top:0,behavior:'smooth'});
+    toast('All details cleared. You can start fresh.','success');
+  }catch(err){ toast('Error: '+err.message,'error'); }
+  autosaveReady=wasReady;
+  btn.disabled=false; btn.innerHTML=orig;
+}
+
+function resetForm(){loadProfile();toast('Reset to last saved values');}
+
+// ── CV Download ───────────────────────────────────────────────────────────────
+async function downloadCV(fmt){
+  const btn=document.getElementById(fmt==='pdf'?'dlPdf':'dlDocx');
+  const orig=btn.innerHTML;
+  btn.disabled=true;btn.innerHTML='<div class="spin spin-dark"></div> '+(fmt==='pdf'?'Making PDF…':'Generating…');
+  try{
+    if(!(await saveProfile(null,false,true))) throw new Error('Could not save your profile');   // file = what you see
+    const res=await fetch(`/cv-builder/download/${fmt}/${selectedTpl}`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!res.ok){let e=null;try{e=await res.json();}catch(x){} throw new Error((e&&typeof e.detail==='string'&&e.detail)||'Failed');}
+    await saveBlob(res,`CV_${(document.getElementById('f_name').value||empId).replace(/\s+/g,'_')}_T${selectedTpl}.${fmt==='pdf'?'pdf':'docx'}`);
+    toast(`CV downloaded as ${fmt==='pdf'?'PDF':'Word'} (Template ${selectedTpl})`,'success');
+  }catch(err){toast('Download failed: '+err.message,'error');}
+  btn.disabled=false;btn.innerHTML=orig;
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init(){
+  // Build template grids
+  buildTplGrid('tplGrid',    'tpl-card',    140);
+  buildTplGrid('previewGrid','preview-tpl', 180);
+
+  applyTemplateFields(selectedTpl);
+  await loadDropdowns();
+  await loadProfile();
+  autosaveReady=true;                                    // from now on, what the user types is saved automatically
+
+  document.getElementById('ls').style.display='none';
+  document.getElementById('app').style.display='block';
+  if(hasSaved){                                  // returning user: show their saved CV, Edit is one click away
+    document.getElementById('savedNote').style.display='block';
+    switchTab('preview');
+  }
+}
+init();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+</body>
+</html>

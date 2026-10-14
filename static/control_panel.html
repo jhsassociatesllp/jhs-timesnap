@@ -55,6 +55,8 @@
     .card-qa{border-left-color:#e67e22}
     .card-eda{border-left-color:#8e44ad}
     .card-cb{border-left-color:#4a6fa5}
+    .card-cvadm{border-left-color:#16a085}
+    .card-bradm{border-left-color:#e84393}
 
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
@@ -62,6 +64,8 @@
     .card-ap .card-icon{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-icon{background:rgba(230,126,34,.12);color:#e67e22}
     .card-eda .card-icon{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-bradm .card-icon{background:rgba(232,67,147,.12);color:#e84393}
+    .card-cvadm .card-icon{background:rgba(22,160,133,.12);color:#16a085}
     .card-cb .card-icon{background:rgba(74,111,165,.12);color:#4a6fa5}
 
     .card-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .75rem;border-radius:20px}
@@ -69,6 +73,8 @@
     .card-ap .card-tag{background:rgba(17,153,142,.12);color:#11998e}
     .card-qa .card-tag{background:rgba(230,126,34,.12);color:#e67e22}
     .card-eda .card-tag{background:rgba(142,68,173,.12);color:#8e44ad}
+    .card-bradm .card-tag{background:rgba(232,67,147,.12);color:#e84393}
+    .card-cvadm .card-tag{background:rgba(22,160,133,.12);color:#16a085}
     .card-cb .card-tag{background:rgba(74,111,165,.12);color:#4a6fa5}
 
     .card-title{font-size:1.45rem;font-weight:700;color:var(--text-dark);margin:0}
@@ -83,6 +89,8 @@
     .card-ap .card-btn{background:var(--sg);color:white}
     .card-qa .card-btn{background:linear-gradient(135deg,#e67e22,#d35400);color:white}
     .card-eda .card-btn{background:linear-gradient(135deg,#8e44ad,#5b2c6f);color:white}
+    .card-bradm .card-btn{background:linear-gradient(135deg,#e84393,#b2246d);color:white}
+    .card-cvadm .card-btn{background:linear-gradient(135deg,#16a085,#0e6655);color:white}
     .card-cb .card-btn{background:linear-gradient(135deg,#4a6fa5,#2f4d75);color:white}
     .module-card:hover .card-btn{transform:translateY(-2px);box-shadow:var(--sh-md)}
 
@@ -98,6 +106,45 @@
     .no-access{text-align:center;padding:3rem 2rem;color:var(--text-light)}
     .no-access i{font-size:3rem;margin-bottom:1rem;display:block;opacity:.35}
     .no-access h3{font-size:1.2rem;color:var(--text-dark);margin-bottom:.5rem}
+
+    /* ── Access manager (button + modal) ── */
+    .am-bar{display:flex;justify-content:flex-end;margin-bottom:1.2rem}
+    .am-btn{display:none;align-items:center;gap:.5rem;padding:.7rem 1.4rem;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;box-shadow:0 4px 6px rgba(0,0,0,.15);transition:all .25s}
+    .am-btn:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(0,0,0,.2)}
+    .am-bg{position:fixed;inset:0;background:rgba(44,62,80,.6);backdrop-filter:blur(4px);z-index:600;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+    .am-bg.open{display:flex}
+    .am-modal{background:#fff;border-radius:18px;width:100%;max-width:760px;box-shadow:0 30px 70px rgba(0,0,0,.3)}
+    .am-head{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:1.2rem 1.6rem;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0}
+    .am-head h3{font-size:1.05rem;display:flex;align-items:center;gap:.5rem;margin:0}
+    .am-x{background:rgba(255,255,255,.18);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
+    .am-body{padding:1.5rem 1.6rem 1.8rem}
+    .am-lbl{display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#2c3e50;margin-bottom:.4rem}
+    .am-in{width:100%;padding:.7rem 1rem;border:2px solid #e1e8ed;border-radius:10px;font-family:inherit;font-size:.92rem;outline:none}
+    .am-in:focus{border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.12)}
+    .am-find{position:relative;margin-bottom:1.1rem}
+    .am-sugg{position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid #667eea;border-top:none;border-radius:0 0 10px 10px;max-height:240px;overflow-y:auto;z-index:20;display:none;box-shadow:0 10px 25px rgba(0,0,0,.15)}
+    .am-sugg.open{display:block}
+    .am-sugg div{padding:.55rem 1rem;cursor:pointer;font-size:.88rem;border-bottom:1px solid #f1f3f9}
+    .am-sugg div:hover{background:#f0f4ff}
+    .am-sugg small{display:block;color:#7f8c8d;font-size:.74rem}
+    .am-target{display:none;background:#f8f9fa;border-left:5px solid #667eea;border-radius:12px;padding:1rem 1.2rem;margin-bottom:1.2rem}
+    .am-target h4{font-size:1rem;margin-bottom:.7rem}
+    .am-mods{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:1rem}
+    .am-mods label{display:flex;align-items:center;gap:.55rem;padding:.55rem .8rem;border:2px solid #e1e8ed;border-radius:10px;background:#fff;font-size:.88rem;font-weight:500;cursor:pointer}
+    .am-mods label:has(input:checked){border-color:#667eea;background:#f0f4ff}
+    .am-acts{display:flex;gap:.6rem;flex-wrap:wrap}
+    .am-b{padding:.6rem 1.2rem;border:none;border-radius:9px;font-family:inherit;font-size:.86rem;font-weight:600;cursor:pointer}
+    .am-b.pri{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+    .am-b.red{background:#fff5f5;color:#dc2626;border:1.5px solid #fecaca}
+    .am-b.gh{background:#fff;color:#7f8c8d;border:2px solid #e1e8ed}
+    .am-b:disabled{opacity:.55;cursor:not-allowed}
+    .am-list{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.4rem}
+    .am-list th{text-align:left;font-size:.74rem;text-transform:uppercase;color:#7f8c8d;padding:.45rem .5rem;border-bottom:2px solid #e1e8ed}
+    .am-list td{padding:.55rem .5rem;border-bottom:1px solid #eef1f6;vertical-align:middle}
+    .am-chip{display:inline-block;font-size:.7rem;padding:.12rem .55rem;border-radius:20px;background:#eef1ff;color:#4c5bd4;margin:0 .25rem .2rem 0;font-weight:600}
+    .am-msg{font-size:.84rem;margin-bottom:.8rem;display:none;padding:.55rem .8rem;border-radius:8px}
+    .am-msg.ok{display:block;background:#ecfdf5;color:#065f46}.am-msg.err{display:block;background:#fef2f2;color:#991b1b}
+    @media(max-width:600px){.am-mods{grid-template-columns:1fr}}
 
     @media(max-width:768px){
       .navbar{padding:1rem}.page-wrapper{padding:1rem}.body-content{padding:1.5rem}
@@ -130,6 +177,10 @@
         </div>
 
         <div class="body-content">
+          <div class="am-bar">
+            <button class="am-btn" id="amBtn" onclick="openAccessManager()"><i class="fas fa-user-lock"></i> Manage Module Access</button>
+          </div>
+
           <p class="section-label"><i class="fas fa-cubes"></i> Your Admin Modules</p>
 
           <div class="cards-grid" id="cards-grid">
@@ -141,6 +192,37 @@
             <span>Logged in as <strong id="empName">—</strong>. You have admin access to the modules shown above.</span>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Access manager modal ── -->
+  <div class="am-bg" id="amBg">
+    <div class="am-modal">
+      <div class="am-head">
+        <h3><i class="fas fa-user-lock"></i> Manage Module Access</h3>
+        <button class="am-x" onclick="closeAccessManager()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="am-body">
+        <div class="am-msg" id="amMsg"></div>
+        <label class="am-lbl">Find employee <span style="font-weight:400;text-transform:none;color:#7f8c8d">(JHS code or name)</span></label>
+        <div class="am-find">
+          <input class="am-in" id="amSearch" placeholder="e.g. JHS1485 or name" autocomplete="off" />
+          <div class="am-sugg" id="amSugg"></div>
+        </div>
+
+        <div class="am-target" id="amTarget">
+          <h4 id="amWho"></h4>
+          <div class="am-mods" id="amMods"></div>
+          <div class="am-acts">
+            <button class="am-b pri" id="amSave" onclick="saveAccess()"><i class="fas fa-save"></i> Save access</button>
+            <button class="am-b red" id="amRevoke" onclick="revokeAll()"><i class="fas fa-ban"></i> Revoke all</button>
+            <button class="am-b gh" onclick="clearTarget()">Cancel</button>
+          </div>
+        </div>
+
+        <label class="am-lbl" style="margin-top:.4rem">Employees with control-panel access</label>
+        <table class="am-list"><thead><tr><th>Employee</th><th>Modules</th><th></th></tr></thead><tbody id="amRows"></tbody></table>
       </div>
     </div>
   </div>
@@ -248,6 +330,67 @@
         </div>`;
     }
 
+    function buildCVAdminCard() {
+      return `
+        <div class="module-card card-cvadm" onclick="goToCVAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-id-card"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">CV Builder</h2>
+          <p class="card-desc">See which employees have filled in their CV and download any employee's CV.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-user-check"></i> CV Status</span>
+            <span class="chip"><i class="fas fa-file-word"></i> Download CV</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">CV admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
+    function buildReferralAdminCard() {
+      return `
+        <div class="module-card card-bradm" onclick="goToReferralAdmin()">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-user-friends"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Buddy Referral</h2>
+          <p class="card-desc">Review referrals from employees, view or download candidate resumes, and export the history to Excel.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-user-tie"></i> Existing Employee</span>
+            <span class="chip"><i class="fas fa-file-alt"></i> Resumes</span>
+            <span class="chip"><i class="fas fa-file-excel"></i> Excel</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Referral admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
+    function buildComplianceAdminCard() {
+      return `
+        <div class="module-card card-bradm" onclick="window.location.href='/compliance-admin'">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-calendar-check"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Compliance Calendar</h2>
+          <p class="card-desc">Add compliance due dates that are not in the imported calendar. They show on the calendar and in the due-date reminders.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-gavel"></i> Law</span>
+            <span class="chip"><i class="fas fa-calendar-day"></i> Due Dates</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Compliance admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
     function buildChatbotAdminCard() {
       return `
         <div class="module-card card-cb" onclick="goToChatbotAdmin()">
@@ -275,6 +418,14 @@
       window.location.href = '/employee-declaration/admin';
     }
 
+    function goToReferralAdmin() {
+      window.location.href = '/referral-admin';
+    }
+
+    function goToCVAdmin() {
+      window.location.href = '/cv-admin';
+    }
+
     function goToChatbotAdmin() {
       window.location.href = '/jhs-chatbot/admin';
     }
@@ -299,11 +450,109 @@
       window.location.href = '/appraisal';
     }
 
+    // ── Access manager ─────────────────────────────────────────────────────
+    let amModules = {}, amTarget = null, amTimer = null, amSeq = 0, amSugg = [];
+    const AM_HDR = { 'Authorization': `Bearer ${token}` };
+    const amEsc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    function amMsg(text, type) {
+      const m = document.getElementById('amMsg');
+      m.className = 'am-msg ' + (type || ''); m.textContent = text || '';
+      m.style.display = text ? 'block' : 'none';
+    }
+    async function amApi(url, opts) {
+      const res = await fetch(url, Object.assign({ headers: AM_HDR }, opts || {}));
+      let d = null; try { d = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || 'Request failed');
+      return d;
+    }
+    function openAccessManager() {
+      document.getElementById('amBg').classList.add('open'); amMsg(''); clearTarget(); loadAccessList();
+    }
+    function closeAccessManager() { document.getElementById('amBg').classList.remove('open'); }
+    document.getElementById('amBg').addEventListener('mousedown', e => { if (e.target.id === 'amBg') closeAccessManager(); });
+
+    async function loadAccessList() {
+      const body = document.getElementById('amRows');
+      try {
+        const d = await amApi('/access-manager/list');
+        body.innerHTML = d.rows.length ? d.rows.map(r => `<tr>
+          <td><b>${amEsc(r.empid)}</b><br><span style="color:#7f8c8d;font-size:.78rem">${amEsc(r.name)}</span></td>
+          <td>${r.modules.map(m => `<span class="am-chip">${amEsc(amModules[m] || m)}</span>`).join('')}</td>
+          <td style="white-space:nowrap"><button class="am-b gh" onclick="selectEmployee('${amEsc(r.empid)}')">Edit</button></td></tr>`).join('')
+          : '<tr><td colspan="3" style="color:#7f8c8d;padding:1rem">No one has module access yet.</td></tr>';
+      } catch (e) { body.innerHTML = `<tr><td colspan="3" style="color:#991b1b">${amEsc(e.message)}</td></tr>`; }
+    }
+
+    const amInp = document.getElementById('amSearch'), amSg = document.getElementById('amSugg');
+    amInp.addEventListener('input', () => {
+      clearTimeout(amTimer);
+      const q = amInp.value.trim();
+      if (!q) { amSg.classList.remove('open'); return; }
+      amTimer = setTimeout(async () => {
+        const my = ++amSeq;
+        try {
+          const d = await amApi('/buddy-referral/employees/search?q=' + encodeURIComponent(q));
+          if (my !== amSeq) return;
+          amSugg = d.results || [];
+          amSg.innerHTML = amSugg.length ? amSugg.map((e, i) =>
+            `<div data-i="${i}">${amEsc(e.empid)} — ${amEsc(e.name)}<small>${amEsc([e.designation, e.department].filter(Boolean).join(' · '))}</small></div>`).join('')
+            : '<div style="color:#7f8c8d;cursor:default">No matching employee</div>';
+          amSg.classList.add('open');
+        } catch (e) {}
+      }, 180);
+    });
+    amSg.addEventListener('mousedown', ev => {
+      const it = ev.target.closest('[data-i]'); if (!it) return;
+      ev.preventDefault(); selectEmployee(amSugg[+it.dataset.i].empid);
+    });
+    amInp.addEventListener('blur', () => setTimeout(() => amSg.classList.remove('open'), 150));
+
+    async function selectEmployee(code) {
+      amMsg(''); amSg.classList.remove('open');
+      try {
+        const u = await amApi('/access-manager/user/' + encodeURIComponent(code));
+        amTarget = u.empid;
+        document.getElementById('amWho').innerHTML = `<i class="fas fa-user" style="color:#667eea"></i> ${amEsc(u.empid)} — ${amEsc(u.name)}`;
+        document.getElementById('amMods').innerHTML = Object.entries(amModules).map(([k, label]) =>
+          `<label><input type="checkbox" value="${k}" ${u.modules.includes(k) ? 'checked' : ''}> ${amEsc(label)}</label>`).join('');
+        document.getElementById('amTarget').style.display = 'block';
+        amInp.value = '';
+      } catch (e) { amMsg(e.message, 'err'); }
+    }
+    function clearTarget() { amTarget = null; document.getElementById('amTarget').style.display = 'none'; }
+
+    async function applyAccess(modules, doneText) {
+      if (!amTarget) return;
+      const save = document.getElementById('amSave'), rev = document.getElementById('amRevoke');
+      save.disabled = rev.disabled = true;
+      try {
+        const r = await amApi('/access-manager/set', { method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, AM_HDR),
+          body: JSON.stringify({ empid: amTarget, modules }) });
+        amMsg(`${doneText} for ${r.empid} — ${r.name}.`, 'ok');
+        clearTarget(); loadAccessList();
+      } catch (e) { amMsg(e.message, 'err'); }
+      save.disabled = rev.disabled = false;
+    }
+    function saveAccess() {
+      const mods = [...document.querySelectorAll('#amMods input:checked')].map(i => i.value);
+      applyAccess(mods, mods.length ? 'Access updated' : 'All access revoked');
+    }
+    function revokeAll() {
+      if (!confirm('Revoke ALL control-panel module access for ' + amTarget + '?')) return;
+      applyAccess([], 'All access revoked');
+    }
+
     // ── Init ───────────────────────────────────────────────────────────────
 
     async function initControlPanel() {
       let moduleAccess = null;
       let declIsAdmin = false;
+      let cvIsAdmin = false;
+      let referralIsAdmin = false;
+      let complianceIsAdmin = false;
+      let isManager = false;
 
       try {
         const res = await fetch('/get-module-access', {
@@ -319,9 +568,39 @@
         if (res.ok) declIsAdmin = (await res.json()).is_admin;
       } catch(e) {}
 
+      try {
+        const res = await fetch('/cv-builder/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) cvIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      try {
+        const res = await fetch('/buddy-referral/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) referralIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      try {
+        const res = await fetch('/compliance-calendar/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) complianceIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      try {
+        const res = await fetch('/access-manager/check', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          isManager = d.is_manager; amModules = d.modules || {};
+          if (isManager) document.getElementById('amBtn').style.display = 'inline-flex';
+        }
+      } catch(e) {}
+
       // If no admin access at all (neither module access nor declaration
       // admin access), redirect back to modules
-      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin) {
+      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin && !cvIsAdmin && !referralIsAdmin && !complianceIsAdmin && !isManager) {
         window.location.href = '/modules';
         return;
       }
@@ -341,6 +620,15 @@
       }
       if (declIsAdmin) {
         grid.innerHTML += buildDeclarationAdminCard();
+      }
+      if (cvIsAdmin) {
+        grid.innerHTML += buildCVAdminCard();
+      }
+      if (referralIsAdmin) {
+        grid.innerHTML += buildReferralAdminCard();
+      }
+      if (complianceIsAdmin) {
+        grid.innerHTML += buildComplianceAdminCard();
       }
       if (modules.includes('chatbot')) {
         grid.innerHTML += buildChatbotAdminCard();
