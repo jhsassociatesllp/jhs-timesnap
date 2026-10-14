@@ -14,7 +14,7 @@ load_dotenv()
 
 _KEY_VARS = ("RESUME_OPENAI_API_KEY", "HR_OPENAI_API_KEY", "LLM_API_KEY", "OPENAI_API_KEY")
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".pptx", ".ppt"}
 MAX_FILE_BYTES = int(os.getenv("RESUME_MAX_FILE_MB", "10")) * 1024 * 1024
 MAX_FILES_PER_REQUEST = 25
 MAX_TEXT_CHARS = 60_000          # stored/searchable text cap per resume

@@ -1,6 +1,6 @@
 # backend/resume_ranker/extract.py
 """
-Text extraction for PDF / DOCX / DOC resumes.
+Text extraction for PDF / DOCX / DOC / PPTX / PPT resumes.
 
 The file's *content* decides how it is read, not its extension: ".doc" files in
 the wild are frequently really DOCX, RTF or HTML, and a ".pdf" is sometimes a
@@ -46,13 +46,17 @@ def extract_text(data: bytes, filename: str = "") -> str:
             text = _docx_text(data)
         elif kind == "doc":
             text = _doc_text(data)
+        elif kind == "pptx":
+            text = _pptx_text(data)
+        elif kind == "ppt":
+            text = _ppt_text(data)
         elif kind == "rtf":
             text = _rtf_text(data)
         elif kind == "html":
             text = _html_text(data)
         else:
             raise ExtractionError(
-                "Unrecognised file content — not a PDF, DOCX or DOC file (it may be corrupt)"
+                "Unrecognised file content — not a PDF, Word or PowerPoint file (it may be corrupt)"
             )
     except ExtractionError:
         raise
@@ -71,9 +75,9 @@ def sniff_kind(data: bytes) -> str:
     if head.startswith(b"%PDF"):
         return "pdf"
     if head.startswith(b"PK"):
-        return "docx" if _is_docx(data) else "unknown"
+        return _zip_kind(data)
     if head.startswith(b"\xd0\xcf\x11\xe0"):
-        return "doc"
+        return "ppt" if _is_legacy_ppt(data) else "doc"
     if head.startswith(b"{\\rtf"):
         return "rtf"
     if data[:512].lstrip().lower().startswith((b"<html", b"<!doctype html", b"<?xml")):
@@ -84,11 +88,28 @@ def sniff_kind(data: bytes) -> str:
     return "unknown"
 
 
-def _is_docx(data: bytes) -> bool:
+def _zip_kind(data: bytes) -> str:
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
-            return "word/document.xml" in z.namelist()
+            names = z.namelist()
     except zipfile.BadZipFile:
+        return "unknown"
+    if "word/document.xml" in names:
+        return "docx"
+    if "ppt/presentation.xml" in names:
+        return "pptx"
+    return "unknown"
+
+
+def _is_legacy_ppt(data: bytes) -> bool:
+    try:
+        import olefile
+        ole = olefile.OleFileIO(io.BytesIO(data))
+        try:
+            return ole.exists("PowerPoint Document")
+        finally:
+            ole.close()
+    except Exception:
         return False
 
 
@@ -289,6 +310,51 @@ def _doc_via_strings(data: bytes) -> str:
     if len(text) < _MIN_USEFUL_CHARS:
         runs = re.findall(rb"[\x20-\x7e]{12,}", data)
         text = "\n".join(r.decode("ascii", "ignore") for r in runs)
+    return text
+
+
+# ── PPTX / legacy PPT ───────────────────────────────────────────────────────
+
+def _pptx_text(data: bytes) -> str:
+    from pptx import Presentation
+    prs = Presentation(io.BytesIO(data))
+    out: list[str] = []
+
+    def shape_text(shape):
+        if getattr(shape, "has_text_frame", False) and shape.has_text_frame:
+            for para in shape.text_frame.paragraphs:
+                line = "".join(r.text for r in para.runs).strip()
+                if line:
+                    out.append(line)
+        if getattr(shape, "has_table", False) and shape.has_table:
+            for row in shape.table.rows:
+                cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                if cells:
+                    out.append(" | ".join(cells))
+        for child in getattr(shape, "shapes", []) or []:   # grouped shapes
+            shape_text(child)
+
+    for slide in prs.slides:
+        # reading order: top-to-bottom, then left-to-right
+        for shape in sorted(slide.shapes, key=lambda s: (s.top or 0, s.left or 0)):
+            shape_text(shape)
+        out.append("")
+    return "\n".join(out)
+
+
+def _ppt_text(data: bytes) -> str:
+    """Legacy PowerPoint 97-2003: convert to PPTX with LibreOffice when present,
+    otherwise fall back to scraping the text runs out of the raw bytes."""
+    from backend.resume_ranker.preview import convert
+    try:
+        text = _pptx_text(convert(data, "ppt", "pptx"))
+        if len(text.strip()) >= _MIN_USEFUL_CHARS:
+            return text
+    except Exception:
+        pass
+    text = _doc_via_strings(data)
+    if len(text.strip()) < _MIN_USEFUL_CHARS:
+        raise ExtractionError("Could not read text from this legacy .ppt file — try re-saving it as PPTX or PDF")
     return text
 
 

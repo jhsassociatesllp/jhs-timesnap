@@ -33,7 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from backend.auth import get_current_user
 from backend.database import employee_details_collection
-from backend.resume_ranker import config, llm, worker
+from backend.resume_ranker import config, llm, preview, worker
 from backend.resume_ranker.db import (OWNER_EMPID, adhoc_scores, batches, ensure_indexes, holders, jobs, resumes,
                                       scores, tasks)
 from backend.resume_ranker.embeddings import cosine_similarity, embed_job
@@ -491,7 +491,7 @@ def upload_files(batch_id: str, files: List[UploadFile] = File(...), user: str =
         reason = None
         data = b""
         if ext not in config.ALLOWED_EXTENSIONS:
-            reason = "Unsupported file type (use PDF, DOCX or DOC)"
+            reason = "Unsupported file type (use PDF, Word or PowerPoint)"
         else:
             data = f.file.read(config.MAX_FILE_BYTES + 1)
             if not data:
@@ -1266,6 +1266,21 @@ def download_original(resume_id: str, inline: bool = False, _: str = Depends(req
                         content_disposition_type="inline" if inline else "attachment")
 
 
+@router.get("/resumes/{resume_id}/preview")
+def preview_original(resume_id: str, _: str = Depends(require_access)):
+    """The CV as a PDF the browser can display — PDFs as-is, Word/PowerPoint/RTF converted (and cached)."""
+    r = _get_resume(resume_id)
+    path = r.get("file_path")
+    if not path or not os.path.exists(path):
+        raise HTTPException(404, "Original file is not available")
+    try:
+        pdf_path = preview.preview_pdf_path(path)
+    except preview.PreviewError as exc:
+        raise HTTPException(503, f"Preview unavailable: {exc}")
+    return FileResponse(pdf_path, media_type="application/pdf", content_disposition_type="inline",
+                        filename=os.path.splitext(r.get("filename") or "resume")[0] + ".pdf")
+
+
 def _delete_resume_doc(r: dict) -> None:
     """Remove one resume everywhere it lives: stored file, scores (job + cached AI Rank), queued
     tasks, and any duplicate links pointing at it."""
@@ -1273,6 +1288,8 @@ def _delete_resume_doc(r: dict) -> None:
     if r.get("file_path"):
         try:
             os.remove(r["file_path"])
+            if os.path.exists(r["file_path"] + ".preview.pdf"):
+                os.remove(r["file_path"] + ".preview.pdf")
         except OSError:
             pass
     scores.delete_many({"resume_id": rid})

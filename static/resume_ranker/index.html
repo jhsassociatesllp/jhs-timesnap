@@ -36,14 +36,14 @@
     <!-- ───────────── UPLOAD ───────────── -->
     <section id="tab-upload" class="panel">
       <div class="panel-head">
-        <div><h2>Bulk upload</h2><p class="muted">PDF, DOCX or DOC — up to <b>10 MB</b> each. Every CV is parsed and ranked automatically — no setup needed. Corrupt or unreadable files are skipped and reported; the rest continue.</p></div>
+        <div><h2>Bulk upload</h2><p class="muted">PDF, Word (DOCX/DOC) or PowerPoint (PPTX/PPT) — up to <b>10 MB</b> each. Every CV is parsed and ranked automatically — no setup needed. Corrupt or unreadable files are skipped and reported; the rest continue.</p></div>
       </div>
       <div class="card">
         <div id="dropzone" class="dropzone" tabindex="0">
           <i class="fas fa-file-arrow-up"></i>
           <div class="dz-title">Drag &amp; drop resumes here</div>
           <div class="muted">or <button class="link" id="pickBtn" type="button">choose files</button> · <button class="link" id="pickFolderBtn" type="button">choose a folder</button></div>
-          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc" hidden />
+          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.pptx,.ppt" hidden />
           <input type="file" id="folderInput" webkitdirectory multiple hidden />
         </div>
         <div id="fileQueue" style="display:none">

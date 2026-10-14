@@ -77,14 +77,14 @@
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
   // ══════════════════════════════ UPLOAD ═════════════════════════════════════
-  const ALLOWED = ['.pdf', '.docx', '.doc'], MAX_BYTES = 10 * 1024 * 1024, CHUNK = 10;
+  const ALLOWED = ['.pdf', '.docx', '.doc', '.pptx', '.ppt'], MAX_BYTES = 10 * 1024 * 1024, CHUNK = 10;
   let queue = [];   // {file, status, note}
 
   function addFiles(list) {
     const rej = [];
     [...list].forEach((f) => {
       const ext = '.' + f.name.split('.').pop().toLowerCase();
-      if (!ALLOWED.includes(ext)) rej.push(`${f.name}: not a PDF/DOCX/DOC`);
+      if (!ALLOWED.includes(ext)) rej.push(`${f.name}: not a PDF, Word or PowerPoint file`);
       else if (f.size > MAX_BYTES) rej.push(`${f.name}: larger than 10 MB`);
       else if (f.size === 0) rej.push(`${f.name}: empty file`);
       else if (!queue.some((q) => q.file.name === f.name && q.file.size === f.size)) queue.push({ file: f, status: 'ready', note: '' });
@@ -485,14 +485,13 @@
 
     const saveBlob = (blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = r.filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
     $('dDownload').addEventListener('click', async () => { try { const res = await api(`/resumes/${r.id}/file`); saveBlob(await res.blob()); } catch (e) { toast(e.message, true); } });
-    // View = open the original in a new tab. Browsers only render PDFs; a Word file can't be shown, so it is downloaded instead.
+    // View = open the CV in a new tab as a PDF. The server converts Word / PowerPoint files to PDF so every CV can be viewed.
     $('dView').addEventListener('click', async () => {
-      const isPdf = /\.pdf$/i.test(r.filename || '');
-      const w = isPdf ? window.open('', '_blank') : null;   // opened now (inside the click) so the popup isn't blocked
+      const w = window.open('', '_blank');   // opened now (inside the click) so the popup isn't blocked
       try {
-        const res = await api(`/resumes/${r.id}/file?inline=true`); const blob = await res.blob();
-        if (w) { w.location.href = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' })); }
-        else { saveBlob(blob); toast('Word files cannot be previewed in the browser — downloaded instead'); }
+        const res = await api(`/resumes/${r.id}/preview`); const blob = await res.blob();
+        if (!w) throw new Error('Allow pop-ups to view the CV');
+        w.location.href = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       } catch (e) { if (w) w.close(); toast(e.message, true); }
     });
   }

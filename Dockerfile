@@ -6,7 +6,7 @@ WORKDIR /app
 # Builder. Carlito/Liberation are metric-compatible with Calibri/Arial/Times so
 # the PDF lays out like the Word file. Kept in its own early layer: it is large
 # and rarely changes.
-RUN apt-get update     && apt-get install -y --no-install-recommends libreoffice-writer fonts-crosextra-carlito fonts-liberation fonts-dejavu-core     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update     && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-crosextra-carlito fonts-liberation fonts-dejavu-core     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
