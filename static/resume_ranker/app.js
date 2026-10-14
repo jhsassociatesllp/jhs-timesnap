@@ -376,6 +376,7 @@
   function updateBulk() {
     const n = state.selected.size; $('bulkBar').style.display = n ? '' : 'none'; $('bulkCount').textContent = `${n} selected`;
   }
+  $('bulkDelete').addEventListener('click', () => deleteCvs([...state.selected]));
   $('bulkClear').addEventListener('click', () => { state.selected.clear(); renderRows(); updateBulk(); });
 
   // Permanent: removes the CV, its stored file and its scores. Always asks first.
@@ -474,7 +475,7 @@
           <div class="d-card"><h4>Candidate</h4><dl class="kv">
             <dt>Name</dt><dd>${esc(p.name || r.name || '—')}</dd><dt>Email</dt><dd>${esc(p.email || '—')}</dd><dt>Phone</dt><dd>${esc(p.phone || '—')}</dd>
             <dt>Location</dt><dd>${esc(cityState(p.location) || '—')}</dd><dt>Experience</dt><dd>${num(p.total_years_experience)} years${p.stated_years_experience != null ? ` <span class="sub">(CV states ${num(p.stated_years_experience)})</span>` : ''}</dd>
-            <dt>Education</dt><dd>${esc(EDU_LABEL[p.highest_education_level] || '—')}</dd><dt>File</dt><dd>${esc(r.filename)}</dd></dl><div class="file-actions"><button class="btn btn-primary btn-sm" id="dView"><i class="fas fa-eye"></i> View original CV</button><button class="btn btn-ghost btn-sm" id="dDownload"><i class="fas fa-download"></i> Download CV</button></div></div>
+            <dt>Education</dt><dd>${esc(EDU_LABEL[p.highest_education_level] || '—')}</dd><dt>File</dt><dd>${esc(r.filename)}</dd></dl><div class="file-actions"><button class="btn btn-primary btn-sm" id="dView"><i class="fas fa-eye"></i> View original CV</button><button class="btn btn-ghost btn-sm" id="dDownload"><i class="fas fa-download"></i> Download CV</button><button class="btn btn-ghost btn-sm" id="dDelete" style="color:#b91c1c"><i class="fas fa-trash"></i> Delete CV</button></div></div>
           ${(p.experience || []).length ? `<div class="d-card"><h4>Work history</h4>${p.experience.map((e) => `<div class="exp-item"><b>${esc(e.title || '')}</b>${e.company ? ` · ${esc(e.company)}` : ''}<div class="sub">${esc(e.start || '?')} – ${esc(e.end || '?')}${e.industry ? ' · ' + esc(e.industry) : ''}</div>${e.summary ? `<div style="font-size:.84rem">${esc(e.summary)}</div>` : ''}</div>`).join('')}</div>` : ''}
           ${(p.education || []).length ? `<div class="d-card"><h4>Education</h4>${p.education.map((e) => `<div class="exp-item"><b>${esc(e.degree)}</b>${e.field ? ` · ${esc(e.field)}` : ''}<div class="sub">${esc([e.institution, e.year].filter(Boolean).join(' · '))}</div></div>`).join('')}</div>` : ''}
           <div class="d-card"><h4>Full extracted text</h4><details><summary class="link">Show the raw text the AI read</summary><div class="raw-text" style="margin-top:.5rem">${esc(r.text || '(none)')}</div></details></div>
@@ -484,6 +485,7 @@
     $('dBody').querySelectorAll('[data-open]').forEach((a) => a.addEventListener('click', () => openDetail(a.dataset.open)));
 
     const saveBlob = (blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = r.filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+    $('dDelete').addEventListener('click', () => deleteCvs([r.id]));
     $('dDownload').addEventListener('click', async () => { try { const res = await api(`/resumes/${r.id}/file`); saveBlob(await res.blob()); } catch (e) { toast(e.message, true); } });
     // View = open the CV in a new tab as a PDF. The server converts Word / PowerPoint files to PDF so every CV can be viewed.
     $('dView').addEventListener('click', async () => {
