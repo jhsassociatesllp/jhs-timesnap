@@ -309,7 +309,7 @@ def save_profile(body: CVProfileModel, current_user: str = Depends(get_current_u
                                if any((a.get(k) or "").strip() for k in ("assignment", "client", "sector", "role"))]
     data["designation"] = body.designation or emp_info["designation"]
     data["department"] = body.department or emp_info["department"]
-    data["profile_status"] = body.profile_status or "Draft"
+    data["profile_status"] = "Filled"
     data["selected_template"] = body.selected_template if body.selected_template in _TPL_IDS else "1"
     data["page_layout"] = "1" if str(body.page_layout) == "1" else "2"
     who = empid
@@ -404,8 +404,6 @@ def _ppt_response(profile: dict, empid: str):
 def download_profile_ppt(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
     profile = _stored_profile(empid)
-    if (profile.get("ppt_required") or "").strip().lower() != "yes":
-        raise HTTPException(400, 'Set "PPT Profile Required" to Yes and save your profile first.')
     return _ppt_response(profile, empid)
 
 
@@ -455,7 +453,7 @@ def cv_admin_status(_: str = Depends(require_cv_admin)):
             "filled": pr is not None,
             "profile_status": (pr or {}).get("profile_status", ""),
             "template": (pr or {}).get("selected_template", ""),
-            "ppt": ((pr or {}).get("ppt_required") or "").strip().lower() == "yes",
+            "ppt": pr is not None,
             "updated_at": (pr or {}).get("updated_at"),
         })
     for empid, pr in profiles.items():          # profiles of ids missing from the roster
@@ -463,7 +461,7 @@ def cv_admin_status(_: str = Depends(require_cv_admin)):
             rows.append({"empid": empid, "name": pr.get("employee_name") or empid, "manager": "", "partner": "",
                          "filled": True, "profile_status": pr.get("profile_status", ""),
                          "template": pr.get("selected_template", ""),
-                         "ppt": (pr.get("ppt_required") or "").strip().lower() == "yes",
+                         "ppt": True,
                          "updated_at": pr.get("updated_at")})
     rows.sort(key=lambda r: (not r["filled"], r["empid"]))
     return {"total": len(rows), "filled": sum(1 for r in rows if r["filled"]), "rows": rows}

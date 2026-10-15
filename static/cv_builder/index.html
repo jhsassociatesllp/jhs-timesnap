@@ -506,30 +506,6 @@
           </div>
 
           <div class="card">
-            <div class="card-title"><i class="fas fa-tasks"></i> Profile Status</div>
-            <div class="g2" style="max-width:640px;margin-bottom:1rem">
-              <div class="form-group">
-                <label><i class="fas fa-file-powerpoint"></i> PPT Profile Required</label>
-                <select class="fi" id="f_ppt" onchange="updatePptButtons()"><option value="">- Select -</option></select>
-              </div>
-              <div class="form-group">
-                <label><i class="fas fa-calendar-check"></i> Next Review Date</label>
-                <input class="fi" type="date" id="f_review" />
-              </div>
-            </div>
-            <div style="max-width:300px">
-              <div class="form-group">
-                <label><i class="fas fa-flag"></i> Status</label>
-                <select class="fi" id="f_status" onchange="updatePill(this.value)">
-                  <option value="Draft">Draft</option>
-                  <option value="Pending Employee Update">Pending Employee Update</option>
-                  <option value="Pending HR Review">Pending HR Review</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Update Required">Update Required</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
             <div class="actions">
               <button type="button" class="btn btn-del" id="clearBtn" onclick="clearAllDetails()" title="Delete everything you entered, here and in the database"><i class="fas fa-eraser"></i> Clear all</button>
               <button type="button" class="btn btn-ghost" onclick="resetForm()"><i class="fas fa-undo"></i> Reset</button>
@@ -616,10 +592,9 @@ function switchTab(name){
 }
 
 // ── Status pill ───────────────────────────────────────────────────────────────
-function updatePill(s){
-  const p=document.getElementById('statusPill'); p.textContent=s||'—';
-  const m={Approved:'Approved',Inactive:'Inactive',Draft:'Draft'};
-  p.className='pill pill-'+(m[s]||'default');
+function updatePill(filled){
+  const p=document.getElementById('statusPill'); const t=filled?'Filled':'Draft';
+  p.textContent=t; p.className='pill pill-'+t;
 }
 
 // ── Template selector ─────────────────────────────────────────────────────────
@@ -889,7 +864,6 @@ async function loadDropdowns(){
   initMS('ms-mem',    'membership',       DD.memberships);
   initMS('ms-skills', 'skills_expertise', DD.skills_expertise);
   initMS('ms-key',    'key_skills',       DD.skills_expertise);
-  const pp=document.getElementById('f_ppt');(DD.ppt_required||[]).forEach(v=>pp.add(new Option(v,v)));
   initSectorWidget(DD.sector_experience);
 }
 
@@ -913,8 +887,6 @@ async function loadProfile(){
   document.getElementById('f_phone').value  =p.phone||'';
   document.getElementById('f_loc').value    =p.location||'';
   document.getElementById('f_summary').value=p.summary||'';
-  document.getElementById('f_ppt').value    =p.ppt_required||'';
-  document.getElementById('f_review').value =p.next_review_date||'';
   if(p.selected_template && ['1','2','3','4','5'].includes(p.selected_template)){ selectTemplate(p.selected_template, true); }
   hasSaved=!!p.updated_at;
   rsUndo=null; $id('rsChip').style.display='none';
@@ -931,14 +903,12 @@ async function loadProfile(){
   asgItems=(p.key_assignments||[]).map(a=>Object.assign({assignment:'',client:'',sector:'',role:''},a));
   renderAsg();
   loadSecSpec();
-  updatePptButtons();
-  document.getElementById('f_status').value =p.profile_status||'Draft';
   setMS('qualification',    p.qualification||[]);
   setMS('membership',       p.membership||[]);
   setMS('skills_expertise', p.skills_expertise||[]);
   setMS('key_skills',       p.key_skills||[]);
   setSectors(p.sector_experience||[]);
-  updatePill(p.profile_status||'Draft');
+  updatePill(!!p.updated_at);
   if(p.updated_at) setSaveState('saved');
 }
 
@@ -1029,7 +999,6 @@ function collectPayload(){
     certifications:document.getElementById('f_certs').value.trim(),
     linkedin:document.getElementById('f_li').value.trim(),
     portfolio:document.getElementById('f_pf').value.trim(),
-    profile_status:document.getElementById('f_status').value,
     email:document.getElementById('f_email').value.trim(),
     phone:document.getElementById('f_phone').value.trim(),
     location:document.getElementById('f_loc').value.trim(),
@@ -1038,8 +1007,6 @@ function collectPayload(){
     qualification_details:Object.fromEntries((msState['qualification']||[]).map(n=>[n,qualDet[n]||{}])),
     membership_details:Object.fromEntries((msState['membership']||[]).map(n=>[n,memDet[n]||{}])),
     key_assignments:asgItems.filter(a=>Object.values(a).some(v=>(v||'').trim())),
-    ppt_required:document.getElementById('f_ppt').value,
-    next_review_date:document.getElementById('f_review').value,
     selected_template:selectedTpl,
     page_layout:pageLayout,
     section_config:{
@@ -1064,7 +1031,7 @@ async function saveProfile(e,thenPreview=false,silent=false){
     const d=await res.json();
     if(!res.ok) throw new Error(typeof d.detail==='string'?d.detail:'Save failed');
     if(!silent) toast('Profile saved!','success'); ok=true; hasSaved=true; resumeDone();
-    updatePill(payload.profile_status);
+    updatePill(true);
     setSaveState('saved');
   }catch(err){toast('Error: '+err.message,'error');}
   btns.forEach((b,i)=>{b.disabled=false;b.innerHTML=origs[i];});
@@ -1209,7 +1176,6 @@ function setLayout(v){
   pageLayout=v; scheduleAutosave();
   if(document.getElementById('tc-preview').classList.contains('active')) renderPreview();
 }
-function updatePptButtons(){ /* the Profile PPT button is always shown; downloadPpt() turns the option on when needed */ }
 async function saveBlob(res, fallbackName){
   const blob=await res.blob(), u=URL.createObjectURL(blob);
   const cd=res.headers.get('Content-Disposition')||''; const m=/filename="?([^";]+)"?/.exec(cd);
@@ -1217,11 +1183,6 @@ async function saveBlob(res, fallbackName){
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
 }
 async function downloadPpt(btn){
-  const sel=document.getElementById('f_ppt');
-  if(sel.value!=='Yes'){
-    if(!confirm('Create a red & white Profile PPT?\n\nThis sets "PPT Profile Required" to Yes on your profile.')) return;
-    sel.value='Yes';
-  }
   const orig=btn.innerHTML; btn.disabled=true; btn.innerHTML='<div class="spin spin-dark"></div> Preparing…';
   try{
     if(!(await saveProfile(null,false,true))) throw new Error('Could not save your profile');
@@ -1266,10 +1227,10 @@ async function clearAllDetails(){
     let d=null; try{d=await res.json();}catch(x){}
     if(!res.ok) throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Could not clear your saved details');
     // database is clean -> empty the page too
-    ['f_desig','f_dept','f_exp','f_photo','f_email','f_phone','f_loc','f_summary','f_ach','f_certs','f_li','f_pf','f_review']
+    ['f_desig','f_dept','f_exp','f_photo','f_email','f_phone','f_loc','f_summary','f_ach','f_certs','f_li','f_pf']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    ['f_hl','f_ppt'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    document.getElementById('f_status').value='Draft'; updatePill('Draft');
+    ['f_hl'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    updatePill(false);
     ['qualification','membership','skills_expertise','key_skills'].forEach(f=>setMS(f,[]));
     qualDet={}; memDet={}; renderQualDet(); renderMemDet();
     setSectors([]); asgItems=[]; renderAsg();
