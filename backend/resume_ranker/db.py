@@ -23,7 +23,11 @@ if not MONGO_CONNECTION_STRING:
     raise ValueError("MONGO_CONNECTION_STRING env var is required")
 
 _client = MongoClient(MONGO_CONNECTION_STRING)
-db = _client["Resume_Ranker"]
+# One database per environment: the deploy workflow sets RESUME_RANKER_DB_NAME
+# (staging -> Resume_Ranker_Staging, production -> Resume_Ranker). Unset = Resume_Ranker,
+# so production and local runs keep using the existing database.
+DB_NAME = os.getenv("RESUME_RANKER_DB_NAME") or "Resume_Ranker"
+db = _client[DB_NAME]
 
 jobs = db["Jobs"]
 resumes = db["Resumes"]
@@ -62,6 +66,13 @@ def ensure_indexes() -> None:
     """Called from the app startup hook (not at import) so a slow/unreachable
     MongoDB can't stall importing the module."""
     try:
+        # Create every collection up front (MongoDB would only create them on first write), so a
+        # brand-new environment database gets the full set — CV files (GridFS) included.
+        existing = set(db.list_collection_names())
+        for name in ("Jobs", "Resumes", "Scores", "AdhocScores", "Batches", "Tasks", "Holders",
+                     "CvFiles.files", "CvFiles.chunks"):
+            if name not in existing:
+                db.create_collection(name)
         resumes.create_index([("uploaded_at", DESCENDING)])
         resumes.create_index("batch_id")
         resumes.create_index("sha256")

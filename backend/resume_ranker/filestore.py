@@ -1,7 +1,7 @@
 # backend/resume_ranker/filestore.py
 """
 Where the CV files themselves live: MongoDB (GridFS, collection "CvFiles") in the
-same Resume_Ranker database as the records, so a redeploy, a new container or a
+same Resume Ranker database as the records, so a redeploy, a new container or a
 new server can never separate a record from its file.
 
 Resumes uploaded before this change still have a `file_path` on disk; reads and
