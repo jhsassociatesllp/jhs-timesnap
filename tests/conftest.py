@@ -13,6 +13,8 @@ import pymongo
 os.environ.setdefault("MONGO_CONNECTION_STRING", "mongodb://localhost:27017")
 os.environ.setdefault("SECRET_KEY", "test-secret")
 pymongo.MongoClient = mongomock.MongoClient          # must happen before backend.* is imported
+from mongomock import gridfs as _mgridfs
+_mgridfs.enable_gridfs_integration()                 # CV files are stored in GridFS
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest  # noqa: E402
@@ -79,6 +81,6 @@ def fake_llm():
 def clean_db(tmp_path, monkeypatch):
     from backend.resume_ranker import db
     monkeypatch.setenv("RESUME_UPLOAD_DIR", str(tmp_path / "uploads"))
-    for coll in (db.jobs, db.resumes, db.scores, db.batches, db.tasks):
+    for coll in (db.jobs, db.resumes, db.scores, db.batches, db.tasks, db.db['CvFiles.files'], db.db['CvFiles.chunks']):
         coll.delete_many({})
     yield

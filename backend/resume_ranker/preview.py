@@ -4,7 +4,7 @@ Browser-viewable PDF previews of uploaded CVs.
 
 Browsers only render PDFs, so Word / PowerPoint / RTF / HTML CVs are converted
 with LibreOffice (headless) on first view and cached next to the original
-(<file>.preview.pdf), so every uploaded CV can be opened in the viewer.
+(stored in the database next to the CV), so every uploaded CV can be opened in the viewer.
 """
 from __future__ import annotations
 
@@ -53,21 +53,11 @@ def convert(data: bytes, kind: str, target: str) -> bytes:
             return fh.read()
 
 
-def preview_pdf_path(path: str) -> str:
-    """Path of a PDF the browser can display for the stored CV (the CV itself if it is a PDF)."""
-    with open(path, "rb") as fh:
-        data = fh.read()
+def to_pdf_bytes(data: bytes) -> bytes:
+    """PDF bytes the browser can display for a stored CV (the CV itself if it is already a PDF)."""
     kind = sniff_kind(data)
     if kind == "pdf":
-        return path
+        return data
     if kind not in _EXT:
         raise PreviewError("This file type cannot be previewed")
-    cached = path + ".preview.pdf"
-    if os.path.exists(cached) and os.path.getmtime(cached) >= os.path.getmtime(path):
-        return cached
-    pdf = convert(data, kind, "pdf")
-    tmp = cached + ".tmp"
-    with open(tmp, "wb") as fh:
-        fh.write(pdf)
-    os.replace(tmp, cached)
-    return cached
+    return convert(data, kind, "pdf")

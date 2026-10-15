@@ -33,11 +33,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 from backend.auth import get_current_user
 from backend.database import employee_details_collection
-from backend.resume_ranker import config, llm, preview, worker
+from backend.resume_ranker import config, filestore, llm, preview, worker
 from backend.resume_ranker.db import (OWNER_EMPID, adhoc_scores, batches, ensure_indexes, holders, jobs, resumes,
                                       scores, tasks)
 from backend.resume_ranker.embeddings import cosine_similarity, embed_job
 from backend.resume_ranker.parser import EDU_LABELS, EDU_RANKS, general_score, skill_key
+from backend.resume_ranker.extract import sniff_kind
 from backend.resume_ranker.prefilter import screened_out_result, split_candidates
 from backend.resume_ranker.scoring import (CRITERIA, CRITERION_LABELS, DEFAULT_WEIGHTS, active_criteria,
                                            criteria_signature, effective_weights, extract_criteria, score_resume)
@@ -79,7 +80,6 @@ def startup() -> None:
             log.info("ranked %d previously-uploaded CV(s) (free, no AI)", filled)
     except Exception:
         log.exception("general-score backfill skipped")
-    os.makedirs(config.upload_dir(), exist_ok=True)
     worker.pool.start()
 
 
@@ -539,12 +539,7 @@ def _store_resume(batch: dict, name: str, ext: str, data: bytes, user: str) -> d
         return {"filename": name, "status": "duplicate", "resume_id": str(rid),
                 "reason": "Identical file already uploaded — skipped re-processing"}
 
-    folder = os.path.join(config.upload_dir(), batch["batch_id"])
-    os.makedirs(folder, exist_ok=True)
-    path = os.path.join(folder, f"{rid}{ext}")
-    with open(path, "wb") as fh:
-        fh.write(data)
-    doc.update({"status": "queued", "file_path": path, "pending_job_ids": list(job_ids)})
+    doc.update({"status": "queued", "file_id": filestore.save(data, name), "pending_job_ids": list(job_ids)})
     resumes.insert_one(doc)
     worker.enqueue("parse", rid, None, batch["batch_id"])
     return {"filename": name, "status": "queued", "resume_id": str(rid)}
@@ -1258,40 +1253,54 @@ def resume_detail(resume_id: str, _: str = Depends(require_access)):
 def download_original(resume_id: str, inline: bool = False, _: str = Depends(require_access)):
     """The CV exactly as uploaded. inline=true lets the browser display it (PDF) instead of saving it."""
     r = _get_resume(resume_id)
-    path = r.get("file_path")
-    if not path or not os.path.exists(path):
+    try:
+        data = filestore.read(r)
+    except FileNotFoundError:
         raise HTTPException(404, "Original file is not available")
     name = r.get("filename") or "resume"
-    return FileResponse(path, filename=name, media_type=mimetypes.guess_type(name)[0] or "application/octet-stream",
-                        content_disposition_type="inline" if inline else "attachment")
+    return Response(data, media_type=mimetypes.guess_type(name)[0] or "application/octet-stream",
+                    headers={"Content-Disposition": _content_disposition(name, inline)})
+
+
+def _content_disposition(name: str, inline: bool) -> str:
+    from urllib.parse import quote
+    ascii_name = name.encode("ascii", "ignore").decode().replace('"', "") or "resume"
+    return f"{'inline' if inline else 'attachment'}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"
 
 
 @router.get("/resumes/{resume_id}/preview")
 def preview_original(resume_id: str, _: str = Depends(require_access)):
     """The CV as a PDF the browser can display — PDFs as-is, Word/PowerPoint/RTF converted (and cached)."""
     r = _get_resume(resume_id)
-    path = r.get("file_path")
-    if not path or not os.path.exists(path):
-        raise HTTPException(404, "Original file is not available")
     try:
-        pdf_path = preview.preview_pdf_path(path)
+        data = filestore.read(r)
+    except FileNotFoundError:
+        raise HTTPException(404, "Original file is not available")
+    pdf_name = os.path.splitext(r.get("filename") or "resume")[0] + ".pdf"
+    headers = {"Content-Disposition": _content_disposition(pdf_name, True)}
+    if sniff_kind(data) == "pdf":
+        return Response(data, media_type="application/pdf", headers=headers)
+    try:                                           # converted once, then cached in the database
+        if r.get("preview_file_id"):
+            return Response(filestore._fs.get(r["preview_file_id"]).read(), media_type="application/pdf", headers=headers)
+    except Exception:
+        pass
+    try:
+        pdf = preview.to_pdf_bytes(data)
     except preview.PreviewError as exc:
         raise HTTPException(503, f"Preview unavailable: {exc}")
-    return FileResponse(pdf_path, media_type="application/pdf", content_disposition_type="inline",
-                        filename=os.path.splitext(r.get("filename") or "resume")[0] + ".pdf")
+    try:
+        resumes.update_one({"_id": r["_id"]}, {"$set": {"preview_file_id": filestore.save(pdf, pdf_name)}})
+    except Exception:
+        log.exception("could not cache preview for %s", resume_id)
+    return Response(pdf, media_type="application/pdf", headers=headers)
 
 
 def _delete_resume_doc(r: dict) -> None:
     """Remove one resume everywhere it lives: stored file, scores (job + cached AI Rank), queued
     tasks, and any duplicate links pointing at it."""
     rid = str(r["_id"])
-    if r.get("file_path"):
-        try:
-            os.remove(r["file_path"])
-            if os.path.exists(r["file_path"] + ".preview.pdf"):
-                os.remove(r["file_path"] + ".preview.pdf")
-        except OSError:
-            pass
+    filestore.delete(r)
     scores.delete_many({"resume_id": rid})
     adhoc_scores.delete_many({"resume_id": rid})
     tasks.delete_many({"resume_id": rid, "status": "queued"})
@@ -1328,7 +1337,7 @@ def bulk_delete_resumes(body: BulkDeleteIn, user: str = Depends(require_access))
 def reparse(resume_id: str, _: str = Depends(require_access)):
     r = _get_resume(resume_id)
     _require_ai()
-    if not r.get("file_path"):
+    if not filestore.has_file(r):
         raise HTTPException(409, "This entry has no stored file to re-read")
     jids = [s["job_id"] for s in scores.find({"resume_id": resume_id}, {"job_id": 1})]
     resumes.update_one({"_id": r["_id"]}, {"$set": {"status": "queued", "error": None, "pending_job_ids": jids},

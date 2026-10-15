@@ -27,6 +27,7 @@ from backend.resume_ranker import config, llm
 from backend.resume_ranker.db import jobs, resumes, scores, tasks
 from backend.resume_ranker.duplicates import apply_duplicate_flags, name_key
 from backend.resume_ranker.embeddings import embed_resume
+from backend.resume_ranker import filestore
 from backend.resume_ranker.extract import ExtractionError, extract_text
 from backend.resume_ranker.parser import general_score, parse_resume, phone_key, skill_key, EDU_RANKS
 from backend.resume_ranker.scoring import criteria_signature, score_resume
@@ -125,12 +126,11 @@ def _handle_parse(task: dict) -> None:
     text = resume.get("text")
     if not text:
         try:
-            with open(resume["file_path"], "rb") as fh:
-                text = extract_text(fh.read(), resume.get("filename", ""))
+            text = extract_text(filestore.read(resume), resume.get("filename", ""))
         except ExtractionError as exc:
             return fail(str(exc))
-        except OSError:
-            return fail("Stored file is missing on the server")
+        except (OSError, FileNotFoundError):
+            return fail("Stored file is missing — please upload this CV again")
 
     try:
         parsed = parse_resume(text)

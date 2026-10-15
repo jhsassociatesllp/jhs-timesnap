@@ -465,12 +465,13 @@ def test_delete_one_and_bulk_delete_remove_cv_file_and_cached_scores(api, fake_l
     drain()
     rows = api.get("/resume-ranker/resumes").json()["resumes"]
     alice, bob = rows[0], rows[1]
-    path = resumes.find_one({"_id": __import__("bson").ObjectId(alice["id"])})["file_path"]
-    assert os.path.exists(path)
+    from backend.resume_ranker import filestore
+    stored = resumes.find_one({"_id": __import__("bson").ObjectId(alice["id"])})
+    assert stored.get("file_id") and filestore.has_file(stored)       # CV bytes live in the database
     adhoc_scores.insert_one({"_id": "sig_" + alice["id"], "resume_id": alice["id"], "score": {"total": 50}})
 
     assert api.delete(f"/resume-ranker/resumes/{alice['id']}").json() == {"success": True}
-    assert not os.path.exists(path)                                    # stored CV file removed
+    assert not filestore.has_file(stored)                              # stored CV file removed
     assert adhoc_scores.count_documents({"resume_id": alice["id"]}) == 0
     assert api.get(f"/resume-ranker/resumes/{alice['id']}").status_code == 404
     assert api.delete(f"/resume-ranker/resumes/{alice['id']}").status_code == 404
