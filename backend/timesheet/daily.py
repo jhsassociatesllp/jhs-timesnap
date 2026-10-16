@@ -191,6 +191,7 @@ def _day_payload(emp: str, d: date, cfg: dict) -> dict:
             "is_leave": is_leave},
         "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
         "allocation_assumed_100": True,
+        "tolerance": cfg["tolerance"],
         "entries": [_entry_view(e) for e in entries],
         "totals": _totals(entries, net, cfg["tolerance"]),
         "submitted": bool(sub), "submitted_at": sub.get("submitted_at") if sub else None,

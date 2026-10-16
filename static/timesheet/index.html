@@ -35,6 +35,9 @@
         <a href="#" id="rejectedBtn" class="manager-only" onclick="showSection('rejected')">
           <i class="fas fa-times-circle"></i> Rejected
         </a>
+        <a href="/static/timesheet/daily.html" id="dailyBtn" style="display:none">
+          <i class="fas fa-list-check"></i> Daily timesheet (pilot)
+        </a>
         <a href="#" id="calendarBtn" onclick="openLdCalendar(); return false;">
           <i class="fas fa-calendar-days"></i> Calendar
         </a>
@@ -281,6 +284,18 @@
     <!-- Timesheet-specific script -->
     <script src="/static/timesheet/script.js"></script>
     <script src="/static/timesheet/calendar-modal.js"></script>
+    <script>
+      // Show the pilot "Daily timesheet" link only to employees it is enabled for.
+      (async () => {
+        try {
+          const id = (localStorage.getItem("loggedInEmployeeId") || "").trim().toUpperCase();
+          const t = localStorage.getItem("access_token") || localStorage.getItem("token");
+          if (!id || !t) return;
+          const r = await fetch(`/timesheet/v2/enabled/${id}`, { headers: { Authorization: `Bearer ${t}` } });
+          if (r.ok && (await r.json()).enabled) document.getElementById("dailyBtn").style.display = "block";
+        } catch (_) { /* link stays hidden */ }
+      })();
+    </script>
       <script src="/static/chatbot/chat-core.js"></script>
       <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
