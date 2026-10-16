@@ -1,0 +1,31 @@
+# Local development only. Usage: docker compose -f docker-compose.dev.yml up -d
+# Never point the app at production NQ / Mongo while developing.
+services:
+  nq_mysql:
+    image: mysql:8.0
+    container_name: timesnap_dev_nq_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_root_pass
+      MYSQL_DATABASE: jhsdb
+    ports:
+      - "${NQ_DEV_MYSQL_PORT:-3308}:3306"
+    volumes:
+      - ./docs/nq_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./docs/nq_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./docker/nq-init/03_users.sql:/docker-entrypoint-initdb.d/03_users.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pdev_root_pass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    container_name: timesnap_dev_mongo
+    ports:
+      - "${MONGO_DEV_PORT:-27018}:27017"
+    volumes:
+      - timesnap_dev_mongo_data:/data/db
+
+volumes:
+  timesnap_dev_mongo_data:
