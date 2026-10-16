@@ -278,8 +278,10 @@ def _build_entry_docs(emp: str, d: date, body: DayIn, cfg: dict) -> List[dict]:
 
 
 def _assert_not_locked(emp: str, d: date) -> None:
-    if store.entries.find_one({"employee_id": emp, "date": d.isoformat(), "locked": True}):
-        raise HTTPException(409, "This day is locked and can no longer be edited")
+    """A day is read-only once its cycle is locked OR a manager has approved any entry."""
+    if store.entries.find_one({"employee_id": emp, "date": d.isoformat(),
+                               "$or": [{"locked": True}, {"approved": True}]}):
+        raise HTTPException(409, "This day is locked or approved and can no longer be edited")
 
 
 # ─────────────────────────────── routes ──────────────────────────────────────
@@ -309,12 +311,15 @@ def save_day(employee_id: str, date: str, body: DayIn, current_user: str = Depen
     _assert_not_locked(emp, d)
     docs = _build_entry_docs(emp, d, body, cfg)
     iso = d.isoformat()
-    old = store.entries.find_one({"employee_id": emp, "date": iso}, {"created_at": 1}, sort=[("created_at", 1)])
-    if old and old.get("created_at"):
+    old_docs = list(store.entries.find({"employee_id": emp, "date": iso}, {"created_at": 1}))
+    created = min((o["created_at"] for o in old_docs if o.get("created_at")), default=None)
+    if created:
         for doc in docs:
-            doc["created_at"] = old["created_at"]
-    store.entries.delete_many({"employee_id": emp, "date": iso})
+            doc["created_at"] = created
+    # Insert the new rows BEFORE removing the old ones: a failed insert can then never
+    # leave the day empty (data loss). The old rows are removed by _id afterwards.
     store.entries.insert_many(docs)
+    store.entries.delete_many({"_id": {"$in": [o["_id"] for o in old_docs]}})
     store.submissions.delete_one({"employee_id": emp, "date": iso})
     return _day_payload(emp, d, cfg)
 

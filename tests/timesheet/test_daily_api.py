@@ -206,6 +206,21 @@ def test_locked_day_is_read_only(api):
     assert api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()["locked"] is True
 
 
+def test_manager_approved_day_is_read_only(api):
+    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
+    api.db["t_entries"].update_many({"employee_id": "JHS9101"}, {"$set": {"approved": True}})
+    assert put(api, "JHS9101", DAY, [e(1, 1), e(2, 1)]).status_code == 409
+    assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 2    # nothing was deleted
+
+
+def test_failed_save_never_empties_the_day(api, monkeypatch):
+    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
+    monkeypatch.setattr(daily.store.entries, "insert_many", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db down")))
+    with pytest.raises(RuntimeError):
+        put(api, "JHS9101", DAY, [e(1, 2), e(2, 2)])
+    assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 2
+
+
 # ── NQ outage ────────────────────────────────────────────────────────────────
 
 def test_nq_down_page_still_loads_and_planned_save_is_503(api):
