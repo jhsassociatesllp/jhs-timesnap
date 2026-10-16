@@ -80,6 +80,7 @@ from backend.buddy_referral.router     import router as buddy_referral_router   
 from backend.access_manager.router     import router as access_manager_router       # ← Control-panel access manager
 from backend.compliance_calendar.router import router as compliance_calendar_router  # ← Compliance Calendar
 from backend.nq.health import router as nq_health_router  # ← NQ health (/api/health/nq)
+from backend.timesheet.daily import router as timesheet_daily_router  # ← hours-only daily timesheet (pilot)
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -129,6 +130,7 @@ app.include_router(buddy_referral_router)  # prefix: /buddy-referral
 app.include_router(access_manager_router)  # prefix: /access-manager
 app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
 app.include_router(nq_health_router)  # prefix: /api/health
+app.include_router(timesheet_daily_router)  # prefix: /timesheet/v2
 from backend.access_manager.router import seed_compliance_admin
 seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 

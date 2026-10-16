@@ -100,3 +100,17 @@ payroll_cycles_collection     = db["payroll_cycles"]
 # Entries are flat (no week grouping) — see backend/timesheet/router.py's
 # module docstring for the full shape and the read-side backward-compat note.
 timesheet_temp_collection     = db["Timesheet_temp"]
+
+# ── project-tracking collections (daily hours-only timesheet) ─────────────────
+# timesheet_entries: ONE document per entry line (not nested). Fields: employee_id,
+#   date (YYYY-MM-DD), task_id, project_code, client, project (copied from NQ),
+#   activity, hours, task_status, is_unplanned, unplanned_reason, cycle_id,
+#   approved, locked, created_at, updated_at (+ task_name, awaiting_hrms).
+# day_submissions: employee_id, date, submitted_at, reco_reason, cycle_id.
+# hrms_attendance: filled by the HRMS upload (Phase 3); read-only here.
+# config: {_id: "timesheet", standard_hours, lunch_hours, tolerance,
+#          pilot_employees: [...], holidays: ["YYYY-MM-DD", ...]}.
+timesheet_entries_collection  = db["timesheet_entries"]
+day_submissions_collection    = db["day_submissions"]
+hrms_attendance_collection    = db["hrms_attendance"]
+config_collection             = db["config"]
