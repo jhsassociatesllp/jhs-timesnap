@@ -160,16 +160,17 @@ def test_reco_outcomes_and_one_task_autofill(api):
 
 def test_reupload_is_idempotent(api):
     seed_entries(api)
-    upload(api, "/hrms/upload/commit")
+    same_file = sample.build_bytes()          # build once: workbooks embed a timestamp, so rebuilding changes the hash
+    upload(api, "/hrms/upload/commit", same_file)
     snap = lambda: (api.db["h_hrms"].count_documents({}), api.db["h_reco"].count_documents({}),
                     api.db["h_entries"].count_documents({}), results(api),
                     sorted(e["hours"] for e in api.db["h_entries"].find()))
     first = snap()
-    r = upload(api, "/hrms/upload/commit").json()
+    r = upload(api, "/hrms/upload/commit", same_file).json()
     assert r["rows_new"] == 0 and r["rows_existing"] == 15 and r["autofilled_entries"] == 0
     assert snap() == first
     assert api.db["h_uploads"].count_documents({}) == 2           # each import is still logged
-    assert upload(api, "/hrms/upload/preview").json()["already_imported"] is True
+    assert upload(api, "/hrms/upload/preview", same_file).json()["already_imported"] is True
 
 
 def test_corrected_reupload_updates_values_and_reco(api):
