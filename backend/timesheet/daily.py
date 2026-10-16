@@ -25,6 +25,7 @@ from backend.database import (
     hrms_attendance_collection,
     timesheet_entries_collection,
 )
+from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
@@ -192,6 +193,7 @@ def _day_payload(emp: str, d: date, cfg: dict) -> dict:
         "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
         "allocation_assumed_100": True,
         "tolerance": cfg["tolerance"],
+        "reco": hrms_reco.reco_for_day(emp, d.isoformat()),   # HRMS reco outcome + manager note
         "entries": [_entry_view(e) for e in entries],
         "totals": _totals(entries, net, cfg["tolerance"]),
         "submitted": bool(sub), "submitted_at": sub.get("submitted_at") if sub else None,
@@ -321,6 +323,7 @@ def save_day(employee_id: str, date: str, body: DayIn, current_user: str = Depen
     store.entries.insert_many(docs)
     store.entries.delete_many({"_id": {"$in": [o["_id"] for o in old_docs]}})
     store.submissions.delete_one({"employee_id": emp, "date": iso})
+    hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)
 
 
@@ -352,4 +355,5 @@ def submit_day(employee_id: str, date: str, body: SubmitIn, current_user: str = 
                   "reco_reason": reason, "cycle_id": rules.cycle_for(d).id}},
         upsert=True,
     )
+    hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)

@@ -17,6 +17,7 @@ DEFAULT_STATUS_CODES: Dict[str, str] = {
 }
 OFF_KINDS = {"weekly_off", "holiday", "leave"}
 
+FLAGGED_RESULTS = {"short", "over", "no_punch", "not_filled"}
 RESULTS = ("matched", "short", "over", "no_punch", "not_filled", "leave")
 
 

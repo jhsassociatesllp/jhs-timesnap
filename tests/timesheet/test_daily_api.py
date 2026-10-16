@@ -17,6 +17,7 @@ from pymongo import MongoClient
 
 from backend.auth import get_current_user
 from backend.nq import cache, repository
+from backend.hrms import reco as hrms_reco
 from backend.timesheet import daily
 from tests.nq.conftest import DEV_PORT, dev_settings
 
@@ -49,6 +50,10 @@ def api(monkeypatch):
     monkeypatch.setattr(daily.store, "hrms", db["t_hrms"])
     monkeypatch.setattr(daily.store, "config", db["t_config"])
     monkeypatch.setattr(daily.store, "employees", db["t_employees"])
+    for attr, coll in (("entries", "t_entries"), ("submissions", "t_submissions"), ("hrms", "t_hrms"),
+                       ("config", "t_config"), ("employees", "t_employees"), ("reco", "t_reco")):
+        monkeypatch.setattr(hrms_reco.store, attr, db[coll])
+    db["t_reco"].drop()
     db["t_config"].insert_one({"_id": "timesheet",
                                "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
                                "holidays": ["2026-10-02"]})
