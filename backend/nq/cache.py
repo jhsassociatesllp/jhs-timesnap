@@ -9,6 +9,7 @@ from backend.nq.models import NQUnavailable
 _lock = threading.Lock()
 _store: dict = {}                       # key -> (stored_at, value)
 _state = {"stale_at": None}             # last time stale data was served
+MAX_ENTRIES = 5000                      # bound memory; oldest entries are dropped first
 
 
 def cached(key, ttl: int, loader: Callable, clock: Callable[[], float] = time.monotonic):
@@ -28,6 +29,8 @@ def cached(key, ttl: int, loader: Callable, clock: Callable[[], float] = time.mo
         raise
     with _lock:
         _store[key] = (now, value)
+        while len(_store) > MAX_ENTRIES:
+            _store.pop(next(iter(_store)))
     return value
 
 

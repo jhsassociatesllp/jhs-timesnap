@@ -8,7 +8,7 @@ services:
       MYSQL_ROOT_PASSWORD: dev_root_pass
       MYSQL_DATABASE: jhsdb
     ports:
-      - "${NQ_DEV_MYSQL_PORT:-3308}:3306"
+      - "127.0.0.1:${NQ_DEV_MYSQL_PORT:-3308}:3306"
     volumes:
       - ./docs/nq_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./docs/nq_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
@@ -23,7 +23,7 @@ services:
     image: mongo:7
     container_name: timesnap_dev_mongo
     ports:
-      - "${MONGO_DEV_PORT:-27018}:27017"
+      - "127.0.0.1:${MONGO_DEV_PORT:-27018}:27017"
     volumes:
       - timesnap_dev_mongo_data:/data/db
 
