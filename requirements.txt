@@ -42,3 +42,10 @@ pandas==2.2.2
 # HR chatbot — hybrid (keyword + semantic) retrieval
 rank-bm25==0.2.2
 
+
+# Project tracking: Nexus Quant read access
+PyMySQL>=1.1.1
+DBUtils>=3.1.0
+
+# Tests
+pytest
