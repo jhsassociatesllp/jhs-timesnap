@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Hours Reconciliation — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/daily.css" />
+  </head>
+  <body>
+    <div class="navbar">
+      <div class="nav-menu active" style="position:static;display:flex;gap:1rem;width:auto;background:none;box-shadow:none;">
+        <a href="/timesheet" style="padding:.4rem 1rem"><i class="fas fa-arrow-left"></i> Timesheet</a>
+        <a href="/static/timesheet/hrms.html" id="uploadLink" style="padding:.4rem 1rem;display:none"><i class="fas fa-upload"></i> HRMS upload</a>
+      </div>
+    </div>
+    <div class="container">
+      <div class="header"><h1><i class="fas fa-scale-balanced"></i> HOURS RECONCILIATION</h1></div>
+      <div id="msg" class="dt-banner"></div>
+
+      <div class="dt-card">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
+          <div><label class="dt-muted" for="from">From</label><br /><input type="date" id="from" /></div>
+          <div><label class="dt-muted" for="to">To</label><br /><input type="date" id="to" /></div>
+          <div id="teamWrap" style="display:none"><label class="dt-muted" for="team">Team (manager code)</label><br />
+            <input type="text" id="team" placeholder="all teams" maxlength="20" /></div>
+          <button class="dt-btn" id="go" type="button">Show</button>
+        </div>
+        <div id="lastUpload" class="dt-muted" style="margin-top:.8rem"></div>
+        <div id="awaiting" class="dt-muted"></div>
+      </div>
+
+      <div class="dt-card"><div class="dt-strip" id="summary"></div></div>
+
+      <div class="dt-card">
+        <div class="table-responsive">
+          <table class="dt-grid">
+            <thead><tr><th>Date</th><th>Employee</th><th>HRMS net</th><th>Timesheet</th><th>Diff</th><th>Result</th><th>Employee's reason</th><th>Review</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script src="/static/timesheet/reco.js"></script>
+  </body>
+</html>

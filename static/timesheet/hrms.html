@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>HRMS Upload — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/daily.css" />
+  </head>
+  <body>
+    <div class="navbar">
+      <div class="nav-menu active" style="position:static;display:flex;gap:1rem;width:auto;background:none;box-shadow:none;">
+        <a href="/timesheet" style="padding:.4rem 1rem"><i class="fas fa-arrow-left"></i> Timesheet</a>
+        <a href="/static/timesheet/reco.html" style="padding:.4rem 1rem"><i class="fas fa-scale-balanced"></i> Reconciliation</a>
+      </div>
+    </div>
+    <div class="container">
+      <div class="header"><h1><i class="fas fa-fingerprint"></i> HRMS ATTENDANCE UPLOAD</h1></div>
+      <div id="msg" class="dt-banner"></div>
+
+      <div class="dt-card">
+        <h3>Status</h3>
+        <div id="status" class="dt-muted">Loading…</div>
+        <div id="awaiting" class="dt-muted" style="margin-top:.4rem"></div>
+      </div>
+
+      <div class="dt-card">
+        <h3>1. Choose file (.xlsx or .csv, max 10 MB)</h3>
+        <input type="file" id="file" accept=".xlsx,.csv" />
+        <div class="dt-actions"><button class="dt-btn" id="previewBtn" type="button">Preview</button></div>
+      </div>
+
+      <div class="dt-card" id="previewCard" style="display:none">
+        <h3>2. Preview</h3>
+        <div class="dt-strip" id="previewStats"></div>
+        <div id="warnings" class="dt-banner warn" style="display:none"></div>
+        <div id="errorsWrap" style="display:none">
+          <h3 style="margin-top:1rem">Row errors (these rows are skipped)</h3>
+          <table class="dt-grid"><thead><tr><th>Row</th><th>Problem</th></tr></thead><tbody id="errorsBody"></tbody></table>
+        </div>
+        <div class="dt-actions"><button class="dt-btn go" id="importBtn" type="button">Import valid rows</button></div>
+      </div>
+
+      <div class="dt-card">
+        <h3>Upload history</h3>
+        <table class="dt-grid">
+          <thead><tr><th>When</th><th>File</th><th>By</th><th>Dates</th><th>Imported</th><th>Errors</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+    </div>
+    <script src="/static/timesheet/hrms.js"></script>
+  </body>
+</html>

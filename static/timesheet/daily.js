@@ -200,6 +200,9 @@
     const t = document.createElement("span"); t.className = "dt-tag";
     t.textContent = p.locked ? "Locked" : p.submitted ? "Submitted" : "Not submitted";
     tag.append(t);
+    const rc = p.reco;
+    if (rc && rc.status === "sent_back") banner("Your manager sent this day back: " + (rc.manager_note || "please review your hours"), "err");
+    else if (rc && rc.status === "accepted") banner("Your manager accepted the hours for this day.", "ok");
     renderHrms(p.hrms);
     renderTasks(p.tasks);
     $("entryBody").textContent = "";
