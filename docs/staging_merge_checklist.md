@@ -5,21 +5,24 @@ Branch facts (at review time): 25 commits, 4 existing files modified (`main.py`,
 Python 3.10. A dry-run merge into `origin/staging` is clean (no textual conflicts; `main.py` was edited on both sides
 and merged automatically). The legacy timesheet router, admin module and `.github/` workflow are untouched.
 
-## 0. BLOCKERS - do these BEFORE the first `git push` of this branch
+## 0. Before the first `git push` of this branch (public repository)
 
 The GitHub repository is **PUBLIC**. Anything pushed is world-readable and permanent in history.
 
-- [ ] **`docs/nq_schema.sql` is the real Nexus Quant database structure** (table names and every column,
-      including the credential columns of `tbl_user`). It is in commit `fd810c6`. Do not push it.
-      Options: (a) rewrite the unpushed branch history to drop it and commit a **sanitized** schema (only tables /
-      columns the app reads; no credential columns) or (b) keep the real dump out of git and generate it per developer.
-      A new commit that deletes the file is NOT enough - it would stay in history.
-- [ ] **`CLAUDE.md` and `PROMPTS.md` are untracked.** `CLAUDE.md` names internal servers, the tunnel and MySQL user
-      roles. Do not commit them to a public repo (add to `.git/info/exclude`), or publish a trimmed copy.
-- [ ] Confirm no real secrets are in the diff: `git diff main..HEAD | grep -i -E "password|secret|key"` should only show
-      dummy dev values (`dev_ro_pass`, ...) and `${{ secrets.X }}` references. (Reviewed: clean.)
-- [ ] The local `.env` holds a pasted private SSH key. Replace it with a key FILE path and rotate that key if it was ever
-      shared. `.env` is git-ignored (verified) but keep it that way.
+- [x] **Real NQ schema removed.** The branch history was rewritten so the real Nexus Quant database dump is in no
+      commit; `docs/nq_schema.sql` is now a REDUCED schema (6 tables, only the columns Timesnap reads, no credential
+      columns) used for local Docker tests. Keep the real dump out of git (keep a copy outside the repo or in the
+      git-ignored `docs/nq_schema.real.sql`).
+- [ ] **Delete the local safety net before pushing.** The rewrite left the old commits reachable through the branch
+      `backup/pre-rewrite-project-tracking` and `refs/original/*`. They still contain the real dump. Remove them, then
+      purge: `git branch -D backup/pre-rewrite-project-tracking`,
+      `git for-each-ref --format="%(refname)" refs/original/ | xargs -n1 git update-ref -d`,
+      `git reflog expire --expire=now --all && git gc --prune=now`. Never use `git push --all` / `--mirror` before this.
+- [x] `CLAUDE.md`, `PROMPTS.md` and `docs/nq_schema.real.sql` are excluded locally through `.git/info/exclude` (they name
+      internal servers / hold the real structure). Do not commit them to a public repo.
+- [x] No real secrets in the diff (dummy dev values and `${{ secrets.X }}` references only).
+- [ ] The local `.env` holds a pasted private SSH key. Replace it with a key FILE path and rotate that key if it was
+      ever shared. `.env` is git-ignored (verified).
 
 ## 1. Before merging into staging
 
