@@ -47,6 +47,17 @@ def test_tasks_for_project_excludes_deleted_tasks_and_projects(nq_db):
     assert nq_db.get_tasks_for_project("NOPE'; DROP TABLE tbl_projects;--") == []
 
 
+def test_bulk_reads_for_the_nightly_job(nq_db):
+    projects = nq_db.list_active_projects()
+    assert [p.project_code for p in projects] == ["PL-T001", "PL-T002", "PL-T003", "PL-T006"]   # not deleted / closed
+    tasks = nq_db.list_tasks_of_active_projects()
+    assert _ids(tasks) == [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 13, 14]     # 8 (deleted), 12 (deleted project), 15 (closed project) excluded
+    assert {t.project_code for t in tasks} == {"PL-T001", "PL-T002", "PL-T003", "PL-T006"}
+    users = {u.emp_id: u for u in nq_db.list_users()}
+    assert "JHS9101" in users and "JHS9199" not in users              # deleted user excluded
+    assert all(not hasattr(u, "password") for u in users.values())
+
+
 def test_get_task_and_project(nq_db):
     assert nq_db.get_task(1).name == "Planning and scoping"
     assert nq_db.get_task(8) is None          # soft-deleted

@@ -207,6 +207,32 @@ def list_projects_for_manager(manager_emp_id: str) -> List[NQProject]:
     return _cached(("projects_for_manager", manager_emp_id), load)
 
 
+# ── bulk reads for the nightly metrics job (no cache: the job wants current data) ──────────
+
+def list_active_projects() -> List[NQProject]:
+    """Every live project whose status is 'active' (project_status = '1')."""
+    rows = _run(
+        "SELECT id, project_id, project_name, client_name, project_manager, project_partner, "
+        "project_status, start_date, end_date FROM tbl_projects "
+        "WHERE is_deleted = '0' AND project_status = '1' ORDER BY project_id")
+    return [project_from_row(r) for r in rows]
+
+
+def list_tasks_of_active_projects() -> List[NQTask]:
+    """All live tasks of all active projects in ONE query (instead of one query per project)."""
+    rows = _run(
+        f"SELECT {_TASK_COLS} {_TASK_FROM} "
+        "WHERE t.is_deleted = '0' AND p.project_status = '1' ORDER BY p.project_id, t.id")
+    return [task_from_row(r) for r in rows]
+
+
+def list_users() -> List[NQUser]:
+    """Live NQ users (id, emp_id, name, reporting_to only - never credential columns)."""
+    rows = _run("SELECT id, emp_id, name, reporting_to FROM tbl_user "
+                "WHERE is_deleted = '0' AND emp_id IS NOT NULL AND emp_id <> ''")
+    return [NQUser(**r) for r in rows]
+
+
 def get_assignments_for_project(project_code: str) -> List[NQAssignment]:
     """One row per (task, assignee) for a project's live tasks."""
     def load():

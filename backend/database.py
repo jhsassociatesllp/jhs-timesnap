@@ -123,3 +123,12 @@ cycle_reviews_collection      = db["cycle_reviews"]
 email_log_collection          = db["email_log"]
 # job_runs: one row per scheduled job per day so only one process ever runs it.
 job_runs_collection           = db["job_runs"]
+# Pre-aggregated data for the dashboards (built nightly by backend/metrics/job.py):
+#   hours_daily   : (date, employee_id, project_code, source new|legacy) -> hours
+#   project_metrics: one snapshot per active NQ project per day (hours, % done, RAG, forecast...)
+#   dashboard_daily: per (date, manager) compliance / unplanned / reco counts
+#   team_snapshot : per (date, employee) 10-day load and missing-days streak
+hours_daily_collection        = db["hours_daily"]
+project_metrics_collection    = db["project_metrics"]
+dashboard_daily_collection    = db["dashboard_daily"]
+team_snapshot_collection      = db["team_snapshot"]

@@ -2,6 +2,7 @@
 """
 Standalone scheduler process:  python -m backend.jobs.scheduler
   * 20:00 IST every working day -> manager digest (one email per manager)
+  * 02:00 IST every day         -> nightly metrics job (hours_daily, project_metrics, dashboards)
 A (job, date) row in job_runs with a unique index guarantees a job runs at most once per day
 even if two scheduler processes are started; the digest itself is also idempotent (email_log).
 Dry run / manual run:  python -m backend.jobs.scheduler --run-now --date 2026-10-14 --dry-run-dir out
@@ -9,7 +10,7 @@ Dry run / manual run:  python -m backend.jobs.scheduler --run-now --date 2026-10
 import argparse
 import logging
 import time
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timedelta
 from typing import Callable, Optional
 
 import pytz
@@ -21,23 +22,29 @@ from backend.cycle.store import store
 log = logging.getLogger("scheduler")
 IST = pytz.timezone("Asia/Kolkata")
 DIGEST_TIME = dtime(20, 0)
+METRICS_TIME = dtime(2, 0)
+METRICS_RETRY_MINUTES = 10          # a failed metrics run (e.g. NQ down) is retried at most this often
 
 
 def _now() -> datetime:
     return datetime.now(IST)
 
 
-def claim_run(job: str, day: date) -> bool:
-    """True for exactly one caller per (job, day)."""
+def claim_run(job: str, day: date, retry_after_minutes: int = 0) -> bool:
+    """True for exactly one caller per (job, day). A FAILED run may be claimed again once
+    retry_after_minutes have passed since it last started."""
     digest.ensure_indexes()
     try:
-        store.job_runs.insert_one({"job": job, "date": day.isoformat(), "started_at": datetime.utcnow(),
-                                   "status": "running"})
+        now = datetime.utcnow()
+        store.job_runs.insert_one({"job": job, "date": day.isoformat(), "started_at": now,
+                                   "last_attempt_at": now, "status": "running"})
         return True
     except DuplicateKeyError:
         # a run that FAILED earlier today may be retried by the next tick
-        res = store.job_runs.update_one({"job": job, "date": day.isoformat(), "status": "failed"},
-                                        {"$set": {"status": "running", "retried_at": datetime.utcnow()}})
+        cutoff = datetime.utcnow() - timedelta(minutes=retry_after_minutes)
+        res = store.job_runs.update_one(
+            {"job": job, "date": day.isoformat(), "status": "failed", "last_attempt_at": {"$lte": cutoff}},
+            {"$set": {"status": "running", "last_attempt_at": datetime.utcnow()}})
         return res.modified_count == 1
 
 
@@ -62,6 +69,28 @@ def run_due_jobs(now: Optional[datetime] = None, digest_fn: Callable = None) -> 
         raise
 
 
+def run_metrics_if_due(now: Optional[datetime] = None, metrics_fn: Callable = None) -> Optional[dict]:
+    """Run the nightly metrics job once per day from 02:00 IST (retried every 10 min while it fails)."""
+    now = now or _now()
+    if now.time() < METRICS_TIME:
+        return None
+    day = now.date()
+    if not claim_run("metrics", day, retry_after_minutes=METRICS_RETRY_MINUTES):
+        return None
+    try:
+        from backend.metrics import job as metrics_job
+        fn = metrics_fn or (lambda d: metrics_job.run(d, backfill_days=metrics_job.default_backfill()))
+        stats = fn(day)
+        store.job_runs.update_one({"job": "metrics", "date": day.isoformat()},
+                                  {"$set": {"status": "done", "finished_at": datetime.utcnow(), "results": stats}})
+        return stats
+    except Exception:
+        log.exception("metrics job failed")
+        store.job_runs.update_one({"job": "metrics", "date": day.isoformat()},
+                                  {"$set": {"status": "failed", "failed_at": datetime.utcnow()}})
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-now", action="store_true", help="build the digest for --date immediately and exit")
@@ -76,6 +105,10 @@ def main() -> int:
         return 0
     log.info("scheduler started (digest at %s IST)", DIGEST_TIME)
     while True:
+        try:
+            run_metrics_if_due()
+        except Exception:
+            log.exception("metrics tick failed")
         try:
             run_due_jobs()
         except Exception:
