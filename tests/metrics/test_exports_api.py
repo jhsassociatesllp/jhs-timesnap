@@ -136,6 +136,13 @@ def test_range_validation_and_row_cap(api, monkeypatch):
     assert api.get("/exports/project-hours?from=2026-10-01&to=2026-10-31").status_code == 413
 
 
+def test_export_refuses_to_read_an_enormous_source(api, monkeypatch):
+    monkeypatch.setattr(ex, "MAX_SOURCE_ROWS", 3)                      # the fixture holds 6 hours rows
+    for path in ("project-hours", "client-allocation", "employee-projects"):
+        assert api.get(f"/exports/{path}?{RANGE}").status_code == 413
+    assert api.db["m_audit"].count_documents({}) == 0
+
+
 def test_every_export_is_audited(api):
     api.get("/exports/project-hours?from=2026-10-01&to=2026-10-31")
     _user["id"] = "JHS9000"

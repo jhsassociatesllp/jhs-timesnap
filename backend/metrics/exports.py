@@ -27,6 +27,7 @@ from backend.metrics.store import mstore
 router = APIRouter(prefix="/exports", tags=["Exports"])
 MAX_RANGE_DAYS = 366
 MAX_ROWS = 50_000
+MAX_SOURCE_ROWS = 400_000          # raw hours_daily rows an export may read (bounds memory)
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _DANGEROUS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -59,6 +60,11 @@ def _range(date_from: str, date_to: str) -> Tuple[str, str]:
     return a.isoformat(), b.isoformat()
 
 
+def _check_source(a: str, b: str) -> None:
+    if mstore.hours.count_documents({"date": {"$gte": a, "$lte": b}}) > MAX_SOURCE_ROWS:
+        raise HTTPException(413, "That range holds too much data - choose a shorter date range")
+
+
 def _names(ids) -> Dict[str, str]:
     return {d["EmpID"].strip().upper(): d.get("Emp Name", "") for d in
             store.employees.find({"EmpID": {"$in": list(set(ids))}}, {"EmpID": 1, "Emp Name": 1}) if d.get("EmpID")}
@@ -87,6 +93,7 @@ def project_hours(date_from: str = Query(..., alias="from"), date_to: str = Quer
                   current_user: str = Depends(get_current_user)):
     me = _require_firm(current_user)
     a, b = _range(date_from, date_to)
+    _check_source(a, b)
     acc: Dict[Tuple[str, str], dict] = {}
     for r in mstore.hours.find({"date": {"$gte": a, "$lte": b}}):
         row = acc.setdefault((r["project_code"], r["employee_id"]),
@@ -107,6 +114,7 @@ def client_allocation(date_from: str = Query(..., alias="from"), date_to: str = 
     range (hours are clipped to the range), with each client's % of the employee's cycle total."""
     me = _require_firm(current_user)
     a, b = _range(date_from, date_to)
+    _check_source(a, b)
     cycles = [c for c in mstore.payroll_cycles.find({}) if c.get("start_date") and c.get("end_date")
               and str(c["end_date"])[:10] >= a and str(c["start_date"])[:10] <= b]
     if not cycles:
@@ -138,6 +146,7 @@ def employee_projects(date_from: str = Query(..., alias="from"), date_to: str = 
                       current_user: str = Depends(get_current_user)):
     me = _require_firm(current_user)
     a, b = _range(date_from, date_to)
+    _check_source(a, b)
     acc: Dict[Tuple[str, str], dict] = {}
     for r in mstore.hours.find({"date": {"$gte": a, "$lte": b}}):
         row = acc.setdefault((r["employee_id"], r["project_code"]), {

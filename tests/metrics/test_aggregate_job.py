@@ -64,6 +64,29 @@ def test_incremental_rebuild_only_touches_the_window(mdb):
     assert got[("2026-08-01", "JHS9101", "PL-T001", "new")] == 5.0 and got[("2026-10-12", "JHS9101", "PL-T001", "new")] == 6.0
 
 
+def test_a_suddenly_empty_source_does_not_wipe_stored_hours(mdb):
+    mdb["c_entries"].insert_many([entry("JHS9101", f"2026-09-{d:02d}", 4) for d in range(1, 26)])      # 25 stored rows
+    agg.build_hours_daily()
+    assert mdb["m_hours"].count_documents({}) == 25
+    mdb["c_entries"].delete_many({})                                    # e.g. the job was pointed at the wrong database
+    out = agg.build_hours_daily()
+    assert out["removed"] == 0 and out["delete_skipped"] == 25
+    assert mdb["m_hours"].count_documents({}) == 25                    # history kept
+    mdb["c_entries"].insert_many([entry("JHS9101", f"2026-09-{d:02d}", 4) for d in range(1, 21)])      # a normal change: 5 of 25 vanish
+    assert agg.build_hours_daily()["removed"] == 5
+
+
+def test_empty_nq_result_keeps_the_last_good_snapshots(mdb):
+    day = date(2026, 10, 15)
+    mdb["m_projects"].insert_one({"date": "2026-10-15", "project_code": "PL-A", "rag": "red"})
+    mdb["m_team"].insert_one({"date": "2026-10-15", "employee_id": "JHS9101", "load_pct": 10})
+    mdb["m_daily"].insert_one({"date": "2026-10-15", "manager_id": "JHS9001"})
+    assert agg.save_project_metrics(day, []) == 0 and agg.save_team_snapshot(day, []) == 0
+    assert agg.save_dashboard_daily(day, []) == 0
+    assert mdb["m_projects"].count_documents({}) == 1 and mdb["m_team"].count_documents({}) == 1
+    assert mdb["m_daily"].count_documents({}) == 1
+
+
 # ── project metrics ──────────────────────────────────────────────────────────
 
 def test_job_builds_project_metrics_from_nq_and_hours(mdb, nq_db):

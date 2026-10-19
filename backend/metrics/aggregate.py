@@ -17,6 +17,9 @@ from backend.nq.models import NQTask, NQProject, NQUser
 from backend.timesheet import rag, rules
 from backend.timesheet.legacy_migration import _entries_of
 
+MIN_ROWS_FOR_DELETE_GUARD = 20     # below this a clean-up of stale rows is always allowed
+MAX_STALE_SHARE = 0.5              # never delete more than half of what is stored in one rebuild
+
 CAPACITY_DAYS = 10            # "team load for the next 10 days" = next 10 working days
 FLAGGED_RECO = ("short", "over", "no_punch", "not_filled")
 RECO_RESULTS = ("matched", "short", "over", "no_punch", "not_filled", "leave")
@@ -89,9 +92,15 @@ def build_hours_daily(since: Optional[date] = None) -> Dict[str, int]:
            for (d, emp, code, src), v in acc.items()]
     for i in range(0, len(ops), 2000):
         mstore.hours.bulk_write(ops[i:i + 2000], ordered=False)
-    stale = {"build_id": {"$ne": build_id}}
-    if since_iso:
-        stale["date"] = {"$gte": since_iso}
+    scope = {"date": {"$gte": since_iso}} if since_iso else {}
+    stale = {**scope, "build_id": {"$ne": build_id}}
+    stale_count = mstore.hours.count_documents(stale)
+    total = mstore.hours.count_documents(scope)
+    # Safety valve: if the source suddenly looks (nearly) empty - wrong database, outage, bad config -
+    # keep the stored data instead of wiping history. A genuine large change can be forced with --full
+    # after investigating.
+    if total >= MIN_ROWS_FOR_DELETE_GUARD and stale_count > MAX_STALE_SHARE * total:
+        return {"rows": len(ops), "removed": 0, "delete_skipped": stale_count}
     removed = mstore.hours.delete_many(stale).deleted_count            # rows that no longer exist at the source
     return {"rows": len(ops), "removed": removed}
 
@@ -157,8 +166,8 @@ def save_project_metrics(day: date, docs: List[dict]) -> int:
     if docs:
         mstore.projects.bulk_write([UpdateOne({"project_code": d["project_code"], "date": iso},
                                               {"$set": d}, upsert=True) for d in docs], ordered=False)
-    keep = [d["project_code"] for d in docs]
-    mstore.projects.delete_many({"date": iso, "project_code": {"$nin": keep}})   # closed / deleted since
+    if docs:                      # an empty list means "NQ returned nothing": keep the last good snapshot
+        mstore.projects.delete_many({"date": iso, "project_code": {"$nin": [d["project_code"] for d in docs]}})
     return len(docs)
 
 
@@ -243,7 +252,8 @@ def save_team_snapshot(day: date, docs: List[dict]) -> int:
     if docs:
         mstore.team.bulk_write([UpdateOne({"date": iso, "employee_id": d["employee_id"]}, {"$set": d}, upsert=True)
                                 for d in docs], ordered=False)
-    mstore.team.delete_many({"date": iso, "employee_id": {"$nin": [d["employee_id"] for d in docs]}})
+    if docs:
+        mstore.team.delete_many({"date": iso, "employee_id": {"$nin": [d["employee_id"] for d in docs]}})
     return len(docs)
 
 
@@ -284,5 +294,6 @@ def save_dashboard_daily(d: date, docs: List[dict]) -> int:
     if docs:
         mstore.daily.bulk_write([UpdateOne({"date": iso, "manager_id": x["manager_id"]}, {"$set": x}, upsert=True)
                                  for x in docs], ordered=False)
-    mstore.daily.delete_many({"date": iso, "manager_id": {"$nin": [x["manager_id"] for x in docs]}})
+    if docs:
+        mstore.daily.delete_many({"date": iso, "manager_id": {"$nin": [x["manager_id"] for x in docs]}})
     return len(docs)
