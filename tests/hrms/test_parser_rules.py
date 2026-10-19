@@ -116,6 +116,28 @@ def test_csv_and_tab_separated():
     assert parse_hrms(tsv.encode(), "x.csv").rows[0]["gross_hours"] == 9.0
 
 
+def test_zip_bomb_row_cap_and_code_validation(monkeypatch):
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("xl/big.bin", b"0" * (101 * 1024 * 1024))              # ~100 KB compressed, 101 MB expanded
+    assert len(buf.getvalue()) < 1024 * 1024
+    with pytest.raises(HrmsFileError, match="100 MB"):
+        parse_hrms(buf.getvalue(), "x.xlsx")
+    from backend.hrms import parser
+    monkeypatch.setattr(parser, "MAX_ROWS", 5)
+    many = [("JHS9101", "%02d/10/2026" % d, "PST", "", "", "") for d in range(1, 9)]
+    with pytest.raises(HrmsFileError, match="Too many rows"):
+        parse_hrms(sample.build_bytes(many), "x.xlsx")
+    monkeypatch.undo()
+    odd = [("JHS 9101;$ne", "12/10/2026", "PST", "", "", ""),                  # bad employee code
+           ("JHS9101", "12/10/2026", "P" * 50, "", "", ""),                    # absurd muster code
+           ("JHS9101", "12/10/2026", "PST", "", "", "")]
+    res = parse_hrms(sample.build_bytes(odd), "x.xlsx")
+    assert [e["message"] for e in res.errors] == ["invalid employee code", "invalid Muster code"]
+    assert len(res.rows) == 1                                                   # a rejected row does not block the valid one
+
+
 def test_parse_time_variants():
     assert parse_time("09:58:48 AM") == time(9, 58, 48)
     assert parse_time("6:30 pm") == time(18, 30)

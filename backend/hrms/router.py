@@ -128,13 +128,15 @@ def _awaiting_dates(date_from: date, date_to: date) -> List[str]:
     return out
 
 
-def _last_upload() -> Optional[dict]:
-    u = store.uploads.find_one({}, sort=[("uploaded_at", -1)])
+def _last_upload(admin: bool = True) -> Optional[dict]:
+    """Managers only learn WHEN data was last uploaded and which dates it covers."""
+    u = store.uploads.find_one({"status": {"$ne": "failed"}}, sort=[("uploaded_at", -1)])
     if not u:
         return None
-    return {"file_name": u.get("file_name"), "uploaded_at": u.get("uploaded_at"),
-            "date_from": u.get("date_from"), "date_to": u.get("date_to"),
-            "uploaded_by": u.get("uploaded_by")}
+    out = {"uploaded_at": u.get("uploaded_at"), "date_from": u.get("date_from"), "date_to": u.get("date_to")}
+    if admin:
+        out.update(file_name=u.get("file_name"), uploaded_by=u.get("uploaded_by"))
+    return out
 
 
 def _parse_range(date_from: str, date_to: str):
@@ -182,23 +184,27 @@ def upload_commit(file: UploadFile = File(...), current_user: str = Depends(get_
         "file_name": name, "sha256": hashlib.sha256(content).hexdigest(), "uploaded_by": me,
         "uploaded_at": now, "date_from": res.date_from, "date_to": res.date_to,
         "rows_total": res.total_rows, "rows_imported": len(res.rows), "rows_errors": len(res.errors),
-        "errors": res.errors[:100], "warnings": res.warnings,
+        "errors": res.errors[:100], "warnings": res.warnings, "status": "importing",
     }).inserted_id
 
     ops = [UpdateOne(
         {"employee_id": r["employee_id"], "date": r["date"]},
         {"$set": {**r, "upload_id": str(upload_id), "updated_at": now}, "$setOnInsert": {"created_at": now}},
         upsert=True) for r in res.rows]
-    bulk = store.hrms.bulk_write(ops, ordered=False)
-
-    holidays = _holiday_dates(res.rows)
-    if holidays:
-        store.config.update_one({"_id": reco.CONFIG_ID}, {"$addToSet": {"holidays": {"$each": holidays}}},
-                                upsert=True)
-    outcome = reco.recompute_range(res.date_from, res.date_to)
+    try:
+        bulk = store.hrms.bulk_write(ops, ordered=False)
+        holidays = _holiday_dates(res.rows)
+        if holidays:
+            store.config.update_one({"_id": reco.CONFIG_ID}, {"$addToSet": {"holidays": {"$each": holidays}}},
+                                    upsert=True)
+        outcome = reco.recompute_range(res.date_from, res.date_to)
+    except Exception:
+        # the log must never claim an import that did not finish (re-running the same file is safe)
+        store.uploads.update_one({"_id": upload_id}, {"$set": {"status": "failed"}})
+        raise
     autofilled = outcome.pop("_autofilled", 0)
     store.uploads.update_one({"_id": upload_id}, {"$set": {
-        "holidays_added": holidays, "autofilled_entries": autofilled, "reco_counts": outcome}})
+        "status": "done", "holidays_added": holidays, "autofilled_entries": autofilled, "reco_counts": outcome}})
     return {"upload_id": str(upload_id), "rows_imported": len(res.rows), "rows_new": bulk.upserted_count,
             "rows_existing": len(res.rows) - bulk.upserted_count, "errors": len(res.errors),
             "warnings": res.warnings, "date_from": res.date_from, "date_to": res.date_to,
@@ -243,7 +249,7 @@ def reco_view(date_from: str = Query(..., alias="from"), date_to: str = Query(..
                     "date": r["date"], "hrms_net": r.get("hrms_net"), "timesheet_hours": r.get("timesheet_hours"),
                     "diff": r.get("diff"), "result": r["result"], "reason": r.get("reason", ""),
                     "status": r.get("status", "open"), "manager_note": r.get("manager_note", "")})
-    return {"summary": summary, "rows": out, "last_upload": _last_upload(),
+    return {"summary": summary, "rows": out, "last_upload": _last_upload(admin),
             "awaiting_dates": _awaiting_dates(a, b)}
 
 

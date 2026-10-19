@@ -202,6 +202,20 @@ def test_non_pilot_employees_get_no_reco(api):
     assert api.db["h_hrms"].count_documents({}) == 15             # attendance is still stored for everyone
 
 
+def test_failed_import_is_marked_failed_and_managers_see_no_file_details(api, monkeypatch):
+    with monkeypatch.context() as m:
+        m.setattr(reco, "recompute_range", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+        with pytest.raises(RuntimeError):
+            upload(api, "/hrms/upload/commit")
+    assert api.db["h_uploads"].find_one()["status"] == "failed"
+    assert api.get("/hrms/uploads").json()["last_upload"] is None               # a failed upload is not the "last upload"
+    upload(api, "/hrms/upload/commit")
+    assert api.db["h_uploads"].find_one({"status": "done"}) is not None
+    _user["id"] = "JHS9001"
+    lu = _view(api).json()["last_upload"]
+    assert set(lu) == {"uploaded_at", "date_from", "date_to"}                    # no file name / uploader for managers
+
+
 # ── reco view ────────────────────────────────────────────────────────────────
 
 def _view(api, **extra):

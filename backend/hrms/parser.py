@@ -6,6 +6,8 @@ need are read; names, DOJ, department etc. are never stored. See docs/hrms_sampl
 """
 import csv
 import io
+import re
+import zipfile
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
@@ -18,6 +20,9 @@ OPTIONAL = {"final status": "final_status"}   # fallback when Muster is blank
 
 MAX_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 200_000
+MAX_UNCOMPRESSED = 100 * 1024 * 1024      # guards against zip-bomb workbooks
+EMP_CODE_RE = re.compile(r"^[A-Z0-9_-]{2,20}$")
+MUSTER_RE = re.compile(r"^[A-Z0-9 ./_-]{0,20}$")
 ALLOWED_EXT = (".xlsx", ".csv")
 
 _TIME_FORMATS = ("%I:%M:%S %p", "%I:%M %p", "%H:%M:%S", "%H:%M")
@@ -89,12 +94,23 @@ def _read_rows(content: bytes, filename: str) -> List[List[Any]]:
         return [r for r in csv.reader(io.StringIO(text), delimiter=delim)]
     import openpyxl
     try:
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            if sum(i.file_size for i in z.infolist()) > MAX_UNCOMPRESSED:
+                raise HrmsFileError("The workbook expands to more than 100 MB - refusing to open it")
+    except zipfile.BadZipFile:
+        raise HrmsFileError("Could not read the Excel file")
+    try:
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     except Exception:
         raise HrmsFileError("Could not read the Excel file")
-    ws = wb.worksheets[0]
-    rows = [list(r) for r in ws.iter_rows(values_only=True)]
-    wb.close()
+    rows = []
+    try:
+        for r in wb.worksheets[0].iter_rows(values_only=True):
+            rows.append(list(r))
+            if len(rows) > MAX_ROWS + 1:                       # header + MAX_ROWS data rows
+                raise HrmsFileError(f"Too many rows (limit {MAX_ROWS})")
+    finally:
+        wb.close()
     return rows
 
 
@@ -124,6 +140,8 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
             emp = str(get("employee_id") or "").strip().upper()
             if not emp:
                 raise ValueError("missing employee code")
+            if not EMP_CODE_RE.match(emp):
+                raise ValueError("invalid employee code")
             d = parse_date(get("date"))
             t_in, t_out = parse_time(get("in_time")), parse_time(get("out_time"))
             gross = rules.gross_hours(t_in, t_out)
@@ -136,6 +154,10 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
             continue
         seen.add(key)
         code = str(get("muster") or get("final_status") or "").strip().upper()
+        if not MUSTER_RE.match(code):
+            res.errors.append({"row": n, "message": "invalid Muster code"})
+            seen.discard(key)
+            continue
         kind = rules.classify(code, status_codes)
         if kind == "unknown":
             res.unknown_codes[code or "(blank)"] = res.unknown_codes.get(code or "(blank)", 0) + 1
