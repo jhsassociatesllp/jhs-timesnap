@@ -41,6 +41,12 @@ def test_unknown_or_deleted_employee_gets_nothing(nq_db):
     assert nq_db.get_tasks_for_employee("JHS9199", TODAY) == []
 
 
+def test_tasks_for_project_excludes_deleted_tasks_and_projects(nq_db):
+    assert _ids(nq_db.get_tasks_for_project("PL-T002")) == [5, 6, 7]       # T008 is soft-deleted
+    assert nq_db.get_tasks_for_project("PL-T004") == []                    # deleted project
+    assert nq_db.get_tasks_for_project("NOPE'; DROP TABLE tbl_projects;--") == []
+
+
 def test_get_task_and_project(nq_db):
     assert nq_db.get_task(1).name == "Planning and scoping"
     assert nq_db.get_task(8) is None          # soft-deleted

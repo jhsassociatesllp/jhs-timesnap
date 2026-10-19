@@ -90,6 +90,17 @@ class Cycle:
     deadline: date   # end + 5 days
 
 
+def cycle_from_id(cycle_id: str) -> Cycle:
+    """Inverse of cycle_for: '2026-10-C2' -> that cycle. Raises ValueError if malformed."""
+    try:
+        ym, c = str(cycle_id).split("-C")
+        year, month = (int(x) for x in ym.split("-"))
+        first_day = {"1": 1, "2": 11, "3": 21}[c]
+        return cycle_for(date(year, month, first_day))
+    except (ValueError, KeyError):
+        raise ValueError("bad cycle id")
+
+
 def cycle_for(d: date) -> Cycle:
     """10-day cycles: 1-10, 11-20, 21-end of month. Deadline = end + 5 days."""
     last = calendar.monthrange(d.year, d.month)[1]

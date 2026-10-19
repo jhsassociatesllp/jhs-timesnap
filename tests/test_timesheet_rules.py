@@ -65,3 +65,11 @@ def test_valid_hours(h, ok):
 def test_cycle_for(d, cid, start, end, deadline):
     c = r.cycle_for(d)
     assert (c.id, c.start, c.end, c.deadline) == (cid, start, end, deadline)
+
+
+def test_cycle_from_id_round_trip_and_rejects_garbage():
+    for d in (date(2026, 10, 1), date(2026, 10, 15), date(2026, 2, 28), date(2028, 2, 29), date(2026, 12, 31)):
+        assert r.cycle_from_id(r.cycle_for(d).id) == r.cycle_for(d)
+    for bad in ("", "2026-10", "2026-13-C1", "2026-10-C4", "x-y-C1", "2026-10-C1; drop", None):
+        with pytest.raises(ValueError):
+            r.cycle_from_id(bad)

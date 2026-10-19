@@ -154,6 +154,18 @@ def get_tasks_for_employee(employee_id: str, on_date: date) -> List[NQTask]:
     return _cached(("tasks_for_employee", employee_id, on_date), load)
 
 
+def get_tasks_for_project(project_code: str) -> List[NQTask]:
+    """All live tasks of a project (any dates, any assignee), for progress / RAG figures."""
+    def load():
+        rows = _run(
+            f"SELECT {_TASK_COLS} {_TASK_FROM} "
+            "WHERE p.project_id = %s AND t.is_deleted = '0' ORDER BY t.id",
+            (project_code,),
+        )
+        return [task_from_row(r, date.today()) for r in rows]
+    return _cached(("tasks_for_project", project_code), load)
+
+
 def get_task(task_id: int) -> Optional[NQTask]:
     def load():
         rows = _run(

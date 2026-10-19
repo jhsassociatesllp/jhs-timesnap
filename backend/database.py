@@ -116,3 +116,10 @@ hrms_attendance_collection    = db["hrms_attendance"]
 config_collection             = db["config"]
 hrms_uploads_collection       = db["hrms_uploads"]
 daily_reco_collection         = db["daily_reco"]
+# cycle_reviews: kind "approval" {cycle_id, employee_id, status, approved_by/at, history[]} and
+#   kind "reestimate" {cycle_id, task_id, project_code, old/new end date, hours_needed, actor, ...}.
+cycle_reviews_collection      = db["cycle_reviews"]
+# email_log: one row per mail attempt (never the body): kind, key, to, subject, status, error.
+email_log_collection          = db["email_log"]
+# job_runs: one row per scheduled job per day so only one process ever runs it.
+job_runs_collection           = db["job_runs"]
