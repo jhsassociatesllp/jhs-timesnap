@@ -35,21 +35,6 @@
         <a href="#" id="rejectedBtn" class="manager-only" onclick="showSection('rejected')">
           <i class="fas fa-times-circle"></i> Rejected
         </a>
-        <a href="/static/timesheet/daily.html" id="dailyBtn" style="display:none">
-          <i class="fas fa-list-check"></i> Daily timesheet (pilot)
-        </a>
-        <a href="/static/timesheet/reco.html" id="recoBtn" style="display:none">
-          <i class="fas fa-scale-balanced"></i> Hours reconciliation
-        </a>
-        <a href="/static/timesheet/cycle.html" id="cycleBtn" style="display:none">
-          <i class="fas fa-calendar-check"></i> Cycle review
-        </a>
-        <a href="/static/timesheet/manager.html" id="dashBtn" style="display:none">
-          <i class="fas fa-gauge-high"></i> Dashboard
-        </a>
-        <a href="/static/timesheet/portfolio.html" id="portfolioBtn" style="display:none">
-          <i class="fas fa-chart-pie"></i> Portfolio
-        </a>
         <a href="#" id="calendarBtn" onclick="openLdCalendar(); return false;">
           <i class="fas fa-calendar-days"></i> Calendar
         </a>
@@ -296,42 +281,6 @@
     <!-- Timesheet-specific script -->
     <script src="/static/timesheet/script.js"></script>
     <script src="/static/timesheet/calendar-modal.js"></script>
-    <script>
-      // Show the pilot "Daily timesheet" link only to employees it is enabled for.
-      (async () => {
-        try {
-          const id = (localStorage.getItem("loggedInEmployeeId") || "").trim().toUpperCase();
-          const t = localStorage.getItem("access_token") || localStorage.getItem("token");
-          if (!id || !t) return;
-          const r = await fetch(`/timesheet/v2/enabled/${id}`, { headers: { Authorization: `Bearer ${t}` } });
-          if (r.ok && (await r.json()).enabled) document.getElementById("dailyBtn").style.display = "block";
-        } catch (_) { /* link stays hidden */ }
-        try {
-          const id2 = (localStorage.getItem("loggedInEmployeeId") || "").trim().toUpperCase();
-          const t2 = localStorage.getItem("access_token") || localStorage.getItem("token");
-          if (!id2 || !t2) return;
-          const r2 = await fetch("/hrms/access", { headers: { Authorization: `Bearer ${t2}` } });
-          if (r2.ok) {
-            const a = await r2.json();
-            if (a.is_admin || a.is_manager) {
-              document.getElementById("recoBtn").style.display = "block";
-              document.getElementById("cycleBtn").style.display = "block";
-            }
-          }
-        } catch (_) { /* link stays hidden */ }
-        try {
-          const id3 = (localStorage.getItem("loggedInEmployeeId") || "").trim().toUpperCase();
-          const t3 = localStorage.getItem("access_token") || localStorage.getItem("token");
-          if (!id3 || !t3) return;
-          const r3 = await fetch("/dashboard/access", { headers: { Authorization: `Bearer ${t3}` } });
-          if (r3.ok) {
-            const a3 = await r3.json();
-            if (a3.manager_dashboard) document.getElementById("dashBtn").style.display = "block";
-            if (a3.portfolio) document.getElementById("portfolioBtn").style.display = "block";
-          }
-        } catch (_) { /* links stay hidden */ }
-      })();
-    </script>
       <script src="/static/chatbot/chat-core.js"></script>
       <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
