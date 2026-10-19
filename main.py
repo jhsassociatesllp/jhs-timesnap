@@ -84,6 +84,7 @@ from backend.timesheet.daily import router as timesheet_daily_router  # ← hour
 from backend.hrms.router import router as hrms_router  # ← HRMS upload + reconciliation
 from backend.cycle.router import router as cycle_router  # ← 10-day cycle review
 from backend.metrics.router import router as dashboard_router  # ← manager / portfolio dashboards
+from backend.metrics.exports import router as exports_router  # ← Excel exports (partners / admins)
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -137,6 +138,7 @@ app.include_router(timesheet_daily_router)  # prefix: /timesheet/v2
 app.include_router(hrms_router)  # prefix: /hrms
 app.include_router(cycle_router)  # prefix: /timesheet/v2/cycles
 app.include_router(dashboard_router)  # prefix: /dashboard
+app.include_router(exports_router)  # prefix: /exports
 from backend.access_manager.router import seed_compliance_admin
 seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 

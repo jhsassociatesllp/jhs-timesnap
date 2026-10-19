@@ -6,6 +6,7 @@ from backend.database import (
     hours_daily_collection,
     payroll_cycles_collection,
     project_metrics_collection,
+    export_audit_collection,
     team_snapshot_collection,
     timesheets_collection,
 )
@@ -18,6 +19,7 @@ class _MStore:
     team = team_snapshot_collection
     legacy = timesheets_collection            # legacy nested Timesheet_data (read-only here)
     payroll_cycles = payroll_cycles_collection
+    audit = export_audit_collection
 
 
 mstore = _MStore()

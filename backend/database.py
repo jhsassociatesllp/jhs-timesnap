@@ -132,3 +132,5 @@ hours_daily_collection        = db["hours_daily"]
 project_metrics_collection    = db["project_metrics"]
 dashboard_daily_collection    = db["dashboard_daily"]
 team_snapshot_collection      = db["team_snapshot"]
+# export_audit: who exported what (kind, date range, row count) - firm-wide data leaves the app here.
+export_audit_collection       = db["export_audit"]
