@@ -25,6 +25,7 @@ from backend.database import (
     hrms_attendance_collection,
     timesheet_entries_collection,
 )
+from backend.cycle.locks import cycle_locked
 from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
@@ -284,6 +285,8 @@ def _assert_not_locked(emp: str, d: date) -> None:
     if store.entries.find_one({"employee_id": emp, "date": d.isoformat(),
                                "$or": [{"locked": True}, {"approved": True}]}):
         raise HTTPException(409, "This day is locked or approved and can no longer be edited")
+    if cycle_locked(emp, rules.cycle_for(d).id):
+        raise HTTPException(409, "This cycle has been approved and locked by your manager")
 
 
 # ─────────────────────────────── routes ──────────────────────────────────────

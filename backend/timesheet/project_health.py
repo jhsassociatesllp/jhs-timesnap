@@ -28,7 +28,7 @@ def compute(project_code: str, today: date) -> Optional[dict]:
     used = round(agg[0]["h"], 2) if agg else 0.0
     last = date.fromisoformat(agg[0]["last"]) if agg and agg[0].get("last") else None
     done = sum(1 for t in tasks if t.is_complete)
-    overdue = sum(1 for t in tasks if t.is_overdue)
+    overdue = sum(1 for t in tasks if not t.is_complete and t.end_date and t.end_date < today)
     done_pct = rag.pct(done, len(tasks))
     stats = rag.ProjectStats(
         budget_hours=round(budget, 2), hours_used=used, tasks_total=len(tasks), tasks_done=done,

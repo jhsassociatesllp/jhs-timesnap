@@ -17,6 +17,7 @@ from pymongo import MongoClient
 
 from backend.auth import get_current_user
 from backend.nq import cache, repository
+from backend.cycle.store import store as cycle_store
 from backend.hrms import reco as hrms_reco
 from backend.timesheet import daily
 from tests.nq.conftest import DEV_PORT, dev_settings
@@ -54,6 +55,8 @@ def api(monkeypatch):
                        ("config", "t_config"), ("employees", "t_employees"), ("reco", "t_reco")):
         monkeypatch.setattr(hrms_reco.store, attr, db[coll])
     db["t_reco"].drop()
+    db["t_reviews"].drop()
+    monkeypatch.setattr(cycle_store, "reviews", db["t_reviews"])
     db["t_config"].insert_one({"_id": "timesheet",
                                "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
                                "holidays": ["2026-10-02"]})
@@ -224,6 +227,15 @@ def test_failed_save_never_empties_the_day(api, monkeypatch):
     with pytest.raises(RuntimeError):
         put(api, "JHS9101", DAY, [e(1, 2), e(2, 2)])
     assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 2
+
+
+def test_approved_cycle_blocks_even_new_entries_on_empty_days(api):
+    api.db["t_reviews"].insert_one({"kind": "approval", "employee_id": "JHS9101", "cycle_id": "2026-10-C2",
+                                    "status": "approved"})
+    r = put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])                 # DAY has no entries, but its cycle is locked
+    assert r.status_code == 409 and "approved" in r.json()["detail"]
+    api.db["t_reviews"].update_one({"employee_id": "JHS9101"}, {"$set": {"status": "reopened"}})
+    assert put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)]).status_code == 200      # unlocked again
 
 
 # ── NQ outage ────────────────────────────────────────────────────────────────
