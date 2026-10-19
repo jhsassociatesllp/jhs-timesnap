@@ -54,6 +54,18 @@ def seed_cycle(db):
     db["c_submissions"].insert_one({"employee_id": "JHS9103", "date": "2026-10-12", "submitted_at": now})
 
 
+def after_cycle(monkeypatch):
+    monkeypatch.setattr(cr, "_today", lambda: date(2026, 10, 21))      # cycle 2026-10-C2 ended on the 20th
+
+
+def fill_cycle(db, emp):
+    """Submit every working day of the cycle (12-16, 19, 20 Oct) for an employee."""
+    now = datetime.utcnow()
+    for day in ("2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-19", "2026-10-20"):
+        db["c_submissions"].update_one({"employee_id": emp, "date": day},
+                                       {"$set": {"submitted_at": now}}, upsert=True)
+
+
 def rows_by_emp(resp):
     return {r["employee_id"]: r for r in resp.json()["rows"]}
 
@@ -97,8 +109,10 @@ def test_team_roles(api):
 
 # ── approve and lock ─────────────────────────────────────────────────────────
 
-def test_approve_clean_employee_locks_entries_and_cycle(api):
+def test_approve_clean_employee_locks_entries_and_cycle(api, monkeypatch):
     seed_cycle(api.db)
+    after_cycle(monkeypatch)
+    fill_cycle(api.db, "JHS9101")
     r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["jhs9101"]})
     assert r.status_code == 200 and r.json()["approved"] == ["JHS9101"]
     assert all(e["locked"] and e["approved"] and e["approved_by"] == "JHS9001"
@@ -108,8 +122,10 @@ def test_approve_clean_employee_locks_entries_and_cycle(api):
     assert rows_by_emp(api.get(f"/timesheet/v2/cycles/{CYCLE}/team"))["JHS9101"]["status"] == "approved"
 
 
-def test_approve_with_open_items_needs_confirmation_and_changes_nothing_otherwise(api):
+def test_approve_with_open_items_needs_confirmation_and_changes_nothing_otherwise(api, monkeypatch):
     seed_cycle(api.db)
+    after_cycle(monkeypatch)
+    fill_cycle(api.db, "JHS9101")
     r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101", "JHS9102"]})
     assert r.status_code == 409 and set(r.json()["detail"]["warnings"]) == {"JHS9102"}
     assert api.db["c_entries"].count_documents({"locked": True}) == 0                 # nobody was locked
@@ -120,8 +136,19 @@ def test_approve_with_open_items_needs_confirmation_and_changes_nothing_otherwis
     assert review["warnings_confirmed"] is True and review["history"][0]["warnings"]
 
 
-def test_approve_authorisation_and_validation(api):
+def test_cannot_approve_a_cycle_that_has_not_ended(api):
+    seed_cycle(api.db)                                                  # today is 2026-10-14, the cycle ends 10-20
+    r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"], "confirm_warnings": True})
+    assert r.status_code == 422 and "after it has ended" in r.json()["detail"]
+    assert api.db["c_entries"].count_documents({"locked": True}) == 0 and api.db["c_reviews"].count_documents({}) == 0
+    _user["id"] = "JHS9000"                                             # admins are held to the same rule
+    assert api.post(f"/timesheet/v2/cycles/{CYCLE}/approve",
+                    json={"employee_ids": ["JHS9101"], "confirm_warnings": True}).status_code == 422
+
+
+def test_approve_authorisation_and_validation(api, monkeypatch):
     seed_cycle(api.db)
+    after_cycle(monkeypatch)
     r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101", "JHS9103"]})
     assert r.status_code == 403 and "JHS9103" in r.json()["detail"]                   # someone else's employee
     assert api.db["c_entries"].count_documents({"locked": True}) == 0                 # all-or-nothing
@@ -138,8 +165,10 @@ def test_approve_authorisation_and_validation(api):
 
 # ── unlock ───────────────────────────────────────────────────────────────────
 
-def test_only_admin_can_unlock_and_it_is_audited(api):
+def test_only_admin_can_unlock_and_it_is_audited(api, monkeypatch):
     seed_cycle(api.db)
+    after_cycle(monkeypatch)
+    fill_cycle(api.db, "JHS9101")
     api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"]})
     body = {"employee_id": "JHS9101", "reason": "Wrong project on the 13th"}
     assert api.post(f"/timesheet/v2/cycles/{CYCLE}/unlock", json=body).status_code == 403    # their own manager
@@ -255,6 +284,15 @@ def test_writeback_changes_only_end_date_and_only_when_enabled(api, nq_db):
         assert api.db["c_reviews"].find_one({"kind": "reestimate"})["written_back"] is True
     finally:
         repository.update_task_end_date(3, before["end_date"])                # leave the seed as we found it
+
+
+def test_audit_row_exists_even_if_the_nq_write_crashes(api, nq_db, monkeypatch):
+    api.db["c_config"].update_one({"_id": "timesheet"}, {"$set": {"nq_writeback_enabled": True}})
+    monkeypatch.setattr(repository, "update_task_end_date", lambda *a: (_ for _ in ()).throw(RuntimeError("crash")))
+    with pytest.raises(RuntimeError):
+        api.post(f"/timesheet/v2/cycles/{CYCLE}/reestimate", json=_est())
+    rec = api.db["c_reviews"].find_one({"kind": "reestimate"})
+    assert rec and rec["new_end_date"] == "2026-10-30" and rec["written_back"] is False
 
 
 def test_writeback_failure_keeps_the_record(api, nq_db, monkeypatch):

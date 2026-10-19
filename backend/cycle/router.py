@@ -158,8 +158,11 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
     cyc = _cycle(cycle_id)
     ids = _employee_ids(body.employee_ids)
     _authorise_all(me, ids, admin)
-    pilot = {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}
     today, hol = _today(), holidays_set()
+    if today <= cyc.end:
+        # locking mid-cycle would stop employees filling the days they have not worked yet
+        raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - approve it after it has ended")
+    pilot = {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}
 
     rows = {}
     for i in ids:
@@ -313,19 +316,22 @@ def reestimate(cycle_id: str, body: ReestimateIn, current_user: str = Depends(ge
     if not health or health["rag"] == "green":
         raise HTTPException(422, "Re-estimates are only for amber or red projects")
 
-    written, error = False, ""
     wb_on = bool(config_doc().get("nq_writeback_enabled", False))
+    record = store.reviews.insert_one({
+        "kind": "reestimate", "cycle_id": cyc.id, "task_id": task.id, "project_code": task.project_code,
+        "old_end_date": task.end_date.isoformat() if task.end_date else None,
+        "new_end_date": body.new_end_date.isoformat(), "hours_needed": body.hours_needed,
+        "note": body.note.strip(), "rag_at_time": health["rag"], "requested_by": me,
+        "requested_at": datetime.utcnow(), "writeback_enabled": wb_on, "written_back": False,
+        "writeback_error": ""})
+    # the audit row above exists before anything changes in NQ, so a crash cannot leave an unaudited change
+    written, error = False, ""
     if wb_on and body.new_end_date != task.end_date:
         try:
             written = nq_repo.update_task_end_date(task.id, body.new_end_date) == 1
         except NQUnavailable as e:
             error = str(e)[:200]
-    store.reviews.insert_one({
-        "kind": "reestimate", "cycle_id": cyc.id, "task_id": task.id, "project_code": task.project_code,
-        "old_end_date": task.end_date.isoformat() if task.end_date else None,
-        "new_end_date": body.new_end_date.isoformat(), "hours_needed": body.hours_needed,
-        "note": body.note.strip(), "rag_at_time": health["rag"], "requested_by": me,
-        "requested_at": datetime.utcnow(), "writeback_enabled": wb_on, "written_back": written,
-        "writeback_error": error})
+        store.reviews.update_one({"_id": record.inserted_id},
+                                 {"$set": {"written_back": written, "writeback_error": error}})
     return {"task_id": task.id, "rag": health["rag"], "written_back": written, "writeback_enabled": wb_on,
             "writeback_error": error}
