@@ -1,0 +1,15 @@
+/* Extra styles for the manager and portfolio dashboards (on top of styles.css + daily.css). */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:1rem; margin:1rem 0; }
+.kpi { background:#fff; border-radius:15px; box-shadow:var(--shadow-light); padding:1rem 1.2rem; }
+.kpi span { display:block; font-size:.75rem; text-transform:uppercase; color:var(--text-light); }
+.kpi b { font-size:1.6rem; }
+.kpi.red b { color:#b91c1c; } .kpi.amber b { color:#b45309; } .kpi.green b { color:#15803d; }
+.bar { position:relative; height:10px; background:#e5e7eb; border-radius:6px; overflow:hidden; margin:3px 0; min-width:120px; }
+.bar > i { display:block; height:100%; border-radius:6px; }
+.bar.used > i { background:#667eea; } .bar.done > i { background:#10b981; }
+.bar.load > i { background:#f59e0b; } .bar.load.over > i { background:#dc2626; }
+.rag { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+.rag.red { background:#dc2626; } .rag.amber { background:#f59e0b; } .rag.green { background:#10b981; }
+.alert { padding:.5rem .8rem; border-radius:8px; margin:.3rem 0; font-size:.9rem; }
+.alert.red { background:#fee2e2; color:#7f1d1d; } .alert.amber { background:#fef3c7; color:#78350f; }
+.dt-note { font-size:.78rem; color:var(--text-light); margin-top:.6rem; }

@@ -44,6 +44,12 @@
         <a href="/static/timesheet/cycle.html" id="cycleBtn" style="display:none">
           <i class="fas fa-calendar-check"></i> Cycle review
         </a>
+        <a href="/static/timesheet/manager.html" id="dashBtn" style="display:none">
+          <i class="fas fa-gauge-high"></i> Dashboard
+        </a>
+        <a href="/static/timesheet/portfolio.html" id="portfolioBtn" style="display:none">
+          <i class="fas fa-chart-pie"></i> Portfolio
+        </a>
         <a href="#" id="calendarBtn" onclick="openLdCalendar(); return false;">
           <i class="fas fa-calendar-days"></i> Calendar
         </a>
@@ -313,6 +319,17 @@
             }
           }
         } catch (_) { /* link stays hidden */ }
+        try {
+          const id3 = (localStorage.getItem("loggedInEmployeeId") || "").trim().toUpperCase();
+          const t3 = localStorage.getItem("access_token") || localStorage.getItem("token");
+          if (!id3 || !t3) return;
+          const r3 = await fetch("/dashboard/access", { headers: { Authorization: `Bearer ${t3}` } });
+          if (r3.ok) {
+            const a3 = await r3.json();
+            if (a3.manager_dashboard) document.getElementById("dashBtn").style.display = "block";
+            if (a3.portfolio) document.getElementById("portfolioBtn").style.display = "block";
+          }
+        } catch (_) { /* links stay hidden */ }
       })();
     </script>
       <script src="/static/chatbot/chat-core.js"></script>

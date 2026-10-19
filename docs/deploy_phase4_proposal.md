@@ -73,3 +73,18 @@ In the Mongo `config` document `{_id: "timesheet"}` set `pilot_employees` (list 
 All new endpoints, collections and the scheduler are additive. To roll back: stop the scheduler
 container and redeploy the previous image. The legacy timesheet grid, `Timesheet_data` and the
 existing approval flow are untouched by Phases 2–4.
+
+## 6. Phase 5 additions (dashboards) - NOT applied
+
+* **Nightly metrics job** runs inside the SAME scheduler container (`python -m backend.jobs.scheduler`):
+  02:00 IST -> `hours_daily`, `dashboard_daily`, `project_metrics`, `team_snapshot`. So the scheduler
+  container needs the **NQ_*** variables and the tunnel access described in section 2 (the digest alone did not).
+  If NQ is unreachable the job retries every 10 minutes; the web dashboards keep showing the last snapshot.
+* **First run / backfill** (once per environment, from any container with the same env):
+  `python -m backend.jobs.metrics --backfill 90`  (builds the full `hours_daily` history from `timesheet_entries`
+  and the legacy `Timesheet_data`, and 90 days of compliance history). Project / team snapshots only exist from
+  the first run onward - NQ cannot provide historic states.
+* No new secrets or ports. New collections: `hours_daily`, `project_metrics`, `dashboard_daily`, `team_snapshot`,
+  `export_audit` (all additive; the legacy collections are only read).
+* Optional `config` keys: `rag` (thresholds), `portfolio` access follows Grade "PND" + timesheet admins.
+* Rollback: stop the scheduler container; the dashboard pages simply show "No snapshot yet".

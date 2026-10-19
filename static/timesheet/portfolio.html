@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Portfolio — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/daily.css" />
+    <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
+  </head>
+  <body>
+    <div class="navbar">
+      <div class="nav-menu active" style="position:static;display:flex;gap:1rem;width:auto;background:none;box-shadow:none;">
+        <a href="/timesheet" style="padding:.4rem 1rem"><i class="fas fa-arrow-left"></i> Timesheet</a>
+        <a href="/static/timesheet/manager.html" style="padding:.4rem 1rem"><i class="fas fa-gauge-high"></i> Manager dashboard</a>
+      </div>
+    </div>
+    <div class="container">
+      <div class="header"><h1><i class="fas fa-chart-pie"></i> PORTFOLIO</h1></div>
+      <div id="msg" class="dt-banner"></div>
+
+      <div class="dt-card">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
+          <div><label class="dt-muted" for="days">Compliance window</label><br />
+            <select id="days"><option value="10">Last 10 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></div>
+          <button class="dt-btn" id="go" type="button">Show</button>
+          <div id="asOf" class="dt-muted"></div>
+        </div>
+      </div>
+
+      <div class="kpi-row" id="kpis"></div>
+
+      <div class="dt-card">
+        <h3>Delayed and at-risk projects</h3>
+        <div class="table-responsive"><table class="dt-grid">
+          <thead><tr><th>Project</th><th>Manager(s)</th><th>Hours used vs budget</th><th>Tasks done</th><th>Overdue</th><th>Planned end</th><th>Forecast</th></tr></thead>
+          <tbody id="risk"></tbody></table></div>
+      </div>
+
+      <div class="dt-card">
+        <h3>Timesheet compliance by manager</h3>
+        <div class="table-responsive"><table class="dt-grid">
+          <thead><tr><th>Manager</th><th>Team</th><th>Compliance</th><th>Unplanned</th><th>Reco matched</th><th>Hours</th></tr></thead>
+          <tbody id="comp"></tbody></table></div>
+      </div>
+
+      <div class="dt-card">
+        <h3>Excel exports</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
+          <div><label class="dt-muted" for="from">From</label><br /><input type="date" id="from" /></div>
+          <div><label class="dt-muted" for="to">To</label><br /><input type="date" id="to" /></div>
+        </div>
+        <div class="dt-actions">
+          <button class="dt-btn" data-export="project-hours" type="button">Project-wise hours</button>
+          <button class="dt-btn" data-export="client-allocation" type="button">Client allocation per payroll cycle</button>
+          <button class="dt-btn" data-export="employee-projects" type="button">Employee-wise project list</button>
+        </div>
+        <div class="dt-note">Up to 366 days. Includes legacy and new timesheet hours.</div>
+      </div>
+
+      <div class="dt-card"><h3>Alerts</h3><div id="alerts"></div></div>
+      <div class="dt-note" id="notes"></div>
+    </div>
+    <script src="/static/timesheet/dash-common.js"></script>
+    <script src="/static/timesheet/portfolio.js"></script>
+  </body>
+</html>
