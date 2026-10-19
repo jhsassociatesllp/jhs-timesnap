@@ -25,6 +25,7 @@ from backend.database import (
     hrms_attendance_collection,
     timesheet_entries_collection,
 )
+from backend import indexes
 from backend.cycle.locks import cycle_locked
 from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
@@ -302,6 +303,7 @@ def get_day(employee_id: str, date: str, current_user: str = Depends(get_current
     emp = _require_self(employee_id, current_user)
     cfg = get_config()
     _require_enabled(emp, cfg)
+    indexes.ensure_once()
     return _day_payload(emp, _parse_date(date), cfg)
 
 

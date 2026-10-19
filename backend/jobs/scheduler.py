@@ -103,7 +103,9 @@ def main() -> int:
         for r in digest.send_digests(day, dry_run_dir=args.dry_run_dir):
             print(r)
         return 0
-    log.info("scheduler started (digest at %s IST)", DIGEST_TIME)
+    from backend import indexes
+    indexes.ensure_all()
+    log.info("scheduler started (digest at %s IST, metrics at %s IST)", DIGEST_TIME, METRICS_TIME)
     while True:
         try:
             run_metrics_if_due()
