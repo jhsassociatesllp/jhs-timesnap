@@ -6,7 +6,7 @@ Defaults mirror CLAUDE.md; the real values live in the Mongo `config` document
 """
 import calendar
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Iterable, Optional, Set
 
 STANDARD_HOURS = 8.5     # net working day
@@ -130,3 +130,47 @@ def cycle_for(d: date) -> Cycle:
         start=start, end=end,
         deadline=end + timedelta(days=FILL_DEADLINE_DAYS),
     )
+
+
+# ── the day-by-day timesheet ("My day") ─────────────────────────────────────────────────────────────
+# Stored values (the labels shown to the employee are friendlier: "Client site", "WFH", "Week off").
+LOCATIONS = ("Office", "Client Site", "Work From Home", "Leave", "Week Off", "PHY")
+DAY_OFF_LOCATIONS = ("Leave", "Week Off", "PHY")
+TASK_STATUSES = ("done", "in_progress", "blocked")
+DEADLINE_TIME = time(23, 59, 59)          # a sub-cycle closes at 23:59 IST on (end date + 5 days)
+MIN_REMARKS_CHARS = 3
+
+
+def typed_hours_ok(h) -> bool:
+    """Hours an employee types: more than 0, at most 24, up to 2 decimals."""
+    try:
+        h = float(h)
+    except (TypeError, ValueError):
+        return False
+    return 0 < h <= MAX_DAY_HOURS and round(h, 2) == h
+
+
+def deadline_passed(cycle: "Cycle", now_ist: datetime) -> bool:
+    """now_ist is a naive datetime in IST."""
+    return now_ist > datetime.combine(cycle.deadline, DEADLINE_TIME)
+
+
+def day_submit_errors(location: str, entries) -> list:
+    """Strict check when an employee submits a day. A day off (Leave / Week off / PHY) needs no rows;
+    a working day needs at least one, each with valid typed hours; the day's hours total at most 24; an
+    unplanned row (not in Nexus Quant) needs a description. Returns human-readable problems."""
+    if location in DAY_OFF_LOCATIONS:
+        return [] if not entries else ["A day off carries no work rows - remove them or change the location"]
+    if not entries:
+        return ["Add at least one task for the day"]
+    errors, total = [], 0.0
+    for i, e in enumerate(entries, start=1):
+        if not typed_hours_ok(e.get("hours")):
+            errors.append(f"Row {i}: enter hours (more than 0 and at most {MAX_DAY_HOURS:g}, up to 2 decimals)")
+        else:
+            total += float(e["hours"])
+        if e.get("is_unplanned") and len((e.get("remarks") or "").strip()) < MIN_REMARKS_CHARS:
+            errors.append(f"Row {i}: describe the unplanned work")
+    if round(total, 2) > MAX_DAY_HOURS:
+        errors.append(f"The day's hours add up to {total:g} - more than {MAX_DAY_HOURS:g}")
+    return errors

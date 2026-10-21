@@ -98,3 +98,40 @@ def test_project_hours_errors_day_total_and_day_off_rows():
                                    _row("30", location="PHY")], OFF) == []
     # row numbers are 1-based positions, like the other submit checks
     assert r.project_hours_errors([_row("8"), _row("8", location="Leave"), _row("")], OFF)[0].startswith("Row 3:")
+
+
+# ── day-by-day timesheet rules ───────────────────────────────────────────────────────────────────────
+
+from datetime import datetime  # noqa: E402
+
+
+@pytest.mark.parametrize("h,ok", [(0.25, True), (8, True), ("7.5", True), (24, True), (8.33, True),
+                                  (0, False), (-1, False), (24.01, False), (8.333, False), ("x", False), (None, False), ("", False)])
+def test_typed_hours_ok(h, ok):
+    assert r.typed_hours_ok(h) is ok
+
+
+def test_deadline_is_end_plus_five_days_at_23_59_ist():
+    c = r.cycle_for(date(2026, 10, 14))                                  # 11-20 Oct -> deadline 25 Oct
+    assert not r.deadline_passed(c, datetime(2026, 10, 25, 23, 59, 59))
+    assert r.deadline_passed(c, datetime(2026, 10, 26, 0, 0, 0))
+    assert not r.deadline_passed(c, datetime(2026, 10, 14, 12, 0))
+
+
+def _e(hours, unplanned=False, remarks=""):
+    return {"hours": hours, "is_unplanned": unplanned, "remarks": remarks}
+
+
+def test_day_submit_errors():
+    assert r.day_submit_errors("Office", [_e(4), _e(4.5)]) == []
+    assert r.day_submit_errors("Leave", []) == [] and r.day_submit_errors("Week Off", []) == [] and r.day_submit_errors("PHY", []) == []
+    assert "day off carries no work rows" in r.day_submit_errors("Leave", [_e(8)])[0]
+    assert r.day_submit_errors("Office", []) == ["Add at least one task for the day"]
+    assert r.day_submit_errors("WFH?", [])[0].startswith("Add at least one")        # unknown location is just a working day
+    errs = r.day_submit_errors("Office", [_e(None), _e(0), _e(25)])
+    assert [x.split(":")[0] for x in errs] == ["Row 1", "Row 2", "Row 3"]
+    assert "add up to 26" not in " ".join(errs)                                      # invalid rows are not summed
+    assert r.day_submit_errors("Office", [_e(12), _e(12.5)]) == ["The day's hours add up to 24.5 - more than 24"]
+    assert r.day_submit_errors("Client Site", [_e(12), _e(12)]) == []                # exactly 24 is allowed
+    assert r.day_submit_errors("Office", [_e(2, True, "ab")]) == ["Row 1: describe the unplanned work"]
+    assert r.day_submit_errors("Office", [_e(2, True, "Ad-hoc data pull")]) == []

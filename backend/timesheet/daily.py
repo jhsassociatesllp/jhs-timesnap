@@ -1,32 +1,38 @@
 # backend/timesheet/daily.py
 """
-Hours-only daily timesheet (pilot), running ALONGSIDE the legacy payroll-cycle grid.
+"My day": the day-by-day timesheet.
 
   * Own data only: every endpoint requires current_user == employee_id (403 otherwise).
-  * Only employees listed in config.pilot_employees may use it; the free-text
-    employees (partner JHS01, JHS1562) stay on the legacy grid.
-  * Projects/tasks come from Nexus Quant (read-only). client / project / project code
-    are copied from NQ on the SERVER; whatever the browser sends for them is ignored.
-  * Storage: timesheet_entries (one doc per entry) and day_submissions. The legacy
-    Timesheet_data / Timesheet_temp collections are never touched.
+  * Only employees listed in config.pilot_employees use it; the free-text employees (partner JHS01,
+    JHS1562) stay on the classic timesheet.
+  * Tasks come from Nexus Quant (read-only): the employee picks an ASSIGNED task and client / project /
+    project code are copied from NQ on the SERVER (whatever the browser sends for them is ignored).
+    Work that is not in NQ is "Unplanned": it needs a description, which the manager reviews.
+  * Hours are TYPED by the employee. HRMS is compared later (reconciliation) and never changes them.
+  * Location is chosen per DAY (Office, Client Site, Work From Home, Leave, Week Off, PHY). A day off needs no rows.
+  * Saving is a lenient DRAFT (autosave); "submit" is the strict check. Editing a submitted day withdraws the
+    submission until it is submitted again. A day is read-only once its cycle is approved / locked, after the
+    sub-cycle deadline (end date + 5 days, 23:59 IST), or if it was filled in the classic timesheet.
+  * Storage: timesheet_entries (one document per row), day_submissions (submitted days only), day_drafts
+    (location / saved state). The classic Timesheet_data is never touched here.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Literal, Optional
 
 import pytz
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend import indexes
 from backend.auth import get_current_user
+from backend.cycle.locks import cycle_locked
 from backend.database import (
     config_collection,
+    day_drafts_collection,
     day_submissions_collection,
     employee_details_collection,
-    hrms_attendance_collection,
     timesheet_entries_collection,
 )
-from backend import indexes
-from backend.cycle.locks import cycle_locked
 from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
@@ -34,7 +40,7 @@ from backend.nq.models import NQUnavailable
 from backend.timesheet import rules
 from backend.timesheet.router import _is_free_text_employee
 
-router = APIRouter(prefix="/timesheet/v2", tags=["Timesheet daily"])
+router = APIRouter(prefix="/timesheet/v2", tags=["Timesheet day"])
 IST = pytz.timezone("Asia/Kolkata")
 CONFIG_ID = "timesheet"
 MAX_ENTRIES_PER_DAY = 20
@@ -44,7 +50,7 @@ class _Store:
     """Collection handles in one place so tests can point them at a scratch database."""
     entries = timesheet_entries_collection
     submissions = day_submissions_collection
-    hrms = hrms_attendance_collection
+    drafts = day_drafts_collection
     config = config_collection
     employees = employee_details_collection
 
@@ -55,24 +61,28 @@ store = _Store()
 # ─────────────────────────────── models ──────────────────────────────────────
 
 class EntryIn(BaseModel):
-    task_id: Optional[int] = None
-    activity: str = Field(..., max_length=1000)
-    hours: Optional[float] = None
-    task_status: Literal["done", "in_progress", "blocked"]
+    task_id: Optional[int] = None                       # an NQ task assigned to the employee, or None when unplanned
+    hours: Optional[float] = None                       # may be empty while drafting; required at submit
+    task_status: Literal["done", "in_progress", "blocked"] = "in_progress"
+    remarks: str = Field("", max_length=1000)           # "what I did"; required for unplanned work
     is_unplanned: bool = False
-    unplanned_reason: str = Field("", max_length=500)
-    project_code: Optional[str] = Field(None, max_length=30)  # unplanned only; validated against NQ
 
 
 class DayIn(BaseModel):
-    entries: List[EntryIn]
-
-
-class SubmitIn(BaseModel):
-    reco_reason: str = Field("", max_length=500)
+    location: str = Field(..., max_length=30)
+    entries: List[EntryIn] = []
 
 
 # ─────────────────────────────── helpers ─────────────────────────────────────
+
+def _now_ist() -> datetime:
+    """Naive datetime in IST (tests replace this to pin the clock)."""
+    return datetime.now(IST).replace(tzinfo=None)
+
+
+def _today() -> date:
+    return _now_ist().date()
+
 
 def get_config() -> dict:
     doc = store.config.find_one({"_id": CONFIG_ID}) or {}
@@ -82,13 +92,8 @@ def get_config() -> dict:
             holidays.add(date.fromisoformat(str(h)[:10]))
         except ValueError:
             continue
-    return {
-        "standard_hours": float(doc.get("standard_hours", rules.STANDARD_HOURS)),
-        "lunch_hours": float(doc.get("lunch_hours", rules.LUNCH_HOURS)),
-        "tolerance": float(doc.get("tolerance", rules.TOLERANCE_HOURS)),
-        "pilot_employees": {str(e).strip().upper() for e in doc.get("pilot_employees", []) or []},
-        "holidays": holidays,
-    }
+    return {"pilot_employees": {str(e).strip().upper() for e in doc.get("pilot_employees", []) or []},
+            "holidays": holidays}
 
 
 def _require_self(employee_id: str, current_user: str) -> str:
@@ -107,7 +112,7 @@ def _is_enabled(emp: str, cfg: dict) -> bool:
 
 def _require_enabled(emp: str, cfg: dict) -> None:
     if not _is_enabled(emp, cfg):
-        raise HTTPException(403, "The daily timesheet is not enabled for you")
+        raise HTTPException(403, "The new timesheet is not enabled for you")
 
 
 def _parse_date(value: str, allow_future: bool = False) -> date:
@@ -115,15 +120,9 @@ def _parse_date(value: str, allow_future: bool = False) -> date:
         d = date.fromisoformat(value)
     except ValueError:
         raise HTTPException(400, "date must be YYYY-MM-DD")
-    if not allow_future and d > datetime.now(IST).date():
+    if not allow_future and d > _today():
         raise HTTPException(400, "Cannot fill a future date")
     return d
-
-
-def _hrms_for(emp: str, d: date) -> Optional[dict]:
-    """HRMS strip for the day, or None if not uploaded (or the day is leave)."""
-    doc = store.hrms.find_one({"employee_id": emp, "date": d.isoformat()})
-    return doc or None
 
 
 def _my_tasks(emp: str, d: date):
@@ -151,143 +150,136 @@ def _task_view(t, used: dict, holidays) -> dict:
         "client_name": t.client_name, "start_date": t.start_date, "end_date": t.end_date,
         "status": t.status, "is_overdue": t.is_overdue,
         "hours_used": used.get(t.id, 0.0),
-        # NQ has no allocation % column -> 100% assumed (flagged in the response).
+        # NQ has no allocation % column -> 100% assumed
         "budget_hours": rules.budget_hours(t.start_date, t.end_date, holidays),
     }
 
 
 def _entry_view(e: dict) -> dict:
-    return {k: e.get(k) for k in (
-        "task_id", "task_name", "project_code", "client", "project", "activity", "hours",
-        "task_status", "is_unplanned", "unplanned_reason", "awaiting_hrms", "locked")}
+    return {k: e.get(k) for k in ("task_id", "task_name", "client", "project", "project_code", "remarks",
+                                  "hours", "task_status", "is_unplanned", "legacy")}
 
 
-def _totals(entries: List[dict], hrms_net: Optional[float], tolerance: float) -> dict:
-    task_hours = round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2)
-    awaiting = any(e.get("awaiting_hrms") for e in entries)
-    if hrms_net is None or awaiting or not entries:
-        return {"task_hours": task_hours, "hrms_net": hrms_net, "difference": None,
-                "within_tolerance": None, "awaiting_hrms": awaiting,
-                "reason_required": False}
-    ok = rules.within_tolerance(task_hours, hrms_net, tolerance)
-    return {"task_hours": task_hours, "hrms_net": hrms_net,
-            "difference": rules.difference(task_hours, hrms_net),
-            "within_tolerance": ok, "awaiting_hrms": False, "reason_required": not ok}
+def _cycle_view(cyc: rules.Cycle) -> dict:
+    return {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline,
+            "deadline_passed": rules.deadline_passed(cyc, _now_ist())}
+
+
+def _read_only_reason(emp: str, d: date) -> Optional[str]:
+    """Why this day cannot be edited, or None."""
+    iso = d.isoformat()
+    if store.entries.find_one({"employee_id": emp, "date": iso, "legacy": True}, {"_id": 1}):
+        return "classic"
+    if store.entries.find_one({"employee_id": emp, "date": iso, "$or": [{"locked": True}, {"approved": True}]}, {"_id": 1}):
+        return "approved"
+    cyc = rules.cycle_for(d)
+    if cycle_locked(emp, cyc.id):
+        return "approved"
+    if rules.deadline_passed(cyc, _now_ist()):
+        return "deadline"
+    return None
+
+
+_READ_ONLY_TEXT = {
+    "classic": "This day was filled in the classic timesheet - it is view only here",
+    "approved": "This cycle has been approved and locked by your manager",
+    "deadline": "The deadline for this cycle has passed",
+}
+
+
+def _assert_editable(emp: str, d: date) -> None:
+    reason = _read_only_reason(emp, d)
+    if reason:
+        raise HTTPException(409, _READ_ONLY_TEXT[reason])
+
+
+def _day_location(entries: List[dict], sub: Optional[dict], draft: Optional[dict]) -> Optional[str]:
+    if sub and sub.get("location"):
+        return sub["location"]
+    if draft and draft.get("location"):
+        return draft["location"]
+    return entries[0].get("location") if entries else None
 
 
 def _day_payload(emp: str, d: date, cfg: dict) -> dict:
+    iso = d.isoformat()
     tasks, nq_down = _my_tasks(emp, d)
     used = _hours_used(emp, [t.id for t in tasks])
-    entries = list(store.entries.find({"employee_id": emp, "date": d.isoformat()}).sort("created_at", 1))
-    hrms = _hrms_for(emp, d)
-    is_leave = bool(hrms and hrms.get("leave_flag"))
-    net = None if (not hrms or is_leave or hrms.get("net_hours") is None) else float(hrms["net_hours"])
-    sub = store.submissions.find_one({"employee_id": emp, "date": d.isoformat()})
-    cyc = rules.cycle_for(d)
+    entries = list(store.entries.find({"employee_id": emp, "date": iso}).sort("created_at", 1))
+    sub = store.submissions.find_one({"employee_id": emp, "date": iso})
+    draft = store.drafts.find_one({"employee_id": emp, "date": iso})
+    mgr = store.employees.find_one({"EmpID": emp}, {"ReportingEmpCode": 1, "ReportingEmpName": 1}) or {}
+    reason = _read_only_reason(emp, d)
+    total = round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2)
     return {
-        "date": d.isoformat(),
-        "cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end,
-                  "deadline": cyc.deadline},
-        "hrms": None if not hrms else {
-            "in_time": hrms.get("in_time"), "out_time": hrms.get("out_time"),
-            "gross": hrms.get("gross_hours"), "lunch": cfg["lunch_hours"], "net": net,
-            "is_leave": is_leave},
+        "date": iso, "weekday": d.strftime("%A"),
+        "cycle": _cycle_view(rules.cycle_for(d)),
+        "location": _day_location(entries, sub, draft),
         "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
         "allocation_assumed_100": True,
-        "tolerance": cfg["tolerance"],
-        "reco": hrms_reco.reco_for_day(emp, d.isoformat()),   # HRMS reco outcome + manager note
         "entries": [_entry_view(e) for e in entries],
-        "totals": _totals(entries, net, cfg["tolerance"]),
+        "totals": {"task_hours": total, "rows": len(entries), "over_24": total > rules.MAX_DAY_HOURS},
         "submitted": bool(sub), "submitted_at": sub.get("submitted_at") if sub else None,
-        "reco_reason": sub.get("reco_reason", "") if sub else "",
-        "locked": any(e.get("locked") for e in entries),
+        "read_only": reason is not None, "read_only_reason": reason,
+        "read_only_text": _READ_ONLY_TEXT.get(reason) if reason else None,
+        "reporting_manager": {"code": (mgr.get("ReportingEmpCode") or "").strip().upper(),
+                              "name": mgr.get("ReportingEmpName") or ""},
         "nq_unavailable": nq_down,
         "nq_data_may_be_stale": nq_down or nq_cache.data_may_be_stale(),
     }
 
 
-def _build_entry_docs(emp: str, d: date, body: DayIn, cfg: dict) -> List[dict]:
-    """Validate the payload and turn it into entry documents. Client/project/code
-    come from NQ, hours for a one-entry day from HRMS. Raises HTTPException."""
-    if not body.entries:
-        raise HTTPException(422, "Add at least one entry")
+def _build_entry_docs(emp: str, d: date, body: DayIn) -> List[dict]:
+    """Validate a DRAFT save and turn it into entry documents. Client / project / code come from NQ,
+    the reporting manager from the employee record; nothing for those is taken from the browser."""
+    location = (body.location or "").strip()
+    if location not in rules.LOCATIONS:
+        raise HTTPException(422, "Choose a location: " + ", ".join(rules.LOCATIONS))
+    if location in rules.DAY_OFF_LOCATIONS:
+        if body.entries:
+            raise HTTPException(422, "A day off carries no work rows - remove them or change the location")
+        return []
     if len(body.entries) > MAX_ENTRIES_PER_DAY:
-        raise HTTPException(422, f"At most {MAX_ENTRIES_PER_DAY} entries per day")
+        raise HTTPException(422, f"At most {MAX_ENTRIES_PER_DAY} rows per day")
 
     tasks, nq_down = _my_tasks(emp, d)
-    needs_nq = any((not e.is_unplanned) or e.project_code for e in body.entries)
-    if nq_down and needs_nq:
-        raise HTTPException(503, "Project data is unavailable right now — please try again shortly")
+    if nq_down and any(not e.is_unplanned for e in body.entries):
+        raise HTTPException(503, "Project data is unavailable right now - please try again shortly")
     by_id = {t.id: t for t in tasks}
-
-    hrms = _hrms_for(emp, d)
-    net = None
-    if hrms and not hrms.get("leave_flag") and hrms.get("net_hours") is not None:
-        net = float(hrms["net_hours"])
-    auto_hours, locked_hours, awaiting = rules.one_task_hours(len(body.entries), net)
-
+    mgr = store.employees.find_one({"EmpID": emp}, {"ReportingEmpCode": 1, "ReportingEmpName": 1}) or {}
     cyc = rules.cycle_for(d)
     now = datetime.utcnow()
-    seen_tasks = set()
-    docs = []
+    seen, docs = set(), []
     for i, e in enumerate(body.entries, start=1):
-        row = f"Entry {i}"
-        activity = (e.activity or "").strip()
-        if not activity:
-            raise HTTPException(422, f"{row}: describe what you did")
-        base = {
-            "employee_id": emp, "date": d.isoformat(), "activity": activity,
+        row = f"Row {i}"
+        if e.hours is not None and not (0 <= e.hours <= rules.MAX_DAY_HOURS and round(e.hours, 2) == e.hours):
+            raise HTTPException(422, f"{row}: hours must be between 0 and {rules.MAX_DAY_HOURS:g} with up to 2 decimals")
+        remarks = (e.remarks or "").strip()
+        doc = {
+            "employee_id": emp, "date": d.isoformat(), "location": location,
+            "remarks": remarks, "activity": remarks,           # `activity` mirrors remarks for older readers (digest)
+            "hours": None if e.hours is None else round(float(e.hours), 2),
             "task_status": e.task_status, "cycle_id": cyc.id,
+            "reporting_manager": (mgr.get("ReportingEmpCode") or "").strip().upper(),
+            "reporting_manager_name": mgr.get("ReportingEmpName") or "",
             "approved": False, "locked": False, "created_at": now, "updated_at": now,
         }
         if e.is_unplanned:
-            reason = (e.unplanned_reason or "").strip()
-            if not reason:
-                raise HTTPException(422, f"{row}: unplanned work needs a reason")
             if e.task_id is not None:
-                raise HTTPException(422, f"{row}: an unplanned entry cannot have a task")
-            proj = None
-            if e.project_code:
-                try:
-                    proj = nq_repo.get_project(e.project_code.strip())
-                except NQUnavailable:
-                    raise HTTPException(503, "Project data is unavailable right now — please try again shortly")
-                if proj is None:
-                    raise HTTPException(422, f"{row}: unknown project code")
-            base.update({
-                "task_id": None, "task_name": "", "is_unplanned": True, "unplanned_reason": reason,
-                "project_code": proj.project_code if proj else "",
-                "client": proj.client_name if proj else "",
-                "project": proj.project_name if proj else "",
-            })
+                raise HTTPException(422, f"{row}: an unplanned row cannot have a task")
+            doc.update({"task_id": None, "task_name": "", "client": "", "project": "", "project_code": "",
+                        "is_unplanned": True, "unplanned_reason": remarks})
         else:
             t = by_id.get(e.task_id)
             if t is None:
-                raise HTTPException(422, f"{row}: task is not assigned to you for {d.isoformat()}")
-            if t.id in seen_tasks:
-                raise HTTPException(422, f"{row}: task listed twice — combine into one entry")
-            seen_tasks.add(t.id)
-            base.update({
-                "task_id": t.id, "task_name": t.name, "is_unplanned": False, "unplanned_reason": "",
-                "project_code": t.project_code, "client": t.client_name, "project": t.project_name,
-            })
-        if locked_hours:                      # one entry: hours are HRMS net, never the browser's
-            base["hours"], base["awaiting_hrms"] = auto_hours, awaiting
-        else:
-            if not rules.valid_hours(e.hours):
-                raise HTTPException(422, f"{row}: hours must be between 0.25 and 24 in steps of 0.25")
-            base["hours"], base["awaiting_hrms"] = round(float(e.hours), 2), False
-        docs.append(base)
+                raise HTTPException(422, f"{row}: that task is not assigned to you for {d.isoformat()}")
+            if t.id in seen:
+                raise HTTPException(422, f"{row}: task listed twice - combine into one row")
+            seen.add(t.id)
+            doc.update({"task_id": t.id, "task_name": t.name, "client": t.client_name, "project": t.project_name,
+                        "project_code": t.project_code, "is_unplanned": False, "unplanned_reason": ""})
+        docs.append(doc)
     return docs
-
-
-def _assert_not_locked(emp: str, d: date) -> None:
-    """A day is read-only once its cycle is locked OR a manager has approved any entry."""
-    if store.entries.find_one({"employee_id": emp, "date": d.isoformat(),
-                               "$or": [{"locked": True}, {"approved": True}]}):
-        raise HTTPException(409, "This day is locked or approved and can no longer be edited")
-    if cycle_locked(emp, rules.cycle_for(d).id):
-        raise HTTPException(409, "This cycle has been approved and locked by your manager")
 
 
 # ─────────────────────────────── routes ──────────────────────────────────────
@@ -296,6 +288,54 @@ def _assert_not_locked(emp: str, d: date) -> None:
 def daily_enabled(employee_id: str, current_user: str = Depends(get_current_user)):
     emp = _require_self(employee_id, current_user)
     return {"enabled": _is_enabled(emp, get_config())}
+
+
+@router.get("/cycle-days/{employee_id}")
+def cycle_days(employee_id: str, date: Optional[str] = Query(None), current_user: str = Depends(get_current_user)):
+    """The day strip: every day of the 10-day sub-cycle that contains `date` (default today) and its state."""
+    emp = _require_self(employee_id, current_user)
+    cfg = get_config()
+    _require_enabled(emp, cfg)
+    d = _parse_date(date, allow_future=True) if date else _today()
+    cyc = rules.cycle_for(d)
+    start, end = cyc.start.isoformat(), cyc.end.isoformat()
+    per_day = {}
+    for e in store.entries.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}},
+                                {"date": 1, "hours": 1, "location": 1, "legacy": 1}):
+        row = per_day.setdefault(e["date"], {"hours": 0.0, "rows": 0, "location": None, "legacy": False})
+        row["hours"] += e.get("hours") or 0.0
+        row["rows"] += 1
+        row["location"] = row["location"] or e.get("location")
+        row["legacy"] = row["legacy"] or bool(e.get("legacy"))
+    subs = {s["date"]: s for s in store.submissions.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
+    drafts = {s["date"]: s for s in store.drafts.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
+    today, days = _today(), []
+    counts = {"submitted": 0, "saved": 0, "missing": 0}
+    cur = cyc.start
+    while cur <= cyc.end:
+        iso = cur.isoformat()
+        info = per_day.get(iso, {})
+        working = cur.weekday() < 5 and cur not in cfg["holidays"]
+        if iso in subs:
+            state = "submitted"
+        elif iso in per_day or iso in drafts:
+            state = "saved"
+        elif cur > today:
+            state = "future"
+        elif working:
+            state = "open" if cur == today else "missing"
+        else:
+            state = "off"
+        if state in counts:
+            counts[state] += 1
+        days.append({"date": iso, "day": cur.day, "weekday": cur.strftime("%a"), "state": state, "working_day": working,
+                     "location": (subs.get(iso) or drafts.get(iso) or {}).get("location") or info.get("location"),
+                     "hours": round(info.get("hours", 0.0), 2), "classic": bool(info.get("legacy"))})
+        cur += timedelta(days=1)
+    counts["missing"] += sum(1 for x in days if x["state"] == "open")        # today still counts as "to do"
+    return {"cycle": _cycle_view(cyc), "today": today.isoformat(), "selected": d.isoformat(), "days": days,
+            "summary": counts, "prev_date": (cyc.start - timedelta(days=1)).isoformat(),
+            "next_date": (cyc.end + timedelta(days=1)).isoformat() if cyc.end < today else None}
 
 
 @router.get("/day/{employee_id}")
@@ -309,56 +349,53 @@ def get_day(employee_id: str, date: str, current_user: str = Depends(get_current
 
 @router.put("/day/{employee_id}/{date}")
 def save_day(employee_id: str, date: str, body: DayIn, current_user: str = Depends(get_current_user)):
-    """Replace the day's entries (draft). Editing a submitted day withdraws the
-    submission - the employee must submit again."""
+    """Save the day as a DRAFT (autosave). Editing a submitted day withdraws its submission."""
     emp = _require_self(employee_id, current_user)
     cfg = get_config()
     _require_enabled(emp, cfg)
     d = _parse_date(date)
-    _assert_not_locked(emp, d)
-    docs = _build_entry_docs(emp, d, body, cfg)
+    _assert_editable(emp, d)
+    docs = _build_entry_docs(emp, d, body)
     iso = d.isoformat()
     old_docs = list(store.entries.find({"employee_id": emp, "date": iso}, {"created_at": 1}))
     created = min((o["created_at"] for o in old_docs if o.get("created_at")), default=None)
     if created:
         for doc in docs:
             doc["created_at"] = created
-    # Insert the new rows BEFORE removing the old ones: a failed insert can then never
-    # leave the day empty (data loss). The old rows are removed by _id afterwards.
-    store.entries.insert_many(docs)
+    # insert the new rows BEFORE removing the old ones: a failed insert can never leave the day empty
+    if docs:
+        store.entries.insert_many(docs)
     store.entries.delete_many({"_id": {"$in": [o["_id"] for o in old_docs]}})
     store.submissions.delete_one({"employee_id": emp, "date": iso})
+    store.drafts.update_one({"employee_id": emp, "date": iso},
+                            {"$set": {"employee_id": emp, "date": iso, "location": body.location.strip(),
+                                      "cycle_id": rules.cycle_for(d).id, "saved_at": datetime.utcnow()}}, upsert=True)
     hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)
 
 
 @router.post("/day/{employee_id}/{date}/submit")
-def submit_day(employee_id: str, date: str, body: SubmitIn, current_user: str = Depends(get_current_user)):
+def submit_day(employee_id: str, date: str, current_user: str = Depends(get_current_user)):
+    """Strict check of the SAVED day, then mark it submitted."""
     emp = _require_self(employee_id, current_user)
     cfg = get_config()
     _require_enabled(emp, cfg)
     d = _parse_date(date)
+    _assert_editable(emp, d)
     iso = d.isoformat()
-    _assert_not_locked(emp, d)
-    entries = list(store.entries.find({"employee_id": emp, "date": iso}))
-    if not entries:
-        raise HTTPException(422, "Nothing to submit — save at least one entry first")
-
-    payload = _day_payload(emp, d, cfg)
-    totals = payload["totals"]
-    reason = (body.reco_reason or "").strip()
-    if totals["reason_required"] and not reason:
-        raise HTTPException(
-            422, f"Task hours ({totals['task_hours']}) differ from HRMS net hours "
-                 f"({totals['hrms_net']}) by more than {cfg['tolerance']} h — give a reason")
-    if not totals["reason_required"]:
-        reason = ""
-    now = datetime.utcnow()
+    entries = list(store.entries.find({"employee_id": emp, "date": iso}).sort("created_at", 1))
+    sub = store.submissions.find_one({"employee_id": emp, "date": iso})
+    draft = store.drafts.find_one({"employee_id": emp, "date": iso})
+    location = _day_location(entries, sub, draft)
+    if not location:
+        raise HTTPException(422, "Choose a location for the day first")
+    problems = rules.day_submit_errors(location, entries)
+    if problems:
+        raise HTTPException(422, "; ".join(problems[:5]))
     store.submissions.update_one(
         {"employee_id": emp, "date": iso},
-        {"$set": {"employee_id": emp, "date": iso, "submitted_at": now,
-                  "reco_reason": reason, "cycle_id": rules.cycle_for(d).id}},
-        upsert=True,
-    )
+        {"$set": {"employee_id": emp, "date": iso, "submitted_at": datetime.utcnow(), "location": location,
+                  "cycle_id": rules.cycle_for(d).id}}, upsert=True)
+    store.drafts.delete_one({"employee_id": emp, "date": iso})
     hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)

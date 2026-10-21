@@ -28,6 +28,7 @@ def _specs():
                          ([("employee_id", 1), ("task_id", 1)], {}),
                          ([("employee_id", 1), ("legacy_id", 1)], {"sparse": True})]),
         (store.submissions, [([("employee_id", 1), ("date", 1)], {"unique": True}), ([("date", 1)], {})]),
+        (store.drafts, [([("employee_id", 1), ("date", 1)], {"unique": True})]),
         (store.reviews, [([("kind", 1), ("employee_id", 1), ("cycle_id", 1)], {}),
                          ([("kind", 1), ("task_id", 1)], {}), ([("cycle_id", 1)], {})]),
         (store.uploads, [([("uploaded_at", -1)], {}), ([("sha256", 1)], {})]),

@@ -112,6 +112,9 @@ timesheet_temp_collection     = db["Timesheet_temp"]
 #          pilot_employees: [...], holidays: ["YYYY-MM-DD", ...]}.
 timesheet_entries_collection  = db["timesheet_entries"]
 day_submissions_collection    = db["day_submissions"]
+# day_drafts: {employee_id, date, location, saved_at} - the not-yet-submitted state of a day (its location,
+#   and a day off with no rows). day_submissions only ever holds SUBMITTED days.
+day_drafts_collection         = db["day_drafts"]
 hrms_attendance_collection    = db["hrms_attendance"]
 config_collection             = db["config"]
 hrms_uploads_collection       = db["hrms_uploads"]

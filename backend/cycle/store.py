@@ -4,6 +4,7 @@ from backend.database import (
     config_collection,
     cycle_reviews_collection,
     daily_reco_collection,
+    day_drafts_collection,
     day_submissions_collection,
     email_log_collection,
     employee_details_collection,
@@ -19,6 +20,7 @@ CONFIG_ID = "timesheet"
 class _Store:
     entries = timesheet_entries_collection
     submissions = day_submissions_collection
+    drafts = day_drafts_collection
     hrms = hrms_attendance_collection
     uploads = hrms_uploads_collection
     reco = daily_reco_collection

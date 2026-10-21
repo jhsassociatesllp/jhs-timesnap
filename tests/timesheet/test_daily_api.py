@@ -1,11 +1,12 @@
 """
-API tests for the hours-only daily timesheet. Need the Docker dev stack
-(docker compose -f docker-compose.dev.yml up -d): MySQL on 3308 (seeded fake NQ) and
-Mongo on 27018 (scratch database 'timesnap_test'). Never touches .env or real data.
-Seed reference: tests use 2026-10-14; JHS9101 has NQ tasks 1,2,3,5 that day.
+API tests for "My day". They need the Docker dev stack (docker compose -f docker-compose.dev.yml up -d):
+MySQL on 3308 (seeded fake NQ) and Mongo on 27018 (scratch database 'timesnap_test'). The clock is pinned to
+Friday 2026-10-16 10:00 IST (cycle 2026-10-C2 = 11-20 Oct, deadline 25 Oct 23:59). JHS9101 (NQ user 3) has the
+assigned tasks 1, 2, 3 (PL-T001) and 5 (PL-T002) on 2026-10-14; task 13 belongs to someone else, task 4 is finished.
 """
 import os
 import socket
+from datetime import datetime
 
 import pytest
 
@@ -16,14 +17,15 @@ from fastapi.testclient import TestClient
 from pymongo import MongoClient
 
 from backend.auth import get_current_user
-from backend.nq import cache, repository
 from backend.cycle.store import store as cycle_store
 from backend.hrms import reco as hrms_reco
+from backend.nq import cache, repository
 from backend.timesheet import daily
 from tests.nq.conftest import DEV_PORT, dev_settings
 
 MONGO_PORT = int(os.getenv("MONGO_DEV_PORT", "27018"))
 DAY = "2026-10-14"
+NOW = datetime(2026, 10, 16, 10, 0, 0)
 
 
 def _up(port):
@@ -44,26 +46,20 @@ _user = {"id": "JHS9101"}
 @pytest.fixture
 def api(monkeypatch):
     db = MongoClient(f"mongodb://127.0.0.1:{MONGO_PORT}/")["timesnap_test"]
-    for name in ("entries", "submissions", "hrms", "config", "employees"):
-        db[f"t_{name}"].drop()
-    monkeypatch.setattr(daily.store, "entries", db["t_entries"])
-    monkeypatch.setattr(daily.store, "submissions", db["t_submissions"])
-    monkeypatch.setattr(daily.store, "hrms", db["t_hrms"])
-    monkeypatch.setattr(daily.store, "config", db["t_config"])
-    monkeypatch.setattr(daily.store, "employees", db["t_employees"])
-    for attr, coll in (("entries", "t_entries"), ("submissions", "t_submissions"), ("hrms", "t_hrms"),
-                       ("config", "t_config"), ("employees", "t_employees"), ("reco", "t_reco")):
-        monkeypatch.setattr(hrms_reco.store, attr, db[coll])
-    db["t_reco"].drop()
-    db["t_reviews"].drop()
+    for coll in ("entries", "submissions", "drafts", "hrms", "uploads", "reco", "config", "employees", "reviews"):
+        db[f"t_{coll}"].drop()
+    for attr in ("entries", "submissions", "drafts", "config", "employees"):
+        monkeypatch.setattr(daily.store, attr, db[f"t_{attr}"])
+    for attr in ("entries", "submissions", "hrms", "uploads", "reco", "config", "employees"):
+        monkeypatch.setattr(hrms_reco.store, attr, db[f"t_{attr}"])
     monkeypatch.setattr(cycle_store, "reviews", db["t_reviews"])
-    db["t_config"].insert_one({"_id": "timesheet",
-                               "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
+    monkeypatch.setattr(daily, "_now_ist", lambda: NOW)
+    db["t_config"].insert_one({"_id": "timesheet", "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
                                "holidays": ["2026-10-02"]})
     db["t_employees"].insert_many([
-        {"EmpID": "JHS9101", "PartnerEmpCode": "JHS02"},
-        {"EmpID": "JHS9102", "PartnerEmpCode": "JHS02"},
-        {"EmpID": "JHS1562", "PartnerEmpCode": "JHS02"},   # free-text employee, always excluded
+        {"EmpID": "JHS9101", "PartnerEmpCode": "JHS02", "ReportingEmpCode": "JHS9001", "ReportingEmpName": "Manager A"},
+        {"EmpID": "JHS9102", "PartnerEmpCode": "JHS02", "ReportingEmpCode": "JHS9001", "ReportingEmpName": "Manager A"},
+        {"EmpID": "JHS1562", "PartnerEmpCode": "JHS02"},                     # free-text employee, always excluded
     ])
     repository.configure(dev_settings())
     app = FastAPI()
@@ -77,175 +73,257 @@ def api(monkeypatch):
     cache.clear()
 
 
-def put(c, emp, day, entries):
-    return c.put(f"/timesheet/v2/day/{emp}/{day}", json={"entries": entries})
+def row(task_id, hours=None, status="in_progress", remarks="", unplanned=False, **kw):
+    return {"task_id": task_id, "hours": hours, "task_status": status, "remarks": remarks, "is_unplanned": unplanned, **kw}
 
 
-def e(task_id, hours=None, status="in_progress", activity="did work", **kw):
-    return {"task_id": task_id, "hours": hours, "task_status": status, "activity": activity, **kw}
+def unplanned(hours=None, remarks=""):
+    return row(None, hours, remarks=remarks, unplanned=True)
 
 
-def add_hrms(c, emp, day, net, leave=False):
-    c.db["t_hrms"].insert_one({"employee_id": emp, "date": day, "in_time": "09:30",
-                               "out_time": "18:30", "gross_hours": net + 0.5,
-                               "net_hours": net, "leave_flag": leave})
+def put(c, entries, location="Office", emp="JHS9101", day=DAY):
+    return c.put(f"/timesheet/v2/day/{emp}/{day}", json={"location": location, "entries": entries})
 
 
-# ── role checks ──────────────────────────────────────────────────────────────
+def submit(c, emp="JHS9101", day=DAY):
+    return c.post(f"/timesheet/v2/day/{emp}/{day}/submit")
+
+
+def get_day(c, emp="JHS9101", day=DAY):
+    return c.get(f"/timesheet/v2/day/{emp}?date={day}")
+
+
+def strip(c, date=None, emp="JHS9101"):
+    return c.get(f"/timesheet/v2/cycle-days/{emp}" + (f"?date={date}" if date else ""))
+
+
+def states(resp):
+    return {d["date"]: d["state"] for d in resp.json()["days"]}
+
+
+# ── roles ────────────────────────────────────────────────────────────────────
 
 def test_cannot_touch_another_employees_day(api):
-    assert api.get(f"/timesheet/v2/day/JHS9102?date={DAY}").status_code == 403
-    assert put(api, "JHS9102", DAY, [e(5, 1)]).status_code == 403
-    assert api.post(f"/timesheet/v2/day/JHS9102/{DAY}/submit", json={}).status_code == 403
+    assert get_day(api, "JHS9102").status_code == 403
+    assert put(api, [row(5, 1)], emp="JHS9102").status_code == 403
+    assert submit(api, "JHS9102").status_code == 403
+    assert strip(api, emp="JHS9102").status_code == 403
     assert api.get("/timesheet/v2/enabled/JHS9102").status_code == 403
 
 
-def test_not_in_pilot_is_forbidden(api):
+def test_not_in_pilot_is_forbidden_and_free_text_employees_are_excluded(api):
     _user["id"] = "JHS9103"
     assert api.get("/timesheet/v2/enabled/JHS9103").json() == {"enabled": False}
-    assert api.get(f"/timesheet/v2/day/JHS9103?date={DAY}").status_code == 403
-    assert put(api, "JHS9103", DAY, [e(6, 1)]).status_code == 403
-
-
-def test_free_text_employee_excluded_even_if_listed(api):
+    assert get_day(api, "JHS9103").status_code == 403 and strip(api, emp="JHS9103").status_code == 403
     _user["id"] = "JHS1562"
     assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}
-    assert api.get(f"/timesheet/v2/day/JHS1562?date={DAY}").status_code == 403
+    assert put(api, [], emp="JHS1562").status_code == 403
 
 
 # ── reading a day ────────────────────────────────────────────────────────────
 
-def test_my_tasks_panel_has_budget_and_usage(api):
-    body = api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()
-    assert sorted(t["task_id"] for t in body["tasks"]) == [1, 2, 3, 5]
-    t1 = next(t for t in body["tasks"] if t["task_id"] == 1)   # 2026-10-01..31, holiday 10-02
-    assert t1["budget_hours"] == 21 * 8.5 and t1["project_code"] == "PL-T001"
-    assert next(t for t in body["tasks"] if t["task_id"] == 3)["is_overdue"] is True
-    assert body["cycle"]["id"] == "2026-10-C2" and body["hrms"] is None
-    assert body["allocation_assumed_100"] is True
+def test_day_payload_has_assigned_tasks_budget_and_no_hrms(api):
+    b = get_day(api).json()
+    assert sorted(t["task_id"] for t in b["tasks"]) == [1, 2, 3, 5]
+    t1 = next(t for t in b["tasks"] if t["task_id"] == 1)
+    assert t1["budget_hours"] == 21 * 8.5 and t1["project_code"] == "PL-T001" and t1["client_name"] == "Test Client A"
+    assert next(t for t in b["tasks"] if t["task_id"] == 3)["is_overdue"] is True
+    assert b["date"] == DAY and b["weekday"] == "Wednesday" and b["location"] is None and b["submitted"] is False
+    assert b["cycle"]["id"] == "2026-10-C2" and b["cycle"]["deadline"] == "2026-10-25" and b["cycle"]["deadline_passed"] is False
+    assert b["reporting_manager"] == {"code": "JHS9001", "name": "Manager A"}
+    assert b["totals"] == {"task_hours": 0, "rows": 0, "over_24": False} and b["read_only"] is False
+    assert "hrms" not in b and "reco" not in b                                   # no HRMS anywhere on the employee screen
 
 
-def test_future_date_and_bad_date_rejected(api):
-    assert api.get("/timesheet/v2/day/JHS9101?date=2999-01-01").status_code == 400
-    assert api.get("/timesheet/v2/day/JHS9101?date=not-a-date").status_code == 400
+def test_future_and_bad_dates(api):
+    assert get_day(api, day="2026-10-17").status_code == 400
+    assert get_day(api, day="nope").status_code == 400
+    assert put(api, [], day="2026-10-17").status_code == 400
 
 
-# ── saving ───────────────────────────────────────────────────────────────────
+# ── saving a draft ───────────────────────────────────────────────────────────
 
-def test_one_task_day_awaiting_hrms_then_nq_fields_copied(api):
-    r = put(api, "JHS9101", DAY, [e(1, 5, client="EVIL", project="EVIL", project_code="EVIL")])
+def test_draft_is_lenient_and_copies_everything_from_nq(api):
+    r = put(api, [row(1, None, remarks="Kick-off", client="EVIL", project="EVIL", project_code="EVIL")], location="Client Site")
     assert r.status_code == 200
-    row = r.json()["entries"][0]
-    assert row["hours"] is None and row["awaiting_hrms"] is True      # browser hours ignored
-    assert (row["client"], row["project_code"]) == ("Test Client A", "PL-T001")
-    assert r.json()["totals"]["awaiting_hrms"] is True
+    b = r.json()
+    e = b["entries"][0]
+    assert (e["client"], e["project"], e["project_code"], e["task_name"]) == ("Test Client A", "Statutory Audit FY26", "PL-T001", "Planning and scoping")
+    assert (e["hours"], e["remarks"], e["task_status"]) == (None, "Kick-off", "in_progress") and b["location"] == "Client Site"
+    doc = api.db["t_entries"].find_one({"employee_id": "JHS9101"})
+    assert doc["reporting_manager"] == "JHS9001" and doc["reporting_manager_name"] == "Manager A" and doc["activity"] == "Kick-off"
+    assert doc["location"] == "Client Site" and doc["cycle_id"] == "2026-10-C2" and doc["approved"] is False
+    assert api.db["t_drafts"].find_one({"employee_id": "JHS9101", "date": DAY})["location"] == "Client Site"
+    assert b["submitted"] is False
 
 
-def test_one_task_day_locked_to_hrms_net(api):
-    add_hrms(api, "JHS9101", DAY, 8.0)
-    row = put(api, "JHS9101", DAY, [e(1, 3)]).json()["entries"][0]
-    assert row["hours"] == 8.0 and row["awaiting_hrms"] is False
+def test_saving_again_replaces_rows_and_keeps_created_at(api):
+    put(api, [row(1, 4), row(2, 3)])
+    first = api.db["t_entries"].find_one({"task_id": 1})["created_at"]
+    r = put(api, [row(1, 5)], location="Work From Home")
+    assert [e["task_id"] for e in r.json()["entries"]] == [1] and r.json()["totals"]["task_hours"] == 5
+    assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 1
+    assert api.db["t_entries"].find_one({"task_id": 1})["created_at"] == first and api.db["t_entries"].find_one()["location"] == "Work From Home"
 
 
-def test_multi_task_day_uses_entered_hours_and_validates(api):
-    add_hrms(api, "JHS9101", DAY, 8.5)
-    body = put(api, "JHS9101", DAY, [e(1, 4), e(2, 4.25)]).json()
-    assert body["totals"]["task_hours"] == 8.25 and body["totals"]["within_tolerance"] is True
-    assert put(api, "JHS9101", DAY, [e(1, 4), e(2, 0.3)]).status_code == 422     # step
-    assert put(api, "JHS9101", DAY, [e(1, 4), e(2, None)]).status_code == 422    # missing
-    assert put(api, "JHS9101", DAY, [e(1, 4), e(1, 4)]).status_code == 422       # duplicate task
+@pytest.mark.parametrize("entries,location,code", [
+    ([row(1, 4), row(1, 2)], "Office", 422),                                         # same task twice
+    ([row(13, 4)], "Office", 422),                                                   # assigned to someone else
+    ([row(4, 4)], "Office", 422),                                                    # finished and not overdue: not offered
+    ([row(1, -1)], "Office", 422), ([row(1, 25)], "Office", 422), ([row(1, 8.333)], "Office", 422),
+    ([row(1, 4, status="paused")], "Office", 422),                                   # unknown status
+    ([row(1, 4, unplanned=True)], "Office", 422),                                    # unplanned row cannot carry a task
+    ([row(1, 4)], "Moon", 422),                                                      # unknown location
+    ([row(1, 4)], "Leave", 422), ([row(1, 4)], "Week Off", 422), ([row(1, 4)], "PHY", 422),   # a day off carries no rows
+])
+def test_draft_validation(api, entries, location, code):
+    assert put(api, entries, location).status_code == code
+    assert api.db["t_entries"].count_documents({}) == 0
 
 
-def test_task_not_assigned_is_rejected(api):
-    assert put(api, "JHS9101", DAY, [e(13, 4), e(1, 4)]).status_code == 422      # task 13 -> user 13
-    assert put(api, "JHS9101", DAY, [e(4, 4), e(1, 4)]).status_code == 422       # done overdue, not listed
+def test_too_many_rows(api):
+    assert put(api, [unplanned(1, "x" * 5)] * 21).status_code == 422
 
 
-def test_unplanned_needs_reason_and_copies_project(api):
-    bad = {"task_id": None, "is_unplanned": True, "hours": 2, "task_status": "done", "activity": "x"}
-    assert put(api, "JHS9101", DAY, [bad, e(1, 4)]).status_code == 422
-    ok = dict(bad, unplanned_reason="client call", project_code="PL-T002")
-    rows = put(api, "JHS9101", DAY, [ok, e(1, 4)]).json()["entries"]
-    un = next(r for r in rows if r["is_unplanned"])
-    assert (un["client"], un["project_code"], un["unplanned_reason"]) == ("Test Client A", "PL-T002", "client call")
-    assert put(api, "JHS9101", DAY, [dict(ok, project_code="NOPE"), e(1, 4)]).status_code == 422
+def test_unplanned_row_keeps_its_description_as_the_reason(api):
+    r = put(api, [row(1, 3), unplanned(1, "Ad-hoc data pull asked by partner")])
+    assert r.status_code == 200
+    u = api.db["t_entries"].find_one({"is_unplanned": True})
+    assert (u["unplanned_reason"], u["remarks"], u["client"], u["project_code"], u["task_id"]) == \
+           ("Ad-hoc data pull asked by partner", "Ad-hoc data pull asked by partner", "", "", None)
 
 
-def test_hours_used_reflects_saved_entries(api):
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
-    body = api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()
-    assert next(t for t in body["tasks"] if t["task_id"] == 1)["hours_used"] == 4.0
-
-
-# ── submit / reconciliation reason / locks ───────────────────────────────────
-
-def test_submit_requires_reason_outside_tolerance(api):
-    add_hrms(api, "JHS9101", DAY, 8.5)
-    put(api, "JHS9101", DAY, [e(1, 3), e(2, 3)])          # 6.0 vs 8.5 -> short
-    assert api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={}).status_code == 422
-    r = api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={"reco_reason": "client meeting"})
-    assert r.status_code == 200 and r.json()["submitted"] and r.json()["reco_reason"] == "client meeting"
-
-
-def test_submit_within_tolerance_needs_no_reason_and_clears_it(api):
-    add_hrms(api, "JHS9101", DAY, 8.5)
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 4.25)])
-    r = api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={"reco_reason": "ignored"})
-    assert r.status_code == 200 and r.json()["reco_reason"] == ""
-
-
-def test_submit_without_entries_fails_and_without_hrms_ok(api):
-    assert api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={}).status_code == 422
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])           # no HRMS yet -> nothing to reconcile
-    assert api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={}).status_code == 200
-
-
-def test_editing_submitted_day_withdraws_submission(api):
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
-    api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={})
-    assert put(api, "JHS9101", DAY, [e(1, 5), e(2, 3)]).json()["submitted"] is False
-
-
-def test_locked_day_is_read_only(api):
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
-    api.db["t_entries"].update_many({"employee_id": "JHS9101"}, {"$set": {"locked": True}})
-    assert put(api, "JHS9101", DAY, [e(1, 1), e(2, 1)]).status_code == 409
-    assert api.post(f"/timesheet/v2/day/JHS9101/{DAY}/submit", json={}).status_code == 409
-    assert api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()["locked"] is True
-
-
-def test_manager_approved_day_is_read_only(api):
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
-    api.db["t_entries"].update_many({"employee_id": "JHS9101"}, {"$set": {"approved": True}})
-    assert put(api, "JHS9101", DAY, [e(1, 1), e(2, 1)]).status_code == 409
-    assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 2    # nothing was deleted
-
-
-def test_failed_save_never_empties_the_day(api, monkeypatch):
-    put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])
+def test_a_failed_save_never_empties_the_day(api, monkeypatch):
+    put(api, [row(1, 4), row(2, 3)])
     monkeypatch.setattr(daily.store.entries, "insert_many", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db down")))
     with pytest.raises(RuntimeError):
-        put(api, "JHS9101", DAY, [e(1, 2), e(2, 2)])
+        put(api, [row(1, 2)])
     assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 2
 
 
-def test_approved_cycle_blocks_even_new_entries_on_empty_days(api):
-    api.db["t_reviews"].insert_one({"kind": "approval", "employee_id": "JHS9101", "cycle_id": "2026-10-C2",
-                                    "status": "approved"})
-    r = put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)])                 # DAY has no entries, but its cycle is locked
+# ── submitting ───────────────────────────────────────────────────────────────
+
+def test_submit_is_strict(api):
+    assert put(api, []).status_code == 200 and "Add at least one task" in submit(api).json()["detail"]
+    put(api, [row(1, None, remarks="x")])
+    assert "Row 1: enter hours" in submit(api).json()["detail"]
+    put(api, [row(1, 12), row(2, 13)])
+    assert "add up to 25" in submit(api).json()["detail"]
+    put(api, [row(1, 4), unplanned(2, "  ")])
+    assert "Row 2: describe the unplanned work" in submit(api).json()["detail"]
+    assert api.db["t_submissions"].count_documents({}) == 0
+
+
+def test_submit_marks_the_day_and_clears_the_draft(api):
+    put(api, [row(1, 4.5, "done", "Tested POs"), row(2, 3.5)], location="Client Site")
+    r = submit(api)
+    assert r.status_code == 200 and r.json()["submitted"] is True and r.json()["totals"]["task_hours"] == 8.0
+    sub = api.db["t_submissions"].find_one({"employee_id": "JHS9101", "date": DAY})
+    assert sub["location"] == "Client Site" and sub["cycle_id"] == "2026-10-C2" and sub["submitted_at"]
+    assert api.db["t_drafts"].count_documents({}) == 0 and r.json()["location"] == "Client Site"
+
+
+def test_editing_a_submitted_day_withdraws_the_submission(api):
+    put(api, [row(1, 8)])
+    submit(api)
+    assert states(strip(api))[DAY] == "submitted"
+    assert put(api, [row(1, 7.5)]).json()["submitted"] is False
+    assert states(strip(api))[DAY] == "saved" and api.db["t_submissions"].count_documents({}) == 0
+    assert submit(api).status_code == 200 and states(strip(api))[DAY] == "submitted"           # resubmit
+
+
+def test_day_off_needs_no_rows(api):
+    for loc in ("Leave", "Week Off", "PHY"):
+        day = {"Leave": "2026-10-13", "Week Off": "2026-10-12", "PHY": "2026-10-15"}[loc]
+        assert put(api, [], loc, day=day).status_code == 200
+        assert submit(api, day=day).status_code == 200
+        s = api.db["t_submissions"].find_one({"date": day})
+        assert s["location"] == loc
+    assert states(strip(api))["2026-10-13"] == "submitted"
+    assert [d["location"] for d in strip(api).json()["days"] if d["date"] == "2026-10-13"] == ["Leave"]
+
+
+def test_submit_needs_a_saved_location(api):
+    assert submit(api).status_code == 422 and "location" in submit(api).json()["detail"]
+
+
+# ── the day strip ────────────────────────────────────────────────────────────
+
+def test_day_strip_states_and_summary(api):
+    b = strip(api).json()
+    assert b["cycle"]["id"] == "2026-10-C2" and b["today"] == "2026-10-16" and len(b["days"]) == 10
+    st = states(strip(api))
+    assert st["2026-10-11"] == "off"                                                  # Sunday, nothing there
+    assert [st[f"2026-10-{d}"] for d in (12, 13, 14, 15)] == ["missing"] * 4
+    assert st["2026-10-16"] == "open" and st["2026-10-17"] == "future"
+    assert b["summary"] == {"submitted": 0, "saved": 0, "missing": 5}                  # four missing days + today still to do
+    put(api, [row(1, 4)])
+    put(api, [], "Leave", day="2026-10-13"); submit(api, day="2026-10-13")
+    st = states(strip(api))
+    assert st[DAY] == "saved" and st["2026-10-13"] == "submitted"
+    assert strip(api).json()["summary"] == {"submitted": 1, "saved": 1, "missing": 3}
+    assert b["prev_date"] == "2026-10-10" and b["next_date"] is None                  # this cycle has not ended
+    old = strip(api, date="2026-10-05").json()
+    assert old["cycle"]["id"] == "2026-10-C1" and old["next_date"] == "2026-10-11"
+
+
+def test_holiday_and_weekend_are_not_missing(api):
+    st = states(strip(api, date="2026-10-01"))
+    assert st["2026-10-02"] == "off" and st["2026-10-03"] == "off" and st["2026-10-04"] == "off"      # holiday + weekend
+    assert st["2026-10-01"] == "missing" and st["2026-10-05"] == "missing"
+
+
+# ── read-only days ───────────────────────────────────────────────────────────
+
+def test_approved_or_locked_days_are_read_only(api):
+    put(api, [row(1, 4)])
+    api.db["t_entries"].update_many({"employee_id": "JHS9101"}, {"$set": {"approved": True}})
+    assert put(api, [row(1, 1)]).status_code == 409 and submit(api).status_code == 409
+    assert api.db["t_entries"].count_documents({"employee_id": "JHS9101"}) == 1
+    b = get_day(api).json()
+    assert b["read_only"] is True and b["read_only_reason"] == "approved"
+
+
+def test_an_approved_cycle_blocks_even_empty_days(api):
+    api.db["t_reviews"].insert_one({"kind": "approval", "employee_id": "JHS9101", "cycle_id": "2026-10-C2", "status": "approved"})
+    r = put(api, [row(1, 4)], day="2026-10-15")
     assert r.status_code == 409 and "approved" in r.json()["detail"]
     api.db["t_reviews"].update_one({"employee_id": "JHS9101"}, {"$set": {"status": "reopened"}})
-    assert put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)]).status_code == 200      # unlocked again
+    assert put(api, [row(1, 4)], day="2026-10-15").status_code == 200
+
+
+def test_the_deadline_closes_the_sub_cycle(api, monkeypatch):
+    put(api, [row(1, 4)])
+    monkeypatch.setattr(daily, "_now_ist", lambda: datetime(2026, 10, 25, 23, 59, 0))
+    assert put(api, [row(1, 5)]).status_code == 200                                   # still open at 23:59
+    monkeypatch.setattr(daily, "_now_ist", lambda: datetime(2026, 10, 26, 0, 0, 1))
+    r = put(api, [row(1, 6)])
+    assert r.status_code == 409 and "deadline" in r.json()["detail"]
+    assert submit(api).status_code == 409
+    b = get_day(api).json()
+    assert b["read_only"] is True and b["read_only_reason"] == "deadline" and b["cycle"]["deadline_passed"] is True
+
+
+def test_days_from_the_classic_timesheet_are_view_only(api):
+    api.db["t_entries"].insert_one({"employee_id": "JHS9101", "date": DAY, "legacy": True, "task_id": None,
+                                    "task_name": "Old activity text", "hours": 8, "location": "Office",
+                                    "client": "C", "project": "P", "project_code": "PL1", "created_at": NOW})
+    b = get_day(api).json()
+    assert b["read_only_reason"] == "classic" and b["entries"][0]["legacy"] is True and "classic" in b["read_only_text"]
+    assert put(api, [row(1, 4)]).status_code == 409
+    assert strip(api).json()["days"][3]["classic"] is True
 
 
 # ── NQ outage ────────────────────────────────────────────────────────────────
 
-def test_nq_down_page_still_loads_and_planned_save_is_503(api):
+def test_nq_down_page_still_loads_and_only_nq_dependent_saves_fail(api):
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
     s.close()
-    repository.configure(dev_settings(port=port, connect_timeout=1))   # also clears the cache
-    body = api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()
-    assert body["tasks"] == [] and body["nq_unavailable"] and body["nq_data_may_be_stale"]
-    assert put(api, "JHS9101", DAY, [e(1, 4), e(2, 3)]).status_code == 503
+    repository.configure(dev_settings(port=port, connect_timeout=1))
+    b = get_day(api).json()
+    assert b["tasks"] == [] and b["nq_unavailable"] and b["nq_data_may_be_stale"]
+    assert put(api, [row(1, 4)]).status_code == 503
+    assert put(api, [unplanned(2, "Client call not in NQ")]).status_code == 200      # unplanned work needs no NQ
+    assert put(api, [], "Leave", day="2026-10-13").status_code == 200
