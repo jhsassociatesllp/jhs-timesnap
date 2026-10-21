@@ -1,0 +1,75 @@
+/* Dashboard look: restyles the shared dt-* / kpi / bar classes inside a page wrapped in `.md`
+   (same theme as My day; load after my-day.css, daily.css and dashboards.css). */
+.md .dt-banner{display:none;margin:0 0 1rem;padding:.8rem 1.1rem;border-radius:10px;font-weight:500;font-size:.95rem;border:2px solid}
+.md .dt-banner.warn{background:#fef9c3;border-color:#fde047;color:#854d0e}
+.md .dt-banner.err{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.md .dt-banner.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+
+/* filter panel (same panel as the day header) */
+.md .filters{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end}
+.md .filters .form-group label{margin-bottom:.4rem}
+.md .filters .asof{margin-left:auto;font-size:.85rem;color:var(--text-light);padding-bottom:.6rem}
+
+/* cards */
+.md .dt-card{background:#fff;border:2px solid var(--border-color);border-radius:15px;box-shadow:var(--shadow-light);padding:1.4rem 1.5rem;margin:0 0 1.3rem}
+.md .dt-card h3{margin:0 0 .3rem;font-size:1.05rem;color:var(--text-dark)}
+.md .dt-card h3 i{color:#3498db;margin-right:.4rem}
+.md .dt-card > .sub{margin:0 0 1rem}
+.md .dt-muted{color:var(--text-light);font-size:.85rem}
+.md .dt-note{font-size:.8rem;color:var(--text-light);margin-top:.8rem}
+.md .dt-actions{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1rem}
+
+/* tables: navy header like the classic grid */
+.md .table-responsive{overflow-x:auto}
+.md .dt-grid{width:100%;border-collapse:separate;border-spacing:0;font-size:.92rem}
+.md .dt-grid th{background:var(--dark-bg);color:#fff;text-align:left;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:.75rem .8rem;white-space:nowrap}
+.md .dt-grid th:first-child{border-radius:10px 0 0 10px}.md .dt-grid th:last-child{border-radius:0 10px 10px 0}
+.md .dt-grid td{padding:.8rem;border-top:0;border-bottom:1px solid var(--border-color);vertical-align:top}
+.md .dt-grid tbody tr:nth-child(even) td{background:#f8f9fa}
+.md .dt-grid tbody tr:hover td{background:#e3f2fd}
+.md .dt-grid .cap{font-size:.75rem;color:var(--text-light)}
+.md .dt-grid td.empty-row{text-align:center;color:var(--text-light);padding:1.6rem}
+@media (max-width:820px){
+  .md .dt-grid thead{display:none}
+  .md .dt-grid,.md .dt-grid tbody,.md .dt-grid tr,.md .dt-grid td{display:block;width:100%}
+  .md .dt-grid tr{border:2px solid var(--border-color);border-radius:12px;margin-bottom:.8rem;padding:.4rem .2rem;background:#fff}
+  .md .dt-grid tbody tr:nth-child(even) td,.md .dt-grid tbody tr:hover td{background:transparent}
+  .md .dt-grid td{border-bottom:0;padding:.35rem .8rem;display:flex;gap:.8rem;justify-content:space-between;align-items:flex-start}
+  .md .dt-grid td[data-label]::before{content:attr(data-label);flex:0 0 38%;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);padding-top:.15rem}
+  .md .dt-grid td > *{flex:1;min-width:0}
+}
+
+/* controls and buttons */
+.md .dt-card select,.md .dt-card input[type=text],.md .dt-card input[type=date],.md .filters select,.md .filters input[type=text]{
+  height:44px;padding:0 .85rem;border:2px solid var(--border-color);border-radius:10px;font:inherit;font-size:.95rem;background:#fff;color:var(--text-dark);min-width:160px}
+.md .dt-card select:focus,.md .dt-card input:focus,.md .filters select:focus,.md .filters input:focus{outline:none;border-color:#3498db;box-shadow:0 0 0 3px rgba(52,152,219,.12)}
+.md .dt-btn{height:44px;padding:0 1.4rem;border:none;border-radius:10px;font:inherit;font-size:.95rem;font-weight:600;color:#fff;background:var(--secondary-gradient);box-shadow:var(--shadow-light);cursor:pointer;transition:var(--transition)}
+.md .dt-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:var(--shadow-medium)}
+.md .dt-btn.go{background:var(--success-gradient)}
+.md .dt-btn.del{background:var(--danger-gradient)}
+
+/* KPI tiles */
+.md .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin:0 0 1.3rem}
+.md .kpi{background:#fff;border:2px solid var(--border-color);border-left:5px solid #3498db;border-radius:15px;box-shadow:var(--shadow-light);padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.2rem}
+.md .kpi span{display:flex;align-items:center;gap:.5rem;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light)}
+.md .kpi span i{color:#3498db}
+.md .kpi b{font-size:1.9rem;line-height:1.2;color:var(--text-dark)}
+.md .kpi.red{border-left-color:#ef4444}.md .kpi.red b{color:#b91c1c}
+.md .kpi.amber{border-left-color:#f59e0b}.md .kpi.amber b{color:#b45309}
+.md .kpi.green{border-left-color:#22c55e}.md .kpi.green b{color:#15803d}
+
+/* progress bars + RAG badges */
+.md .bar{position:relative;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin:.2rem 0 .3rem;min-width:130px}
+.md .bar > i{display:block;height:100%;border-radius:6px}
+.md .bar.used > i{background:#667eea}.md .bar.done > i{background:#22c55e}
+.md .bar.load > i{background:#f59e0b}.md .bar.load.over > i{background:#ef4444}
+.md .rag{display:inline-block;width:auto;height:auto;border-radius:999px;padding:.12rem .65rem;margin:0 .5rem .2rem 0;font-size:.72rem;font-weight:700;color:#fff;vertical-align:middle}
+.md .rag.red{background:#ef4444}.md .rag.amber{background:#f59e0b}.md .rag.green{background:#22c55e}
+.md .bad{color:#b91c1c;font-weight:600}
+
+/* alerts */
+.md .alert{padding:.7rem 1rem;border-radius:10px;margin:.4rem 0;font-size:.92rem;border-left:5px solid}
+.md .alert.red{background:#fee2e2;color:#7f1d1d;border-left-color:#ef4444}
+.md .alert.amber{background:#fef3c7;color:#78350f;border-left-color:#f59e0b}
+.md .none{color:var(--text-light);font-size:.92rem;padding:.4rem 0}
+@media (max-width:820px){.md .filters .asof{margin-left:0}}

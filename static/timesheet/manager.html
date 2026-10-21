@@ -4,50 +4,56 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
-    <title>Manager Dashboard — JHS</title>
+    <title>Team dashboard — JHS</title>
     <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/timesheet/styles.css" />
     <link rel="stylesheet" href="/static/timesheet/shell.css" />
+    <link rel="stylesheet" href="/static/timesheet/my-day.css" />
     <link rel="stylesheet" href="/static/timesheet/daily.css" />
     <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
+    <link rel="stylesheet" href="/static/timesheet/dash-theme.css" />
   </head>
   <body>
     <div id="appNav" data-active="team"></div>
-    <div class="container">
-      <div class="header"><h1><i class="fas fa-gauge-high"></i> MANAGER DASHBOARD</h1></div>
-      <div id="msg" class="dt-banner"></div>
 
-      <div class="dt-card">
-        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
-          <div id="mgrWrap" style="display:none"><label class="dt-muted" for="mgr">Manager code</label><br />
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-gauge-high"></i> Team dashboard</h1></div>
+
+      <div class="md-body">
+        <div id="msg" class="dt-banner"></div>
+
+        <section class="day-head filters">
+          <div class="form-group" id="mgrWrap" style="display:none"><label for="mgr">Manager code</label>
             <input type="text" id="mgr" placeholder="my dashboard" maxlength="20" /></div>
-          <div><label class="dt-muted" for="days">Compliance window</label><br />
+          <div class="form-group"><label for="days">Compliance window</label>
             <select id="days"><option value="10">Last 10 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></div>
-          <button class="dt-btn" id="go" type="button">Show</button>
-          <div id="asOf" class="dt-muted"></div>
+          <button class="dt-btn" id="go" type="button"><i class="fas fa-rotate"></i> Show</button>
+          <div id="asOf" class="asof"></div>
+        </section>
+
+        <div class="kpi-row" id="kpis"></div>
+
+        <div class="dt-card">
+          <h3><i class="fas fa-diagram-project"></i> Projects, worst first</h3>
+          <p class="sub">Red: overdue work, hours running well ahead of progress, or a late forecast. Amber: early warning.</p>
+          <div class="table-responsive"><table class="dt-grid">
+            <thead><tr><th>Project</th><th>Hours used vs budget</th><th>Tasks done</th><th>Overdue</th><th>Last hours</th><th>Planned end</th><th>Forecast end</th></tr></thead>
+            <tbody id="projects"></tbody></table></div>
         </div>
+
+        <div class="dt-card">
+          <h3><i class="fas fa-people-group"></i> Team load, next 10 working days</h3>
+          <p class="sub">Remaining budget hours of open tasks due in the window, against available hours.</p>
+          <div class="table-responsive"><table class="dt-grid">
+            <thead><tr><th>Employee</th><th>Load</th><th>Remaining hrs / capacity</th><th>Open tasks</th></tr></thead>
+            <tbody id="load"></tbody></table></div>
+        </div>
+
+        <div class="dt-card"><h3><i class="fas fa-bell"></i> Alerts</h3><div id="alerts"></div></div>
+        <div class="dt-note" id="notes"></div>
       </div>
-
-      <div class="kpi-row" id="kpis"></div>
-
-      <div class="dt-card">
-        <h3>Projects — worst first</h3>
-        <div class="table-responsive"><table class="dt-grid">
-          <thead><tr><th>Project</th><th>Hours used vs budget</th><th>Tasks done</th><th>Overdue</th><th>Last hours</th><th>Planned end</th><th>Forecast end</th></tr></thead>
-          <tbody id="projects"></tbody></table></div>
-      </div>
-
-      <div class="dt-card">
-        <h3>Team load — next 10 working days</h3>
-        <div class="table-responsive"><table class="dt-grid">
-          <thead><tr><th>Employee</th><th>Load</th><th>Remaining hrs / capacity</th><th>Open tasks</th></tr></thead>
-          <tbody id="load"></tbody></table></div>
-      </div>
-
-      <div class="dt-card"><h3>Alerts</h3><div id="alerts"></div></div>
-      <div class="dt-note" id="notes"></div>
     </div>
     <script src="/static/timesheet/shell.js"></script>
     <script src="/static/timesheet/dash-common.js"></script>

@@ -41,9 +41,11 @@ window.Dash = (function () {
     el.textContent = text; el.className = "dt-banner " + kind; el.style.display = "block";
   }
 
-  function kpi(box, label, value, cls) {
+  function kpi(box, label, value, cls, icon) {
     const d = document.createElement("div"); d.className = "kpi " + (cls || "");
-    const s = document.createElement("span"); s.textContent = label;
+    const s = document.createElement("span");
+    if (icon) { const i = document.createElement("i"); i.className = "fas " + icon; s.append(i); }
+    s.append(document.createTextNode(label));
     const b = document.createElement("b"); b.textContent = value === null || value === undefined ? "—" : value;
     d.append(s, b); box.append(d);
   }
@@ -57,7 +59,10 @@ window.Dash = (function () {
     b.append(i); return b;
   }
 
-  function ragDot(r) { const s = document.createElement("span"); s.className = "rag " + r; s.title = r; return s; }
+  function ragDot(r) {                                  // a labelled badge, so colour is never the only signal
+    const s = document.createElement("span"); s.className = "rag " + r; s.textContent = r ? r.charAt(0).toUpperCase() + r.slice(1) : "";
+    return s;
+  }
 
   function cell(tr, content) {
     const td = tr.insertCell();
@@ -65,9 +70,15 @@ window.Dash = (function () {
     return td;
   }
 
+  // Copy each column heading onto its cells so a narrow screen can show the table as stacked cards.
+  function label(tbody) {
+    const heads = [...tbody.closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
+    [...tbody.rows].forEach((tr) => { [...tr.cells].forEach((td, i) => { if (heads[i] && !td.classList.contains("empty-row")) td.setAttribute("data-label", heads[i]); }); });
+  }
+
   function alerts(box, list) {
     box.textContent = "";
-    if (!list.length) { box.textContent = "No alerts."; return; }
+    if (!list.length) { const d = document.createElement("div"); d.className = "none"; d.textContent = "No alerts. Everything is on track."; box.append(d); return; }
     list.forEach((a) => { const d = document.createElement("div"); d.className = "alert " + a.level; d.textContent = a.text; box.append(d); });
   }
 
@@ -76,5 +87,5 @@ window.Dash = (function () {
       "team load assumes 100% allocation (Nexus Quant has no allocation field).";
   }
 
-  return { get, download, banner, kpi, pct, fmt, bar, ragDot, cell, alerts, notes };
+  return { get, download, banner, kpi, pct, fmt, bar, ragDot, cell, label, alerts, notes };
 })();
