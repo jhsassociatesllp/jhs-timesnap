@@ -151,6 +151,7 @@ async function loadEmployeeProjects() {
 
     if (res.ok) {
       employeeProjects = await res.json();
+      _showNqBanner();
       window._freeTextClientProject =
         (employeeProjects.partner_emp_code || "").trim().toUpperCase() === FREE_TEXT_PARTNER_CODE ||
         FREE_TEXT_EMPLOYEE_CODES.has((loggedInEmployeeId || "").trim().toUpperCase());
@@ -547,7 +548,7 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" value="${entry.reportingManagerEntry||''}" placeholder="Enter Reporting Manager"></td>
-    <td class="col-activity" style="min-width:200px;"><input type="text" class="activity-field form-input" value="${entry.activity||''}" placeholder="Enter Activity" oninput="updateSummary()"></td>
+    <td class="col-activity" style="min-width:200px;"></td>
     <td class="col-project-hours"><input type="number" class="project-hours-field form-input" value="${entry.projectHours||''}" readonly></td>
     <td class="col-billable">
       <select class="billable-select form-input" onchange="updateSummary()">
@@ -633,6 +634,15 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
     }
   }
 
+  // Activity (after client / project are restored, so its choices can be worked out). An old row without a
+  // picked task keeps its text; the server asks the employee to pick an assigned activity at submit time.
+  setupActivityCell(tr, {
+    activity: entry.activity,
+    nqTaskId: entry.nqTaskId,
+    activityOther: entry.activityOther,
+    activityReason: entry.activityReason,
+  });
+
   // Covers drafts loaded on page load and rows restored right after an Excel
   // upload alike — both funnel through this one restore function.
   showProjectPlanStatus(entry.projectCode || '', { row: tr });
@@ -671,6 +681,10 @@ function createSearchableCombo(type, options, currentValue = "") {
   let lastValid = currentValue || "";
   let highlighted = -1;
   let scrollHandler = null;
+  // options may be an array or a function returning the current array (used by the Activity column,
+  // whose choices depend on the row's client / project / date)
+  const getOpts = () => (typeof options === "function" ? options() : options);
+  input._suggestList = list;       // lets callers remove the floating list when they discard this input
 
   function positionList() {
     const r = input.getBoundingClientRect();
@@ -709,7 +723,8 @@ function createSearchableCombo(type, options, currentValue = "") {
 
   function renderList() {
     const q = input.value.trim().toLowerCase();
-    const matches = (q ? options.filter(o => o.toLowerCase().includes(q)) : options).slice(0, 200);
+    const all = getOpts();
+    const matches = (q ? all.filter(o => o.toLowerCase().includes(q)) : all).slice(0, 200);
     list.innerHTML = "";
     highlighted = -1;
     if (!matches.length) { closeList(); return; }
@@ -762,7 +777,7 @@ function createSearchableCombo(type, options, currentValue = "") {
       e.preventDefault();
       if (highlighted >= 0 && items[highlighted]) {
         commit(items[highlighted].textContent);
-      } else if (options.includes(input.value)) {
+      } else if (getOpts().includes(input.value)) {
         commit(input.value);
       }
     } else if (e.key === "Escape") {
@@ -775,7 +790,7 @@ function createSearchableCombo(type, options, currentValue = "") {
     // whether the typed text is valid.
     setTimeout(() => {
       closeList();
-      if (!options.includes(input.value)) {
+      if (!getOpts().includes(input.value)) {
         input.value = lastValid;
       } else {
         lastValid = input.value;
@@ -784,6 +799,271 @@ function createSearchableCombo(type, options, currentValue = "") {
   });
 
   return input;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   Activity = the Nexus Quant tasks ASSIGNED to this employee for the row's client + project + date
+   (task window overlaps the date, or the task is overdue and still open). Anything else is "Other"
+   with a reason, which the manager sees. Free-text employees (JHS01 partner / JHS1562) and rows whose
+   client is "Other" keep the plain text box they always had.
+   The control's root is a <div class="activity-wrap">; the value-bearing input keeps the class
+   .activity-field, so every existing reader of that class keeps working. The picked task id travels in
+   wrap.dataset.taskId and is read with getActivityState().
+   ───────────────────────────────────────────────────────────────────────────────────────────── */
+const ACTIVITY_OTHER = "Other (not in my assigned list)";
+
+function _activityTasksFor(clientValue, projectValue, dateStr) {
+  if (window._freeTextClientProject) return [];
+  const projs = (employeeProjects.projects_by_client || {})[clientValue] || [];
+  const p = projs.find(x => x.project_name === projectValue);
+  if (!p) return [];
+  const acts = (employeeProjects.activities_by_project || {})[p.project_code] || [];
+  const d = dateStr || "";
+  return acts.filter(a => {
+    const s = a.start_date, e = a.end_date;
+    if (!s && !e) return !a.is_complete;                 // undated task: offered while it is open
+    if (!d) return !a.is_complete;
+    if (s && d < s) return false;                        // starts after this date
+    if (e && d > e) return !a.is_complete;               // ended before this date: only if still open (overdue)
+    return true;                                         // the date falls inside the task window
+  });
+}
+
+function createActivityControl(ctx, preset) {
+  preset = preset || {};
+  const wrap = document.createElement("div");
+  wrap.className = "activity-wrap";
+  wrap._ctx = ctx;
+
+  const tasks = () => _activityTasksFor(ctx.getClient(), ctx.getProject(), ctx.getDate());
+  const labels = () => tasks().map(t => t.label).concat([ACTIVITY_OTHER]);
+  const taskByLabel = (lbl) => tasks().find(t => t.label === lbl);
+  const dropOldList = () => {
+    const old = wrap.querySelector(".activity-field");
+    if (old && old._suggestList) old._suggestList.remove();
+  };
+
+  function showList(value, taskId) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "list";
+    wrap.dataset.taskId = taskId ? String(taskId) : "";
+    const combo = createSearchableCombo("activity", labels, value || "");
+    combo.placeholder = "Select your assigned activity";
+    combo.title = "Only activities assigned to you in Nexus Quant for this client, project and date are listed";
+    combo.addEventListener("change", () => {
+      const v = combo.value;
+      if (v === ACTIVITY_OTHER) { showOther("", ""); return; }
+      const t = taskByLabel(v);
+      wrap.dataset.taskId = t ? String(t.task_id) : "";
+      updateSummary();
+    });
+    wrap.appendChild(combo);
+    if (value && !taskId) {                              // an old / typed value that matches a task by name
+      const t = taskByLabel(value);
+      if (t) wrap.dataset.taskId = String(t.task_id);
+    }
+    updateSummary();
+  }
+
+  function showOther(activity, reason) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "other";
+    wrap.dataset.taskId = "";
+    const what = document.createElement("input");
+    what.type = "text";
+    what.className = "activity-field form-input";
+    what.placeholder = "What did you do?";
+    what.value = activity || "";
+    what.addEventListener("input", updateSummary);
+    const why = document.createElement("input");
+    why.type = "text";
+    why.className = "activity-reason form-input";
+    why.placeholder = "Reason: why is it not in your assigned list?";
+    why.value = reason || "";
+    why.addEventListener("input", updateSummary);
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "activity-back-btn";
+    back.textContent = "↩ pick from my assigned list";
+    back.addEventListener("click", () => showList("", ""));
+    wrap.append(what, why, back);
+    updateSummary();
+  }
+
+  function showPlain(value) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "plain";
+    wrap.dataset.taskId = "";
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "activity-field form-input";
+    inp.placeholder = "Enter Activity";
+    inp.value = value || "";
+    inp.addEventListener("input", updateSummary);
+    wrap.appendChild(inp);
+  }
+
+  wrap._showList = showList;
+  wrap._showOther = showOther;
+  wrap._showPlain = showPlain;
+
+  if (window._freeTextClientProject || ctx.isPlain()) showPlain(preset.activity);
+  else if (preset.activityOther) showOther(preset.activity, preset.activityReason);
+  else showList(preset.activity, preset.nqTaskId);
+  return wrap;
+}
+
+// scope = a table row or the modal's #modalActivityHost
+function getActivityState(scope) {
+  const wrap = scope && scope.querySelector ? scope.querySelector(".activity-wrap") : null;
+  const field = scope && scope.querySelector ? scope.querySelector(".activity-field") : null;
+  const activity = field ? field.value : "";
+  if (!wrap) return { activity, nqTaskId: null, activityOther: false, activityReason: "" };
+  const mode = wrap.dataset.mode;
+  return {
+    activity,
+    nqTaskId: mode === "list" && wrap.dataset.taskId ? Number(wrap.dataset.taskId) : null,
+    activityOther: mode === "other",
+    activityReason: mode === "other" ? (scope.querySelector(".activity-reason")?.value || "") : "",
+  };
+}
+
+function setActivityState(scope, st) {
+  st = st || {};
+  const wrap = scope.querySelector(".activity-wrap");
+  if (!wrap) {
+    const f = scope.querySelector(".activity-field");
+    if (f) f.value = st.activity || "";
+    return;
+  }
+  if (wrap.dataset.mode === "plain") { wrap._showPlain(st.activity); return; }
+  if (st.activityOther) wrap._showOther(st.activity, st.activityReason);
+  else wrap._showList(st.activity, st.nqTaskId);
+}
+
+// Keep the Activity consistent with the client / project / date of its row (or of the modal).
+function _refreshActivityWrap(wrap, clear) {
+  if (!wrap || window._freeTextClientProject) return;
+  const mode = wrap.dataset.mode, ctx = wrap._ctx;
+  if (ctx.isPlain()) {                                   // client is "Other": plain text like before
+    if (mode !== "plain") wrap._showPlain(wrap.querySelector(".activity-field")?.value || "");
+    return;
+  }
+  if (mode === "other") return;                          // an explicit "Other" stays Other
+  if (mode === "plain" || clear) { wrap._showList("", ""); return; }
+  const id = Number(wrap.dataset.taskId || 0);           // date changed: keep only a still-valid task
+  if (id && !_activityTasksFor(ctx.getClient(), ctx.getProject(), ctx.getDate()).some(t => t.task_id === id)) {
+    wrap._showList("", "");
+  }
+}
+
+function refreshActivity(row, clear) {
+  _refreshActivityWrap(row && row.querySelector(".activity-wrap"), clear);
+}
+
+function setupActivityCell(row, preset) {
+  const cell = row.querySelector(".col-activity");
+  if (!cell) return;
+  cell.innerHTML = "";
+  const ctx = {
+    getClient: () => getFieldValue(row, ".col-client"),
+    getProject: () => getFieldValue(row, ".col-project"),
+    getDate: () => row.querySelector(".date-field")?.value || "",
+    isPlain: () => (getFieldValue(row, ".col-client") || "").trim() === "Other",
+  };
+  cell.appendChild(createActivityControl(ctx, preset));
+  const dateField = row.querySelector(".date-field");
+  if (dateField && !row._activityDateHook) {
+    row._activityDateHook = true;
+    dateField.addEventListener("change", () => refreshActivity(row, false));
+  }
+}
+
+// ── the same control inside the edit modal (replaces the old plain #modalInput9) ──
+function mountModalActivity(state) {
+  let host = document.getElementById("modalActivityHost");
+  if (!host) {
+    const old = document.getElementById("modalInput9");
+    if (!old || !old.parentNode) return;
+    host = document.createElement("div");
+    host.id = "modalActivityHost";
+    old.parentNode.replaceChild(host, old);
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay) {
+      overlay.addEventListener("change", (e) => {
+        const t = e.target;
+        if (!t || !t.closest) return;
+        const wrap = document.querySelector("#modalActivityHost .activity-wrap");
+        if (t.closest("#modalClientContainer, #modalProjectContainer")) _refreshActivityWrap(wrap, true);
+        else if (t.id === "modalInput1") _refreshActivityWrap(wrap, false);
+      });
+    }
+  }
+  const modalVal = (id) => (document.getElementById(id)?.querySelector("input")?.value || "").trim();
+  const ctx = {
+    getClient: () => modalVal("modalClientContainer"),
+    getProject: () => modalVal("modalProjectContainer"),
+    getDate: () => document.getElementById("modalInput1")?.value || "",
+    isPlain: () => modalVal("modalClientContainer") === "Other",
+  };
+  host.innerHTML = "";
+  host.appendChild(createActivityControl(ctx, state || {}));
+}
+
+// Copies the modal's activity back onto its table row (after the row's client/project/date were updated).
+function applyModalActivityToRow(row) {
+  const host = document.getElementById("modalActivityHost");
+  if (!host || !row) return;
+  const st = getActivityState(host);
+  refreshActivity(row, false);                           // e.g. client became "Other" -> plain text
+  if (!st.activityOther && st.nqTaskId) {
+    const ok = _activityTasksFor(getFieldValue(row, ".col-client"), getFieldValue(row, ".col-project"),
+                                 row.querySelector(".date-field")?.value || "").some(t => t.task_id === st.nqTaskId);
+    if (!ok) {
+      setActivityState(row, { activity: "" });
+      showPopup("The activity was cleared: it is not assigned to you for that project and date.", true);
+      return;
+    }
+  }
+  setActivityState(row, st);
+}
+
+// history edit: the saved entry (with its nqTaskId) comes from the history data already loaded
+function _historyActivityState(entryId, fallbackText) {
+  for (const p of (window._historyPayrolls || [])) {
+    const list = p.entries || (p.weeks || []).flatMap(w => w.entries || []);
+    const e = list.find(x => x.id === entryId);
+    if (e) return { activity: e.activity || fallbackText, nqTaskId: e.nqTaskId || null,
+                    activityOther: !!e.activityOther, activityReason: e.activityReason || "" };
+  }
+  return { activity: fallbackText };
+}
+
+// Banner above the cycle selector: NQ down / stale / nothing assigned yet
+function _showNqBanner() {
+  const p = employeeProjects || {};
+  let msg = "";
+  if (p.nq_unavailable) {
+    msg = "Project data from Nexus Quant is unavailable right now, so your assigned clients, projects and activities cannot be listed. Please refresh in a few minutes. Rows you already saved are not affected.";
+  } else if (p.nq_data_may_be_stale) {
+    msg = "Project data may be out of date.";
+  } else if (p.source === "nq" && !(p.clients || []).length) {
+    msg = "No clients, projects or activities are assigned to you in Nexus Quant yet. You can use Other (with a reason) for now, and ask your manager to assign your work in Nexus Quant.";
+  }
+  let el = document.getElementById("nqBanner");
+  if (!msg) { if (el) el.style.display = "none"; return; }
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "nqBanner";
+    el.style.cssText = "margin:1rem 0;padding:.8rem 1.2rem;border-radius:10px;font-weight:600;background:#fef9c3;border:2px solid #fde047;color:#854d0e;";
+    const anchor = document.getElementById("payrollCycleSelectorWrap");
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
+  }
+  el.textContent = msg;
+  el.style.display = "block";
 }
 
 function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
@@ -1211,7 +1491,7 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
-    <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
+    <td class="col-activity" style="min-width: 200px;"></td>
     <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
     <td class="col-billable">
       <select class="billable-select form-input" onchange="updateSummary()">
@@ -1255,6 +1535,7 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
 
   // ✅ Setup smart dropdowns for client, project, project code
   setupSmartDropdowns(tr);
+  setupActivityCell(tr);
   applyLocationTimeRules(tr);
 
   // Auto focus first input
@@ -1477,6 +1758,7 @@ function _applyRowClientCascade(row, clientValue) {
 
     projectCodeCell.innerHTML = "";
     projectCodeCell.appendChild(createReadonlyProjectCode("Other", "Other"));
+    refreshActivity(row, true);
     updateSummary();
     return;
   }
@@ -1491,6 +1773,7 @@ function _applyRowClientCascade(row, clientValue) {
 
   projectCodeCell.innerHTML = "";
   projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+  refreshActivity(row, true);
   updateSummary();
 }
 
@@ -1507,6 +1790,7 @@ function _applyRowProjectCode(row, clientValue, projectValue) {
   projectCodeCell.innerHTML = "";
   projectCodeCell.appendChild(createReadonlyProjectCode(code, "Auto-filled"));
   showProjectPlanStatus(code, { row });
+  refreshActivity(row, true);
 }
 
 function setupSmartDropdowns(row) {
@@ -2129,7 +2413,7 @@ function openModal(button) {
 
   // Set other fields
   document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
-  document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
+  mountModalActivity(getActivityState(currentRow));
   document.getElementById("modalInput10").value = currentRow.querySelector(".project-hours-field")?.value || "";
   document.getElementById("modalInput11").value = currentRow.querySelector(".billable-select")?.value || "";
   // Lunch & Travel Time
@@ -2380,8 +2664,7 @@ function saveModalEntry() {
   const reportingManager = currentRow.querySelector(".reporting-manager-field");
   if (reportingManager) reportingManager.value = document.getElementById("modalInput8").value;
 
-  const activity = currentRow.querySelector(".activity-field");
-  if (activity) activity.value = document.getElementById("modalInput9").value;
+  applyModalActivityToRow(currentRow);
 
   const projectHours = currentRow.querySelector(".project-hours-field");
   if (projectHours) projectHours.value = document.getElementById("modalInput10").value;
@@ -3161,7 +3444,7 @@ function editHistoryRow(button, entryId) {
       }
 
     document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
-    document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Activity
+    mountModalActivity(_historyActivityState(entryId, cells[10].textContent.trim())); // Activity
     document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Project Hours
     document.getElementById("modalInput11").value = cells[12].textContent.trim(); // Billable
     document.getElementById("modalInput12").value = cells[13].textContent.trim(); // Remarks
@@ -3214,7 +3497,10 @@ function updateHistoryEntry() {
     projectCode: projectCodeValue,
     
     reportingManagerEntry: document.getElementById("modalInput8").value,
-    activity: document.getElementById("modalInput9").value,
+    ...(() => {
+      const st = getActivityState(document.getElementById("modalActivityHost"));
+      return { activity: st.activity, nqTaskId: st.nqTaskId, activityOther: st.activityOther, activityReason: st.activityReason };
+    })(),
     projectHours: document.getElementById("modalInput10").value,
     billable: document.getElementById("modalInput11").value,
     remarks: document.getElementById("modalInput12").value,
@@ -3234,7 +3520,7 @@ function updateHistoryEntry() {
         closeModal();
         loadHistory();
       } else {
-        showPopup("Failed to update entry", true);
+        showPopup((res && res.detail) || "Failed to update entry", true);
       }
     })
     .catch((err) => {
@@ -3284,7 +3570,8 @@ function _collectEntries() {
     const project         = getFieldValue(row, '.col-project') || '';
     const projectCode     = getFieldValue(row, '.col-project-code') || '';
     const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || '';
-    const activity        = row.querySelector('.activity-field')?.value || '';
+    const actState       = getActivityState(row);
+    const activity        = actState.activity || '';
     const projectHours    = row.querySelector('.project-hours-field')?.value || '0';
     let billable          = row.querySelector('.billable-select')?.value || 'No';
     const remarks         = row.querySelector('.remarks-field')?.value || '';
@@ -3302,6 +3589,9 @@ function _collectEntries() {
       reportingManagerEntry: reportingMgr,
       activity, projectHours, billable, remarks,
       lunchTime, travelTime,
+      nqTaskId: actState.nqTaskId,
+      activityOther: actState.activityOther,
+      activityReason: actState.activityReason,
     });
   });
   return entries;
@@ -3651,6 +3941,7 @@ function copyRow(button) {
     projectCode: getFieldValue(row, '.col-project-code'), // ✅ Smart dropdown
     reportingManager: row.querySelector('.reporting-manager-field')?.value || '',
     activity: row.querySelector('.activity-field')?.value || '',
+    activityState: getActivityState(row),
     billable: row.querySelector('.billable-select')?.value || '',
     remarks: row.querySelector('.remarks-field')?.value || ''
   };
@@ -3691,8 +3982,8 @@ function pasteRow(button) {
   const reportingManagerField = row.querySelector('.reporting-manager-field');
   if (reportingManagerField) reportingManagerField.value = copiedData.reportingManager;
   
-  const activityField = row.querySelector('.activity-field');
-  if (activityField) activityField.value = copiedData.activity;
+  refreshActivity(row, true);                              // client / project were just pasted
+  setActivityState(row, copiedData.activityState || { activity: copiedData.activity });
   
   const billableField = row.querySelector('.billable-select');
   if (billableField) billableField.value = copiedData.billable;

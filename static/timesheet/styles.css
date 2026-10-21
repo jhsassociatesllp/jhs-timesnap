@@ -460,3 +460,8 @@ body{
     color: #3730a3;
     animation: fadeInMeta 0.3s ease;
 }
+
+/* Activity column (Nexus Quant assigned tasks) */
+.activity-wrap{ display:flex; flex-direction:column; gap:4px; min-width:200px; }
+.activity-wrap .activity-reason{ font-size:.82rem; }
+.activity-back-btn{ align-self:flex-start; background:none; border:none; color:#5d5fef; cursor:pointer; font-size:.78rem; padding:0; }
