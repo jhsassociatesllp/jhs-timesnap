@@ -161,3 +161,25 @@ select.inp{width:auto;min-width:200px}
 
 /* styles.css gives .form-group select 1rem padding; keep the 44px control readable */
 .form-group select.inp,.form-group input.inp{padding:0 .85rem}
+
+/* My tasks: search + client > project groups, overdue collapsed */
+.tsearch{position:relative;margin-bottom:.5rem}
+.tsearch i{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:var(--text-light);pointer-events:none}
+.tsearch .inp{padding-left:2.4rem}
+.tsummary{font-size:.8rem;color:var(--text-light);margin:0 0 .6rem}
+.tgroup{border:0}
+.tgroup > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:.4rem;padding:.55rem .2rem;font-weight:600;color:var(--text-dark)}
+.tgroup > summary::-webkit-details-marker{display:none}
+.tgroup > summary::before{content:"\25B8";font-size:.8rem;color:var(--text-light);transition:var(--transition)}
+.tgroup[open] > summary::before{transform:rotate(90deg)}
+.tgroup > summary .tcount{margin-left:auto;background:#e5e7eb;color:#4b5563;border-radius:999px;font-size:.72rem;padding:.05rem .55rem;font-weight:700}
+.tgroup > summary .tcode{font-size:.75rem;color:var(--text-light);font-weight:500}
+.tgroup.client{border-bottom:1px solid var(--border-color);margin-bottom:.4rem}
+.tgroup.client > summary{font-size:.95rem}
+.tgroup.proj{margin-left:.9rem}
+.tgroup.proj > summary{font-size:.88rem}
+.tgroup.od{margin-left:.9rem}
+.tgroup.od > summary{font-size:.8rem;color:#b91c1c;font-weight:600}
+.tgroup.od > summary .tcount{background:#fee2e2;color:#b91c1c}
+.tgroup .tcard{margin:.35rem 0 .35rem .9rem;width:calc(100% - .9rem);padding:.6rem .8rem}
+.tgroup .tcard .t1{font-size:.88rem}

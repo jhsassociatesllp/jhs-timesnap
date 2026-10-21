@@ -48,6 +48,7 @@
   const S = {
     date: null, day: null, strip: null, rows: [], location: "Office", readOnly: false,
     timer: null, chain: Promise.resolve(), dirty: false, hintsOn: false,
+    taskQuery: "", taskOpen: new Set(),         // search text and which task groups the person opened
   };
   let seq = 0;
   const newRow = (init) => Object.assign({ key: ++seq, task_id: null, unplanned: false, hours: "", status: "in_progress", remarks: "", info: null }, init || {});
@@ -166,19 +167,68 @@
 
   function taskInfo(t) { return { name: t.task_name, client: t.client_name, project: t.project_name, code: t.project_code, end: t.end_date, overdue: t.is_overdue }; }
 
+  // "My tasks today": searchable, grouped client > project; overdue tasks sit in a collapsed sub-group with a count.
+  function taskMatches(t, q) {
+    if (!q) return true;
+    return [t.task_name, t.client_name, t.project_name, t.project_code].some((v) => String(v || "").toLowerCase().includes(q));
+  }
+
+  function taskCard(t, used) {
+    const meta = t.is_overdue ? `Overdue · ended ${shortDate(t.end_date)}`
+      : `${t.end_date ? "Ends " + shortDate(t.end_date) : "No end date"} · ${fmt(t.hours_used)} of ${fmt(t.budget_hours)} h used`;
+    return h("button", { type: "button", class: "tcard" + (t.is_overdue ? " overdue" : "") + (used.has(t.task_id) ? " added" : ""),
+      disabled: S.readOnly || isDayOff(), onclick: () => addTask(t) },
+      h("div", { class: "t1", text: t.task_name }),
+      h("div", { class: "t3", text: used.has(t.task_id) ? "Added to today ✓" : meta }));
+  }
+
   function renderTasks() {
     const box = $("taskCards"); box.textContent = "";
-    const tasks = S.day.tasks, used = usedTaskIds();
-    if (!tasks.length) { box.append(h("div", { class: "empty", text: S.day.nq_unavailable ? "Tasks are unavailable right now." : "No tasks are assigned to you for this date. Use “Unplanned work” if you did something else." })); return; }
+    const sum = $("taskSummary"); sum.textContent = "";
+    const all = S.day.tasks, used = usedTaskIds();
+    $("taskSearchWrap").hidden = all.length < 6;
+    if (!all.length) { box.append(h("div", { class: "empty", text: S.day.nq_unavailable ? "Tasks are unavailable right now." : "No tasks are assigned to you for this date. Use “Unplanned work” if you did something else." })); return; }
+    const q = S.taskQuery.trim().toLowerCase();
+    const tasks = all.filter((t) => taskMatches(t, q));
+    const overdueAll = all.filter((t) => t.is_overdue).length;
+    sum.textContent = q ? `${tasks.length} of ${all.length} tasks match` : `${all.length - overdueAll} current · ${overdueAll} overdue`;
+    if (!tasks.length) { box.append(h("div", { class: "empty", text: "No task matches your search." })); return; }
+
+    const byClient = new Map();                       // client -> project key -> { name, code, current[], overdue[] }
     tasks.forEach((t) => {
-      const meta = t.is_overdue ? `Overdue · ended ${shortDate(t.end_date)}`
-        : `${t.end_date ? "Ends " + shortDate(t.end_date) : "No end date"} · ${fmt(t.hours_used)} of ${fmt(t.budget_hours)} h used`;
-      const card = h("button", { type: "button", class: "tcard" + (t.is_overdue ? " overdue" : "") + (used.has(t.task_id) ? " added" : ""),
-        disabled: S.readOnly || isDayOff(), onclick: () => addTask(t) },
-        h("div", { class: "t1", text: t.task_name }),
-        h("div", { class: "t2" }, `${t.client_name || "—"} · ${t.project_name || ""} · `, h("span", { class: "mono", text: t.project_code })),
-        h("div", { class: "t3", text: used.has(t.task_id) ? "Added to today ✓" : meta }));
-      box.append(card);
+      const c = t.client_name || "No client", pk = t.project_code || t.project_name || "";
+      if (!byClient.has(c)) byClient.set(c, new Map());
+      const projects = byClient.get(c);
+      if (!projects.has(pk)) projects.set(pk, { name: t.project_name || pk, code: t.project_code || "", current: [], overdue: [] });
+      projects.get(pk)[t.is_overdue ? "overdue" : "current"].push(t);
+    });
+
+    const isOpen = (key, dflt) => { const on = [...S.taskOpen].includes(key + ":1"), off = [...S.taskOpen].includes(key + ":0"); return on ? true : off ? false : dflt; };
+    const mk = (key, cls, summary, kids, dflt) => {
+      const d = h("details", { class: cls });
+      d.open = !!q || isOpen(key, dflt);
+      d.append(h("summary", {}, ...summary), ...kids);
+      d.addEventListener("toggle", () => {
+        if (q) return;
+        S.taskOpen.delete(key + ":1"); S.taskOpen.delete(key + ":0"); S.taskOpen.add(key + (d.open ? ":1" : ":0"));
+      });
+      return d;
+    };
+
+    [...byClient.keys()].sort((a, b) => a.localeCompare(b)).forEach((client) => {
+      const projects = [...byClient.get(client).values()].sort((a, b) => (b.current.length > 0) - (a.current.length > 0) || a.name.localeCompare(b.name));
+      const clientCount = projects.reduce((n, p) => n + p.current.length + p.overdue.length, 0);
+      const kids = projects.map((p) => {
+        const inner = p.current.map((t) => taskCard(t, used));
+        if (p.overdue.length) {
+          inner.push(mk(`od:${client}|${p.code}`, "tgroup od", [h("span", { text: `Overdue (${p.overdue.length})` })],
+            p.overdue.map((t) => taskCard(t, used)), false));
+        }
+        return mk(`p:${client}|${p.code}`, "tgroup proj",
+          [h("span", { class: "tname", text: p.name }), " ", h("span", { class: "mono tcode", text: p.code }), h("span", { class: "tcount", text: String(p.current.length + p.overdue.length) })],
+          inner, p.current.length > 0);
+      });
+      box.append(mk(`c:${client}`, "tgroup client", [h("span", { class: "tname", text: client }), h("span", { class: "tcount", text: String(clientCount) })], kids, true));
     });
   }
 
@@ -492,6 +542,7 @@
     renderWork(); renderTasks(); touched();
   });
   $("submitBtn").addEventListener("click", submitDay);
+  $("taskSearch").addEventListener("input", () => { S.taskQuery = $("taskSearch").value; renderTasks(); });
   $("prevDay").addEventListener("click", () => goto(addDays(S.date, -1)));
   $("nextDay").addEventListener("click", () => goto(addDays(S.date, 1)));
   $("todayBtn").addEventListener("click", () => goto(S.strip.today));

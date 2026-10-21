@@ -63,6 +63,11 @@
             <section class="card" aria-labelledby="mtH">
               <h3 id="mtH"><i class="fas fa-list-check"></i> My tasks today</h3>
               <p class="sub">From Nexus Quant: tasks running on this date, plus overdue ones. Click one to add it.</p>
+              <div class="tsearch" id="taskSearchWrap">
+                <i class="fas fa-magnifying-glass"></i>
+                <input class="inp" id="taskSearch" type="search" placeholder="Search tasks, clients or projects" aria-label="Search my tasks" autocomplete="off" />
+              </div>
+              <div class="tsummary" id="taskSummary"></div>
               <div class="taskcards" id="taskCards"></div>
             </section>
           </aside>
