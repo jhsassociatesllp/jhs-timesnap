@@ -81,6 +81,7 @@ from backend.access_manager.router     import router as access_manager_router   
 from backend.compliance_calendar.router import router as compliance_calendar_router  # ← Compliance Calendar
 from backend.nq.health import router as nq_health_router  # ← NQ health (/api/health/nq)
 from backend.timesheet.daily import router as timesheet_daily_router  # ← hours-only daily timesheet (pilot)
+from backend.timesheet.me import router as timesheet_me_router  # ← role info for the shared menu (/timesheet/v2/me)
 from backend.hrms.router import router as hrms_router  # ← HRMS upload + reconciliation
 from backend.cycle.router import router as cycle_router  # ← 10-day cycle review
 from backend.metrics.router import router as dashboard_router  # ← manager / portfolio dashboards
@@ -135,6 +136,7 @@ app.include_router(access_manager_router)  # prefix: /access-manager
 app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
 app.include_router(nq_health_router)  # prefix: /api/health
 app.include_router(timesheet_daily_router)  # prefix: /timesheet/v2
+app.include_router(timesheet_me_router)  # prefix: /timesheet/v2
 app.include_router(hrms_router)  # prefix: /hrms
 app.include_router(cycle_router)  # prefix: /timesheet/v2/cycles
 app.include_router(dashboard_router)  # prefix: /dashboard

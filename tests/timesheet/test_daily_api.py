@@ -370,3 +370,27 @@ def test_nq_down_page_still_loads_and_only_nq_dependent_saves_fail(api):
     assert put(api, [row(1, 4)]).status_code == 503
     assert put(api, [unplanned(2, "Client call not in NQ")]).status_code == 200      # unplanned work needs no NQ
     assert put(api, [], "Leave", day="2026-10-13").status_code == 200
+
+
+def test_me_endpoint_reports_roles_for_the_menu(api, monkeypatch):
+    from backend.metrics import access
+    from backend.timesheet import me
+    monkeypatch.setattr(me.store, "employees", api.db["t_employees"])
+    monkeypatch.setattr(me, "config_doc", lambda: api.db["t_config"].find_one({"_id": "timesheet"}) or {})
+    monkeypatch.setattr(access, "is_admin", lambda u: u == "JHS9001")
+    monkeypatch.setattr(access, "is_partner", lambda u: False)
+    monkeypatch.setattr(access, "is_manager", lambda u: u == "JHS9001")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(me.router)
+    app.dependency_overrides[get_current_user] = lambda: _user["id"]
+    c = TestClient(app)
+    api.db["t_employees"].insert_one({"EmpID": "JHS9001", "Emp Name": "Manager A", "PartnerEmpCode": "JHS02"})
+    _user["id"] = "JHS9101"
+    b = c.get("/timesheet/v2/me").json()
+    assert b["employee_id"] == "JHS9101" and b["new_timesheet"] is True
+    assert (b["is_admin"], b["is_manager"], b["has_reportees"]) == (False, False, False)
+    _user["id"] = "JHS9001"
+    b = c.get("/timesheet/v2/me").json()
+    assert b["name"] == "Manager A" and b["is_admin"] is True and b["has_reportees"] is True and b["is_manager"] is True

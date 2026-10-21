@@ -178,7 +178,6 @@
 
   $("go").addEventListener("click", load);
   $("cycleSel").addEventListener("change", load);
-  $("who").textContent = emp;
   fillCycles();
   load();
 })();

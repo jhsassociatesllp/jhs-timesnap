@@ -4,57 +4,56 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
-    <title>Review timesheets — JHS</title>
+    <title>Review team — JHS</title>
     <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
     <link rel="stylesheet" href="/static/timesheet/my-day.css" />
     <link rel="stylesheet" href="/static/timesheet/review.css" />
   </head>
   <body>
-    <header class="top">
-      <div class="top-in">
-        <strong class="brand">JHS Timesnap</strong>
-        <nav class="nav" aria-label="Main">
-          <a href="/timesheet">Timesheet</a>
-          <a href="/static/timesheet/review.html" class="on" aria-current="page">Review</a>
-          <a href="/static/timesheet/manager.html">Dashboard</a>
-          <a href="/modules">Modules</a>
-        </nav>
-        <div class="top-r"><span id="who"></span></div>
-      </div>
-    </header>
+    <div id="appNav" data-active="review"></div>
 
-    <main>
-      <div id="banners" aria-live="polite"></div>
-      <h1 style="margin:0 0 14px;font-size:24px">Review timesheets</h1>
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-clipboard-check"></i> Review team</h1></div>
 
-      <div class="rv-bar">
-        <div><label for="cycleSel">10-day cycle</label><select class="inp" id="cycleSel"></select></div>
-        <div id="teamWrap" hidden><label for="team">Manager code (admin)</label><input class="inp" id="team" maxlength="20" placeholder="all pilot teams" style="width:170px" /></div>
-        <button class="btn small" id="go" type="button">Show</button>
-      </div>
-      <p class="rv-info" id="cycleInfo"></p>
+      <div class="md-body">
+        <div id="banners" aria-live="polite"></div>
 
-      <div class="cols">
-        <section class="card work" aria-labelledby="teamH">
-          <h2 id="teamH">Your team</h2>
-          <div style="overflow-x:auto">
-            <table class="tbl">
-              <thead><tr><th><input type="checkbox" id="all" aria-label="Select all" /></th><th>Employee</th><th class="num">Days filled</th><th class="num hide-s">Hours</th><th class="num hide-s">Unplanned</th><th>Status</th><th class="hide-s">Open items</th></tr></thead>
-              <tbody id="rows"></tbody>
-            </table>
+        <section class="day-head rv-head">
+          <div class="rv-bar">
+            <div class="form-group"><label for="cycleSel">10-day cycle</label><select class="inp" id="cycleSel"></select></div>
+            <div class="form-group" id="teamWrap" hidden><label for="team">Manager code (admin)</label><input class="inp" id="team" maxlength="20" placeholder="all teams" /></div>
+            <button class="btn small" id="go" type="button"><i class="fas fa-rotate"></i> Show</button>
           </div>
-          <label class="confirm" id="confirmWrap" hidden><input type="checkbox" id="confirm" /> <span id="confirmText"></span></label>
-          <div class="rv-actions">
-            <button class="btn primary small" id="approveBtn" type="button">Approve &amp; lock selected</button>
-          </div>
+          <p class="rv-info" id="cycleInfo"></p>
         </section>
 
-        <aside class="side" style="flex:1 1 380px">
-          <section class="card" id="detail" aria-live="polite"><div class="empty">Click an employee to see their days.</div></section>
-        </aside>
+        <div class="cols">
+          <section class="card work" aria-labelledby="teamH">
+            <h3 id="teamH"><i class="fas fa-users"></i> Your team</h3>
+            <p class="sub">Click a name to see their days. Approving locks the cycle for that employee.</p>
+            <div class="table-responsive">
+              <table class="tbl">
+                <thead><tr><th><input type="checkbox" id="all" aria-label="Select all" /></th><th>Employee</th><th class="num">Days filled</th><th class="num hide-s">Hours</th><th class="num hide-s">Unplanned</th><th>Status</th><th class="hide-s">Open items</th></tr></thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+            <label class="confirm" id="confirmWrap" hidden><input type="checkbox" id="confirm" /> <span id="confirmText"></span></label>
+            <div class="rv-actions">
+              <button class="btn good" id="approveBtn" type="button"><i class="fas fa-lock"></i> Approve &amp; lock selected</button>
+            </div>
+          </section>
+
+          <aside class="side" style="flex:1 1 380px">
+            <section class="card" id="detail" aria-live="polite"><div class="empty">Click an employee to see their days.</div></section>
+          </aside>
+        </div>
       </div>
-    </main>
+    </div>
+    <script src="/static/timesheet/shell.js"></script>
     <script src="/static/timesheet/review.js"></script>
   </body>
 </html>

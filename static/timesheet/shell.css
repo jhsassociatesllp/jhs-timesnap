@@ -1,0 +1,7 @@
+/* Small additions for the shared navigation bar (built from the classic .navbar in styles.css). */
+.navbar .nav-left{display:flex;align-items:center;gap:1rem}
+.navbar .hamburger{border:0;line-height:1;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center}
+.navbar .nav-brand{color:#fff;text-decoration:none;font-weight:700;font-size:1.1rem;letter-spacing:.5px}
+.navbar .nav-user{color:rgba(255,255,255,.85);font-size:.9rem;text-align:right}
+.navbar .nav-menu i{width:1.4rem;text-align:center;margin-right:.3rem}
+@media (max-width:600px){.navbar .nav-user{display:none}}

@@ -9,17 +9,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
     <link rel="stylesheet" href="/static/timesheet/daily.css" />
     <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
   </head>
   <body>
-    <div class="navbar">
-      <div class="nav-menu active" style="position:static;display:flex;gap:1rem;width:auto;background:none;box-shadow:none;">
-        <a href="/timesheet" style="padding:.4rem 1rem"><i class="fas fa-arrow-left"></i> Timesheet</a>
-        <a href="/static/timesheet/cycle.html" style="padding:.4rem 1rem"><i class="fas fa-calendar-check"></i> Cycle review</a>
-        <a href="/static/timesheet/portfolio.html" id="portfolioLink" style="padding:.4rem 1rem;display:none"><i class="fas fa-chart-pie"></i> Portfolio</a>
-      </div>
-    </div>
+    <div id="appNav" data-active="team"></div>
     <div class="container">
       <div class="header"><h1><i class="fas fa-gauge-high"></i> MANAGER DASHBOARD</h1></div>
       <div id="msg" class="dt-banner"></div>
@@ -54,6 +49,7 @@
       <div class="dt-card"><h3>Alerts</h3><div id="alerts"></div></div>
       <div class="dt-note" id="notes"></div>
     </div>
+    <script src="/static/timesheet/shell.js"></script>
     <script src="/static/timesheet/dash-common.js"></script>
     <script src="/static/timesheet/manager.js"></script>
   </body>

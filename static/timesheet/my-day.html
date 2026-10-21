@@ -6,66 +6,69 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
     <title>Timesheet — JHS</title>
     <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
     <link rel="stylesheet" href="/static/timesheet/my-day.css" />
   </head>
   <body>
-    <div id="boot" class="boot">Loading your timesheet…</div>
+    <div id="appNav" data-active="myday"></div>
 
-    <div id="app" hidden>
-      <header class="top">
-        <div class="top-in">
-          <strong class="brand">JHS Timesnap</strong>
-          <nav class="nav" aria-label="Main">
-            <a href="/timesheet" class="on" aria-current="page">Timesheet</a>
-            <a href="/static/timesheet/review.html" id="reviewLink" hidden>Review</a>
-            <a href="/static/timesheet/index.html" title="The classic timesheet grid">Classic view</a>
-            <a href="/modules">Modules</a>
-          </nav>
-          <div class="top-r"><span id="who"></span><button id="logout" class="linkbtn" type="button">Log out</button></div>
-        </div>
-      </header>
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-stopwatch"></i> My timesheet</h1></div>
 
-      <main>
+      <div id="boot" class="boot">Loading your timesheet…</div>
+
+      <div id="app" class="md-body" hidden>
         <div id="banners" aria-live="polite"></div>
 
-        <div class="cyclebar">
-          <div>
+        <section class="day-head">
+          <div class="day-head-l">
             <div class="cyc-label" id="cycLabel"></div>
-            <h1 id="dayTitle"></h1>
+            <h2 id="dayTitle"></h2>
             <div class="daynav">
-              <button class="iconbtn" id="prevDay" type="button" aria-label="Previous day">‹</button>
-              <input class="inp" id="datePick" type="date" aria-label="Pick a date" style="width:auto;height:32px" />
-              <button class="iconbtn" id="nextDay" type="button" aria-label="Next day">›</button>
+              <button class="iconbtn" id="prevDay" type="button" aria-label="Previous day"><i class="fas fa-chevron-left"></i></button>
+              <input class="inp" id="datePick" type="date" aria-label="Pick a date" />
+              <button class="iconbtn" id="nextDay" type="button" aria-label="Next day"><i class="fas fa-chevron-right"></i></button>
               <button class="iconbtn" id="todayBtn" type="button">Today</button>
             </div>
           </div>
-          <div>
+          <div class="day-head-r">
             <div class="strip" id="strip" aria-label="Days of this cycle"></div>
-            <div class="strip" style="margin-top:8px"><span class="stripsum" id="stripSum"></span>
-              <span class="stripnav"><button class="iconbtn" id="prevCycle" type="button">‹ Earlier cycle</button><button class="iconbtn" id="nextCycle" type="button">Later cycle ›</button></span>
+            <div class="stripfoot">
+              <span class="stripsum" id="stripSum"></span>
+              <span class="stripnav">
+                <button class="iconbtn" id="prevCycle" type="button"><i class="fas fa-angles-left"></i> Earlier cycle</button>
+                <button class="iconbtn" id="nextCycle" type="button">Later cycle <i class="fas fa-angles-right"></i></button>
+              </span>
+            </div>
+            <div class="legend" aria-hidden="true">
+              <span><i class="dot submitted"></i>Submitted</span><span><i class="dot saved"></i>Saved</span>
+              <span><i class="dot missing"></i>To do</span><span><i class="dot off"></i>Day off</span>
             </div>
           </div>
-        </div>
+        </section>
 
         <div class="locbar">
-          <label for="loc">Where did you work?</label>
-          <select class="inp" id="loc"></select>
+          <div class="form-group">
+            <label for="loc">Where did you work?</label>
+            <select class="inp" id="loc"></select>
+          </div>
           <span id="saveState" class="save-state" role="status" aria-live="polite"></span>
         </div>
 
         <div class="cols">
           <aside class="side">
             <section class="card" aria-labelledby="mtH">
-              <h2 id="mtH">My tasks today</h2>
-              <p class="sub">From Nexus Quant · tasks running on this date, plus overdue ones</p>
+              <h3 id="mtH"><i class="fas fa-list-check"></i> My tasks today</h3>
+              <p class="sub">From Nexus Quant: tasks running on this date, plus overdue ones. Click one to add it.</p>
               <div class="taskcards" id="taskCards"></div>
             </section>
           </aside>
 
           <section class="card work" aria-labelledby="twH">
-            <h2 id="twH">Today's work</h2>
+            <h3 id="twH"><i class="fas fa-pen-to-square"></i> Today's work</h3>
             <div id="workBody"></div>
 
             <div class="totals" id="totals" hidden>
@@ -77,14 +80,15 @@
 
             <div class="submitrow">
               <p id="submitNote">Hours are what you worked. Submitting sends the day to your manager.</p>
-              <button class="btn primary" id="submitBtn" type="button">Submit day</button>
+              <button class="btn primary" id="submitBtn" type="button"><i class="fas fa-paper-plane"></i> Submit day</button>
             </div>
           </section>
         </div>
-      </main>
+      </div>
     </div>
 
     <div class="plist" id="plist" role="listbox" hidden></div>
+    <script src="/static/timesheet/shell.js"></script>
     <script src="/static/timesheet/my-day.js"></script>
   </body>
 </html>

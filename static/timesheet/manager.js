@@ -54,7 +54,6 @@
     try {
       const a = await D.get("/dashboard/access");
       if (a.is_admin || a.is_partner) $("mgrWrap").style.display = "block";
-      if (a.portfolio) $("portfolioLink").style.display = "inline-block";
       if (!a.manager_dashboard) { D.banner("msg", "Only managers, partners and admins have a dashboard.", "err"); return; }
       await load();
     } catch (err) { D.banner("msg", err.message, "err"); }

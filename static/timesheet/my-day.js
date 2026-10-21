@@ -195,7 +195,7 @@
       return;
     }
     const ro = S.readOnly;
-    body.append(h("div", { class: "whead" }, h("div", { text: "Task" }), h("div", { text: "What I did" }), h("div", { text: "Hours" }), h("div", { text: "Status" }), h("div")));
+    body.append(h("div", { class: "whead" }, h("div", { text: "Task" }), h("div", { text: "Hours" }), h("div", { text: "Status" }), h("div")));
     S.rows.forEach((r) => body.append(buildRow(r, ro)));
     if (!S.rows.length) body.append(h("div", { class: "empty", text: "Nothing added yet. Click a task on the left, or press “+ Add task”." }));
     const actions = h("div", { class: "rowactions" });
@@ -234,7 +234,7 @@
 
     // status
     const seg = h("div", { class: "seg", role: "group", "aria-label": "Status" });
-    STATUS.forEach(([v, l]) => seg.append(h("button", { type: "button", class: r.status === v ? "on" : "", "aria-pressed": r.status === v ? "true" : "false", disabled: ro,
+    STATUS.forEach(([v, l]) => seg.append(h("button", { type: "button", "data-s": v, class: r.status === v ? "on" : "", "aria-pressed": r.status === v ? "true" : "false", disabled: ro,
       onclick: () => { r.status = v; seg.querySelectorAll("button").forEach((b, i) => { b.classList.toggle("on", STATUS[i][0] === v); b.setAttribute("aria-pressed", STATUS[i][0] === v ? "true" : "false"); }); touched(); } }, l)));
     row.append(h("div", {}, seg));
 
@@ -498,12 +498,6 @@
   $("datePick").addEventListener("change", () => { if ($("datePick").value) goto($("datePick").value); });
   $("prevCycle").addEventListener("click", () => goto(S.strip.prev_date));
   $("nextCycle").addEventListener("click", () => { if (S.strip.next_date) goto(S.strip.next_date); });
-  $("logout").addEventListener("click", () => {
-    fetch("/logout", { method: "POST", headers }).finally(() => {
-      localStorage.removeItem("access_token"); localStorage.removeItem("loggedInEmployeeId");
-      window.location.href = "/static/login.html";
-    });
-  });
   window.addEventListener("beforeunload", (e) => { if (S.dirty && !S.readOnly) { e.preventDefault(); e.returnValue = ""; } });
 
   // ── start: only pilot employees see this page; everyone else gets the classic timesheet ──
@@ -511,11 +505,9 @@
     try {
       const en = await api("GET", `/timesheet/v2/enabled/${emp}`);
       if (!en.enabled) { window.location.replace("/static/timesheet/index.html"); return; }
-      $("who").textContent = emp;
       const strip0 = await api("GET", `/timesheet/v2/cycle-days/${emp}`);
       await loadDay(strip0.today);
       $("boot").hidden = true; $("app").hidden = false;
-      api("GET", `/timesheet/v2/cycles/${strip0.cycle.id}/team`).then(() => { $("reviewLink").hidden = false; }).catch(() => { /* not a manager */ });
     } catch (err) {
       $("boot").textContent = "Could not load your timesheet: " + err.message;
     }

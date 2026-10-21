@@ -106,7 +106,7 @@
   (async () => {
     try {
       const a = await call("GET", "/hrms/access");
-      if (a.is_admin) { $("teamWrap").style.display = "block"; $("uploadLink").style.display = "inline-block"; }
+      if (a.is_admin) { $("teamWrap").style.display = "block"; }
       if (!a.is_admin && !a.is_manager) { banner("Only managers and admins can view reconciliation.", "err"); return; }
       await load();
     } catch (err) { banner(err.message, "err"); }
