@@ -4166,19 +4166,20 @@ function exportTimesheetToExcel() {
     const employeeInfo = getEmployeeInfoForExport();
     const wb = XLSX.utils.book_new();
 
+    // same columns as the downloadable template, so an export can be edited and uploaded again
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "date","location","projectStartTime","projectEndTime",
+        "date","location",
         "client","project","projectCode","reportingManagerEntry","activity",
-        "projectHours","billable","lunchTime","travelTime","remarks",
+        "projectHours","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others"
     ];
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Date","Work","Project Start Time","Project End Time",
+        "Date","Work",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
-        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "Project Hours","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others"
     ];
 
@@ -4188,17 +4189,12 @@ function exportTimesheetToExcel() {
     rows.forEach((row) => {
         const date            = row.querySelector('.date-field')?.value?.trim() || "";
         const location        = row.querySelector('.location-select')?.value || "";
-        const projectStart    = row.querySelector('.project-start')?.value || "";
-        const projectEnd      = row.querySelector('.project-end')?.value || "";
         const client          = getFieldValue(row, '.col-client') || "";
         const project          = getFieldValue(row, '.col-project') || "";
         const projectCode     = getFieldValue(row, '.col-project-code') || "";
         const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || "";
         const activity        = row.querySelector('.activity-field')?.value || "";
         const projectHours    = row.querySelector('.project-hours-field')?.value || "";
-        const billable        = row.querySelector('.billable-select')?.value || "";
-        const lunchTime       = row.querySelector('.lunch-time-select')?.value || "";
-        const travelTime      = row.querySelector('.travel-time-select')?.value || "";
         const remarks         = row.querySelector('.remarks-field')?.value || "";
 
         if (!date && !project && !client) return;
@@ -4211,11 +4207,9 @@ function exportTimesheetToExcel() {
             partner: employeeInfo["Partner"],
             reportingManager: employeeInfo["Reporting Manager"],
             date, location,
-            projectStartTime: projectStart,
-            projectEndTime: projectEnd,
             client, project, projectCode,
             reportingManagerEntry: reportingMgr,
-            activity, projectHours, billable, lunchTime, travelTime, remarks,
+            activity, projectHours, remarks,
             hits: document.getElementById("hits")?.value || "",
             misses: document.getElementById("misses")?.value || "",
             feedback_hr: document.getElementById("feedback_hr")?.value || "",
@@ -4244,20 +4238,20 @@ function exportHistoryToExcel() {
 
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "date","location","projectStartTime","projectEndTime",
+        "date","location",
         "client","project","projectCode","reportingManagerEntry","activity",
-        "projectHours","billable","lunchTime","travelTime","remarks",
+        "projectHours","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others",
-        "totalHours","totalBillableHours","totalNonBillableHours"
+        "totalHours"
     ];
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Date","Work","Project Start Time","Project End Time",
+        "Date","Work",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
-        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "Project Hours","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others",
-        "Total Hours","Total Billable Hours","Total Non Billable Hours"
+        "Total Hours"
     ];
 
     const cleanedRows = historyEntries.map((row) => ({
@@ -4269,17 +4263,12 @@ function exportHistoryToExcel() {
         reportingManager: row.reportingManager || "",
         date: row.date || "",
         location: row.location || "",
-        projectStartTime: row.projectStartTime || "",
-        projectEndTime: row.projectEndTime || "",
         client: row.client || "",
         project: row.project || "",
         projectCode: row.projectCode || "",
         reportingManagerEntry: row.reportingManagerEntry || "",
         activity: row.activity || "",
         projectHours: row.projectHours || "",
-        billable: row.billable || "",
-        lunchTime: row.lunchTime || "",
-        travelTime: row.travelTime || "",
         remarks: row.remarks || "",
         hits: row.hits || "",
         misses: row.misses || "",
@@ -4287,9 +4276,7 @@ function exportHistoryToExcel() {
         feedback_it: row.feedback_it || "",
         feedback_crm: row.feedback_crm || "",
         feedback_others: row.feedback_others || "",
-        totalHours: row.totalHours || "",
-        totalBillableHours: row.totalBillableHours || "",
-        totalNonBillableHours: row.totalNonBillableHours || ""
+        totalHours: row.totalHours || ""
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
@@ -5089,6 +5076,26 @@ async function handleExcelUpload(event) {
             };
           });
 
+          // Activity -> the assigned Nexus Quant task of that project (so the row passes the submit rule), or
+          // "Other" with the Remarks as its reason. Anything else stays as typed text and is flagged below.
+          const activityProblems = [];
+          timesheetData.forEach((entry, i) => {
+            if (!entry.date || isDayOffLocation(entry.location) || window._freeTextClientProject) return;
+            if (entry.client.trim().toUpperCase() === 'OTHER') return;
+            const text = entry.activity.trim().toLowerCase();
+            if (text === 'other' || text === ACTIVITY_OTHER.toLowerCase()) {
+              entry.activityOther = true;
+              entry.activityReason = (entry.remarks || '').trim();
+              entry.activity = ACTIVITY_OTHER;
+              if (entry.activityReason.length < 3) activityProblems.push(`Row ${i + 1} (${entry.date}): Activity "Other" needs the reason in Remarks`);
+              return;
+            }
+            const tasks = (employeeProjects.activities_by_project || {})[entry.projectCode] || [];
+            const match = tasks.find(t => t.label.toLowerCase() === text) || tasks.find(t => t.name.toLowerCase() === text);
+            if (match) { entry.nqTaskId = match.task_id; entry.activity = match.label; }
+            else activityProblems.push(`Row ${i + 1} (${entry.date}): Activity "${entry.activity || '(blank)'}" is not one of your tasks for ${entry.projectCode || 'this project'} - see the "My tasks" tab`);
+          });
+
           // Rows with no Date are unused buffer rows from the template (dropdown/
           // validation formatting can materialize a cell even when nothing was
           // typed into it) — they aren't real entries, so drop them here.
@@ -5097,6 +5104,12 @@ async function handleExcelUpload(event) {
           if (realEntries.length === 0) {
             hideLoading();
             showPopup('No filled-in rows found in this Excel file.', true);
+            return;
+          }
+          if (activityProblems.length) {
+            hideLoading();
+            showPopup(activityProblems.slice(0, 5).join('\n') + (activityProblems.length > 5 ? `\n...and ${activityProblems.length - 5} more` : ''), true);
+            event.target.value = "";
             return;
           }
 
@@ -5334,11 +5347,13 @@ async function downloadSampleTemplate() {
     // LTSC — don't have and never will). Ctrl+F searches it like any text.
     const refWS = window._freeTextClientProject ? null : wb.addWorksheet('Client-Project List');
 
+    // Columns: A-F employee details, G Date, H Work, I Client, J Project, K Project Code, L Reporting Manager Entry,
+    // M Activity, N Project Hours (typed), O Remarks, P-U 3 Hits ... Feedback for Others
     const headers = [
       'Employee ID','Employee Name','Designation','Gender','Partner','Reporting Manager',
-      'Date','Work','Project Start Time','Project End Time',
+      'Date','Work',
       'Client','Project','Project Code','Reporting Manager Entry','Activity',
-      'Project Hours','Billable','Lunch Time','Travel Time','Remarks',
+      'Project Hours','Remarks',
       '3 Hits','3 Misses','Feedback for HR','Feedback for IT','Feedback for CRM','Feedback for Others'
     ];
     const headerRow = ws.addRow(headers);
@@ -5350,15 +5365,13 @@ async function downloadSampleTemplate() {
     let lastDateRow = 1;
 
     while (curr <= end) {
-      const rIdx        = ws.rowCount + 1;
       const dateStr     = curr.toISOString().split('T')[0];
-      const hFormula    = `IF(AND(I${rIdx}<>"",J${rIdx}<>""),(J${rIdx}-I${rIdx})*24,"")`;
 
       ws.addRow([
         empId, empName, designation, gender, partner, repManager,
-        dateStr, '', '', '',
+        dateStr, '',
         '', '', '', repManager, '',
-        { formula: hFormula }, 'Yes', '30 min', 'None', '',
+        '', '',
         '', '', '', '', '', ''
       ]);
       lastDateRow = ws.rowCount;
@@ -5372,11 +5385,9 @@ async function downloadSampleTemplate() {
     // validation identically throughout.
     const bufferRows = lastDateRow + 60;
 
-    // Apply hh:mm format to Project Start/End Time columns (I, J) across the
-    // full buffer range, not just the date rows, so inserted/extra rows format correctly too.
+    // Project Hours (N) is typed by the employee: a plain number, 2 decimals
     for (let r = 2; r <= bufferRows; r++) {
-      ws.getCell(`I${r}`).numFmt = 'hh:mm';
-      ws.getCell(`J${r}`).numFmt = 'hh:mm';
+      ws.getCell(`N${r}`).numFmt = '0.00';
     }
 
     // ── Build MetadataLists sheet (hidden helper sheet backing the dropdowns) ──
@@ -5384,7 +5395,7 @@ async function downloadSampleTemplate() {
     let d = new Date(start);
     while (d <= end) { dateValues.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
 
-    const locations = ['Office','Client Site','Work From Home','Field Work','Leave','PHY','Week Off'];
+    const locations = ['Office','Client Site','Work From Home','Leave','Week Off','PHY'];
     const billable  = ['Yes','No'];
     const lunch     = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr'];
     const travel    = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr','2.5 hr','3 hr'];
@@ -5469,6 +5480,43 @@ async function downloadSampleTemplate() {
     lookupNames.forEach((name, r) => { metaWS.getCell(r + 2, 24).value = name; });
     lookupCodes.forEach((code, r) => { metaWS.getCell(r + 2, 25).value = code; });
 
+    // Activities: every assigned task label (flat list for the dropdown) + "Other"; the visible "My tasks" tab shows
+    // which task belongs to which project and when it runs.
+    const activityLabels = [];
+    if (!freeTextClientProject) {
+      const seen = new Set();
+      Object.values(employeeProjects.activities_by_project || {}).forEach(list => list.forEach(a => {
+        if (a.is_complete) return;                           // finished tasks are not offered (same as the grid)
+        if (!seen.has(a.label)) { seen.add(a.label); activityLabels.push(a.label); }
+      }));
+      activityLabels.push('Other');
+    }
+    metaWS.getCell(1, 28).value = 'Activities';
+    activityLabels.forEach((label, r) => { metaWS.getCell(r + 2, 28).value = label; });
+    if (!freeTextClientProject) {
+      const tasksWS = wb.addWorksheet('My tasks');
+      tasksWS.getCell('A1').value = 'Your assigned Nexus Quant tasks. Pick the Activity in the Timesheet tab from these; ' +
+        'use "Other" (with the reason in Remarks) only for work that is not in this list.';
+      tasksWS.getCell('A1').font = { italic: true, size: 10, color: { argb: 'FF6B7280' } };
+      tasksWS.mergeCells('A1:G1');
+      tasksWS.getRow(1).height = 30;
+      tasksWS.getCell('A1').alignment = { wrapText: true, vertical: 'middle' };
+      const th = tasksWS.addRow(['Client', 'Project', 'Project Code', 'Activity', 'Starts', 'Ends', 'Status']);
+      th.font = { bold: true };
+      th.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
+      clients.forEach(c => {
+        if (c === 'Other') return;
+        (employeeProjects.projects_by_client[c] || []).forEach(p => {
+          ((employeeProjects.activities_by_project || {})[p.project_code] || []).forEach(a => {
+            if (a.is_complete) return;
+            tasksWS.addRow([c, p.project_name, p.project_code, a.label, a.start_date || '', a.end_date || '', a.is_complete ? 'Complete' : (a.status || 'Open')]);
+          });
+        });
+      });
+      tasksWS.views = [{ state: 'frozen', ySplit: 2 }];
+      [30, 40, 16, 44, 12, 12, 14].forEach((w, i) => { tasksWS.getColumn(i + 1).width = w; });
+    }
+
     // Shared-services (free-text partner) Project Code options — the fixed
     // SS-team list plus "Type Here", mirroring the app's dropdown.
     const ssProjectCodeOptions = freeTextClientProject
@@ -5520,9 +5568,15 @@ async function downloadSampleTemplate() {
     const lookupEnd  = Math.max(lookupNames.length + 1, 2);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
-    const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
-    const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
-    const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
+    // Activity: strict list of the employee's own tasks (+ Other); free-text employees type it freely
+    const dvActivity = freeTextClientProject ? null : strictList(`MetadataLists!$AB$2:$AB$${Math.max(activityLabels.length + 1, 2)}`);
+    const dvHours = {
+      type: 'decimal', operator: 'between', allowBlank: true,
+      showErrorMessage: true, errorStyle: 'error',
+      errorTitle: 'Invalid hours',
+      error: 'Type the hours you worked on this row as a number from 0.25 to 24, e.g. 4 or 2.5.',
+      formulae: [0.25, 24]
+    };
     // Plain static strict list — Excel dropdowns can't live-filter based on
     // their own in-progress typed text without a dynamic-array function
     // (FILTER), which many real-world Excel installs don't have (notably
@@ -5540,24 +5594,15 @@ async function downloadSampleTemplate() {
       showErrorMessage: false,
       formulae: [`MetadataLists!$AA$2:$AA$${ssProjectCodeOptions.length + 1}`]
     } : null;
-    // Strict time-of-day validation so Project Start/End Time can only ever
-    // hold an actual time value (rejects plain text, numbers, etc.).
-    const dvTime = {
-      type: 'time', operator: 'between', allowBlank: true,
-      showErrorMessage: true, errorStyle: 'error',
-      errorTitle: 'Invalid time',
-      error: 'Enter a valid time (hh:mm), e.g. 09:30.',
-      formulae: [0, 0.9999884259259259]
-    };
 
     // (bufferRows was computed earlier, alongside the search-helper block)
     for (let r = 2; r <= bufferRows; r++) {
       ws.getCell(`G${r}`).dataValidation  = dvDate;
       ws.getCell(`H${r}`).dataValidation  = dvLocation;
-      ws.getCell(`I${r}`).dataValidation  = dvTime;
-      ws.getCell(`J${r}`).dataValidation  = dvTime;
-      if (dvClient) ws.getCell(`K${r}`).dataValidation = dvClient;
-      if (dvSSProjectCode) ws.getCell(`M${r}`).dataValidation = dvSSProjectCode;
+      if (dvClient) ws.getCell(`I${r}`).dataValidation = dvClient;
+      if (dvSSProjectCode) ws.getCell(`K${r}`).dataValidation = dvSSProjectCode;
+      if (dvActivity) ws.getCell(`M${r}`).dataValidation = dvActivity;
+      ws.getCell(`N${r}`).dataValidation = dvHours;
       // Project's dependent-dropdown formula must reference *this* row's
       // Client cell explicitly (MATCH(K{r}, ...)) rather than a single
       // shared reference — ExcelJS splits a 500-row range into several XML
@@ -5569,11 +5614,11 @@ async function downloadSampleTemplate() {
       // errorStyle 'error') so a Client of "Other" — which has no fixed
       // project list — can still be typed into freely.
       if (!freeTextClientProject) {
-        ws.getCell(`L${r}`).dataValidation = {
+        ws.getCell(`J${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDIRECT("Client_"&MATCH(K${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
+          formulae: [`INDIRECT("Client_"&MATCH(I${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
         };
-        // Project Code (M) is normally auto-filled by the formula set below —
+        // Project Code (K) is normally auto-filled by the formula set below —
         // but a row a user inserts via Excel's own Insert Row only inherits
         // formatting/validation, never formulas/values, which would otherwise
         // leave Project Code blank on an inserted row. Backing it with this
@@ -5582,14 +5627,11 @@ async function downloadSampleTemplate() {
         // an inserted row too — one click instead of zero, but no dead end.
         // Doesn't fight the formula: a formula-derived value never triggers
         // its own cell's validation, only a value the user types/picks does.
-        ws.getCell(`M${r}`).dataValidation = {
+        ws.getCell(`K${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(L${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
+          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(J${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
         };
       }
-      ws.getCell(`Q${r}`).dataValidation  = dvBillable;
-      ws.getCell(`R${r}`).dataValidation  = dvLunch;
-      ws.getCell(`S${r}`).dataValidation  = dvTravel;
     }
 
     // ── Project Code formula (Column M) — auto-fills "Other" when Client is
@@ -5599,20 +5641,10 @@ async function downloadSampleTemplate() {
     // extra/inserted rows compute the code too, not just the original dates. ──
     if (!freeTextClientProject) {
       for (let r = 2; r <= bufferRows; r++) {
-        ws.getCell(`M${r}`).value = {
-          formula: `IF(K${r}="Other","Other",IFERROR(VLOOKUP(L${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
+        ws.getCell(`K${r}`).value = {
+          formula: `IF(I${r}="Other","Other",IFERROR(VLOOKUP(J${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
         };
       }
-    }
-
-    // ── Project Hours formula (Column P) — computed from Start/End Time.
-    // Only the cycle's date rows get it inline when created (above); extend it
-    // across the full buffer range too, so extra/inserted rows compute hours
-    // automatically as well, exactly like the real date rows do. ──
-    for (let r = lastDateRow + 1; r <= bufferRows; r++) {
-      ws.getCell(`P${r}`).value = {
-        formula: `IF(AND(I${r}<>"",J${r}<>""),(J${r}-I${r})*24,"")`
-      };
     }
 
     // ── Every column stays editable, including Project Code (M) — it's
@@ -5627,7 +5659,7 @@ async function downloadSampleTemplate() {
     // object across untouched cells, so leaving one column "untouched" let
     // it silently pick up whatever locked state a neighboring cell happened
     // to set. ──
-    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U'];
     const lockedCols = [];
     for (let r = 2; r <= bufferRows; r++) {
       allDataCols.forEach(col => {
@@ -5658,7 +5690,7 @@ async function downloadSampleTemplate() {
     });
 
     // Reasonable column widths so the template reads like the app, not a raw dump
-    const widths = [12,18,14,10,14,18,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
+    const widths = [12,18,14,10,14,18,12,16,16,22,14,20,28,12,26,16,16,20,20,20,20];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     const cycleLabel = _selectedCycle.cycle_label.replace(/[^a-zA-Z0-9]/g, '_');
