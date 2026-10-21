@@ -50,6 +50,7 @@ from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
 from backend.timesheet import nq_assignments
+from backend.timesheet import rules as ts_rules
 from backend.timesheet.models import (
     TimesheetEntry,
     UpdateTimesheetRequest,
@@ -392,14 +393,14 @@ async def submit_timesheet(
     meta = _trusted_metadata(current_user, temp_payroll.get("metadata") or metadata or {})
     temp_entries = _get_payroll_entries(temp_payroll)
 
-    # Keep not-applicable time fields consistently empty in both the submitted
-    # timesheet and the locked draft. This also makes older drafts conform when
-    # they are submitted after a location is changed.
+    # Keep not-applicable fields consistently empty in both the submitted timesheet and the locked
+    # draft. A day off (Leave / PHY / Week Off) carries no worked hours. Start/end time, lunch, travel and
+    # billable are no longer entered; older drafts that still carry them keep their values untouched.
     for entry in temp_entries:
         location = (entry.get("location", "") or "").strip()
         if location in DAY_OFF_LOCATIONS:
             entry["lunchTime"] = ""
-            entry["billable"] = "No"
+            entry["projectHours"] = ""
         if location in NO_TRAVEL_TIME_LOCATIONS:
             entry["travelTime"] = ""
 
@@ -427,25 +428,11 @@ async def submit_timesheet(
             if not entry.get("date") or (entry.get("date", "") or "")[:10] in required_dates
         ]
 
-    # ── Lunch-time gate ─────────────────────────────────────────────────
-    show_lunch_travel = cycle_doc.get("show_lunch_travel", True) if cycle_doc else True
-    if show_lunch_travel:
-        lunch_errors = []
-        for i, entry in enumerate(validation_entries):
-            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
-                continue  # not a working day — lunch time isn't applicable
-            lt = entry.get("lunchTime", "") or ""
-            if not lt.strip():
-                lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
-        if lunch_errors:
-            raise HTTPException(400, "Cannot submit — " + "; ".join(lunch_errors[:5]))
-
     # ── Mandatory fields gate ───────────────────────────────────────────
     # Every working-day row must be fully filled in before the timesheet can
     # be submitted (draft saves allow partial rows; this is the final check).
     mandatory_fields = [
-        "date", "projectStartTime", "projectEndTime", "client", "project",
-        "projectCode", "reportingManagerEntry", "activity",
+        "date", "client", "project", "projectCode", "reportingManagerEntry", "activity",
     ]
     field_errors = []
     for i, entry in enumerate(validation_entries):
@@ -456,6 +443,13 @@ async def submit_timesheet(
                 field_errors.append(f"Row {i + 1}: {field} is required")
     if field_errors:
         raise HTTPException(400, "Cannot submit — " + "; ".join(field_errors[:5]))
+
+    # ── Project-hours gate ────────────────────────────────────────────────
+    # Employees type their own hours (there is no start/end time any more). HRMS hours are compared
+    # later in the reconciliation, not here.
+    hour_problems = ts_rules.project_hours_errors(validation_entries, DAY_OFF_LOCATIONS)
+    if hour_problems:
+        raise HTTPException(400, "Cannot submit — " + "; ".join(hour_problems[:5]))
 
     # ── PL-prefix gate ──────────────────────────────────────────────────
     # Non-JHS01 partners must use real Nexus Quant project codes (all start

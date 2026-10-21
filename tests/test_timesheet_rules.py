@@ -73,3 +73,35 @@ def test_cycle_from_id_round_trip_and_rejects_garbage():
     for bad in ("", "2026-10", "2026-13-C1", "2026-10-C4", "x-y-C1", "2026-10-C1; drop", None):
         with pytest.raises(ValueError):
             r.cycle_from_id(bad)
+
+
+# ── hours typed by the employee (no start/end time any more) ────────────────────────────────────
+
+OFF = {"Leave", "PHY", "Week Off"}
+
+
+def _row(hours, date="2026-10-14", location="Office"):
+    return {"projectHours": hours, "date": date, "location": location}
+
+
+def test_project_hours_errors_accepts_normal_days():
+    assert r.project_hours_errors([_row("8"), _row("7.5", "2026-10-15"), _row("0.25", "2026-10-16")], OFF) == []
+    assert r.project_hours_errors([_row("4"), _row("4.5")], OFF) == []                 # two rows, same day, 8.5 total
+    assert r.project_hours_errors([_row("12"), _row("12")], OFF) == []                 # exactly 24 in a day is allowed
+    assert r.project_hours_errors([_row(8.33)], OFF) == []                             # older computed hours (2 decimals)
+
+
+@pytest.mark.parametrize("bad", ["", None, "abc", "0", "0.0", "-1", "24.01", "25", "8,5", "8.333", " "])
+def test_project_hours_errors_rejects_bad_values(bad):
+    errs = r.project_hours_errors([_row("8"), _row(bad, "2026-10-15")], OFF)
+    assert len(errs) == 1 and errs[0].startswith("Row 2: enter project hours")
+
+
+def test_project_hours_errors_day_total_and_day_off_rows():
+    errs = r.project_hours_errors([_row("12"), _row("12.5")], OFF)
+    assert errs == ["2026-10-14: total hours 24.5 are more than 24 for one day"]
+    # a day off needs no hours, and hours typed on it are ignored (not counted towards anything)
+    assert r.project_hours_errors([_row("", location="Leave"), _row(None, location="Week Off"),
+                                   _row("30", location="PHY")], OFF) == []
+    # row numbers are 1-based positions, like the other submit checks
+    assert r.project_hours_errors([_row("8"), _row("8", location="Leave"), _row("")], OFF)[0].startswith("Row 3:")

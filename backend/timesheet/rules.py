@@ -57,6 +57,32 @@ def difference(task_hours: float, hrms_net: float) -> float:
     return round(task_hours - hrms_net, 2)
 
 
+def project_hours_errors(entries, day_off_locations, max_per_row: float = MAX_DAY_HOURS,
+                         max_per_day: float = MAX_DAY_HOURS):
+    """Submit-time check of the hours an employee TYPES on the timesheet (HRMS is compared later, in the
+    reconciliation). Every working-day row needs hours > 0 and <= 24 with at most 2 decimals; a day's rows
+    together cannot exceed 24. Day-off rows (Leave / PHY / Week Off) carry no hours. Row numbers are 1-based
+    positions in `entries`, matching the other submit checks."""
+    off = set(day_off_locations)
+    errors, per_day = [], {}
+    for i, e in enumerate(entries, start=1):
+        if (e.get("location", "") or "").strip() in off:
+            continue
+        try:
+            h = float(str(e.get("projectHours", "")).strip())
+        except (TypeError, ValueError):
+            h = None
+        if h is None or not (0 < h <= max_per_row) or round(h, 2) != h:
+            errors.append(f"Row {i}: enter project hours (more than 0 and at most {max_per_row:g}, up to 2 decimals)")
+            continue
+        d = str(e.get("date", "") or "")[:10]
+        per_day[d] = round(per_day.get(d, 0.0) + h, 2)
+    for d, total in sorted(per_day.items()):
+        if total > max_per_day:
+            errors.append(f"{d}: total hours {total:g} are more than {max_per_day:g} for one day")
+    return errors
+
+
 def valid_hours(h, step: float = HOURS_STEP) -> bool:
     """Positive, at most 24, in whole steps of `step` (0.25)."""
     try:

@@ -305,3 +305,60 @@ def test_editing_a_submitted_entry_cannot_bypass_the_rule(api):
     assert api.db["g_data"].find_one({"employeeId": "JHS9101"})["payrolls"][0]["entries"][0]["activity"] == "Fieldwork week 2"
     plain = api.put(f"/timesheet/update/JHS9101/{eid}", json={"date": "2026-10-14", "remarks": "just a note"})   # activity untouched
     assert plain.status_code == 200
+
+
+# ── Step 2: hours are typed; no start/end time, lunch, travel or billable ───────────────────────────
+
+def lean_entry(**kw):
+    """A row the way the simplified grid saves it: no start/end, lunch, travel or billable."""
+    e = entry(**kw)
+    for k in ("projectStartTime", "projectEndTime", "lunchTime", "travelTime", "billable"):
+        e.pop(k, None)
+    return e
+
+
+@needs_stack
+def test_submit_needs_no_times_lunch_or_billable(api):
+    r = submit(api, [lean_entry()])
+    assert r.status_code == 200 and r.json()["success"] is True
+    saved = api.db["g_data"].find_one({"employeeId": "JHS9101"})["payrolls"][0]["entries"][0]
+    assert saved["projectHours"] == "8" and "billable" not in saved                           # nothing invented for removed columns
+
+
+@needs_stack
+@pytest.mark.parametrize("hours,expect", [
+    ("", "enter project hours"), ("0", "enter project hours"), ("abc", "enter project hours"),
+    ("25", "enter project hours"), ("7.333", "enter project hours"),
+])
+def test_submit_requires_valid_typed_hours(api, hours, expect):
+    r = submit(api, [lean_entry(projectHours=hours)])
+    assert r.status_code == 400 and expect in r.json()["detail"] and "Row 1" in r.json()["detail"]
+    assert api.db["g_data"].count_documents({}) == 0
+
+
+@needs_stack
+def test_submit_rejects_more_than_24_hours_in_a_day(api):
+    two = [lean_entry(projectHours="12"), lean_entry(projectHours="13", nqTaskId=2, activity="Fieldwork week 2")]
+    r = submit(api, two)
+    assert r.status_code == 400 and "2026-10-14: total hours 25 are more than 24" in r.json()["detail"]
+    ok = [lean_entry(projectHours="4"), lean_entry(projectHours="4.5", nqTaskId=2, activity="Fieldwork week 2")]
+    assert submit(api, ok).status_code == 200
+
+
+@needs_stack
+def test_day_off_rows_need_no_hours_and_typed_hours_are_cleared(api):
+    leave = lean_entry(date="2026-10-15", location="Leave", nqTaskId=None, client="", project="", projectCode="",
+                       activity="", reportingManagerEntry="", projectHours="8")
+    r = submit(api, [lean_entry(), leave])
+    assert r.status_code == 200
+    rows = {e["date"]: e for e in api.db["g_data"].find_one({"employeeId": "JHS9101"})["payrolls"][0]["entries"]}
+    assert rows["2026-10-15"]["projectHours"] == "" and rows["2026-10-14"]["projectHours"] == "8"   # a day off carries no worked hours
+    assert api.db["g_data"].find_one({"employeeId": "JHS9101"})["payrolls"][0]["totalHours"] == 8.0
+
+
+@needs_stack
+def test_older_rows_that_still_carry_times_and_lunch_keep_working(api):
+    old = entry(projectHours="8.33")                                                          # old grid: times, lunch, computed hours
+    assert submit(api, [old]).status_code == 200
+    saved = api.db["g_data"].find_one({"employeeId": "JHS9101"})["payrolls"][0]["entries"][0]
+    assert saved["projectStartTime"] == "09:00" and saved["lunchTime"] == "30 min" and saved["projectHours"] == "8.33"
