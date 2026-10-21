@@ -394,3 +394,15 @@ def test_me_endpoint_reports_roles_for_the_menu(api, monkeypatch):
     _user["id"] = "JHS9001"
     b = c.get("/timesheet/v2/me").json()
     assert b["name"] == "Manager A" and b["is_admin"] is True and b["has_reportees"] is True and b["is_manager"] is True
+
+
+def test_page_endpoint_gives_enabled_day_and_strip_in_one_request(api):
+    b = api.get(f"/timesheet/v2/page/JHS9101?date={DAY}").json()
+    assert b["enabled"] is True and b["day"]["date"] == DAY and b["strip"]["selected"] == DAY
+    assert b["day"] == api.get(f"/timesheet/v2/day/JHS9101?date={DAY}").json()
+    assert b["strip"] == api.get(f"/timesheet/v2/cycle-days/JHS9101?date={DAY}").json()
+    assert api.get("/timesheet/v2/page/JHS9101").json()["day"]["date"] == "2026-10-16"            # default: today
+    _user["id"] = "JHS1562"
+    assert api.get("/timesheet/v2/page/JHS1562").json() == {"enabled": False, "reason": "free_text_employee"}
+    _user["id"] = "JHS9101"
+    assert api.get("/timesheet/v2/page/JHS9102").status_code == 403                               # only your own page

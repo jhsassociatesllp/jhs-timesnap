@@ -89,11 +89,10 @@
   // ── loading ───────────────────────────────────────────────────────────────────────
   async function loadDay(date) {
     setSaveState("", "Loading…");
-    const [day, strip] = await Promise.all([
-      api("GET", `/timesheet/v2/day/${emp}?date=${date}`),
-      api("GET", `/timesheet/v2/cycle-days/${emp}?date=${date}`),
-    ]);
-    S.date = date; S.day = day; S.strip = strip; S.dirty = false;
+    const page = await api("GET", `/timesheet/v2/page/${emp}${date ? "?date=" + date : ""}`);
+    if (!page.enabled) { window.location.replace("/static/timesheet/index.html"); return; }
+    const day = page.day, strip = page.strip;
+    S.date = day.date; S.day = day; S.strip = strip; S.dirty = false;
     S.location = day.location || remembered() || "Office";
     S.readOnly = !!day.read_only;
     S.rows = day.entries.map((e) => newRow({
@@ -554,10 +553,8 @@
   // ── start: only pilot employees see this page; everyone else gets the classic timesheet ──
   (async function start() {
     try {
-      const en = await api("GET", `/timesheet/v2/enabled/${emp}`);
-      if (!en.enabled) { window.location.replace("/static/timesheet/index.html"); return; }
-      const strip0 = await api("GET", `/timesheet/v2/cycle-days/${emp}`);
-      await loadDay(strip0.today);
+      await loadDay(null);                          // today; sends people who are not on the new timesheet to the classic one
+      if (!S.day) return;
       $("boot").hidden = true; $("app").hidden = false;
     } catch (err) {
       $("boot").textContent = "Could not load your timesheet: " + err.message;

@@ -10,7 +10,7 @@ Column names come from docs/nq_schema.sql; mapping to clean models is in models.
 """
 import logging
 import threading
-from datetime import date
+from datetime import date, timedelta
 from typing import Callable, List, Optional
 
 import pymysql
@@ -147,19 +147,32 @@ def get_tasks_for_employee(employee_id: str, on_date: date) -> List[NQTask]:
     """Open work for an employee (Timesnap EmpID == tbl_user.emp_id) on a date:
     tasks whose start..end window contains on_date, plus overdue tasks not done.
     Tasks without dates are not listed. Sub-tasks are included."""
-    def load():
-        rows = _run(
-            f"SELECT {_TASK_COLS} {_TASK_FROM} "
-            "JOIN tbl_user u ON u.emp_id = %s AND u.is_deleted = '0' "
-            f"WHERE t.is_deleted = '0' AND {_ASSIGNED_TO_USER} "
-            "AND t.end_date IS NOT NULL AND t.start_date IS NOT NULL AND ("
-            "  (t.start_date <= %s AND t.end_date >= %s) "
-            "  OR (t.end_date < %s AND t.task_status <> 4 AND t.is_complete = '0')) "
-            "ORDER BY t.end_date, t.id",
-            (employee_id, on_date, on_date, on_date),
-        )
-        return [task_from_row(r, on_date) for r in rows]
-    return _cached(("tasks_for_employee", employee_id, on_date), load)
+    # NQ is reached over an SSH tunnel (hundreds of ms per query), so ask ONCE per employee for every dated
+    # task and apply the date rule here: walking through days of a cycle then costs no further NQ queries.
+    rows = _cached(("tasks_of_employee", employee_id), lambda: _employee_task_rows(employee_id))
+    out = []
+    for r in rows:
+        start, end = r["start_date"], r["end_date"]
+        open_task = r.get("task_status") != 4 and str(r.get("is_complete")) != "1"
+        if (start <= on_date <= end) or (end < on_date and open_task):
+            out.append(task_from_row(r, on_date))
+    return out
+
+
+_TASK_HISTORY_DAYS = 450          # completed tasks older than this are not offered for any date
+
+
+def _employee_task_rows(employee_id: str) -> list:
+    """Raw rows: every dated, live task assigned to the employee that is still open or ended recently."""
+    return _run(
+        f"SELECT {_TASK_COLS} {_TASK_FROM} "
+        "JOIN tbl_user u ON u.emp_id = %s AND u.is_deleted = '0' "
+        f"WHERE t.is_deleted = '0' AND {_ASSIGNED_TO_USER} "
+        "AND t.end_date IS NOT NULL AND t.start_date IS NOT NULL "
+        "AND ((t.task_status <> 4 AND t.is_complete = '0') OR t.end_date >= %s) "
+        "ORDER BY t.end_date, t.id",
+        (employee_id, date.today() - timedelta(days=_TASK_HISTORY_DAYS)),
+    )
 
 
 def list_tasks_assigned_to(employee_id: str, since: date) -> List[NQTask]:

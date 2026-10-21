@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from backend import indexes
 from backend.auth import get_current_user
-from backend.cycle.locks import cycle_locked, cycle_reopened, cycle_review
+from backend.cycle.locks import cycle_review
 from backend.database import (
     config_collection,
     day_drafts_collection,
@@ -162,27 +162,37 @@ def _entry_view(e: dict) -> dict:
                                   "hours", "task_status", "is_unplanned", "legacy")}
 
 
-def _cycle_view(cyc: rules.Cycle, emp: Optional[str] = None) -> dict:
+def _cycle_view(cyc: rules.Cycle, emp: Optional[str] = None, review: Optional[dict] = None) -> dict:
     view = {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline,
             "deadline_passed": rules.deadline_passed(cyc, _now_ist())}
     if emp:                                   # manager review state of THIS employee's cycle
-        rev = cycle_review(emp, cyc.id) or {}
+        rev = review if review is not None else (cycle_review(emp, cyc.id) or {})
         view["review_status"] = rev.get("status", "pending")
         view["review_note"] = rev.get("note") if rev.get("status") == "sent_back" else None
     return view
 
 
-def _read_only_reason(emp: str, d: date) -> Optional[str]:
-    """Why this day cannot be edited, or None."""
+def _read_only_reason(emp: str, d: date, review: Optional[dict] = None, entries: Optional[List[dict]] = None) -> Optional[str]:
+    """Why this day cannot be edited, or None. `review` / `entries` may be passed when the caller already
+    has them (saves database round trips); otherwise they are looked up."""
     iso = d.isoformat()
-    if store.entries.find_one({"employee_id": emp, "date": iso, "legacy": True}, {"_id": 1}):
-        return "classic"
-    if store.entries.find_one({"employee_id": emp, "date": iso, "$or": [{"locked": True}, {"approved": True}]}, {"_id": 1}):
-        return "approved"
+    if entries is None:
+        if store.entries.find_one({"employee_id": emp, "date": iso, "legacy": True}, {"_id": 1}):
+            return "classic"
+        if store.entries.find_one({"employee_id": emp, "date": iso, "$or": [{"locked": True}, {"approved": True}]}, {"_id": 1}):
+            return "approved"
+    else:
+        if any(e.get("legacy") for e in entries):
+            return "classic"
+        if any(e.get("locked") or e.get("approved") for e in entries):
+            return "approved"
     cyc = rules.cycle_for(d)
-    if cycle_locked(emp, cyc.id):
+    if review is None:
+        review = cycle_review(emp, cyc.id) or {}
+    status = review.get("status")
+    if status == "approved":
         return "approved"
-    if rules.deadline_passed(cyc, _now_ist()) and not cycle_reopened(emp, cyc.id):
+    if rules.deadline_passed(cyc, _now_ist()) and status not in ("sent_back", "reopened"):
         return "deadline"
     return None
 
@@ -216,11 +226,13 @@ def _day_payload(emp: str, d: date, cfg: dict) -> dict:
     sub = store.submissions.find_one({"employee_id": emp, "date": iso})
     draft = store.drafts.find_one({"employee_id": emp, "date": iso})
     mgr = store.employees.find_one({"EmpID": emp}, {"ReportingEmpCode": 1, "ReportingEmpName": 1}) or {}
-    reason = _read_only_reason(emp, d)
+    cyc = rules.cycle_for(d)
+    review = cycle_review(emp, cyc.id) or {}
+    reason = _read_only_reason(emp, d, review, entries)
     total = round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2)
     return {
         "date": iso, "weekday": d.strftime("%A"),
-        "cycle": _cycle_view(rules.cycle_for(d), emp),
+        "cycle": _cycle_view(cyc, emp, review),
         "location": _day_location(entries, sub, draft),
         "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
         "allocation_assumed_100": True,
@@ -309,6 +321,10 @@ def cycle_days(employee_id: str, date: Optional[str] = Query(None), current_user
     cfg = get_config()
     _require_enabled(emp, cfg)
     d = _parse_date(date, allow_future=True) if date else _today()
+    return _strip_payload(emp, d, cfg)
+
+
+def _strip_payload(emp: str, d: date, cfg: dict) -> dict:
     cyc = rules.cycle_for(d)
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
     per_day = {}
@@ -348,6 +364,19 @@ def cycle_days(employee_id: str, date: Optional[str] = Query(None), current_user
     return {"cycle": _cycle_view(cyc, emp), "today": today.isoformat(), "selected": d.isoformat(), "days": days,
             "summary": counts, "prev_date": (cyc.start - timedelta(days=1)).isoformat(),
             "next_date": (cyc.end + timedelta(days=1)).isoformat() if cyc.end < today else None}
+
+
+@router.get("/page/{employee_id}")
+def page(employee_id: str, date: Optional[str] = Query(None), current_user: str = Depends(get_current_user)):
+    """Everything the My day screen needs in ONE request: whether the person uses it, the day and the day strip.
+    (One round trip instead of enabled + cycle-days + day + cycle-days, which matters over a slow link.)"""
+    emp = _require_self(employee_id, current_user)
+    cfg = get_config()
+    if not _is_enabled(emp, cfg):
+        return {"enabled": False, "reason": "not_in_pilot" if cfg["pilot_only"] and emp not in cfg["pilot_employees"] else "free_text_employee"}
+    indexes.ensure_once()
+    d = _parse_date(date, allow_future=True) if date else _today()
+    return {"enabled": True, "day": _day_payload(emp, d, cfg), "strip": _strip_payload(emp, d, cfg)}
 
 
 @router.get("/day/{employee_id}")
