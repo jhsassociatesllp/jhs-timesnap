@@ -294,7 +294,12 @@ def _build_entry_docs(emp: str, d: date, body: DayIn) -> List[dict]:
 @router.get("/enabled/{employee_id}")
 def daily_enabled(employee_id: str, current_user: str = Depends(get_current_user)):
     emp = _require_self(employee_id, current_user)
-    return {"enabled": _is_enabled(emp, get_config())}
+    cfg = get_config()
+    enabled = _is_enabled(emp, cfg)
+    reason = None
+    if not enabled:
+        reason = "not_in_pilot" if cfg["pilot_only"] and emp not in cfg["pilot_employees"] else "free_text_employee"
+    return {"enabled": enabled, "reason": reason}
 
 
 @router.get("/cycle-days/{employee_id}")

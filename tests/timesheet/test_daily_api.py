@@ -113,10 +113,10 @@ def test_cannot_touch_another_employees_day(api):
 
 def test_not_in_pilot_is_forbidden_and_free_text_employees_are_excluded(api):
     _user["id"] = "JHS9103"
-    assert api.get("/timesheet/v2/enabled/JHS9103").json() == {"enabled": False}
+    assert api.get("/timesheet/v2/enabled/JHS9103").json()["enabled"] is False
     assert get_day(api, "JHS9103").status_code == 403 and strip(api, emp="JHS9103").status_code == 403
     _user["id"] = "JHS1562"
-    assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}
+    assert api.get("/timesheet/v2/enabled/JHS1562").json()["enabled"] is False
     assert put(api, [], emp="JHS1562").status_code == 403
 
 
@@ -308,24 +308,24 @@ def test_everyone_is_enabled_by_default_except_free_text_employees(api):
     api.db["t_config"].update_one({"_id": "timesheet"}, {"$unset": {"timesheet_scope": ""}, "$set": {"pilot_employees": []}})
     api.db["t_employees"].insert_one({"EmpID": "JHS7777", "PartnerEmpCode": "JHS02", "ReportingEmpCode": "JHS9001"})
     _user["id"] = "JHS7777"
-    assert api.get("/timesheet/v2/enabled/JHS7777").json() == {"enabled": True}          # not on any list
+    assert api.get("/timesheet/v2/enabled/JHS7777").json()["enabled"] is True          # not on any list
     _user["id"] = "JHS1562"
-    assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}         # free-text employee: classic
+    assert api.get("/timesheet/v2/enabled/JHS1562").json()["enabled"] is False         # free-text employee: classic
     api.db["t_config"].update_one({"_id": "timesheet"}, {"$set": {"timesheet_scope": "pilot"}})
     _user["id"] = "JHS7777"
-    assert api.get("/timesheet/v2/enabled/JHS7777").json() == {"enabled": False}         # staged roll-out switched on
+    assert api.get("/timesheet/v2/enabled/JHS7777").json()["enabled"] is False         # staged roll-out switched on
 
 
 def test_a_named_free_text_employee_can_be_included(api):
     api.db["t_employees"].insert_one({"EmpID": "JHS1191", "PartnerEmpCode": "JHS01", "ReportingEmpCode": "JHS9001"})
     api.db["t_config"].update_one({"_id": "timesheet"}, {"$unset": {"timesheet_scope": ""}})
     _user["id"] = "JHS1191"
-    assert api.get("/timesheet/v2/enabled/JHS1191").json() == {"enabled": False}         # JHS01 rule still applies
+    assert api.get("/timesheet/v2/enabled/JHS1191").json()["enabled"] is False         # JHS01 rule still applies
     api.db["t_config"].update_one({"_id": "timesheet"}, {"$set": {"new_timesheet_include": ["jhs1191"]}})
-    assert api.get("/timesheet/v2/enabled/JHS1191").json() == {"enabled": True}
+    assert api.get("/timesheet/v2/enabled/JHS1191").json()["enabled"] is True
     assert api.get(f"/timesheet/v2/day/JHS1191?date={DAY}").status_code == 200
     _user["id"] = "JHS1562"
-    assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}         # others are unaffected
+    assert api.get("/timesheet/v2/enabled/JHS1562").json()["enabled"] is False         # others are unaffected
     from backend.timesheet import scope
     cfg = api.db["t_config"].find_one({"_id": "timesheet"})
     assert "JHS1191" in scope.enabled_set(api.db["t_config"], api.db["t_employees"])
