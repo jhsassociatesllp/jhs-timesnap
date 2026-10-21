@@ -1,8 +1,8 @@
-# Step 3 – "My day" timesheet (pilot employees only)
+# Step 3 – "My day" timesheet
 
-`/timesheet` now opens the day-by-day "My day" screen for **pilot employees**. Everyone else is sent to the
-classic grid (`/static/timesheet/index.html`), unchanged. Pilot employees can still open the classic grid from
-the "Classic view" link.
+`/timesheet` opens the day-by-day "My day" screen for **every employee** who logs in (the free-text employees
+JHS01-partner staff and JHS1562 keep the classic grid). For a staged roll-out run
+`python -m backend.timesheet.pilot scope pilot`, then `add` the codes; `scope all` switches back.
 
 ## What it does
 - Pick a task (searchable, grouped by client › project); client, project and code fill in from Nexus Quant.
@@ -13,7 +13,7 @@ the "Classic view" link.
 - Cycle deadline = cycle end + 5 days, 23:59 IST. After that, days are view only.
 - No HRMS data is shown or used here; the reconciliation compares typed hours later.
 
-## Set up a pilot (local)
+## Optional: pilot mode
 ```
 python -m backend.timesheet.pilot add JHS####      # yourself, and your manager
 python -m backend.timesheet.pilot list

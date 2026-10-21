@@ -1,5 +1,6 @@
 # backend/cycle/store.py
 """Collection handles for the cycle review and digest, in one place so tests can swap them."""
+from backend.timesheet import scope
 from backend.database import (
     approval_history_collection,
     approved_collection,
@@ -52,7 +53,8 @@ def config_doc() -> dict:
 
 
 def pilot_set() -> set:
-    return {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}
+    """Employees on the new timesheet: everyone (except free-text employees), or only the pilot list."""
+    return scope.enabled_set(store.config, store.employees)
 
 
 def holidays_set() -> set:

@@ -62,12 +62,7 @@ router = APIRouter(prefix="/timesheet", tags=["Timesheet"])
 # Partner whose employees have no fixed client/project list — those fields
 # are free-typed in the app instead of dropdowns, and their project codes
 # aren't required to follow the PL-prefix convention.
-FREE_TEXT_PARTNER_CODE = "JHS01"
-
-# Individual employees exempted the same way regardless of their actual
-# partner — e.g. because they do shared-services-style work under a partner
-# who otherwise uses the fixed client/project list.
-FREE_TEXT_EMPLOYEE_CODES = {"JHS1562"}
+from backend.timesheet.scope import FREE_TEXT_EMPLOYEE_CODES, FREE_TEXT_PARTNER_CODE  # noqa: E402  (shared with the new timesheet)
 
 
 def _activity_gate_on() -> bool:

@@ -37,7 +37,7 @@ from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
-from backend.timesheet import rules
+from backend.timesheet import rules, scope
 from backend.timesheet.router import _is_free_text_employee
 
 router = APIRouter(prefix="/timesheet/v2", tags=["Timesheet day"])
@@ -92,8 +92,7 @@ def get_config() -> dict:
             holidays.add(date.fromisoformat(str(h)[:10]))
         except ValueError:
             continue
-    return {"pilot_employees": {str(e).strip().upper() for e in doc.get("pilot_employees", []) or []},
-            "holidays": holidays}
+    return {"pilot_employees": scope.pilot_codes(doc), "pilot_only": scope.pilot_only(doc), "holidays": holidays}
 
 
 def _require_self(employee_id: str, current_user: str) -> str:
@@ -104,7 +103,7 @@ def _require_self(employee_id: str, current_user: str) -> str:
 
 
 def _is_enabled(emp: str, cfg: dict) -> bool:
-    if emp not in cfg["pilot_employees"]:
+    if cfg["pilot_only"] and emp not in cfg["pilot_employees"]:
         return False
     doc = store.employees.find_one({"EmpID": emp}, {"PartnerEmpCode": 1}) or {}
     return not _is_free_text_employee(emp, (doc.get("PartnerEmpCode") or ""))

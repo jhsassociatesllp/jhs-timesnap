@@ -22,7 +22,7 @@ from backend import mailer
 from backend.access_manager.router import has_admin_module
 from backend.auth import get_current_user
 from backend.cycle import digest, mirror
-from backend.cycle.store import config_doc, holidays_set, store
+from backend.cycle.store import config_doc, holidays_set, pilot_set, store
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
 from backend.timesheet import project_health, rules
@@ -125,7 +125,7 @@ def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: 
 
 
 def _team_ids(me: str, admin: bool, manager: Optional[str]) -> List[str]:
-    pilot = {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}
+    pilot = pilot_set()
     if admin:
         ids = _reportees(manager.strip().upper()) if manager else sorted(pilot)
     else:
@@ -170,7 +170,7 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
     if today <= cyc.end:
         # locking mid-cycle would stop employees filling the days they have not worked yet
         raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - approve it after it has ended")
-    pilot = {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}
+    pilot = pilot_set()
 
     rows = {}
     for i in ids:
@@ -275,7 +275,7 @@ def send_back(cycle_id: str, body: SendBackIn, current_user: str = Depends(get_c
     cyc = _cycle(cycle_id)
     emp = body.employee_id.strip().upper()
     _authorise_all(me, [emp], admin)
-    if emp not in {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}:
+    if emp not in pilot_set():
         raise HTTPException(422, f"{emp} is not on the daily timesheet")
     if _today() <= cyc.end:
         raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - review it after it has ended")
@@ -298,7 +298,7 @@ def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends
     cyc = _cycle(cycle_id)
     emp = employee_id.strip().upper()
     _authorise_all(me, [emp], admin)
-    if emp not in {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}:
+    if emp not in pilot_set():
         raise HTTPException(422, f"{emp} is not on the daily timesheet")
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
     subs = {x["date"]: x for x in store.submissions.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}

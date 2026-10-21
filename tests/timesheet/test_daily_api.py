@@ -54,7 +54,7 @@ def api(monkeypatch):
         monkeypatch.setattr(hrms_reco.store, attr, db[f"t_{attr}"])
     monkeypatch.setattr(cycle_store, "reviews", db["t_reviews"])
     monkeypatch.setattr(daily, "_now_ist", lambda: NOW)
-    db["t_config"].insert_one({"_id": "timesheet", "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
+    db["t_config"].insert_one({"_id": "timesheet", "timesheet_scope": "pilot", "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
                                "holidays": ["2026-10-02"]})
     db["t_employees"].insert_many([
         {"EmpID": "JHS9101", "PartnerEmpCode": "JHS02", "ReportingEmpCode": "JHS9001", "ReportingEmpName": "Manager A"},
@@ -302,6 +302,18 @@ def test_the_deadline_closes_the_sub_cycle(api, monkeypatch):
     assert submit(api).status_code == 409
     b = get_day(api).json()
     assert b["read_only"] is True and b["read_only_reason"] == "deadline" and b["cycle"]["deadline_passed"] is True
+
+
+def test_everyone_is_enabled_by_default_except_free_text_employees(api):
+    api.db["t_config"].update_one({"_id": "timesheet"}, {"$unset": {"timesheet_scope": ""}, "$set": {"pilot_employees": []}})
+    api.db["t_employees"].insert_one({"EmpID": "JHS7777", "PartnerEmpCode": "JHS02", "ReportingEmpCode": "JHS9001"})
+    _user["id"] = "JHS7777"
+    assert api.get("/timesheet/v2/enabled/JHS7777").json() == {"enabled": True}          # not on any list
+    _user["id"] = "JHS1562"
+    assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}         # free-text employee: classic
+    api.db["t_config"].update_one({"_id": "timesheet"}, {"$set": {"timesheet_scope": "pilot"}})
+    _user["id"] = "JHS7777"
+    assert api.get("/timesheet/v2/enabled/JHS7777").json() == {"enabled": False}         # staged roll-out switched on
 
 
 def test_a_sent_back_cycle_is_editable_after_the_deadline_with_the_note_shown(api, monkeypatch):

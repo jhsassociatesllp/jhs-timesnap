@@ -19,7 +19,7 @@ from backend.database import (
     timesheet_entries_collection,
 )
 from backend.hrms import rules
-from backend.timesheet import rules as ts_rules
+from backend.timesheet import rules as ts_rules, scope
 
 log = logging.getLogger("hrms")
 CONFIG_ID = "timesheet"
@@ -45,7 +45,7 @@ def config() -> dict:
     codes.update({str(k).strip().upper(): str(v) for k, v in (doc.get("hrms_status_codes") or {}).items()})
     return {
         "tolerance": float(doc.get("tolerance", ts_rules.TOLERANCE_HOURS)),
-        "pilot": {str(e).strip().upper() for e in doc.get("pilot_employees", []) or []},
+        "pilot": scope.enabled_set(store.config, store.employees),
         "status_codes": codes,
     }
 

@@ -44,7 +44,7 @@ def cdb(monkeypatch):
     from backend.hrms import reco as hrms_reco
     for attr in ("entries", "submissions", "hrms", "uploads", "reco", "config", "employees"):
         monkeypatch.setattr(hrms_reco.store, attr, db[names[attr]])
-    db["c_config"].insert_one({"_id": "timesheet", "pilot_employees": ["JHS9101", "JHS9102", "JHS9103"],
+    db["c_config"].insert_one({"_id": "timesheet", "timesheet_scope": "pilot", "pilot_employees": ["JHS9101", "JHS9102", "JHS9103"],
                                "holidays": ["2026-10-02"]})
     db["c_employees"].insert_many([
         {"EmpID": "JHS9101", "Emp Name": "Emp One", "ReportingEmpCode": "JHS9001", "EMail": "e1@example.invalid"},

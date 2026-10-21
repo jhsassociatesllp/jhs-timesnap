@@ -14,7 +14,7 @@ from pymongo import UpdateOne
 from backend.cycle.store import store
 from backend.metrics.store import mstore
 from backend.nq.models import NQTask, NQProject, NQUser
-from backend.timesheet import rag, rules
+from backend.timesheet import rag, rules, scope
 from backend.timesheet.legacy_migration import _entries_of
 
 MIN_ROWS_FOR_DELETE_GUARD = 20     # below this a clean-up of stale rows is always allowed
@@ -40,8 +40,7 @@ def _holidays() -> Set[str]:
 
 
 def _pilot() -> Set[str]:
-    doc = store.config.find_one({"_id": "timesheet"}) or {}
-    return {str(e).strip().upper() for e in doc.get("pilot_employees", []) or []}
+    return scope.enabled_set(store.config, store.employees)
 
 
 # ─────────────────────────────── hours_daily ─────────────────────────────────

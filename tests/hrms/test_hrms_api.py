@@ -45,7 +45,7 @@ def api(monkeypatch):
     for attr, coll in names.items():
         db[coll].drop()
         monkeypatch.setattr(reco.store, attr, db[coll])
-    db["h_config"].insert_one({"_id": "timesheet", "pilot_employees": ["JHS9101", "JHS9102", "JHS9103"]})
+    db["h_config"].insert_one({"_id": "timesheet", "timesheet_scope": "pilot", "pilot_employees": ["JHS9101", "JHS9102", "JHS9103"]})
     db["h_employees"].insert_many([
         {"EmpID": "JHS9101", "Emp Name": "Emp One", "ReportingEmpCode": "JHS9001"},
         {"EmpID": "JHS9102", "Emp Name": "Emp Two", "ReportingEmpCode": "JHS9001"},

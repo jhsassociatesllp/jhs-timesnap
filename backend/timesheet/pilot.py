@@ -1,7 +1,11 @@
 # backend/timesheet/pilot.py
 """
-Who sees the new day-by-day timesheet ("My day") at /timesheet. Everyone else keeps the classic timesheet.
+Who sees the new day-by-day timesheet ("My day") at /timesheet.
 
+By default EVERY employee does (free-text employees keep the classic grid). To stage a roll-out, switch to
+pilot mode: only the listed codes see it and everyone else keeps the classic timesheet.
+
+  python -m backend.timesheet.pilot scope pilot     # or: scope all
   python -m backend.timesheet.pilot list
   python -m backend.timesheet.pilot add JHS1234 JHS5678
   python -m backend.timesheet.pilot remove JHS1234
@@ -43,7 +47,22 @@ def remove(codes: List[str]) -> List[str]:
     return current()
 
 
+def set_scope(value: str) -> str:
+    value = value.strip().lower()
+    if value not in ("all", "pilot"):
+        raise ValueError("scope must be 'all' or 'pilot'")
+    store.config.update_one({"_id": CONFIG_ID}, {"$set": {"timesheet_scope": value}}, upsert=True)
+    return value
+
+
 def main(argv: List[str]) -> int:
+    if argv and argv[0] == "scope" and len(argv) == 2:
+        try:
+            print("timesheet scope:", set_scope(argv[1]))
+            return 0
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return 2
     if not argv or argv[0] not in ("list", "add", "remove") or (argv[0] != "list" and len(argv) < 2):
         print(__doc__)
         return 2
