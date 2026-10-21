@@ -79,7 +79,7 @@ def upload(c, path, content=None, name="hrms.xlsx"):
 def seed_entries(c):
     ins = c.db["h_entries"].insert_many
     ins([entry("JHS9101", "2026-10-12", 4), entry("JHS9101", "2026-10-12", 4.5),          # 8.5 vs 8.5 -> matched
-         entry("JHS9101", "2026-10-13", None),                                            # one task, awaiting HRMS
+         entry("JHS9101", "2026-10-13", 9.25),                                            # one task, typed 9.25 = HRMS net
          entry("JHS9102", "2026-10-12", 4), entry("JHS9102", "2026-10-12", 1),            # 5.0 vs 7.0 -> short
          entry("JHS9102", "2026-10-14", 3),                                               # no punch but entries
          entry("JHS9103", "2026-10-14", 3), entry("JHS9103", "2026-10-14", 3)])           # 6.0 vs 3.5 -> over
@@ -140,13 +140,12 @@ def test_commit_imports_records_upload_and_derives_holidays(api):
     assert doc["net_hours"] == 9.25 and "employee_name" not in doc
 
 
-def test_reco_outcomes_and_one_task_autofill(api):
+def test_reco_outcomes_for_typed_hours(api):
     seed_entries(api)
-    r = upload(api, "/hrms/upload/commit").json()
-    assert r["autofilled_entries"] == 1
+    upload(api, "/hrms/upload/commit")
     got = results(api)
     assert got[("JHS9101", "2026-10-12")] == "matched"
-    assert got[("JHS9101", "2026-10-13")] == "matched"          # one task: hours became HRMS net 9.25
+    assert got[("JHS9101", "2026-10-13")] == "matched"          # typed 9.25 vs HRMS net 9.25
     assert got[("JHS9101", "2026-10-14")] == "not_filled"
     assert got[("JHS9102", "2026-10-12")] == "short"
     assert got[("JHS9102", "2026-10-13")] == "leave"
@@ -154,8 +153,8 @@ def test_reco_outcomes_and_one_task_autofill(api):
     assert ("JHS9103", "2026-10-13") not in got                  # absent and nothing filled
     assert got[("JHS9103", "2026-10-14")] == "over"
     assert all(got[(e, "2026-10-02")] == "leave" for e in ("JHS9101", "JHS9102", "JHS9103"))
-    filled = api.db["h_entries"].find_one({"employee_id": "JHS9101", "date": "2026-10-13"})
-    assert filled["hours"] == 9.25 and filled["awaiting_hrms"] is False
+    typed = api.db["h_entries"].find_one({"employee_id": "JHS9101", "date": "2026-10-13"})
+    assert typed["hours"] == 9.25
 
 
 def test_reupload_is_idempotent(api):
@@ -167,7 +166,7 @@ def test_reupload_is_idempotent(api):
                     sorted(e["hours"] for e in api.db["h_entries"].find()))
     first = snap()
     r = upload(api, "/hrms/upload/commit", same_file).json()
-    assert r["rows_new"] == 0 and r["rows_existing"] == 15 and r["autofilled_entries"] == 0
+    assert r["rows_new"] == 0 and r["rows_existing"] == 15
     assert snap() == first
     assert api.db["h_uploads"].count_documents({}) == 2           # each import is still logged
     assert upload(api, "/hrms/upload/preview", same_file).json()["already_imported"] is True
@@ -185,14 +184,16 @@ def test_corrected_reupload_updates_values_and_reco(api):
     assert api.db["h_hrms"].count_documents({}) == 15
 
 
-def test_autofill_skips_locked_approved_and_multi_task_days(api):
+def test_upload_never_changes_typed_hours(api):
+    """HRMS is only compared with what the employee typed - even on a one-entry day, locked or not."""
     api.db["h_entries"].insert_many([
-        entry("JHS9101", "2026-10-12", None, locked=True),
-        entry("JHS9101", "2026-10-13", 2, approved=True),
-        entry("JHS9101", "2026-10-14", 2), entry("JHS9101", "2026-10-14", 2)])
-    assert upload(api, "/hrms/upload/commit").json()["autofilled_entries"] == 0
-    assert api.db["h_entries"].find_one({"date": "2026-10-12"})["hours"] is None
-    assert api.db["h_entries"].find_one({"date": "2026-10-13"})["hours"] == 2
+        entry("JHS9103", "2026-10-12", 6),                                      # HRMS net is 8.5 that day
+        entry("JHS9101", "2026-10-13", 2, approved=True, locked=True),
+        entry("JHS9101", "2026-10-14", 2), entry("JHS9101", "2026-10-14", 3)])
+    upload(api, "/hrms/upload/commit")
+    hours = {(e["employee_id"], e["date"], i): e["hours"] for i, e in enumerate(api.db["h_entries"].find())}
+    assert sorted(hours.values()) == [2, 2, 3, 6]                              # nothing was filled or corrected
+    assert results(api)[("JHS9103", "2026-10-12")] == "short"                  # ...it is just reported as short
 
 
 def test_non_pilot_employees_get_no_reco(api):

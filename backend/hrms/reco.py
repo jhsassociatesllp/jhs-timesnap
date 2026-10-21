@@ -95,32 +95,10 @@ def recompute_day(emp: str, iso: str, reset_review: bool = False, cfg: Optional[
     return result
 
 
-def autofill_one_task_days(emp_ids: Iterable[str], date_from: str, date_to: str) -> int:
-    """One entry that day => hours are HRMS net. Fills 'awaiting HRMS' rows and corrects
-    rows after a re-upload. Skips locked/approved days and migrated legacy rows."""
-    changed = 0
-    ids = list(emp_ids)
-    if not ids:
-        return 0
-    for h in store.hrms.find({"employee_id": {"$in": ids}, "date": {"$gte": date_from, "$lte": date_to},
-                              "net_hours": {"$ne": None}, "leave_flag": {"$ne": True}}):
-        rows = list(store.entries.find({"employee_id": h["employee_id"], "date": h["date"]}))
-        if len(rows) != 1:
-            continue
-        r = rows[0]
-        if r.get("locked") or r.get("approved") or r.get("legacy"):
-            continue
-        if r.get("hours") != h["net_hours"] or r.get("awaiting_hrms"):
-            store.entries.update_one({"_id": r["_id"]}, {"$set": {
-                "hours": h["net_hours"], "awaiting_hrms": False, "updated_at": datetime.utcnow()}})
-            changed += 1
-    return changed
-
-
 def recompute_range(date_from: str, date_to: str) -> Dict[str, int]:
-    """Autofill then reconcile every pilot employee's HRMS rows in the date range."""
+    """Reconcile every pilot employee's HRMS rows in the date range. Hours are typed by the employee and are
+    NEVER changed here: the reconciliation only compares them with HRMS net hours."""
     cfg = config()
-    changed = autofill_one_task_days(cfg["pilot"], date_from, date_to)
     counts: Dict[str, int] = {}
     if cfg["pilot"]:
         for h in store.hrms.find({"employee_id": {"$in": list(cfg["pilot"])},
@@ -128,7 +106,6 @@ def recompute_range(date_from: str, date_to: str) -> Dict[str, int]:
             res = recompute_day(h["employee_id"], h["date"], cfg=cfg)
             if res:
                 counts[res] = counts.get(res, 0) + 1
-    counts["_autofilled"] = changed
     return counts
 
 

@@ -94,19 +94,6 @@ def valid_hours(h, step: float = HOURS_STEP) -> bool:
     return abs(h / step - round(h / step)) < 1e-9
 
 
-def one_task_hours(entry_count: int, hrms_net: Optional[float]):
-    """Hours for a day with exactly one entry are locked to HRMS net hours.
-    Returns (hours, locked, awaiting_hrms):
-      one entry + HRMS present   -> (net, True, False)
-      one entry + no HRMS yet    -> (None, True, True)   'awaiting HRMS', filled on upload
-      several entries            -> (None, False, False) employee enters hours."""
-    if entry_count != 1:
-        return None, False, False
-    if hrms_net is None:
-        return None, True, True
-    return round(float(hrms_net), 2), True, False
-
-
 @dataclass(frozen=True)
 class Cycle:
     id: str          # e.g. "2026-10-C1"

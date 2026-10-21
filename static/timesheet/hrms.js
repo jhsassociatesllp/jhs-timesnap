@@ -83,7 +83,6 @@
       const r = await call("POST", "/hrms/upload/commit", formFile());
       const c = r.reco_counts || {};
       banner(`Imported ${r.rows_imported} rows (${r.rows_new} new, ${r.rows_existing} already there). ` +
-        `Autofilled ${r.autofilled_entries} one-task entries. ` +
         `Reconciled: ${Object.entries(c).map(([k, v]) => `${v} ${k}`).join(", ") || "nothing to reconcile"}.` +
         (r.holidays_added.length ? ` Holidays added: ${r.holidays_added.join(", ")}.` : ""), "ok");
       $("previewCard").style.display = "none"; $("file").value = "";

@@ -171,7 +171,7 @@ def upload_preview(file: UploadFile = File(...), current_user: str = Depends(get
 @router.post("/upload/commit")
 def upload_commit(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     """Import the file (upsert by employee_id + date, so re-importing is harmless),
-    record it, derive holidays, autofill one-task days and reconcile."""
+    record it, derive holidays and reconcile (typed hours are never changed)."""
     me = _require_admin(current_user)
     content, res = _parse(file)
     if not res.rows:
@@ -202,13 +202,12 @@ def upload_commit(file: UploadFile = File(...), current_user: str = Depends(get_
         # the log must never claim an import that did not finish (re-running the same file is safe)
         store.uploads.update_one({"_id": upload_id}, {"$set": {"status": "failed"}})
         raise
-    autofilled = outcome.pop("_autofilled", 0)
     store.uploads.update_one({"_id": upload_id}, {"$set": {
-        "status": "done", "holidays_added": holidays, "autofilled_entries": autofilled, "reco_counts": outcome}})
+        "status": "done", "holidays_added": holidays, "reco_counts": outcome}})
     return {"upload_id": str(upload_id), "rows_imported": len(res.rows), "rows_new": bulk.upserted_count,
             "rows_existing": len(res.rows) - bulk.upserted_count, "errors": len(res.errors),
             "warnings": res.warnings, "date_from": res.date_from, "date_to": res.date_to,
-            "holidays_added": holidays, "autofilled_entries": autofilled, "reco_counts": outcome}
+            "holidays_added": holidays, "reco_counts": outcome}
 
 
 @router.get("/uploads")

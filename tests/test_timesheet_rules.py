@@ -37,13 +37,6 @@ def test_tolerance_boundary():
     assert r.difference(7.5, 8.5) == -1.0
 
 
-def test_one_task_autofill_and_awaiting():
-    assert r.one_task_hours(1, 8.0) == (8.0, True, False)
-    assert r.one_task_hours(1, None) == (None, True, True)       # awaiting HRMS
-    assert r.one_task_hours(2, 8.0) == (None, False, False)      # employee enters hours
-    assert r.one_task_hours(0, 8.0) == (None, False, False)
-
-
 @pytest.mark.parametrize("h,ok", [(0.25, True), (1, True), (7.75, True), (24, True),
                                   (0, False), (-1, False), (0.3, False), (24.25, False),
                                   ("x", False), (None, False)])
