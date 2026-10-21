@@ -154,6 +154,24 @@ def get_tasks_for_employee(employee_id: str, on_date: date) -> List[NQTask]:
     return _cached(("tasks_for_employee", employee_id, on_date), load)
 
 
+def list_tasks_assigned_to(employee_id: str, since: date) -> List[NQTask]:
+    """Every live task assigned to an employee (Timesnap EmpID == tbl_user.emp_id) in an ACTIVE project
+    (project_status = '1'): all open tasks, plus completed ones that ended on/after `since` (so a task
+    finished last week can still be picked for last week's timesheet rows). Sub-tasks included.
+    Carries the project's own start/end dates."""
+    def load():
+        rows = _run(
+            f"SELECT {_TASK_COLS}, p.start_date AS project_start, p.end_date AS project_end {_TASK_FROM} "
+            "JOIN tbl_user u ON u.emp_id = %s AND u.is_deleted = '0' "
+            f"WHERE p.project_status = '1' AND t.is_deleted = '0' AND {_ASSIGNED_TO_USER} "
+            "AND ((t.is_complete = '0' AND t.task_status <> 4) OR t.end_date >= %s) "
+            "ORDER BY p.client_name, p.project_name, t.start_date, t.id",
+            (employee_id, since),
+        )
+        return [task_from_row(r, date.today()) for r in rows]
+    return _cached(("assigned_tasks", employee_id, since), load)
+
+
 def get_tasks_for_project(project_code: str) -> List[NQTask]:
     """All live tasks of a project (any dates, any assignee), for progress / RAG figures."""
     def load():

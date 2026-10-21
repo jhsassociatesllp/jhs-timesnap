@@ -48,6 +48,8 @@ class NQTask(BaseModel):
     status: str = "To Do"
     is_complete: bool = False
     is_overdue: bool = False         # set by the repository relative to the query date
+    project_start: Optional[date] = None
+    project_end: Optional[date] = None
 
 
 class NQUser(BaseModel):
@@ -100,6 +102,8 @@ def task_from_row(row: dict, on_date: Optional[date] = None) -> NQTask:
         status=TASK_STATUS_NAMES.get(status_id, str(status_id)),
         is_complete=complete,
         is_overdue=bool(on_date and end and end < on_date and not complete),
+        project_start=row.get("project_start"),
+        project_end=row.get("project_end"),
     )
 
 
