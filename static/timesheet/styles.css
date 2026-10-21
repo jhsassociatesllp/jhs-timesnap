@@ -465,3 +465,6 @@ body{
 .activity-wrap{ display:flex; flex-direction:column; gap:4px; min-width:200px; }
 .activity-wrap .activity-reason{ font-size:.82rem; }
 .activity-back-btn{ align-self:flex-start; background:none; border:none; color:#5d5fef; cursor:pointer; font-size:.78rem; padding:0; }
+
+/* Project hours typed by the employee */
+.project-hours-field.hours-over{ border-color:#dc2626 !important; background:#fee2e2 !important; }

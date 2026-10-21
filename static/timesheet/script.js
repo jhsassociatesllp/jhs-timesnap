@@ -56,9 +56,30 @@ const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
 const isDayOffLocation = (loc) => DAY_OFF_LOCATIONS.includes((loc || "").trim());
 const NO_TRAVEL_TIME_LOCATIONS = [...DAY_OFF_LOCATIONS, "Work From Home", "Office"];
 
+// Location dropdown: [stored value, label shown]. Stored values are unchanged ("Client Site", "Work From Home",
+// "Week Off") so existing entries, reports and the server rules keep working; only the labels differ.
+const LOCATION_CHOICES = [
+  ["Office", "Office"], ["Client Site", "Client site"], ["Work From Home", "WFH"],
+  ["Leave", "Leave"], ["Week Off", "Week off"], ["PHY", "PHY"],
+];
+const _escHtml = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function locationOptionsHtml(selected) {
+  const sel = (selected || "").trim();
+  let html = LOCATION_CHOICES.map(([v, l]) => `<option value="${v}"${sel === v ? " selected" : ""}>${l}</option>`).join("");
+  // an older entry may hold a value that is no longer offered (e.g. "Field Work"): keep showing it
+  if (sel && !LOCATION_CHOICES.some(([v]) => v === sel)) html += `<option value="${_escHtml(sel)}" selected>${_escHtml(sel)}</option>`;
+  return html;
+}
+
 function applyLocationTimeRules(row) {
   if (!row) return;
   const location = row.querySelector('.location-select')?.value || '';
+  const hoursBox = row.querySelector('.project-hours-field');
+  if (hoursBox) {                                   // Leave / PHY / Week off: no worked hours
+    const off = isDayOffLocation(location);
+    if (off) hoursBox.value = '';
+    hoursBox.disabled = off;
+  }
   const lunchTime = row.querySelector('.lunch-time-select');
   const travelTime = row.querySelector('.travel-time-select');
   const billable = row.querySelector('.billable-select');
@@ -86,6 +107,12 @@ function onLocationChange(select) {
 
 function applyModalLocationTimeRules() {
   const location = document.getElementById('modalInput2')?.value || '';
+  const modalHours = document.getElementById('modalInput10');
+  if (modalHours) {
+    const off = isDayOffLocation(location);
+    if (off) modalHours.value = '';
+    modalHours.disabled = off;
+  }
   const lunchTime = document.getElementById('modalInput13');
   const travelTime = document.getElementById('modalInput14');
   const billable = document.getElementById('modalInput11');
@@ -421,8 +448,9 @@ function _applyLunchTravelVisibility() {
   ['13','14'].forEach(n => {
     const label = document.getElementById(`modalLabel${n}`);
     const input = document.getElementById(`modalInput${n}`);
-    if (label) label.closest('div').style.display = show ? '' : 'none';
-    else if (input) input.closest('div').style.display = show ? '' : 'none';
+    // lunch / travel are no longer entered on the timesheet: the modal fields stay hidden whatever the cycle says
+    if (label) label.closest('div').style.display = 'none';
+    else if (input) input.closest('div').style.display = 'none';
   });
 
   // Table columns — header and cells in all existing sections
@@ -532,54 +560,14 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
         onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="onLocationChange(this)">
-        <option value="Office"${entry.location==='Office'?' selected':''}>Office</option>
-        <option value="Client Site"${entry.location==='Client Site'?' selected':''}>Client Site</option>
-        <option value="Work From Home"${entry.location==='Work From Home'?' selected':''}>Work From Home</option>
-        <option value="Field Work"${entry.location==='Field Work'?' selected':''}>Field Work</option>
-        <option value="Leave"${entry.location==='Leave'?' selected':''}>Leave</option>
-        <option value="PHY"${entry.location==='PHY'?' selected':''}>PHY</option>
-        <option value="Week Off"${entry.location==='Week Off'?' selected':''}>Week Off</option>
-      </select>
+      <select class="location-select form-input" onchange="onLocationChange(this)">${locationOptionsHtml(entry.location)}</select>
     </td>
-    <td class="col-project-start"><input type="time" class="project-start form-input" value="${entry.projectStartTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-    <td class="col-project-end"><input type="time" class="project-end form-input" value="${entry.projectEndTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
     <td class="col-client"></td>
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" value="${entry.reportingManagerEntry||''}" placeholder="Enter Reporting Manager"></td>
     <td class="col-activity" style="min-width:200px;"></td>
-    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" value="${entry.projectHours||''}" readonly></td>
-    <td class="col-billable">
-      <select class="billable-select form-input" onchange="updateSummary()">
-        <option value="Yes"${entry.billable==='Yes'?' selected':''}>Billable</option>
-        <option value="No"${entry.billable==='No'?' selected':''}>Non-Billable</option>
-      </select>
-    </td>
-    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="lunch-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min"${entry.lunchTime==='15 min'?' selected':''}>15 min</option>
-        <option value="30 min"${(entry.lunchTime || '30 min')==='30 min'?' selected':''}>30 min</option>
-        <option value="45 min"${entry.lunchTime==='45 min'?' selected':''}>45 min</option>
-        <option value="1 hr"${entry.lunchTime==='1 hr'?' selected':''}>1 hr</option>
-        <option value="1.5 hr"${entry.lunchTime==='1.5 hr'?' selected':''}>1.5 hr</option>
-        <option value="2 hr"${entry.lunchTime==='2 hr'?' selected':''}>2 hr</option>
-      </select>
-    </td>
-    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="travel-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min"${entry.travelTime==='15 min'?' selected':''}>15 min</option>
-        <option value="30 min"${entry.travelTime==='30 min'?' selected':''}>30 min</option>
-        <option value="45 min"${entry.travelTime==='45 min'?' selected':''}>45 min</option>
-        <option value="1 hr"${entry.travelTime==='1 hr'?' selected':''}>1 hr</option>
-        <option value="1.5 hr"${entry.travelTime==='1.5 hr'?' selected':''}>1.5 hr</option>
-        <option value="2 hr"${entry.travelTime==='2 hr'?' selected':''}>2 hr</option>
-        <option value="2.5 hr"${entry.travelTime==='2.5 hr'?' selected':''}>2.5 hr</option>
-        <option value="3 hr"${entry.travelTime==='3 hr'?' selected':''}>3 hr</option>
-      </select>
-    </td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" step="0.25" min="0" max="24" value="${_escHtml(entry.projectHours||'')}" placeholder="Hours" oninput="onHoursInput(this)"></td>
     <td class="col-remarks"><input type="text" class="remarks-field form-input" value="${entry.remarks||''}" placeholder="Additional notes"></td>
     <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
   `;
@@ -1327,12 +1315,10 @@ function renderTimesheetTable() {
     <table class="timesheet-table">
       <thead>
         <tr>
-          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Work</th>
-          <th>Project Start</th><th>Project End</th><th>Client</th><th>Project</th>
+          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th>
+          <th>Client</th><th>Project</th>
           <th>Project Code</th><th>Reporting Manager</th><th>Activity</th>
-          <th>Project Hours</th><th>Billable</th>
-          <th style="display:${showLT?'':'none'}">Lunch Time</th>
-          <th style="display:${showLT?'':'none'}">Travel Time</th>
+          <th>Project Hours</th>
           <th>Remarks</th><th>Delete</th>
         </tr>
       </thead>
@@ -1475,54 +1461,14 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
       <input type="date" class="date-field form-input" value="${defaultDate}" min="${minDate}" max="${maxDate}" onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="onLocationChange(this)">
-        <option value="Office">Office</option>
-        <option value="Client Site">Client Site</option>
-        <option value="Work From Home">Work From Home</option>
-        <option value="Field Work">Field Work</option>
-        <option value="Leave">Leave</option>
-        <option value="PHY">PHY</option>
-        <option value="Week Off">Week Off</option>
-      </select>
+      <select class="location-select form-input" onchange="onLocationChange(this)">${locationOptionsHtml('')}</select>
     </td>
-    <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-    <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
     <td class="col-client"></td>
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
     <td class="col-activity" style="min-width: 200px;"></td>
-    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
-    <td class="col-billable">
-      <select class="billable-select form-input" onchange="updateSummary()">
-        <option value="Yes">Billable</option>
-        <option value="No">Non-Billable</option>
-      </select>
-    </td>
-    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="lunch-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min">15 min</option>
-        <option value="30 min" selected>30 min</option>
-        <option value="45 min">45 min</option>
-        <option value="1 hr">1 hr</option>
-        <option value="1.5 hr">1.5 hr</option>
-        <option value="2 hr">2 hr</option>
-      </select>
-    </td>
-    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="travel-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min">15 min</option>
-        <option value="30 min">30 min</option>
-        <option value="45 min">45 min</option>
-        <option value="1 hr">1 hr</option>
-        <option value="1.5 hr">1.5 hr</option>
-        <option value="2 hr">2 hr</option>
-        <option value="2.5 hr">2.5 hr</option>
-        <option value="3 hr">3 hr</option>
-      </select>
-    </td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" step="0.25" min="0" max="24" placeholder="Hours" oninput="onHoursInput(this)"></td>
     <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
     <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
   `;
@@ -1989,25 +1935,34 @@ function deleteRow(btn) {
 }
 
 /* Calculations & validations */
+// Project hours are typed by the employee now (there is no start/end time). Kept under its old name so the
+// older call sites (paste, modal save) keep working: it only re-checks the day's total and the summary.
 function calculateHours(row) {
   if (!row) return;
-  const start = row.querySelector(".project-start")?.value;
-  const end = row.querySelector(".project-end")?.value;
-  const hoursField = row.querySelector(".project-hours-field");
-  if (!start || !end) {
-    if (hoursField) hoursField.value = "";
-    updateSummary();
-    return;
-  }
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let startMin = sh * 60 + sm;
-  let endMin = eh * 60 + em;
-  if (endMin < startMin) endMin += 24 * 60; // overnight allowed
-  const hrs = ((endMin - startMin) / 60).toFixed(2);
-  if (hoursField) hoursField.value = hrs;
-
+  _flagDayTotal(row);
   updateSummary();
+}
+
+// Called as hours are typed in a row
+function onHoursInput(el) {
+  _flagDayTotal(el && el.closest("tr"));
+  updateSummary();
+}
+
+// Highlight every row of a date whose hours add up to more than 24
+function _flagDayTotal(row) {
+  const section = row && row.closest("tbody");
+  if (!section) return;
+  const date = row.querySelector(".date-field")?.value || "";
+  const rows = [...section.querySelectorAll("tr")].filter((r) => (r.querySelector(".date-field")?.value || "") === date);
+  const total = rows.reduce((t, r) => t + (parseFloat(r.querySelector(".project-hours-field")?.value) || 0), 0);
+  rows.forEach((r) => {
+    const box = r.querySelector(".project-hours-field");
+    if (box) {
+      box.classList.toggle("hours-over", total > 24);
+      box.title = total > 24 ? `Hours for ${date} add up to ${total.toFixed(2)} - more than 24` : "";
+    }
+  });
 }
 
 function validateTimes(rowOrModal, isModal = false) {
@@ -2697,19 +2652,7 @@ function closeModal() {
 }
 
 function updateModalHours() {
-  // Project hours from modalInput4/5 -> modalInput10
-  const projectStart = document.getElementById("modalInput3")?.value;
-  const projectEnd = document.getElementById("modalInput4")?.value;
-  const projectHoursInput = document.getElementById("modalInput10");
-
-  if (projectStart && projectEnd && projectHoursInput) {
-    const [sh, sm] = projectStart.split(":").map(Number);
-    const [eh, em] = projectEnd.split(":").map(Number);
-    let s = sh * 60 + sm;
-    let e = eh * 60 + em;
-    if (e < s) e += 24 * 60;
-    projectHoursInput.value = ((e - s) / 60).toFixed(2);
-  }
+  // Project hours are typed in the modal now (no start/end time) - nothing to calculate.
 }
 
 /* Manager employee details modal (opens timeline and feedback) */
@@ -3573,13 +3516,12 @@ function _collectEntries() {
     const actState       = getActivityState(row);
     const activity        = actState.activity || '';
     const projectHours    = row.querySelector('.project-hours-field')?.value || '0';
-    let billable          = row.querySelector('.billable-select')?.value || 'No';
+    let billable          = row.querySelector('.billable-select')?.value || '';   // column removed: blank unless an older row carries one
     const remarks         = row.querySelector('.remarks-field')?.value || '';
     let lunchTime         = row.querySelector('.lunch-time-select')?.value || '';
     let travelTime        = row.querySelector('.travel-time-select')?.value || '';
     if (isDayOffLocation(location)) lunchTime = '';
     if (NO_TRAVEL_TIME_LOCATIONS.includes(location.trim())) travelTime = '';
-    if (isDayOffLocation(location)) billable = 'No';
     if (!date) return;
     entries.push({
       date, location,
@@ -3942,6 +3884,7 @@ function copyRow(button) {
     reportingManager: row.querySelector('.reporting-manager-field')?.value || '',
     activity: row.querySelector('.activity-field')?.value || '',
     activityState: getActivityState(row),
+    projectHours: row.querySelector('.project-hours-field')?.value || '',
     billable: row.querySelector('.billable-select')?.value || '',
     remarks: row.querySelector('.remarks-field')?.value || ''
   };
@@ -3985,6 +3928,8 @@ function pasteRow(button) {
   refreshActivity(row, true);                              // client / project were just pasted
   setActivityState(row, copiedData.activityState || { activity: copiedData.activity });
   
+  const hoursField = row.querySelector('.project-hours-field');
+  if (hoursField && !hoursField.disabled) hoursField.value = copiedData.projectHours || '';
   const billableField = row.querySelector('.billable-select');
   if (billableField) billableField.value = copiedData.billable;
   
@@ -5018,11 +4963,11 @@ async function handleExcelUpload(event) {
             }
 
             // ✅ Required columns to validate (Lunch Time & Travel Time are optional)
-            const requiredColumns = [
+            const requiredColumns = [   // start/end time, billable, lunch and travel columns are no longer needed
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
                 'Reporting Manager', 'Date', 'Work',
-                'Project Start Time', 'Project End Time', 'Client', 'Project', 'Project Code',
-                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Billable', 'Remarks'
+                'Client', 'Project', 'Project Code',
+                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Remarks'
             ];
 
             const fileColumns = Object.keys(jsonData[0]);
@@ -5091,14 +5036,15 @@ async function handleExcelUpload(event) {
             }
             
             function calculateHours(row) {
+              // hours are typed in the 'Project Hours' column; an old template without typed hours still
+              // gets them from its start/end times
+              const typed = parseFloat(String(row['Project Hours'] == null ? '' : row['Project Hours']).replace(',', '.'));
+              if (!isNaN(typed) && typed > 0) return Math.round(typed * 100) / 100;
               const start = excelTimeToMinutes(row['Project Start Time']);
               const end = excelTimeToMinutes(row['Project End Time']);
-
               if (start !== null && end !== null && end > start) {
                 return minutesToHours(end - start);
               }
-
-              // No valid time data → explicitly zero
               return 0;
             }
 
@@ -5158,16 +5104,16 @@ async function handleExcelUpload(event) {
           // working-day rows must have every project field filled in. Leave /
           // PHY / Week Off rows are exempt (but whatever is filled stays).
           {
-            const requireLunch = window._showLunchTravel !== false;
-            const mandatoryFields = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
+            const mandatoryFields = ['date', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
             const uploadErrors = [];
             realEntries.forEach((entry, i) => {
               if (isDayOffLocation(entry.location)) return;
               mandatoryFields.forEach(f => {
                 if (!entry[f] || !entry[f].trim()) uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): ${f} is required`);
               });
-              if (requireLunch && (!entry.lunchTime || !entry.lunchTime.trim())) {
-                uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): Lunch Time is required`);
+              const uploadedHours = parseFloat(entry.projectHours);
+              if (!(uploadedHours > 0 && uploadedHours <= 24)) {
+                uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): Project Hours must be more than 0 and at most 24`);
               }
             });
             if (uploadErrors.length) {

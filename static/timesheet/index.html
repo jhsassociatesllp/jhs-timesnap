@@ -111,8 +111,6 @@
 
         <div class="summary-section">
           <div class="summary-item total-hours"><h3><i class="fas fa-clock"></i> Total Hours</h3><div class="value">0.00</div></div>
-          <div class="summary-item billable-hours"><h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3><div class="value">0.00</div></div>
-          <div class="summary-item non-billable-hours"><h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3><div class="value">0.00</div></div>
         </div>
 
         <div class="export-section">
@@ -148,8 +146,6 @@
         <h2><i class="fas fa-history"></i> Past Timesheet Entries</h2>
         <div class="summary-section history-summary">
           <div class="summary-item total-hours"><h3><i class="fas fa-clock"></i> Total Hours</h3><div class="value">0.00</div></div>
-          <div class="summary-item billable-hours"><h3><i class="fas fa-dollar-sign"></i> Billable Hours</h3><div class="value">0.00</div></div>
-          <div class="summary-item non-billable-hours"><h3><i class="fas fa-exclamation-triangle"></i> Non-Billable Hours</h3><div class="value">0.00</div></div>
         </div>
         <div id="historyContent"></div>
         <div class="history-export-section">
@@ -213,33 +209,32 @@
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal-content">
         <div><label id="modalLabel1">Date</label><input type="date" id="modalInput1" class="form-input" onchange="validateModalDate(this); updateModalHours()" /></div>
-        <div><label id="modalLabel2">Work</label>
+        <div><label id="modalLabel2">Location</label>
           <select id="modalInput2" class="form-input" onchange="applyModalLocationTimeRules()">
             <option value="Office">Office</option>
-            <option value="Client Site">Client Site</option>
-            <option value="Work From Home">Work From Home</option>
-            <option value="Field Work">Field Work</option>
+            <option value="Client Site">Client site</option>
+            <option value="Work From Home">WFH</option>
             <option value="Leave">Leave</option>
+            <option value="Week Off">Week off</option>
             <option value="PHY">PHY</option>
-            <option value="Week Off">Week Off</option>
           </select>
         </div>
-        <div><label id="modalLabel3">Project Start</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
-        <div><label id="modalLabel4">Project End</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
+        <div style="display:none"><label id="modalLabel3">Project Start</label><input type="time" id="modalInput3" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
+        <div style="display:none"><label id="modalLabel4">Project End</label><input type="time" id="modalInput4" class="form-input" onchange="validateTimes(null,true); updateModalHours()" /></div>
         <div><label id="modalLabel5">Client</label><div id="modalClientContainer"></div></div>
         <div><label id="modalLabel6">Project</label><div id="modalProjectContainer"></div></div>
         <div><label id="modalLabel7">Project Code</label><div id="modalProjectCodeContainer"></div></div>
         <div id="modalProjectMetaTL" style="display:none;"></div>
         <div><label id="modalLabel8">Reporting Manager</label><input type="text" id="modalInput8" class="form-input" placeholder="Enter Reporting Manager" onchange="updateModalHours()" /></div>
         <div><label id="modalLabel9">Activity</label><input type="text" id="modalInput9" class="form-input" placeholder="Enter Activity" onchange="updateModalHours()" /></div>
-        <div><label id="modalLabel10">Project Hours</label><input type="number" id="modalInput10" class="form-input" readonly /></div>
-        <div><label id="modalLabel11">Billable</label>
+        <div><label id="modalLabel10">Project Hours</label><input type="number" id="modalInput10" class="form-input" step="0.25" min="0" max="24" placeholder="Hours worked" /></div>
+        <div style="display:none"><label id="modalLabel11">Billable</label>
           <select id="modalInput11" class="form-input" onchange="updateModalHours()">
             <option value="Yes">Billable</option>
             <option value="No">Non-Billable</option>
           </select>
         </div>
-        <div><label id="modalLabel13">Lunch Time Taken</label>
+        <div style="display:none"><label id="modalLabel13">Lunch Time Taken</label>
           <select id="modalInput13" class="form-input">
             <option value="">None</option>
             <option value="15 min">15 min</option>
@@ -250,7 +245,7 @@
             <option value="2 hr">2 hr</option>
           </select>
         </div>
-        <div><label id="modalLabel14">Travel Time Taken</label>
+        <div style="display:none"><label id="modalLabel14">Travel Time Taken</label>
           <select id="modalInput14" class="form-input">
             <option value="">None</option>
             <option value="15 min">15 min</option>
