@@ -48,7 +48,10 @@ def convert(doc: dict) -> Iterator[dict]:
             now = datetime.utcnow()
             yield {
                 "employee_id": emp, "date": d.isoformat(),
-                "task_id": None, "task_name": "",
+                "location": (e.get("location") or "").strip(),
+                "remarks": (e.get("remarks") or "").strip(),
+                "reporting_manager_name": (e.get("reportingManagerEntry") or "").strip(),
+                "task_id": None, "task_name": (e.get("activity") or "").strip(),
                 "project_code": (e.get("projectCode") or "").strip(),
                 "client": (e.get("client") or "").strip(),
                 "project": (e.get("project") or "").strip(),
@@ -62,11 +65,43 @@ def convert(doc: dict) -> Iterator[dict]:
             }
 
 
-def migrate(source, dest, apply: bool = False) -> Dict[str, int]:
-    """Convert every legacy document in `source` into `dest`. Dry-run unless apply=True."""
-    stats = {"employees": 0, "entries": 0, "inserted": 0, "already_present": 0}
+def convert_submissions(doc: dict) -> Iterator[dict]:
+    """One submitted-day record per date of every SUBMITTED legacy payroll (day-off rows included), so the new
+    day strip shows those days as submitted. Legacy days are view-only in the new timesheet."""
+    emp = str(doc.get("employeeId") or "").strip().upper()
+    seen = set()
+    for payroll in doc.get("payrolls", []) or []:
+        if not payroll.get("submitted"):
+            continue
+        for e in _entries_of(payroll):
+            raw = str(e.get("date") or "")[:10]
+            try:
+                d = date.fromisoformat(raw)
+            except ValueError:
+                continue
+            if (emp, raw) in seen:
+                continue
+            seen.add((emp, raw))
+            yield {"employee_id": emp, "date": raw, "location": (e.get("location") or "").strip(),
+                   "cycle_id": rules.cycle_for(d).id, "submitted_at": datetime.utcnow(), "legacy": True}
+
+
+def migrate(source, dest, apply: bool = False, submissions=None, employees=None) -> Dict[str, int]:
+    """Convert legacy documents in `source` into `dest` (and, if `submissions` is given, mark their submitted
+    days). `employees` limits it to those codes. Dry-run unless apply=True; never changes `source`."""
+    wanted = {str(c).strip().upper() for c in employees} if employees else None
+    stats = {"employees": 0, "entries": 0, "inserted": 0, "already_present": 0, "days_submitted": 0}
     for doc in source.find({}):
+        if wanted is not None and str(doc.get("employeeId") or "").strip().upper() not in wanted:
+            continue
         stats["employees"] += 1
+        if submissions is not None:
+            for sub in convert_submissions(doc):
+                key = {"employee_id": sub["employee_id"], "date": sub["date"]}
+                if not submissions.count_documents(key, limit=1):
+                    stats["days_submitted"] += 1
+                    if apply:
+                        submissions.update_one(key, {"$setOnInsert": sub}, upsert=True)
         for new in convert(doc):
             stats["entries"] += 1
             key = {"employee_id": new["employee_id"], "legacy_id": new["legacy_id"]}
