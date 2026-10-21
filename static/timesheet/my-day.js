@@ -124,13 +124,14 @@
     const d = S.day;
     if (d.nq_unavailable) banner("warn", "Project data from Nexus Quant is unavailable right now, so your tasks cannot be listed. You can still add unplanned work or mark a day off. Please refresh in a few minutes.");
     else if (d.nq_data_may_be_stale) banner("warn", "Project data may be out of date.");
+    if (d.cycle.review_status === "sent_back") banner("warn", "Your manager sent this cycle back: " + (d.cycle.review_note || "please check your days") + ". Fix the days, then submit them again.");
     if (d.read_only) banner("info", d.read_only_text || "This day is view only.");
     else if (d.submitted) banner("ok", "This day is submitted. If you change anything it needs to be submitted again.");
   }
 
   function renderTitle() {
     const d = S.day, c = d.cycle;
-    $("cycLabel").textContent = `Cycle ${c.label} · fill by ${shortDate(c.deadline)}${c.deadline_passed ? " (closed)" : ""}`;
+    $("cycLabel").textContent = `Cycle ${c.label} · fill by ${shortDate(c.deadline)}${c.deadline_passed && c.review_status !== "sent_back" && c.review_status !== "reopened" ? " (closed)" : ""}`;
     $("dayTitle").textContent = `${d.weekday}, ${shortDate(d.date)}`;
     $("datePick").value = d.date;
     $("datePick").max = S.strip.today;
@@ -514,6 +515,7 @@
       const strip0 = await api("GET", `/timesheet/v2/cycle-days/${emp}`);
       await loadDay(strip0.today);
       $("boot").hidden = true; $("app").hidden = false;
+      api("GET", `/timesheet/v2/cycles/${strip0.cycle.id}/team`).then(() => { $("reviewLink").hidden = false; }).catch(() => { /* not a manager */ });
     } catch (err) {
       $("boot").textContent = "Could not load your timesheet: " + err.message;
     }
