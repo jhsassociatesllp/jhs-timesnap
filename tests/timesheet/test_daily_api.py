@@ -316,6 +316,22 @@ def test_everyone_is_enabled_by_default_except_free_text_employees(api):
     assert api.get("/timesheet/v2/enabled/JHS7777").json() == {"enabled": False}         # staged roll-out switched on
 
 
+def test_a_named_free_text_employee_can_be_included(api):
+    api.db["t_employees"].insert_one({"EmpID": "JHS1191", "PartnerEmpCode": "JHS01", "ReportingEmpCode": "JHS9001"})
+    api.db["t_config"].update_one({"_id": "timesheet"}, {"$unset": {"timesheet_scope": ""}})
+    _user["id"] = "JHS1191"
+    assert api.get("/timesheet/v2/enabled/JHS1191").json() == {"enabled": False}         # JHS01 rule still applies
+    api.db["t_config"].update_one({"_id": "timesheet"}, {"$set": {"new_timesheet_include": ["jhs1191"]}})
+    assert api.get("/timesheet/v2/enabled/JHS1191").json() == {"enabled": True}
+    assert api.get(f"/timesheet/v2/day/JHS1191?date={DAY}").status_code == 200
+    _user["id"] = "JHS1562"
+    assert api.get("/timesheet/v2/enabled/JHS1562").json() == {"enabled": False}         # others are unaffected
+    from backend.timesheet import scope
+    cfg = api.db["t_config"].find_one({"_id": "timesheet"})
+    assert "JHS1191" in scope.enabled_set(api.db["t_config"], api.db["t_employees"])
+    assert scope.is_enabled("JHS1562", cfg, api.db["t_employees"]) is False
+
+
 def test_a_sent_back_cycle_is_editable_after_the_deadline_with_the_note_shown(api, monkeypatch):
     put(api, [row(1, 4)])
     monkeypatch.setattr(daily, "_now_ist", lambda: datetime(2026, 10, 26, 0, 0, 1))

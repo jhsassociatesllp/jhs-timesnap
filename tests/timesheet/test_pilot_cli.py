@@ -47,3 +47,13 @@ def test_bad_codes_and_usage_change_nothing(cfg, capsys):
         assert pilot.main(bad) == 2
     assert pilot.main([]) == 2 and pilot.main(["add"]) == 2 and pilot.main(["nope", "JHS1"]) == 2
     assert pilot.current() == ["JHS1"]
+
+
+def test_include_and_scope_commands(cfg, capsys):
+    assert pilot.main(["include", "jhs1191"]) == 0 and pilot.current_include() == ["JHS1191"]
+    assert pilot.main(["include", "JHS1191"]) == 0 and pilot.current_include() == ["JHS1191"]      # no duplicates
+    assert pilot.main(["list"]) == 0 and "JHS1191" in capsys.readouterr().out
+    assert pilot.main(["include", "bad code!"]) == 2 and pilot.current_include() == ["JHS1191"]
+    assert pilot.main(["uninclude", "JHS1191"]) == 0 and pilot.current_include() == []
+    assert pilot.main(["scope", "pilot"]) == 0 and cfg.find_one({"_id": "timesheet"})["timesheet_scope"] == "pilot"
+    assert pilot.main(["scope", "nope"]) == 2

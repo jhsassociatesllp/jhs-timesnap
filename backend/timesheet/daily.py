@@ -92,7 +92,8 @@ def get_config() -> dict:
             holidays.add(date.fromisoformat(str(h)[:10]))
         except ValueError:
             continue
-    return {"pilot_employees": scope.pilot_codes(doc), "pilot_only": scope.pilot_only(doc), "holidays": holidays}
+    return {"pilot_employees": scope.pilot_codes(doc), "pilot_only": scope.pilot_only(doc),
+            "include": scope.include_codes(doc), "holidays": holidays}
 
 
 def _require_self(employee_id: str, current_user: str) -> str:
@@ -105,6 +106,8 @@ def _require_self(employee_id: str, current_user: str) -> str:
 def _is_enabled(emp: str, cfg: dict) -> bool:
     if cfg["pilot_only"] and emp not in cfg["pilot_employees"]:
         return False
+    if emp in cfg["include"]:                       # named employees use it even if they are free-text
+        return True
     doc = store.employees.find_one({"EmpID": emp}, {"PartnerEmpCode": 1}) or {}
     return not _is_free_text_employee(emp, (doc.get("PartnerEmpCode") or ""))
 

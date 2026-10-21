@@ -3,6 +3,8 @@
 `/timesheet` opens the day-by-day "My day" screen for **every employee** who logs in (the free-text employees
 JHS01-partner staff and JHS1562 keep the classic grid). For a staged roll-out run
 `python -m backend.timesheet.pilot scope pilot`, then `add` the codes; `scope all` switches back.
+A free-text employee who should still see it (for testing) is added with
+`python -m backend.timesheet.pilot include JHS1191` (undo with `uninclude`).
 
 ## What it does
 - Pick a task (searchable, grouped by client › project); client, project and code fill in from Nexus Quant.
