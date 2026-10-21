@@ -43,6 +43,15 @@ def test_hours_daily_combines_new_and_legacy_without_double_counting(mdb):
         ("2026-10-14", "JHS9101", "PL-T001", "legacy"): 8.0}
 
 
+def test_mirrored_rows_of_the_new_timesheet_are_not_counted_again(mdb):
+    mdb["m_legacy"].insert_one({"employeeId": "JHS9101", "payrolls": [{"entries": [
+        {"date": "2026-10-13", "projectCode": "PL-T001", "projectHours": "8", "v2_mirror": True, "v2_cycle_id": "2026-10-C2"},
+        {"date": "2026-10-14", "projectCode": "PL-T001", "projectHours": "5", "v2_mirror": True},
+        {"date": "2026-10-15", "projectCode": "PL-T001", "projectHours": "2"}]}]})
+    agg.build_hours_daily()
+    assert hrows(mdb) == {("2026-10-15", "JHS9101", "PL-T001", "legacy"): 2.0}
+
+
 def test_hours_daily_is_idempotent_and_removes_stale_rows(mdb):
     mdb["c_entries"].insert_many([entry("JHS9101", "2026-10-12", 5), entry("JHS9101", "2026-10-13", 4)])
     agg.build_hours_daily()

@@ -6,7 +6,9 @@
   employee = nothing here
 
 Approving LOCKS the employee's cycle: entries become approved+locked, and the daily timesheet
-refuses any further change (even new entries on empty days) via backend.cycle.locks.
+refuses any further change (even new entries on empty days) via backend.cycle.locks, then the cycle is
+mirrored into the classic Timesheet_data (backend.cycle.mirror). Sending a cycle back reopens it for the
+employee (with the manager's note) until it is approved.
 """
 import html as _h
 from datetime import date, datetime, timedelta
@@ -19,7 +21,7 @@ from pydantic import BaseModel, Field
 from backend import mailer
 from backend.access_manager.router import has_admin_module
 from backend.auth import get_current_user
-from backend.cycle import digest
+from backend.cycle import digest, mirror
 from backend.cycle.store import config_doc, holidays_set, store
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
@@ -100,6 +102,10 @@ def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: 
         "employee_id": emp, "date": {"$gte": start, "$lte": end},
         "result": {"$in": ["short", "over", "no_punch", "not_filled"]}, "status": "open"})
     review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
+    resubmitted = False
+    if review.get("status") == "sent_back" and review.get("sent_back_at"):
+        resubmitted = store.submissions.count_documents(
+            {"employee_id": emp, "cycle_id": cyc.id, "submitted_at": {"$gt": review["sent_back_at"]}}, limit=1) > 0
     warnings = []
     if missing:
         warnings.append(f"{len(missing)} day(s) not submitted")
@@ -113,6 +119,8 @@ def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: 
         "unplanned": sum(1 for e in entries if e.get("is_unplanned")), "reco_gaps": reco_open,
         "status": review.get("status", "pending"), "approved_by": review.get("approved_by"),
         "approved_at": review.get("approved_at"), "warnings": warnings,
+        "note": review.get("note") if review.get("status") == "sent_back" else None,
+        "resubmitted": resubmitted, "mirror": (review.get("mirror") or {}).get("status"),
     }
 
 
@@ -168,8 +176,9 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
     for i in ids:
         if i not in pilot:
             raise HTTPException(422, f"{i} is not on the daily timesheet")
-        if not store.entries.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1}):
-            raise HTTPException(422, f"{i} has no entries in this cycle")
+        if not (store.entries.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})
+                or store.submissions.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})):
+            raise HTTPException(422, f"{i} has no entries or submitted days in this cycle")
         rows[i] = _employee_row(i, "", cyc, today, hol)
     flagged = {i: r["warnings"] for i, r in rows.items() if r["warnings"]}
     if flagged and not body.confirm_warnings:
@@ -183,9 +192,27 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
             {"kind": "approval", "employee_id": i, "cycle_id": cyc.id},
             {"$set": {"status": "approved", "approved_by": me, "approved_at": now,
                       "warnings_confirmed": bool(flagged.get(i))},
+             "$unset": {"note": "", "sent_back_at": "", "sent_back_by": ""},
              "$push": {"history": {"action": "approved", "by": me, "at": now, "warnings": flagged.get(i, [])}}},
             upsert=True)
-    return {"approved": ids, "warnings_confirmed": sorted(flagged)}
+    # the lock above is what matters; a failed copy to the classic collection is recorded and can be re-run
+    mirror_failed = []
+    for i in ids:
+        result = _run_mirror(i, cyc, me)
+        if result["status"] not in ("ok", "no_payroll_cycle"):
+            mirror_failed.append(i)
+    return {"approved": ids, "warnings_confirmed": sorted(flagged), "mirror_failed": mirror_failed}
+
+
+def _run_mirror(emp: str, cyc: rules.Cycle, me: str) -> dict:
+    try:
+        name = (store.employees.find_one({"EmpID": me}, {"Emp Name": 1}) or {}).get("Emp Name", "")
+        result = mirror.write(emp, cyc, me, name)
+    except Exception as exc:                                                    # never undo an approval over this
+        result = {"status": "error", "error": str(exc)[:300]}
+    store.reviews.update_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id},
+                             {"$set": {"mirror": {**result, "at": datetime.utcnow()}}})
+    return result
 
 
 class UnlockIn(BaseModel):
@@ -209,7 +236,101 @@ def unlock(cycle_id: str, body: UnlockIn, current_user: str = Depends(get_curren
     store.reviews.update_one({"_id": review["_id"]}, {
         "$set": {"status": "reopened", "reopened_by": me, "reopened_at": now},
         "$push": {"history": {"action": "unlocked", "by": me, "at": now, "reason": body.reason.strip()}}})
+    try:
+        mirror.remove(emp, cyc)
+    except Exception as exc:
+        store.reviews.update_one({"_id": review["_id"]}, {"$set": {"mirror": {"status": "error", "error": str(exc)[:300],
+                                                                              "at": datetime.utcnow()}}})
     return {"employee_id": emp, "status": "reopened"}
+
+
+class MirrorIn(BaseModel):
+    employee_id: str
+
+
+@router.post("/{cycle_id}/mirror")
+def remirror(cycle_id: str, body: MirrorIn, current_user: str = Depends(get_current_user)):
+    """ADMIN ONLY: run the copy to the classic timesheet again for an approved cycle (safe to repeat)."""
+    me = _me(current_user)
+    if not _is_admin(me):
+        raise HTTPException(403, "Only an admin can re-run the mirror")
+    cyc = _cycle(cycle_id)
+    emp = body.employee_id.strip().upper()
+    if not store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id, "status": "approved"}):
+        raise HTTPException(404, "That cycle is not approved for this employee")
+    return _run_mirror(emp, cyc, me)
+
+
+class SendBackIn(BaseModel):
+    employee_id: str
+    note: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post("/{cycle_id}/send-back")
+def send_back(cycle_id: str, body: SendBackIn, current_user: str = Depends(get_current_user)):
+    """Reopen an employee's cycle for corrections, with a note they see on their timesheet. The reporting
+    manager (or an admin) only. An APPROVED cycle must be unlocked by an admin first."""
+    me = _me(current_user)
+    admin = _is_admin(me)
+    cyc = _cycle(cycle_id)
+    emp = body.employee_id.strip().upper()
+    _authorise_all(me, [emp], admin)
+    if emp not in {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}:
+        raise HTTPException(422, f"{emp} is not on the daily timesheet")
+    if _today() <= cyc.end:
+        raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - review it after it has ended")
+    key = {"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}
+    if store.reviews.find_one({**key, "status": "approved"}):
+        raise HTTPException(409, "This cycle is approved and locked - ask an admin to unlock it first")
+    now = datetime.utcnow()
+    note = body.note.strip()
+    store.reviews.update_one(key, {
+        "$set": {"status": "sent_back", "note": note, "sent_back_by": me, "sent_back_at": now},
+        "$push": {"history": {"action": "sent_back", "by": me, "at": now, "note": note}}}, upsert=True)
+    return {"employee_id": emp, "status": "sent_back"}
+
+
+@router.get("/{cycle_id}/employee/{employee_id}")
+def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends(get_current_user)):
+    """Day-by-day rows of one employee for the review screen. Reporting manager or admin only."""
+    me = _me(current_user)
+    admin = _is_admin(me)
+    cyc = _cycle(cycle_id)
+    emp = employee_id.strip().upper()
+    _authorise_all(me, [emp], admin)
+    if emp not in {str(e).strip().upper() for e in config_doc().get("pilot_employees", []) or []}:
+        raise HTTPException(422, f"{emp} is not on the daily timesheet")
+    start, end = cyc.start.isoformat(), cyc.end.isoformat()
+    subs = {x["date"]: x for x in store.submissions.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
+    drafts = {x["date"]: x for x in store.drafts.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
+    by_day: dict = {}
+    for e in store.entries.find({"employee_id": emp, "cycle_id": cyc.id}).sort("created_at", 1):
+        by_day.setdefault(e["date"], []).append(e)
+    hol, today = holidays_set(), _today()
+    days, d = [], cyc.start
+    while d <= cyc.end:
+        iso = d.isoformat()
+        rows = by_day.get(iso, [])
+        sub = subs.get(iso)
+        loc = (sub or drafts.get(iso) or {}).get("location") or (rows[0].get("location") if rows else None)
+        working = d.weekday() < 5 and iso not in hol
+        days.append({
+            "date": iso, "weekday": d.strftime("%a"), "working_day": working, "location": loc,
+            "state": "submitted" if sub else ("saved" if rows or iso in drafts else ("missing" if working and d <= today else "none")),
+            "hours": round(sum(r["hours"] for r in rows if r.get("hours") is not None), 2),
+            "entries": [{"task_name": r.get("task_name") or "", "client": r.get("client") or "",
+                         "project": r.get("project") or "", "project_code": r.get("project_code") or "",
+                         "remarks": r.get("remarks") or "", "hours": r.get("hours"),
+                         "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned"))}
+                        for r in rows]})
+        d += timedelta(days=1)
+    name = (store.employees.find_one({"EmpID": emp}, {"Emp Name": 1}) or {}).get("Emp Name", "")
+    review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
+    row = _employee_row(emp, name, cyc, today, hol)
+    return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline},
+            "employee": row, "days": days,
+            "history": [{"action": h.get("action"), "by": h.get("by"), "at": h.get("at"),
+                         "note": h.get("note") or h.get("reason")} for h in review.get("history", [])][-20:]}
 
 
 class RemindIn(BaseModel):

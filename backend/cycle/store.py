@@ -1,6 +1,8 @@
 # backend/cycle/store.py
 """Collection handles for the cycle review and digest, in one place so tests can swap them."""
 from backend.database import (
+    approval_history_collection,
+    approved_collection,
     config_collection,
     cycle_reviews_collection,
     daily_reco_collection,
@@ -11,7 +13,11 @@ from backend.database import (
     hrms_attendance_collection,
     hrms_uploads_collection,
     job_runs_collection,
+    payroll_cycles_collection,
+    pending_collection,
+    rejected_collection,
     timesheet_entries_collection,
+    timesheets_collection,
 )
 
 CONFIG_ID = "timesheet"
@@ -29,6 +35,13 @@ class _Store:
     job_runs = job_runs_collection
     config = config_collection
     employees = employee_details_collection
+    # classic (legacy) collections: only backend.cycle.mirror writes to them
+    legacy = timesheets_collection
+    payroll_cycles = payroll_cycles_collection
+    pending = pending_collection
+    approved = approved_collection
+    rejected = rejected_collection
+    approval_history = approval_history_collection
 
 
 store = _Store()

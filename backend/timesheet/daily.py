@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from backend import indexes
 from backend.auth import get_current_user
-from backend.cycle.locks import cycle_locked
+from backend.cycle.locks import cycle_locked, cycle_reopened, cycle_review
 from backend.database import (
     config_collection,
     day_drafts_collection,
@@ -160,9 +160,14 @@ def _entry_view(e: dict) -> dict:
                                   "hours", "task_status", "is_unplanned", "legacy")}
 
 
-def _cycle_view(cyc: rules.Cycle) -> dict:
-    return {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline,
+def _cycle_view(cyc: rules.Cycle, emp: Optional[str] = None) -> dict:
+    view = {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline,
             "deadline_passed": rules.deadline_passed(cyc, _now_ist())}
+    if emp:                                   # manager review state of THIS employee's cycle
+        rev = cycle_review(emp, cyc.id) or {}
+        view["review_status"] = rev.get("status", "pending")
+        view["review_note"] = rev.get("note") if rev.get("status") == "sent_back" else None
+    return view
 
 
 def _read_only_reason(emp: str, d: date) -> Optional[str]:
@@ -175,7 +180,7 @@ def _read_only_reason(emp: str, d: date) -> Optional[str]:
     cyc = rules.cycle_for(d)
     if cycle_locked(emp, cyc.id):
         return "approved"
-    if rules.deadline_passed(cyc, _now_ist()):
+    if rules.deadline_passed(cyc, _now_ist()) and not cycle_reopened(emp, cyc.id):
         return "deadline"
     return None
 
@@ -213,7 +218,7 @@ def _day_payload(emp: str, d: date, cfg: dict) -> dict:
     total = round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2)
     return {
         "date": iso, "weekday": d.strftime("%A"),
-        "cycle": _cycle_view(rules.cycle_for(d)),
+        "cycle": _cycle_view(rules.cycle_for(d), emp),
         "location": _day_location(entries, sub, draft),
         "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
         "allocation_assumed_100": True,
@@ -333,7 +338,7 @@ def cycle_days(employee_id: str, date: Optional[str] = Query(None), current_user
                      "hours": round(info.get("hours", 0.0), 2), "classic": bool(info.get("legacy"))})
         cur += timedelta(days=1)
     counts["missing"] += sum(1 for x in days if x["state"] == "open")        # today still counts as "to do"
-    return {"cycle": _cycle_view(cyc), "today": today.isoformat(), "selected": d.isoformat(), "days": days,
+    return {"cycle": _cycle_view(cyc, emp), "today": today.isoformat(), "selected": d.isoformat(), "days": days,
             "summary": counts, "prev_date": (cyc.start - timedelta(days=1)).isoformat(),
             "next_date": (cyc.end + timedelta(days=1)).isoformat() if cyc.end < today else None}
 

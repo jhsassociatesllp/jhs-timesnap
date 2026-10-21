@@ -304,6 +304,21 @@ def test_the_deadline_closes_the_sub_cycle(api, monkeypatch):
     assert b["read_only"] is True and b["read_only_reason"] == "deadline" and b["cycle"]["deadline_passed"] is True
 
 
+def test_a_sent_back_cycle_is_editable_after_the_deadline_with_the_note_shown(api, monkeypatch):
+    put(api, [row(1, 4)])
+    monkeypatch.setattr(daily, "_now_ist", lambda: datetime(2026, 10, 26, 0, 0, 1))
+    assert put(api, [row(1, 6)]).status_code == 409
+    api.db["t_reviews"].insert_one({"kind": "approval", "employee_id": "JHS9101", "cycle_id": "2026-10-C2",
+                                    "status": "sent_back", "note": "Fix the hours on the 14th"})
+    assert put(api, [row(1, 6)]).status_code == 200 and submit(api).status_code == 200
+    b = get_day(api).json()
+    assert b["read_only"] is False and b["cycle"]["review_status"] == "sent_back"
+    assert b["cycle"]["review_note"] == "Fix the hours on the 14th"
+    api.db["t_reviews"].update_one({"employee_id": "JHS9101"}, {"$set": {"status": "approved"}})
+    b = get_day(api).json()
+    assert b["read_only_reason"] == "approved" and b["cycle"]["review_note"] is None
+
+
 def test_days_from_the_classic_timesheet_are_view_only(api):
     api.db["t_entries"].insert_one({"employee_id": "JHS9101", "date": DAY, "legacy": True, "task_id": None,
                                     "task_name": "Old activity text", "hours": 8, "location": "Office",

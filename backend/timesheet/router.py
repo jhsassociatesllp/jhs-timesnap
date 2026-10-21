@@ -390,6 +390,13 @@ async def submit_timesheet(
         raise HTTPException(404, "No draft found for this cycle")
 
     emp_id = current_user
+    # This submit replaces the payroll's rows wholesale. Rows copied from the approved "My day" timesheet
+    # (v2_mirror) would be lost, so refuse and point the employee to the new screen.
+    _main = timesheets_collection.find_one({"employeeId": emp_id}, {"payrolls": 1}) or {}
+    for _p in _main.get("payrolls", []) or []:
+        if _p.get("cycle_id") == cycle_id and any(e.get("v2_mirror") for e in _p.get("entries", []) or []):
+            raise HTTPException(409, "This payroll cycle already holds days approved in the new timesheet "
+                                     "(My day). Please continue there instead of the classic grid.")
     meta = _trusted_metadata(current_user, temp_payroll.get("metadata") or metadata or {})
     temp_entries = _get_payroll_entries(temp_payroll)
 

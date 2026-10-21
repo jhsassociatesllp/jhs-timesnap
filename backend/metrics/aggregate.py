@@ -71,6 +71,8 @@ def build_hours_daily(since: Optional[date] = None) -> Dict[str, int]:
         for payroll in doc.get("payrolls", []) or []:
             for e in _entries_of(payroll):
                 d = str(e.get("date") or "")[:10]
+                if e.get("v2_mirror"):               # copy of an approved new-timesheet row: already counted above
+                    continue
                 if len(d) != 10 or (since_iso and d < since_iso) or (d, emp) in new_days:
                     continue
                 try:
