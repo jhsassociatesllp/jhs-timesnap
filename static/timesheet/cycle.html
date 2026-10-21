@@ -4,51 +4,57 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
-    <title>Cycle Review — JHS</title>
+    <title>Cycle tools — JHS</title>
     <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/timesheet/styles.css" />
     <link rel="stylesheet" href="/static/timesheet/shell.css" />
+    <link rel="stylesheet" href="/static/timesheet/my-day.css" />
     <link rel="stylesheet" href="/static/timesheet/daily.css" />
+    <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
+    <link rel="stylesheet" href="/static/timesheet/dash-theme.css" />
   </head>
   <body>
     <div id="appNav" data-active="review"></div>
-    <div class="container">
-      <div class="header"><h1><i class="fas fa-calendar-check"></i> 10-DAY CYCLE REVIEW</h1></div>
-      <div id="msg" class="dt-banner"></div>
 
-      <div class="dt-card">
-        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
-          <div><label class="dt-muted" for="cycleSel">Cycle</label><br /><select id="cycleSel"></select></div>
-          <div id="teamWrap" style="display:none"><label class="dt-muted" for="team">Team (manager code)</label><br />
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-toolbox"></i> Cycle tools</h1></div>
+
+      <div class="md-body">
+        <div id="msg" class="dt-banner"></div>
+
+        <section class="day-head filters">
+          <div class="form-group"><label for="cycleSel">10-day cycle</label><select id="cycleSel"></select></div>
+          <div class="form-group" id="teamWrap" style="display:none"><label for="team">Team (manager code)</label>
             <input type="text" id="team" placeholder="all pilot teams" maxlength="20" /></div>
-          <button class="dt-btn" id="go" type="button">Show</button>
-        </div>
-        <div id="cycleInfo" class="dt-muted" style="margin-top:.6rem"></div>
-      </div>
+          <button class="dt-btn" id="go" type="button"><i class="fas fa-rotate"></i> Show</button>
+          <div id="cycleInfo" class="asof"></div>
+        </section>
 
-      <div class="dt-card">
-        <h3>Team</h3>
-        <div class="table-responsive">
-          <table class="dt-grid">
-            <thead><tr><th></th><th>Employee</th><th>Days filled</th><th>HRMS hrs</th><th>Timesheet hrs</th><th>Unplanned</th><th>Hours gaps</th><th>Status</th><th>Open items</th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table>
+        <div class="dt-card">
+          <h3><i class="fas fa-users"></i> Team: reminders and quick approval</h3>
+          <p class="sub">For the full review with each day's rows and "Send back with note", use <a href="/static/timesheet/review.html">Review team</a>.</p>
+          <div class="table-responsive">
+            <table class="dt-grid">
+              <thead><tr><th></th><th>Employee</th><th>Days filled</th><th>HRMS hrs</th><th>Timesheet hrs</th><th>Unplanned</th><th>Hours gaps</th><th>Status</th><th>Open items</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <label class="confirm" style="display:none" id="confirmWrap"><input type="checkbox" id="confirm" />
+            <span id="confirmText"></span></label>
+          <div class="dt-actions">
+            <button class="dt-btn go" id="approveBtn" type="button"><i class="fas fa-lock"></i> Approve &amp; lock selected</button>
+            <button class="dt-btn" id="remindBtn" type="button"><i class="fas fa-bell"></i> Remind pending</button>
+            <button class="dt-btn del" id="unlockBtn" type="button" style="display:none"><i class="fas fa-lock-open"></i> Unlock selected (admin)</button>
+          </div>
         </div>
-        <label style="display:none;margin-top:.8rem" id="confirmWrap"><input type="checkbox" id="confirm" />
-          <span id="confirmText"></span></label>
-        <div class="dt-actions">
-          <button class="dt-btn go" id="approveBtn" type="button">Approve &amp; lock selected</button>
-          <button class="dt-btn" id="remindBtn" type="button">Remind pending</button>
-          <button class="dt-btn del" id="unlockBtn" type="button" style="display:none">Unlock selected (admin)</button>
-        </div>
-      </div>
 
-      <div class="dt-card">
-        <h3>Projects at risk (amber / red) — re-estimate</h3>
-        <div id="wbNote" class="dt-muted"></div>
-        <div id="risk"></div>
+        <div class="dt-card">
+          <h3><i class="fas fa-triangle-exclamation"></i> Projects at risk (amber / red): re-estimate</h3>
+          <p class="sub" id="wbNote"></p>
+          <div id="risk"></div>
+        </div>
       </div>
     </div>
     <script src="/static/timesheet/shell.js"></script>

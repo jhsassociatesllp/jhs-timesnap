@@ -34,7 +34,7 @@
   };
 
   function stat(box, label, value) {
-    const d = document.createElement("div");
+    const d = document.createElement("div"); d.className = "kpi" + (label === "Errors" && value > 0 ? " red" : "");
     const s = document.createElement("span"); s.textContent = label;
     const b = document.createElement("b"); b.textContent = value;
     d.append(s, b); box.append(d);
@@ -52,11 +52,14 @@
       ? "Working days still awaiting HRMS (last 30 days): " + d.awaiting_dates.join(", ")
       : "No working days awaiting HRMS in the last 30 days.";
     const body = $("history"); body.textContent = "";
+    if (!d.uploads.length) { const td = body.insertRow().insertCell(); td.colSpan = 6; td.className = "empty-row"; td.textContent = "No uploads yet."; }
     d.uploads.forEach((u) => {
       const tr = body.insertRow();
       cell(tr, new Date(u.uploaded_at).toLocaleString()); cell(tr, u.file_name); cell(tr, u.uploaded_by);
       cell(tr, `${u.date_from} → ${u.date_to}`); cell(tr, u.rows_imported); cell(tr, u.rows_errors);
     });
+    const heads = [...body.closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
+    [...body.rows].forEach((tr) => [...tr.cells].forEach((td, i) => { if (heads[i] && !td.classList.contains("empty-row")) td.setAttribute("data-label", heads[i]); }));
   }
 
   $("previewBtn").onclick = async () => {

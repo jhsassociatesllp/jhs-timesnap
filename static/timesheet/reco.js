@@ -38,10 +38,15 @@
 
   function render(d) {
     const sum = $("summary"); sum.textContent = "";
+    const KPI_CLASS = { matched: "green", leave: "", short: "red", over: "red", no_punch: "amber", not_filled: "amber" };
+    const KPI_ICON = { matched: "fa-circle-check", leave: "fa-umbrella-beach", short: "fa-arrow-down", over: "fa-arrow-up", no_punch: "fa-fingerprint", not_filled: "fa-pen" };
     Object.keys(LABEL).forEach((k) => {
-      const box = document.createElement("div");
-      const s = document.createElement("span"); s.textContent = LABEL[k];
-      const b = document.createElement("b"); b.textContent = d.summary[k] || 0;
+      const n = d.summary[k] || 0;
+      const box = document.createElement("div"); box.className = "kpi " + (n && KPI_CLASS[k] ? KPI_CLASS[k] : "");
+      const s = document.createElement("span");
+      const ic = document.createElement("i"); ic.className = "fas " + KPI_ICON[k];
+      s.append(ic, document.createTextNode(LABEL[k]));
+      const b = document.createElement("b"); b.textContent = n;
       box.append(s, b); sum.append(box);
     });
     const lu = d.last_upload;
@@ -52,13 +57,16 @@
 
     const body = $("rows"); body.textContent = "";
     if (!d.rows.length) {
-      const td = body.insertRow().insertCell(); td.colSpan = 8; td.className = "dt-muted";
+      const td = body.insertRow().insertCell(); td.colSpan = 8; td.className = "empty-row";
       td.textContent = "Nothing to show for this period."; return;
     }
     d.rows.forEach((r) => {
       const tr = body.insertRow();
       tr.insertCell().textContent = r.date;
-      tr.insertCell().textContent = `${r.employee_name || ""} (${r.employee_id})`;
+      const who = tr.insertCell();
+      const nm = document.createElement("b"); nm.textContent = r.employee_name || r.employee_id;
+      const cd = document.createElement("div"); cd.className = "cap"; cd.textContent = r.employee_id;
+      who.append(nm, cd);
       tr.insertCell().textContent = fmt(r.hrms_net);
       tr.insertCell().textContent = fmt(r.timesheet_hours);
       tr.insertCell().textContent = r.diff === null || r.diff === undefined ? "—" : (r.diff > 0 ? "+" : "") + r.diff;
@@ -81,6 +89,8 @@
         }
       }
     });
+    const heads = [...$("rows").closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
+    [...$("rows").rows].forEach((tr) => [...tr.cells].forEach((td, i) => { if (heads[i]) td.setAttribute("data-label", heads[i]); }));
   }
 
   async function review(r, action, note) {
@@ -106,7 +116,7 @@
   (async () => {
     try {
       const a = await call("GET", "/hrms/access");
-      if (a.is_admin) { $("teamWrap").style.display = "block"; }
+      if (a.is_admin) { $("teamWrap").style.display = "flex"; }
       if (!a.is_admin && !a.is_manager) { banner("Only managers and admins can view reconciliation.", "err"); return; }
       await load();
     } catch (err) { banner(err.message, "err"); }

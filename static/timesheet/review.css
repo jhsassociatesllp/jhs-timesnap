@@ -28,3 +28,6 @@
 .hist{margin:1rem 0 0;padding:0;list-style:none;font-size:.8rem;color:var(--text-light)}
 textarea.inp{height:auto;min-height:80px;padding:.6rem .85rem;resize:vertical}
 @media (max-width:820px){ .tbl .hide-s{display:none} .dayrow{grid-template-columns:1fr} }
+
+.rv-tools{margin:0 0 1.2rem;font-size:.9rem;color:var(--text-light)}
+.rv-tools a{color:#1d6fa5;font-weight:600}

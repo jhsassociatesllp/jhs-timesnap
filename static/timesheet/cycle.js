@@ -55,18 +55,23 @@
       (d.cycle.past_deadline ? " (deadline passed)" : "");
     const body = $("rows"); body.textContent = "";
     if (!d.rows.length) {
-      const td = body.insertRow().insertCell(); td.colSpan = 9; td.className = "dt-muted"; td.textContent = "No employees on the daily timesheet in this team."; return;
+      const td = body.insertRow().insertCell(); td.colSpan = 9; td.className = "empty-row"; td.textContent = "No employees on the daily timesheet in this team."; return;
     }
     d.rows.forEach((r) => {
       const tr = body.insertRow();
       const c = tr.insertCell(); const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = r.employee_id; c.append(cb);
-      cell(tr, `${r.employee_name || ""} (${r.employee_id})`);
+      const who = tr.insertCell();
+      const nm = document.createElement("b"); nm.textContent = r.employee_name || r.employee_id;
+      const cd = document.createElement("div"); cd.className = "cap"; cd.textContent = r.employee_id;
+      who.append(nm, cd);
       cell(tr, `${r.days_filled} / ${r.days_required}`);
       cell(tr, r.hrms_hours); cell(tr, r.timesheet_hours); cell(tr, r.unplanned); cell(tr, r.reco_gaps);
-      tr.insertCell().append(tag(r.status === "approved" ? "Approved & locked" : r.status === "reopened" ? "Reopened" : "Pending",
-        r.status === "approved" ? "green" : r.status === "reopened" ? "amber" : ""));
+      tr.insertCell().append(tag(r.status === "approved" ? "Approved & locked" : r.status === "reopened" ? "Reopened" : r.status === "sent_back" ? "Sent back" : "Pending",
+        r.status === "approved" ? "green" : r.status === "reopened" || r.status === "sent_back" ? "amber" : ""));
       const w = tr.insertCell(); w.textContent = r.warnings.join("; ");
     });
+    const heads = [...body.closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
+    [...body.rows].forEach((tr) => [...tr.cells].forEach((td, i) => { if (heads[i]) td.setAttribute("data-label", heads[i]); }));
   }
 
   async function renderRisk(cycleId) {
@@ -77,9 +82,9 @@
     $("wbNote").textContent = d.writeback_enabled
       ? "New end dates are saved here AND written back to Nexus Quant."
       : "New end dates are saved here only (write-back to Nexus Quant is switched off).";
-    if (!d.projects.length) { box.textContent = "No amber or red projects."; return; }
+    if (!d.projects.length) { const n = document.createElement("div"); n.className = "none"; n.textContent = "No amber or red projects. Everything is on track."; box.append(n); return; }
     d.projects.forEach((p) => {
-      const card = document.createElement("div"); card.className = "dt-card"; card.style.margin = ".6rem 0";
+      const card = document.createElement("div"); card.className = "dt-card inner";
       const h = document.createElement("div");
       h.append(tag(p.rag.toUpperCase(), p.rag === "red" ? "red" : "amber"), " ", `${p.project_code} · ${p.project_name} (${p.client_name})`);
       const m = document.createElement("div"); m.className = "dt-muted";
@@ -105,7 +110,8 @@
         };
         act.append(hrs, " ", dt, " ", btn);
       });
-      card.append(tb); box.append(card);
+      const wrap = document.createElement("div"); wrap.className = "table-responsive"; wrap.append(tb);
+      card.append(wrap); box.append(card);
     });
   }
 
