@@ -11,6 +11,7 @@ CREATE TABLE `tbl_client` (
   `id` int NOT NULL AUTO_INCREMENT,
   `client_id` varchar(100) DEFAULT NULL,
   `client_name` varchar(200) DEFAULT NULL,
+  `company_name` varchar(200) DEFAULT NULL,   -- the client's real name; tbl_projects.client_name holds this table's id
   `project_incharge` varchar(100) DEFAULT NULL,
   `status` enum('0','1') NOT NULL DEFAULT '1',
   `is_deleted` enum('0','1') NOT NULL DEFAULT '0',

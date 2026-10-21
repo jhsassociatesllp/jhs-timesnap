@@ -123,14 +123,22 @@ def _in_clause(n: int) -> str:
 
 # Tasks joined to their (non-deleted) project. assigned_to may be a comma list
 # ('3', '3,4', '4, 5'), so assignee matching uses FIND_IN_SET on the id list.
-_TASK_COLS = """
+# tbl_projects.client_name holds the id of the client row (as text); the client's real name is
+# tbl_client.company_name. Older rows with plain text there keep that text.
+_CLIENT_NAME = "COALESCE(NULLIF(cl.company_name, ''), p.client_name)"
+_CLIENT_JOIN = """
+    LEFT JOIN tbl_client cl ON cl.is_deleted = '0' AND p.client_name REGEXP '^[0-9]+$'
+        AND cl.id = CAST(p.client_name AS UNSIGNED)
+"""
+_TASK_COLS = f"""
     t.id, t.task_uid, t.parent_task_id, t.project_id, t.task_name,
     t.start_date, t.end_date, t.assigned_to, t.task_status, t.is_complete,
-    p.project_id AS project_code, p.project_name, p.client_name
+    p.project_id AS project_code, p.project_name, {_CLIENT_NAME} AS client_name
 """
-_TASK_FROM = """
+_TASK_FROM = f"""
     FROM tbl_project_tasks t
     JOIN tbl_projects p ON p.id = t.project_id AND p.is_deleted = '0'
+    {_CLIENT_JOIN}
 """
 _ASSIGNED_TO_USER = "FIND_IN_SET(u.id, REPLACE(t.assigned_to, ' ', '')) > 0"
 
@@ -165,7 +173,7 @@ def list_tasks_assigned_to(employee_id: str, since: date) -> List[NQTask]:
             "JOIN tbl_user u ON u.emp_id = %s AND u.is_deleted = '0' "
             f"WHERE p.project_status = '1' AND t.is_deleted = '0' AND {_ASSIGNED_TO_USER} "
             "AND ((t.is_complete = '0' AND t.task_status <> 4) OR t.end_date >= %s) "
-            "ORDER BY p.client_name, p.project_name, t.start_date, t.id",
+            f"ORDER BY {_CLIENT_NAME}, p.project_name, t.start_date, t.id",
             (employee_id, since),
         )
         return [task_from_row(r, date.today()) for r in rows]
@@ -197,9 +205,9 @@ def get_task(task_id: int) -> Optional[NQTask]:
 def get_project(project_code: str) -> Optional[NQProject]:
     def load():
         rows = _run(
-            "SELECT id, project_id, project_name, client_name, project_manager, "
-            "project_partner, project_status, start_date, end_date "
-            "FROM tbl_projects WHERE project_id = %s AND is_deleted = '0'",
+            f"SELECT p.id, p.project_id, p.project_name, {_CLIENT_NAME} AS client_name, p.project_manager, "
+            "p.project_partner, p.project_status, p.start_date, p.end_date "
+            f"FROM tbl_projects p {_CLIENT_JOIN} WHERE p.project_id = %s AND p.is_deleted = '0'",
             (project_code,),
         )
         return project_from_row(rows[0]) if rows else None
@@ -212,9 +220,9 @@ def list_projects_for_manager(manager_emp_id: str) -> List[NQProject]:
     value(s); verify against live data before relying on it."""
     def load():
         rows = _run(
-            "SELECT p.id, p.project_id, p.project_name, p.client_name, p.project_manager, "
+            f"SELECT p.id, p.project_id, p.project_name, {_CLIENT_NAME} AS client_name, p.project_manager, "
             "p.project_partner, p.project_status, p.start_date, p.end_date "
-            "FROM tbl_projects p "
+            f"FROM tbl_projects p {_CLIENT_JOIN} "
             "JOIN tbl_user u ON u.emp_id = %s AND u.is_deleted = '0' "
             "WHERE p.is_deleted = '0' AND p.project_status <> '3' "
             "AND FIND_IN_SET(u.id, REPLACE(p.project_manager, ' ', '')) > 0 "
@@ -230,9 +238,9 @@ def list_projects_for_manager(manager_emp_id: str) -> List[NQProject]:
 def list_active_projects() -> List[NQProject]:
     """Every live project whose status is 'active' (project_status = '1')."""
     rows = _run(
-        "SELECT id, project_id, project_name, client_name, project_manager, project_partner, "
-        "project_status, start_date, end_date FROM tbl_projects "
-        "WHERE is_deleted = '0' AND project_status = '1' ORDER BY project_id")
+        f"SELECT p.id, p.project_id, p.project_name, {_CLIENT_NAME} AS client_name, p.project_manager, p.project_partner, "
+        f"p.project_status, p.start_date, p.end_date FROM tbl_projects p {_CLIENT_JOIN} "
+        "WHERE p.is_deleted = '0' AND p.project_status = '1' ORDER BY p.project_id")
     return [project_from_row(r) for r in rows]
 
 
