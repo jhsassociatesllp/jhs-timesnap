@@ -48,3 +48,19 @@ People (with a Review link that opens that employee in Review team), Clients. "D
 - Hours come from the new timesheet only. Allotted hours = NQ task working days x hours per day (admin working rules) per assigned person.
 - Late: an overdue unfinished task, or hours so far over the allotted hours. Watch: 80% or more of the allotted hours used with fewer than 80% of tasks
   done, or no hours for 14 days while tasks are open. Calculated when the page opens; needs the NQ connection for project status.
+
+## Project tracker (team leads, partners, admins)
+
+Menu: **Project tracker**. One place to see every project and client linked to a manager, straight from Nexus Quant (NQ). Nothing is written to NQ.
+
+- **Which projects**: those where the manager is the NQ project manager or partner, plus any project where the manager or one of their reportees is assigned to a stage. Admins and partners see the whole firm, or one manager (Manager box).
+- **Totals**: clients, projects, completed / ongoing / pending / on hold, not planned, not assigned, and on track / at risk / delayed.
+- **Per project**: audit type (NQ category, tidied; "Not set" if empty), State, Plan, Assigned, live Status, stage progress, final report due date, who logged hours in the last 7 days. Click a row for its stages (dates, people, state).
+  - State: Completed = every stage done (or project closed); Ongoing = a stage started or done; Pending = nothing started; On hold.
+  - Plan: Planned = every stage has start and end dates; Partly planned; Not planned (no stages or no dates).
+  - Assigned: Assigned = every stage has someone; Partly assigned; Not assigned.
+  - Final report due = end date of the stage named "Final Report", else the project end date.
+  - Delayed = that date has passed (not complete) or an open stage is past its end date. At risk = due within 3 days while earlier stages are open. Otherwise On track.
+- Closed projects are hidden until "All, including closed" is chosen (the summary says how many are hidden).
+- **Download this view** gives an Excel file: Dashboard, Projects, Master Tracker (one row per stage), Clients, Notes. Each download is recorded in the audit log.
+- The fake NQ (docs/nq_schema.sql, nq_seed.sql) now has `tbl_projects.category`; recreate the dev containers to pick it up.

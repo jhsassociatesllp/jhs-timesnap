@@ -35,13 +35,14 @@ INSERT INTO tbl_project_status (id, status_name, color, status, is_deleted, crea
  (4, 'Closed', '#00aa00', '1', '0', '2026-01-01 00:00:00');
 
 -- project_status enum: 0 inactive, 1 active, 2 hold, 3 closed. project_manager holds NQ user id(s).
-INSERT INTO tbl_projects (id, project_id, client_name, project_name, project_manager, project_partner, project_status, start_date, end_date, is_deleted, status, created_on) VALUES
- (1, 'PL-T001', '1', 'Statutory Audit FY26',   '1',   2, '1', '2026-10-01', '2026-10-31', '0', '1', '2026-09-01 00:00:00'),
- (2, 'PL-T002', 'Test Client A', 'Internal Audit Q2',      '1',   2, '1', '2026-10-05', '2026-11-15', '0', '1', '2026-09-01 00:00:00'),
- (3, 'PL-T003', '2', 'Tax Review',             '1,2', 2, '1', '2026-10-10', '2026-12-31', '0', '1', '2026-09-01 00:00:00'),
- (4, 'PL-T004', 'Test Client B', 'Deleted Project',        '1',   2, '1', '2026-10-01', '2026-10-31', '1', '1', '2026-09-01 00:00:00'),
- (5, 'PL-T005', 'Test Client B', 'Closed Project',         '1',   2, '3', '2026-01-01', '2026-03-31', '0', '1', '2026-01-01 00:00:00'),
- (6, 'PL-T006', '1', 'Other Managers Project', '13',  2, '1', '2026-10-01', '2026-10-31', '0', '1', '2026-09-01 00:00:00');
+INSERT INTO tbl_projects (id, project_id, client_name, project_name, category, project_manager, project_partner, project_status, start_date, end_date, is_deleted, status, created_on) VALUES
+ (1, 'PL-T001', '1', 'Statutory Audit FY26', 'Statutory Audit ',   '1',   2, '1', '2026-10-01', '2026-10-31', '0', '1', '2026-09-01 00:00:00'),
+ (2, 'PL-T002', 'Test Client A', 'Internal Audit Q2', 'Internal Audit',      '1',   2, '1', '2026-10-05', '2026-11-15', '0', '1', '2026-09-01 00:00:00'),
+ (3, 'PL-T003', '2', 'Tax Review', NULL,             '1,2', 2, '1', '2026-10-10', '2026-12-31', '0', '1', '2026-09-01 00:00:00'),
+ (4, 'PL-T004', 'Test Client B', 'Deleted Project', 'Tax Audit',        '1',   2, '1', '2026-10-01', '2026-10-31', '1', '1', '2026-09-01 00:00:00'),
+ (5, 'PL-T005', 'Test Client B', 'Closed Project', 'Stock Audit',         '1',   2, '3', '2026-01-01', '2026-03-31', '0', '1', '2026-01-01 00:00:00'),
+ (6, 'PL-T006', '1', 'Other Managers Project', 'Statutory Audit', '13',  2, '1', '2026-10-01', '2026-10-31', '0', '1', '2026-09-01 00:00:00'),
+ (7, 'PL-T007', '2', 'Not Yet Planned', 'GST Audit', '1', 2, '1', NULL, NULL, '0', '1', '2026-10-01 00:00:00');
 
 -- task_status: 1 To Do, 2 In Process, 3 Hold, 4 Complete (is_complete=1 only for 4)
 INSERT INTO tbl_project_tasks (id, task_uid, parent_task_id, project_id, task_name, start_date, end_date, assigned_to, task_status, is_complete, is_deleted, status, created_on) VALUES

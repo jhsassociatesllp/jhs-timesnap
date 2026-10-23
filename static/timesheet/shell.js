@@ -17,6 +17,8 @@
       when: (m) => m.is_admin || m.has_reportees },
     { id: "team", href: "/static/timesheet/team.html", icon: "fa-gauge-high", label: "Team dashboard",
       when: (m) => m.is_admin || m.is_partner || m.has_reportees },
+    { id: "tracker", href: "/static/timesheet/tracker.html", icon: "fa-list-check", label: "Project tracker",
+      when: (m) => m.is_admin || m.is_partner || m.has_reportees },
     { id: "portfolio", href: "/static/timesheet/portfolio.html", icon: "fa-chart-pie", label: "Portfolio",
       when: (m) => m.is_admin || m.is_partner },
     { id: "admin", href: "/static/timesheet/admin.html", icon: "fa-sliders", label: "Admin setup", when: (m) => m.is_admin },

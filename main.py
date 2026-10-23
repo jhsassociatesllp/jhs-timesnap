@@ -84,6 +84,7 @@ from backend.timesheet.daily import router as timesheet_daily_router  # ← hour
 from backend.timesheet.me import router as timesheet_me_router  # ← role info for the shared menu (/timesheet/v2/me)
 from backend.timesheet.admin import router as timesheet_admin_router  # ← admin setup (/timesheet/v2/admin)
 from backend.timesheet.team_dashboard import router as team_dashboard_router  # ← team dashboard (/timesheet/v2/team)
+from backend.timesheet.project_tracker import router as project_tracker_router  # ← project tracker (/timesheet/v2/tracker)
 from backend.hrms.router import router as hrms_router  # ← HRMS upload + reconciliation
 from backend.cycle.router import router as cycle_router  # ← 10-day cycle review
 from backend.metrics.router import router as dashboard_router  # ← manager / portfolio dashboards
@@ -142,6 +143,7 @@ app.include_router(timesheet_daily_router)  # prefix: /timesheet/v2
 app.include_router(timesheet_me_router)  # prefix: /timesheet/v2
 app.include_router(timesheet_admin_router)  # prefix: /timesheet/v2/admin
 app.include_router(team_dashboard_router)  # prefix: /timesheet/v2/team
+app.include_router(project_tracker_router)  # prefix: /timesheet/v2/tracker
 app.include_router(hrms_router)  # prefix: /hrms
 app.include_router(cycle_router)  # prefix: /timesheet/v2/cycles
 app.include_router(dashboard_router)  # prefix: /dashboard

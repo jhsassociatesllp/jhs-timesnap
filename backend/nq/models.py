@@ -27,6 +27,7 @@ class NQProject(BaseModel):
     client_name: str = ""
     manager_ids: List[int] = []  # tbl_projects.project_manager (may be a comma list)
     partner_id: Optional[int] = None
+    category: str = ""          # tbl_projects.category: the audit type, free text
     status: str = "active"
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -115,6 +116,7 @@ def project_from_row(row: dict) -> NQProject:
         client_name=row.get("client_name") or "",
         manager_ids=parse_id_list(row.get("project_manager")),
         partner_id=row.get("project_partner"),
+        category=(row.get("category") or "").strip(),
         status=PROJECT_STATUS_NAMES.get(str(row.get("project_status")), "active"),
         start_date=row.get("start_date"),
         end_date=row.get("end_date"),

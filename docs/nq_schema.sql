@@ -58,6 +58,7 @@ CREATE TABLE `tbl_projects` (
   `project_id` varchar(15) DEFAULT NULL,        -- the project code, e.g. PL-T001
   `client_name` varchar(100) DEFAULT NULL,      -- free text, not a foreign key
   `project_name` varchar(100) DEFAULT NULL,
+  `category` varchar(100) DEFAULT NULL,         -- audit type, free text (e.g. Statutory Audit)
   `project_manager` varchar(100) DEFAULT NULL,  -- NQ user id(s)
   `project_partner` int DEFAULT NULL,
   `project_status` enum('0','1','2','3') DEFAULT '1' COMMENT '0=inactive,1=active,2=hold,3=closed',

@@ -1,0 +1,23 @@
+/* Project tracker: builds on styles.css, my-day.css, dash-theme.css and team.css (chips, attention, tables) */
+.md .filters select{min-width:160px}
+.md .filters .dt-btn{align-self:flex-end}
+.sumline{display:flex;gap:.6rem;align-items:flex-start;padding:.45rem 0;border-bottom:1px solid var(--border-color);font-size:.93rem}
+.sumline:last-child{border-bottom:0}
+.sumline i{color:#667eea;margin-top:.2rem}
+.md .st.completed{background:#dcfce7;color:#166534}.md .st.delayed{background:#fee2e2;color:#b91c1c}
+.md .st.at_risk{background:#fef3c7;color:#92400e}.md .st.on_track{background:#dbeafe;color:#1e40af}
+.md .st.no_plan{background:#ede9fe;color:#5b21b6}.md .st.on_hold{background:#e5e7eb;color:#4b5563}
+.tag{display:inline-block;padding:.1rem .55rem;border-radius:6px;font-size:.74rem;font-weight:600;background:#eef2f7;color:#334155;margin:0 .3rem .2rem 0}
+.tag.warn{background:#fef3c7;color:#92400e}.tag.good{background:#dcfce7;color:#166534}.tag.bad{background:#fee2e2;color:#b91c1c}
+.prog{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:.3rem 0 .15rem;min-width:110px}
+.prog i{display:block;height:100%;background:#22c55e}
+.md .dt-grid tr.pr{cursor:pointer}
+.md .dt-grid tr.pr:hover td{background:#f8fafc}
+.md .dt-grid tr.detail td{background:#f8fafc;padding:.6rem 1rem 1rem}
+.md .dt-grid tr.detail table{width:100%;font-size:.85rem;border-collapse:collapse}
+.md .dt-grid tr.detail th,.md .dt-grid tr.detail td{padding:.3rem .5rem;border-bottom:1px solid var(--border-color);text-align:left}
+.md .dt-grid tr.detail td.sub-task{padding-left:1.6rem;color:var(--text-light)}
+.md .chev{display:inline-block;transition:transform .15s;margin-right:.35rem;color:#94a3b8}
+.md tr.open .chev{transform:rotate(90deg)}
+.md .dt-grid td.num{text-align:right}
+.hint{font-size:.82rem;color:var(--text-light);margin:.2rem 0 .6rem}

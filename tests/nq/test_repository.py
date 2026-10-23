@@ -49,7 +49,7 @@ def test_tasks_for_project_excludes_deleted_tasks_and_projects(nq_db):
 
 def test_bulk_reads_for_the_nightly_job(nq_db):
     projects = nq_db.list_active_projects()
-    assert [p.project_code for p in projects] == ["PL-T001", "PL-T002", "PL-T003", "PL-T006"]   # not deleted / closed
+    assert [p.project_code for p in projects] == ["PL-T001", "PL-T002", "PL-T003", "PL-T006", "PL-T007"]   # not deleted / closed
     tasks = nq_db.list_tasks_of_active_projects()
     assert _ids(tasks) == [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 13, 14]     # 8 (deleted), 12 (deleted project), 15 (closed project) excluded
     assert {t.project_code for t in tasks} == {"PL-T001", "PL-T002", "PL-T003", "PL-T006"}
@@ -68,7 +68,7 @@ def test_get_task_and_project(nq_db):
 
 def test_projects_for_manager_excludes_closed_deleted_and_other_managers(nq_db):
     codes = [p.project_code for p in nq_db.list_projects_for_manager("JHS9001")]
-    assert codes == ["PL-T001", "PL-T002", "PL-T003"]   # T003 manager is '1,2'; T005 closed; T006 is '13'
+    assert codes == ["PL-T001", "PL-T002", "PL-T003", "PL-T007"]   # T003 manager is '1,2'; T005 closed; T006 is '13'; T007 has no tasks
     assert [p.project_code for p in nq_db.list_projects_for_manager("JHS9000")] == ["PL-T003"]
 
 

@@ -104,7 +104,7 @@ def test_job_builds_project_metrics_from_nq_and_hours(mdb, nq_db):
     mdb["m_legacy"].insert_one({"employeeId": "JHS9105", "payrolls": [{"entries": [
         {"date": "2026-10-14", "projectCode": "PL-T001", "projectHours": "10"}]}]})
     stats = job.run(DAY)
-    assert stats["projects"] == 4
+    assert stats["projects"] == 5
     p = {d["project_code"]: d for d in mdb["m_projects"].find({"date": "2026-10-15"})}
     t1 = p["PL-T001"]
     assert (t1["tasks_total"], t1["tasks_done"], t1["tasks_done_pct"], t1["overdue_tasks"]) == (4, 1, 25.0, 1)
@@ -120,7 +120,7 @@ def test_job_is_idempotent_and_drops_projects_that_are_no_longer_active(mdb, nq_
     job.run(DAY)
     first = mdb["m_projects"].count_documents({"date": "2026-10-15"})
     job.run(DAY)
-    assert mdb["m_projects"].count_documents({"date": "2026-10-15"}) == first == 4
+    assert mdb["m_projects"].count_documents({"date": "2026-10-15"}) == first == 5
     mdb["m_projects"].insert_one({"date": "2026-10-15", "project_code": "PL-OLD", "rag": "red"})
     job.run(DAY)
     assert mdb["m_projects"].count_documents({"project_code": "PL-OLD"}) == 0

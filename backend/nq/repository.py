@@ -295,6 +295,31 @@ def list_tasks_of_active_projects() -> List[NQTask]:
     return [task_from_row(r) for r in rows]
 
 
+# ── the project tracker: every live project and task, read once and cached ───────────────
+
+def list_all_projects() -> List[NQProject]:
+    """Every live project of any status (open, hold, closed), with its category (the audit type)."""
+    def load():
+        rows = _run(
+            f"SELECT p.id, p.project_id, p.project_name, {_CLIENT_NAME} AS client_name, p.category, p.project_manager, "
+            f"p.project_partner, p.project_status, p.start_date, p.end_date FROM tbl_projects p {_CLIENT_JOIN} "
+            "WHERE p.is_deleted = '0' ORDER BY p.project_id")
+        return [project_from_row(r) for r in rows]
+    return _cached(("all_projects",), load)
+
+
+def list_all_tasks() -> List[NQTask]:
+    """Every live task of every live project (stages and sub-tasks), any status."""
+    def load():
+        rows = _run(f"SELECT {_TASK_COLS} {_TASK_FROM} WHERE t.is_deleted = '0' ORDER BY p.project_id, t.id")
+        return [task_from_row(r, date.today()) for r in rows]
+    return _cached(("all_tasks", date.today().isoformat()), load)
+
+
+def get_users() -> List[NQUser]:
+    return _cached(("users",), list_users)
+
+
 def list_users() -> List[NQUser]:
     """Live NQ users (id, emp_id, name, reporting_to only - never credential columns)."""
     rows = _run("SELECT id, emp_id, name, reporting_to FROM tbl_user "
