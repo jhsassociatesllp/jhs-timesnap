@@ -37,7 +37,7 @@ from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
-from backend.timesheet import rules, scope
+from backend.timesheet import payrolls, rules, scope
 from backend.timesheet.router import _is_free_text_employee
 
 router = APIRouter(prefix="/timesheet/v2", tags=["Timesheet day"])
@@ -87,14 +87,10 @@ def _today() -> date:
 
 def get_config() -> dict:
     doc = store.config.find_one({"_id": CONFIG_ID}) or {}
-    holidays = set()
-    for h in doc.get("holidays", []) or []:
-        try:
-            holidays.add(date.fromisoformat(str(h)[:10]))
-        except ValueError:
-            continue
+    st = payrolls.settings_from(doc)
     return {"pilot_employees": scope.pilot_codes(doc), "pilot_only": scope.pilot_only(doc),
-            "include": scope.include_codes(doc), "holidays": holidays}
+            "include": scope.include_codes(doc), "holidays": set(st["holidays"]),
+            "standard_hours": st["standard_hours"], "week_off": st["week_off"]}
 
 
 def _require_self(employee_id: str, current_user: str) -> str:
@@ -146,7 +142,7 @@ def _hours_used(emp: str, task_ids: List[int]) -> dict:
     return {r["_id"]: round(r["h"], 2) for r in store.entries.aggregate(pipeline)}
 
 
-def _task_view(t, used: dict, holidays) -> dict:
+def _task_view(t, used: dict, cfg: dict) -> dict:
     return {
         "task_id": t.id, "task_name": t.name, "parent_task_id": t.parent_task_id,
         "project_code": t.project_code, "project_name": t.project_name,
@@ -154,7 +150,8 @@ def _task_view(t, used: dict, holidays) -> dict:
         "status": t.status, "is_overdue": t.is_overdue,
         "hours_used": used.get(t.id, 0.0),
         # NQ has no allocation % column -> 100% assumed
-        "budget_hours": rules.budget_hours(t.start_date, t.end_date, holidays),
+        "budget_hours": rules.budget_hours(t.start_date, t.end_date, cfg["holidays"], standard_hours=cfg["standard_hours"],
+                                           week_off=cfg["week_off"]),
     }
 
 
@@ -165,7 +162,7 @@ def _entry_view(e: dict) -> dict:
 
 def _cycle_view(cyc: rules.Cycle, emp: Optional[str] = None, review: Optional[dict] = None) -> dict:
     view = {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline,
-            "deadline_passed": rules.deadline_passed(cyc, _now_ist())}
+            "deadline_passed": rules.deadline_passed(cyc, _now_ist()), "configured": payrolls.is_configured(cyc.id)}
     if emp:                                   # manager review state of THIS employee's cycle
         rev = review if review is not None else (cycle_review(emp, cyc.id) or {})
         view["review_status"] = rev.get("status", "pending")
@@ -173,9 +170,12 @@ def _cycle_view(cyc: rules.Cycle, emp: Optional[str] = None, review: Optional[di
     return view
 
 
-def _read_only_reason(emp: str, d: date, review: Optional[dict] = None, entries: Optional[List[dict]] = None) -> Optional[str]:
-    """Why this day cannot be edited, or None. `review` / `entries` may be passed when the caller already
-    has them (saves database round trips); otherwise they are looked up."""
+def _read_only_reason(emp: str, d: date, review: Optional[dict] = None, entries: Optional[List[dict]] = None,
+                      sub: Optional[dict] = None, cyc: Optional[rules.Cycle] = None) -> Optional[str]:
+    """Why this day cannot be edited, or None. `review` / `entries` / `sub` may be passed when the caller already
+    has them (saves database round trips); otherwise they are looked up.
+    A SUBMITTED day is locked for the employee: only an admin's "Allow changes" (sub["reopened"]) or the manager sending
+    the cycle back opens it again."""
     iso = d.isoformat()
     if entries is None:
         if store.entries.find_one({"employee_id": emp, "date": iso, "legacy": True}, {"_id": 1}):
@@ -187,13 +187,20 @@ def _read_only_reason(emp: str, d: date, review: Optional[dict] = None, entries:
             return "classic"
         if any(e.get("locked") or e.get("approved") for e in entries):
             return "approved"
-    cyc = rules.cycle_for(d)
+    cyc = cyc or payrolls.effective_cycle(d)
+    if not payrolls.is_configured(cyc.id):
+        return "no_cycle"
     if review is None:
         review = cycle_review(emp, cyc.id) or {}
     status = review.get("status")
     if status == "approved":
         return "approved"
-    if rules.deadline_passed(cyc, _now_ist()) and status not in ("sent_back", "reopened"):
+    if sub is None:
+        sub = store.submissions.find_one({"employee_id": emp, "date": iso})
+    allowed = bool(sub and sub.get("reopened"))
+    if sub and not allowed and status not in ("sent_back", "reopened"):
+        return "submitted"
+    if rules.deadline_passed(cyc, _now_ist()) and not allowed and status not in ("sent_back", "reopened"):
         return "deadline"
     return None
 
@@ -202,6 +209,8 @@ _READ_ONLY_TEXT = {
     "classic": "This day was filled in the classic timesheet - it is view only here",
     "approved": "This cycle has been approved and locked by your manager",
     "deadline": "The deadline for this cycle has passed",
+    "submitted": "This day is submitted. Ask your admin if it needs to be changed",
+    "no_cycle": "No payroll cycle has been set up for this date yet. Please ask your admin",
 }
 
 
@@ -227,19 +236,20 @@ def _day_payload(emp: str, d: date, cfg: dict) -> dict:
     sub = store.submissions.find_one({"employee_id": emp, "date": iso})
     draft = store.drafts.find_one({"employee_id": emp, "date": iso})
     mgr = store.employees.find_one({"EmpID": emp}, {"ReportingEmpCode": 1, "ReportingEmpName": 1}) or {}
-    cyc = rules.cycle_for(d)
+    cyc = payrolls.effective_cycle(d)
     review = cycle_review(emp, cyc.id) or {}
-    reason = _read_only_reason(emp, d, review, entries)
+    reason = _read_only_reason(emp, d, review, entries, sub, cyc)
     total = round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2)
     return {
         "date": iso, "weekday": d.strftime("%A"),
         "cycle": _cycle_view(cyc, emp, review),
         "location": _day_location(entries, sub, draft),
-        "tasks": [_task_view(t, used, cfg["holidays"]) for t in tasks],
+        "tasks": [_task_view(t, used, cfg) for t in tasks],
         "allocation_assumed_100": True,
         "entries": [_entry_view(e) for e in entries],
         "totals": {"task_hours": total, "rows": len(entries), "over_24": total > rules.MAX_DAY_HOURS},
         "submitted": bool(sub), "submitted_at": sub.get("submitted_at") if sub else None,
+        "day_reopened": bool(sub and sub.get("reopened")),
         "read_only": reason is not None, "read_only_reason": reason,
         "read_only_text": _READ_ONLY_TEXT.get(reason) if reason else None,
         "reporting_manager": {"code": (mgr.get("ReportingEmpCode") or "").strip().upper(),
@@ -326,7 +336,7 @@ def cycle_days(employee_id: str, date: Optional[str] = Query(None), current_user
 
 
 def _strip_payload(emp: str, d: date, cfg: dict) -> dict:
-    cyc = rules.cycle_for(d)
+    cyc = payrolls.effective_cycle(d)
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
     per_day = {}
     for e in store.entries.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}},
@@ -344,7 +354,7 @@ def _strip_payload(emp: str, d: date, cfg: dict) -> dict:
     while cur <= cyc.end:
         iso = cur.isoformat()
         info = per_day.get(iso, {})
-        working = cur.weekday() < 5 and cur not in cfg["holidays"]
+        working = cur.weekday() not in cfg["week_off"] and cur not in cfg["holidays"]
         if iso in subs:
             state = "submitted"
         elif iso in per_day or iso in drafts:
@@ -437,7 +447,7 @@ def submit_day(employee_id: str, date: str, current_user: str = Depends(get_curr
     store.submissions.update_one(
         {"employee_id": emp, "date": iso},
         {"$set": {"employee_id": emp, "date": iso, "submitted_at": datetime.utcnow(), "location": location,
-                  "cycle_id": rules.cycle_for(d).id}}, upsert=True)
+                  "cycle_id": rules.cycle_for(d).id}, "$unset": {"reopened": ""}}, upsert=True)
     store.drafts.delete_one({"employee_id": emp, "date": iso})
     hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)

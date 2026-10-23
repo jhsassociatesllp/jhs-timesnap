@@ -18,6 +18,7 @@ from backend.database import (
     pending_collection,
     rejected_collection,
     timesheet_entries_collection,
+    timesheet_payrolls_collection,
     timesheets_collection,
 )
 
@@ -26,6 +27,7 @@ CONFIG_ID = "timesheet"
 
 class _Store:
     entries = timesheet_entries_collection
+    payrolls = timesheet_payrolls_collection
     submissions = day_submissions_collection
     drafts = day_drafts_collection
     hrms = hrms_attendance_collection

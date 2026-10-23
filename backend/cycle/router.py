@@ -25,7 +25,7 @@ from backend.cycle import digest, mirror
 from backend.cycle.store import config_doc, holidays_set, pilot_set, store
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
-from backend.timesheet import project_health, rules
+from backend.timesheet import payrolls, project_health, rules
 
 router = APIRouter(prefix="/timesheet/v2/cycles", tags=["Cycle review"])
 IST = pytz.timezone("Asia/Kolkata")
@@ -65,6 +65,14 @@ def _cycle(cycle_id: str) -> rules.Cycle:
         raise HTTPException(400, "Bad cycle id (expected e.g. 2026-10-C2)")
 
 
+def _configured_cycle(cycle_id: str) -> rules.Cycle:
+    """A cycle an ADMIN has created (Admin setup), with the admin's deadline. Anything else is not reviewable."""
+    cyc = _cycle(cycle_id)
+    if not payrolls.is_configured(cyc.id):
+        raise HTTPException(404, "That cycle has not been created by an admin yet")
+    return payrolls.effective_cycle_by_id(cyc.id)
+
+
 def _employee_ids(raw: List[str]) -> List[str]:
     ids = sorted({str(e).strip().upper() for e in raw if str(e).strip()})
     if not ids:
@@ -82,14 +90,15 @@ def _authorise_all(me: str, ids: List[str], admin: bool) -> None:
 
 # ─────────────────────────── team table ──────────────────────────────────────
 
-def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: set) -> dict:
+def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: set,
+                  week_off=rules.WEEK_OFF_DEFAULT) -> dict:
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
     off_days = {h["date"] for h in store.hrms.find(
         {"employee_id": emp, "date": {"$gte": start, "$lte": end}, "leave_flag": True}, {"date": 1})}
     required, d = [], cyc.start
     while d <= min(cyc.end, today):
         iso = d.isoformat()
-        if d.weekday() < 5 and iso not in holidays and iso not in off_days:
+        if d.weekday() not in week_off and iso not in holidays and iso not in off_days:
             required.append(iso)
         d += timedelta(days=1)
     submitted = {s["date"] for s in store.submissions.find(
@@ -137,18 +146,34 @@ def _team_ids(me: str, admin: bool, manager: Optional[str]) -> List[str]:
 
 # ─────────────────────────────── routes ──────────────────────────────────────
 
+@router.get("/payrolls")
+def payroll_list(current_user: str = Depends(get_current_user)):
+    """The payrolls and sub-cycles the admin created (newest first), for the Review team drop-down."""
+    me = _me(current_user)
+    if not _is_admin(me) and not _reportees(me):
+        raise HTTPException(403, "Only managers and admins can review cycles")
+    today = _today()
+    out = []
+    for p in payrolls.list_payrolls():
+        out.append({"id": p["_id"], "label": p["label"], "cycles": [
+            {"id": c["id"], "label": c["label"], "start": c["start"], "end": c["end"], "deadline": c["deadline"],
+             "ended": date.fromisoformat(c["end"]) < today, "current": c["start"] <= today.isoformat() <= c["end"]}
+            for c in p["cycles"]]})
+    return {"payrolls": out, "today": today.isoformat()}
+
+
 @router.get("/{cycle_id}/team")
 def team(cycle_id: str, manager: Optional[str] = None, current_user: str = Depends(get_current_user)):
     me = _me(current_user)
     admin = _is_admin(me)
-    cyc = _cycle(cycle_id)
+    cyc = _configured_cycle(cycle_id)
     ids = _team_ids(me, admin, manager)
     names = {d["EmpID"].strip().upper(): d.get("Emp Name", "") for d in
              store.employees.find({"EmpID": {"$in": ids}}, {"EmpID": 1, "Emp Name": 1}) if d.get("EmpID")}
-    today, hol = _today(), holidays_set()
+    today, hol, st = _today(), holidays_set(), payrolls.settings()
     return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end,
                       "deadline": cyc.deadline, "past_deadline": today > cyc.deadline},
-            "rows": [_employee_row(i, names.get(i, ""), cyc, today, hol) for i in ids],
+            "rows": [_employee_row(i, names.get(i, ""), cyc, today, hol, st["week_off"]) for i in ids],
             "is_admin": admin}
 
 
@@ -164,13 +189,10 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
     open hours gaps, nothing is changed (409) until the caller repeats with confirm_warnings."""
     me = _me(current_user)
     admin = _is_admin(me)
-    cyc = _cycle(cycle_id)
+    cyc = _configured_cycle(cycle_id)
     ids = _employee_ids(body.employee_ids)
     _authorise_all(me, ids, admin)
-    today, hol = _today(), holidays_set()
-    if today <= cyc.end:
-        # locking mid-cycle would stop employees filling the days they have not worked yet
-        raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - approve it after it has ended")
+    today, hol, st = _today(), holidays_set(), payrolls.settings()
     pilot = pilot_set()
 
     rows = {}
@@ -180,7 +202,9 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
         if not (store.entries.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})
                 or store.submissions.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})):
             raise HTTPException(422, f"{i} has no entries or submitted days in this cycle")
-        rows[i] = _employee_row(i, "", cyc, today, hol)
+        rows[i] = _employee_row(i, "", cyc, today, hol, st["week_off"])
+        if today <= cyc.end:                       # approving early locks the days the employee has not filled yet
+            rows[i]["warnings"].append(f"the cycle has not ended (it ends on {cyc.end.isoformat()}): the employee cannot fill any more days after approval")
     flagged = {i: r["warnings"] for i, r in rows.items() if r["warnings"]}
     if flagged and not body.confirm_warnings:
         raise HTTPException(409, {"message": "Some employees have open items - confirm to approve anyway",
@@ -274,13 +298,11 @@ def send_back(cycle_id: str, body: SendBackIn, current_user: str = Depends(get_c
     manager (or an admin) only. An APPROVED cycle must be unlocked by an admin first."""
     me = _me(current_user)
     admin = _is_admin(me)
-    cyc = _cycle(cycle_id)
+    cyc = _configured_cycle(cycle_id)
     emp = body.employee_id.strip().upper()
     _authorise_all(me, [emp], admin)
     if emp not in pilot_set():
         raise HTTPException(422, f"{emp} is not on the daily timesheet")
-    if _today() <= cyc.end:
-        raise HTTPException(422, f"This cycle ends on {cyc.end.isoformat()} - review it after it has ended")
     key = {"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}
     if store.reviews.find_one({**key, "status": "approved"}):
         raise HTTPException(409, "This cycle is approved and locked - ask an admin to unlock it first")
@@ -292,15 +314,25 @@ def send_back(cycle_id: str, body: SendBackIn, current_user: str = Depends(get_c
     return {"employee_id": emp, "status": "sent_back"}
 
 
-def _task_summary(emp: str, cyc: rules.Cycle):
-    """Per task the employee worked on in this cycle: hours this cycle, hours so far on the task, and the hours
-    allotted to it (working days x 8.5, from its Nexus Quant dates). Unplanned work is one extra line."""
-    rows = list(store.entries.find({"employee_id": emp, "cycle_id": cyc.id, "hours": {"$ne": None}},
-                                   {"task_id": 1, "task_name": 1, "client": 1, "project": 1, "project_code": 1, "hours": 1,
-                                    "task_status": 1, "is_unplanned": 1, "date": 1}).sort("date", 1))
+def _verdict(e: dict, total: float, allotted) -> str:
+    """How a row stands against the hours allotted to its task (allotted = working days of the task x hours per day)."""
+    if e.get("task_id") is None or e.get("is_unplanned"):
+        return "unplanned"
+    if allotted is None:
+        return "unknown"
+    within = round(total, 2) <= round(allotted, 2)
+    if e.get("task_status") == "done":
+        return "completed_within" if within else "completed_over"
+    return "in_progress_within" if within else "in_progress_over"
+
+
+def _review_rows(emp: str, cyc: rules.Cycle, st: dict):
+    """Every entry of the cycle, in date order, enriched with the hours on its task so far, the hours allotted to the task
+    (from its Nexus Quant start/end dates, excluding week-off days and holidays) and a verdict. Also the NQ-down flag."""
+    rows = list(store.entries.find({"employee_id": emp, "cycle_id": cyc.id}).sort([("date", 1), ("created_at", 1)]))
     ids = sorted({r["task_id"] for r in rows if r.get("task_id") is not None})
-    used = {x["_id"]: round(x["h"], 2) for x in store.entries.aggregate([
-        {"$match": {"employee_id": emp, "task_id": {"$in": ids}, "hours": {"$ne": None}}},
+    before = {x["_id"]: x["h"] for x in store.entries.aggregate([
+        {"$match": {"employee_id": emp, "task_id": {"$in": ids}, "hours": {"$ne": None}, "date": {"$lt": cyc.start.isoformat()}}},
         {"$group": {"_id": "$task_id", "h": {"$sum": "$hours"}}}])} if ids else {}
     nq, nq_down = {}, False
     if ids:
@@ -308,69 +340,94 @@ def _task_summary(emp: str, cyc: rules.Cycle):
             nq = {t.id: t for t in nq_repo.get_tasks_by_ids(ids)}
         except NQUnavailable:
             nq_down = True
-    hol = {date.fromisoformat(h) for h in holidays_set()}
+    hol = set(st["holidays"])
+    allotted = {tid: rules.budget_hours(t.start_date, t.end_date, hol, standard_hours=st["standard_hours"], week_off=st["week_off"])
+                for tid, t in nq.items()}
+    running = dict(before)
+    out = []
+    for r in rows:
+        tid = r.get("task_id")
+        if tid is not None and r.get("hours") is not None:
+            running[tid] = running.get(tid, 0.0) + r["hours"]
+        total = running.get(tid, 0.0) if tid is not None else None
+        allot = allotted.get(tid) if tid is not None else None
+        t = nq.get(tid) if tid is not None else None
+        out.append({"date": r["date"], "task_id": tid, "task_name": r.get("task_name") or ("Unplanned work" if tid is None else ""),
+                    "client": r.get("client") or "", "project": r.get("project") or "", "project_code": r.get("project_code") or "",
+                    "hours": r.get("hours"), "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned")),
+                    "remarks": r.get("remarks") or "", "extra_remarks": r.get("extra_remarks") or "",
+                    "total_on_task": round(total, 2) if total is not None else None, "allotted_hours": allot,
+                    "task_start": t.start_date if t else None, "task_end": t.end_date if t else None,
+                    "verdict": _verdict(r, total or 0.0, allot), "location": r.get("location")})
+    return out, nq_down
+
+
+def _task_rollup(rows: List[dict]):
+    """One line per task for the cycle (hours this cycle, hours so far, allotted, final verdict) and the counts."""
     by: dict = {}
     for r in rows:
-        key = r["task_id"] if r.get("task_id") is not None else "unplanned"
-        g = by.setdefault(key, {"task_id": r.get("task_id"), "task_name": r.get("task_name") or ("Unplanned work" if key == "unplanned" else ""),
-                                "client": r.get("client") or "", "project": r.get("project") or "", "project_code": r.get("project_code") or "",
-                                "cycle_hours": 0.0, "rows": 0, "days": set(), "last_status": None})
-        g["cycle_hours"] += r["hours"]; g["rows"] += 1; g["days"].add(r["date"]); g["last_status"] = r.get("task_status")
-    out = []
-    for key, g in by.items():
-        t = nq.get(key) if key != "unplanned" else None
-        budget = rules.budget_hours(t.start_date, t.end_date, hol) if t else None
-        total = used.get(key) if key != "unplanned" else None
-        out.append({**{k: v for k, v in g.items() if k != "days"}, "days": len(g["days"]), "cycle_hours": round(g["cycle_hours"], 2),
-                    "hours_so_far": total, "allotted_hours": budget,
-                    "pct_used": round(100 * total / budget) if (budget and total is not None) else None,
-                    "over_allotted": bool(budget and total is not None and total > budget),
-                    "task_start": t.start_date if t else None, "task_end": t.end_date if t else None})
-    out.sort(key=lambda x: (x["task_id"] is None, -x["cycle_hours"]))
-    return out, nq_down
+        if r["hours"] is None:
+            continue
+        key = r["task_id"] if r["task_id"] is not None else "unplanned"
+        g = by.setdefault(key, {"task_id": r["task_id"], "task_name": r["task_name"], "client": r["client"], "project": r["project"],
+                                "project_code": r["project_code"], "cycle_hours": 0.0, "rows": 0, "days": set(),
+                                "task_start": r["task_start"], "task_end": r["task_end"]})
+        g["cycle_hours"] += r["hours"]; g["rows"] += 1; g["days"].add(r["date"])
+        g["hours_so_far"] = r["total_on_task"]; g["allotted_hours"] = r["allotted_hours"]; g["verdict"] = r["verdict"]
+    tasks = []
+    for g in by.values():
+        allot, so_far = g["allotted_hours"], g["hours_so_far"]
+        tasks.append({**{k: v for k, v in g.items() if k != "days"}, "days": len(g["days"]), "cycle_hours": round(g["cycle_hours"], 2),
+                      "pct_used": round(100 * so_far / allot) if (allot and so_far is not None) else None,
+                      "over_allotted": bool(allot and so_far is not None and so_far > allot)})
+    tasks.sort(key=lambda x: (x["task_id"] is None, -x["cycle_hours"]))
+    summary = {k: 0 for k in ("completed_within", "completed_over", "in_progress_within", "in_progress_over", "unplanned", "unknown")}
+    for t in tasks:
+        summary[t["verdict"]] += 1
+    return tasks, summary
 
 
 @router.get("/{cycle_id}/employee/{employee_id}")
 def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends(get_current_user)):
-    """Day-by-day rows of one employee for the review screen. Reporting manager or admin only."""
+    """Everything a reviewer needs for one employee and cycle: per date the tasks done with hours, the hours allotted to each
+    task and how it stands, plus a roll-up per task. Reporting manager or admin only."""
     me = _me(current_user)
     admin = _is_admin(me)
-    cyc = _cycle(cycle_id)
+    cyc = _configured_cycle(cycle_id)
     emp = employee_id.strip().upper()
     _authorise_all(me, [emp], admin)
     if emp not in pilot_set():
         raise HTTPException(422, f"{emp} is not on the daily timesheet")
+    st = payrolls.settings()
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
     subs = {x["date"]: x for x in store.submissions.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
     drafts = {x["date"]: x for x in store.drafts.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
+    rows, nq_down = _review_rows(emp, cyc, st)
     by_day: dict = {}
-    for e in store.entries.find({"employee_id": emp, "cycle_id": cyc.id}).sort("created_at", 1):
-        by_day.setdefault(e["date"], []).append(e)
-    hol, today = holidays_set(), _today()
+    for r in rows:
+        by_day.setdefault(r["date"], []).append(r)
+    hol, today = {d.isoformat() for d in st["holidays"]}, _today()
     days, d = [], cyc.start
     while d <= cyc.end:
         iso = d.isoformat()
-        rows = by_day.get(iso, [])
+        day_rows = by_day.get(iso, [])
         sub = subs.get(iso)
-        loc = (sub or drafts.get(iso) or {}).get("location") or (rows[0].get("location") if rows else None)
-        working = d.weekday() < 5 and iso not in hol
+        loc = (sub or drafts.get(iso) or {}).get("location") or (day_rows[0].get("location") if day_rows else None)
+        working = d.weekday() not in st["week_off"] and iso not in hol
         days.append({
             "date": iso, "weekday": d.strftime("%a"), "working_day": working, "location": loc,
-            "state": "submitted" if sub else ("saved" if rows or iso in drafts else ("missing" if working and d <= today else "none")),
-            "hours": round(sum(r["hours"] for r in rows if r.get("hours") is not None), 2),
-            "entries": [{"task_name": r.get("task_name") or "", "client": r.get("client") or "",
-                         "project": r.get("project") or "", "project_code": r.get("project_code") or "",
-                         "remarks": r.get("remarks") or "", "hours": r.get("hours"),
-                         "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned")),
-                         "extra_remarks": r.get("extra_remarks") or ""}
-                        for r in rows]})
+            "holiday": st["holidays"].get(d) if d in st["holidays"] else None,
+            "state": "submitted" if sub else ("saved" if day_rows or iso in drafts else ("missing" if working and d <= today else "none")),
+            "hours": round(sum(r["hours"] for r in day_rows if r["hours"] is not None), 2),
+            "entries": day_rows})
         d += timedelta(days=1)
+    tasks, summary = _task_rollup(rows)
     name = (store.employees.find_one({"EmpID": emp}, {"Emp Name": 1}) or {}).get("Emp Name", "")
     review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
-    row = _employee_row(emp, name, cyc, today, hol)
-    tasks, nq_down = _task_summary(emp, cyc)
+    row = _employee_row(emp, name, cyc, today, hol, st["week_off"])
     return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline},
-            "employee": row, "days": days, "tasks": tasks, "nq_unavailable": nq_down,
+            "employee": row, "days": days, "tasks": tasks, "summary": summary, "nq_unavailable": nq_down,
+            "rules": {"standard_hours": st["standard_hours"], "week_off_days": list(st["week_off"])},
             "history": [{"action": h.get("action"), "by": h.get("by"), "at": h.get("at"),
                          "note": h.get("note") or h.get("reason")} for h in review.get("history", [])][-20:]}
 

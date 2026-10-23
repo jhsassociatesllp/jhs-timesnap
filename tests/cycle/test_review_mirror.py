@@ -194,11 +194,10 @@ def test_send_back_rules(api):
     assert send(api, emp="JHS9103").status_code in (200, 422)              # admin may send back anyone (pilot only)
 
 
-def test_send_back_before_cycle_end_refused(api, monkeypatch):
+def test_send_back_is_allowed_before_the_cycle_ends(api, monkeypatch):
     seed(api.db)
     monkeypatch.setattr(cr, "_today", lambda: date(2026, 10, 14))
-    assert send(api).status_code == 422
-    assert api.db["c_reviews"].count_documents({}) == 0
+    assert send(api).status_code == 200
 
 
 # ── review detail ────────────────────────────────────────────────────────────
@@ -258,3 +257,30 @@ def test_approve_can_carry_a_remark(api):
     assert r.status_code == 200
     hist = api.db["c_reviews"].find_one({"employee_id": "JHS9101"})["history"]
     assert hist[-1]["action"] == "approved" and hist[-1]["note"] == "Good work"
+
+
+def test_review_table_verdicts_per_date_and_task(api):
+    seed(api.db)                                                         # task 1: two done rows (8.5 + 8.5), plus 1 h unplanned
+    api.db["c_entries"].insert_one(entry("JHS9101", "2026-10-15", 6, task_id=2, task_status="in_progress"))   # open task, within
+    api.db["c_entries"].insert_one(entry("JHS9101", "2026-10-16", 300, task_id=3, task_status="done"))        # done but far over
+    body = api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()
+    rows = [e for d in body["days"] for e in d["entries"]]
+    by_task = {}
+    for e in rows:
+        by_task.setdefault(e["task_id"], []).append(e)
+    first, second = by_task[1][0], by_task[1][1]
+    assert first["verdict"] == second["verdict"] == "completed_within" and second["total_on_task"] >= first["total_on_task"]
+    assert by_task[2][0]["verdict"] == "in_progress_within"
+    assert by_task[3][0]["verdict"] == "completed_over" and by_task[3][0]["total_on_task"] == 300.0
+    assert by_task[None][0]["verdict"] == "unplanned"
+    s = body["summary"]
+    assert (s["completed_within"], s["completed_over"], s["in_progress_within"], s["unplanned"]) == (1, 1, 1, 1)
+    assert body["rules"] == {"standard_hours": 8.5, "week_off_days": [5, 6]}
+
+
+def test_allotted_hours_follow_the_admins_week_off_days_and_hours_per_day(api):
+    seed(api.db)
+    task = lambda: next(t for t in api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()["tasks"] if t["task_id"] == 1)
+    assert task()["allotted_hours"] == 178.5                                     # Oct 1-31: 21 working days (Sat/Sun off, 2 Oct holiday) x 8.5
+    api.db["c_config"].update_one({"_id": "timesheet"}, {"$set": {"week_off_days": [6], "standard_hours": 8}})
+    assert task()["allotted_hours"] == 26 * 8.0                                  # only Sunday off: 27 days minus the holiday = 26 x 8

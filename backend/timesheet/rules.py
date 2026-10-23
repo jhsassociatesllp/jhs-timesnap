@@ -26,14 +26,18 @@ def is_working_day(d: date, holidays: Iterable[date] = ()) -> bool:
     return d.weekday() < 5 and d not in set(holidays)
 
 
-def working_days(start: date, end: date, holidays: Iterable[date] = ()) -> int:
-    """Mon-Fri days in [start, end] inclusive, minus holidays. 0 if end < start."""
+WEEK_OFF_DEFAULT = (5, 6)          # Saturday, Sunday (Monday is 0); admins can change it
+
+
+def working_days(start: date, end: date, holidays: Iterable[date] = (), week_off: Iterable[int] = WEEK_OFF_DEFAULT) -> int:
+    """Days in [start, end] inclusive that are not a week-off day (default Sat/Sun) and not a holiday. 0 if end < start."""
     if end < start:
         return 0
     hol: Set[date] = set(holidays)
+    off = set(week_off)
     n, d = 0, start
     while d <= end:
-        if d.weekday() < 5 and d not in hol:
+        if d.weekday() not in off and d not in hol:
             n += 1
         d += timedelta(days=1)
     return n
@@ -41,12 +45,12 @@ def working_days(start: date, end: date, holidays: Iterable[date] = ()) -> int:
 
 def budget_hours(start: Optional[date], end: Optional[date],
                  holidays: Iterable[date] = (), allocation_pct: float = 100.0,
-                 standard_hours: float = STANDARD_HOURS) -> float:
+                 standard_hours: float = STANDARD_HOURS, week_off: Iterable[int] = WEEK_OFF_DEFAULT) -> float:
     """Budget for a task assignment = working days x 8.5 x allocation %.
     NQ has no allocation column, so callers pass 100 and flag it."""
     if not start or not end:
         return 0.0
-    return round(working_days(start, end, holidays) * standard_hours * allocation_pct / 100.0, 2)
+    return round(working_days(start, end, holidays, week_off) * standard_hours * allocation_pct / 100.0, 2)
 
 
 def within_tolerance(task_hours: float, hrms_net: float, tolerance: float = TOLERANCE_HOURS) -> bool:

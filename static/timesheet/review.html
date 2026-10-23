@@ -24,40 +24,40 @@
 
         <section class="day-head rv-head">
           <div class="rv-bar">
-            <div class="form-group"><label for="cycleSel">10-day cycle</label><select class="inp" id="cycleSel"></select></div>
+            <div class="form-group"><label for="cycleSel">Payroll and 10-day cycle</label><select class="inp" id="cycleSel"></select></div>
             <div class="form-group" id="teamWrap" hidden><label for="team">Manager code (admin)</label><input class="inp" id="team" maxlength="20" placeholder="all teams" /></div>
             <button class="btn small" id="go" type="button"><i class="fas fa-rotate"></i> Show</button>
           </div>
           <p class="rv-info" id="cycleInfo"></p>
         </section>
 
-        <p class="rv-tools">
-          <button class="btn small" id="remindBtn" type="button"><i class="fas fa-bell"></i> Remind employees with missing days</button>
-          <span>Projects running late? <a href="/static/timesheet/cycle.html">Update task end dates and hours needed</a></span>
-        </p>
-
-        <div class="cols">
-          <section class="card work" aria-labelledby="teamH">
-            <h3 id="teamH"><i class="fas fa-users"></i> Your team</h3>
-            <p class="sub">Click a name to see their days. Approving locks the cycle for that employee.</p>
-            <div class="table-responsive">
-              <table class="tbl">
-                <thead><tr><th><input type="checkbox" id="all" aria-label="Select all" /></th><th>Employee</th><th class="num">Days filled</th><th class="num hide-s">Hours</th><th class="num hide-s">Unplanned</th><th>Status</th><th class="hide-s">Open items</th></tr></thead>
-                <tbody id="rows"></tbody>
-              </table>
-            </div>
-            <label class="confirm" id="confirmWrap" hidden><input type="checkbox" id="confirm" /> <span id="confirmText"></span></label>
-            <div class="rv-actions">
-              <button class="btn good" id="approveBtn" type="button"><i class="fas fa-lock"></i> Approve &amp; lock selected</button>
-            </div>
-          </section>
-
-          <aside class="side" style="flex:1 1 380px">
-            <section class="card" id="detail" aria-live="polite"><div class="empty">Click an employee to see their days.</div></section>
-          </aside>
-        </div>
+        <section class="card" aria-labelledby="teamH">
+          <h3 id="teamH"><i class="fas fa-users"></i> Your team</h3>
+          <p class="sub">Click <b>Review</b> on an employee to see every day, the tasks and the hours against what was allotted. You can approve at any time.</p>
+          <div class="table-responsive">
+            <table class="tbl">
+              <thead><tr><th><input type="checkbox" id="all" aria-label="Select all" /></th><th>Employee</th><th class="num">Days filled</th><th class="num hide-s">Hours</th><th class="num hide-s">Unplanned</th><th>Status</th><th class="hide-s">Open items</th><th></th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <label class="confirm" id="confirmWrap" hidden><input type="checkbox" id="confirm" /> <span id="confirmText"></span></label>
+          <div class="rv-actions">
+            <button class="btn good" id="approveBtn" type="button"><i class="fas fa-lock"></i> Approve &amp; lock selected</button>
+          </div>
+        </section>
       </div>
     </div>
+
+    <div class="modal" id="rvModal" role="dialog" aria-modal="true" aria-labelledby="mTitle" hidden>
+      <div class="modal-box" id="mBox" tabindex="-1">
+        <div class="modal-head">
+          <div><h2 id="mTitle"></h2><div class="sub" id="mSub"></div></div>
+          <button type="button" class="modal-x" id="mClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="mBody"></div>
+      </div>
+    </div>
+
     <script src="/static/timesheet/shell.js"></script>
     <script src="/static/timesheet/review.js"></script>
   </body>

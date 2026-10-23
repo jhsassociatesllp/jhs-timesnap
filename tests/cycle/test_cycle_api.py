@@ -136,14 +136,32 @@ def test_approve_with_open_items_needs_confirmation_and_changes_nothing_otherwis
     assert review["warnings_confirmed"] is True and review["history"][0]["warnings"]
 
 
-def test_cannot_approve_a_cycle_that_has_not_ended(api):
+def test_approving_before_the_cycle_ends_needs_the_confirmation(api):
     seed_cycle(api.db)                                                  # today is 2026-10-14, the cycle ends 10-20
-    r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"], "confirm_warnings": True})
-    assert r.status_code == 422 and "after it has ended" in r.json()["detail"]
-    assert api.db["c_entries"].count_documents({"locked": True}) == 0 and api.db["c_reviews"].count_documents({}) == 0
-    _user["id"] = "JHS9000"                                             # admins are held to the same rule
-    assert api.post(f"/timesheet/v2/cycles/{CYCLE}/approve",
-                    json={"employee_ids": ["JHS9101"], "confirm_warnings": True}).status_code == 422
+    fill_cycle(api.db, "JHS9101")
+    r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"]})
+    assert r.status_code == 409 and "has not ended" in " ".join(r.json()["detail"]["warnings"]["JHS9101"])
+    assert api.db["c_entries"].count_documents({"locked": True}) == 0                 # nothing changed yet
+    ok = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"], "confirm_warnings": True})
+    assert ok.status_code == 200 and api.db["c_entries"].count_documents({"locked": True}) > 0
+
+
+def test_a_cycle_the_admin_has_not_created_cannot_be_reviewed(api):
+    seed_cycle(api.db)
+    for path in ("team", "employee/JHS9101"):
+        r = api.get(f"/timesheet/v2/cycles/2026-08-C2/{path}")
+        assert r.status_code == 404 and "admin" in r.json()["detail"]
+    assert api.post("/timesheet/v2/cycles/2026-08-C2/approve", json={"employee_ids": ["JHS9101"]}).status_code == 404
+
+
+def test_payroll_list_shows_only_what_the_admin_created(api):
+    r = api.get("/timesheet/v2/cycles/payrolls").json()
+    assert [p["id"] for p in r["payrolls"]] == ["2026-12", "2026-11", "2026-10"]
+    p = next(x for x in r["payrolls"] if x["id"] == "2026-10")
+    assert [c["id"] for c in p["cycles"]] == ["2026-09-C3", "2026-10-C1", "2026-10-C2"] and p["label"] == "21 Sep - 20 Oct 2026"
+    assert next(c for c in p["cycles"] if c["id"] == "2026-10-C2")["ended"] is False                # today is the 14th
+    _user["id"] = "JHS9101"
+    assert api.get("/timesheet/v2/cycles/payrolls").status_code == 403
 
 
 def test_approve_authorisation_and_validation(api, monkeypatch):

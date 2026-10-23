@@ -150,7 +150,7 @@ def render_digest(d: dict, base_url: str = "") -> Tuple[str, str, str]:
 
     link = ""
     if base_url.startswith(("http://", "https://")):
-        link = f"<p><a href=\"{_e(base_url.rstrip('/'))}/static/timesheet/reco.html\">Open reconciliation</a></p>"
+        link = f"<p><a href=\"{_e(base_url.rstrip('/'))}/static/timesheet/review.html\">Open Review team</a></p>"
     body = f"""<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#222">
 <h2 style="margin:0 0 8px">Timesheet digest &mdash; {_e(day)}</h2>
 <table cellpadding="6" style="border-collapse:collapse"><tr>

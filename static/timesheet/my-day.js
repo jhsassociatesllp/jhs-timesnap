@@ -126,12 +126,12 @@
     else if (d.nq_data_may_be_stale) banner("warn", "Project data may be out of date.");
     if (d.cycle.review_status === "sent_back") banner("warn", "Your manager sent this cycle back: " + (d.cycle.review_note || "please check your days") + ". Fix the days, then submit them again.");
     if (d.read_only) banner("info", d.read_only_text || "This day is view only.");
-    else if (d.submitted) banner("ok", "This day is submitted. If you change anything it needs to be submitted again.");
+    else if (d.submitted) banner("info", "This day was submitted earlier and has been opened for changes. Fix it, then submit it again.");
   }
 
   function renderTitle() {
     const d = S.day, c = d.cycle;
-    $("cycLabel").textContent = `Cycle ${c.label} · fill by ${shortDate(c.deadline)}${c.deadline_passed && c.review_status !== "sent_back" && c.review_status !== "reopened" ? " (closed)" : ""}`;
+    $("cycLabel").textContent = `Cycle ${c.label} · fill by ${shortDate(c.deadline)}${!c.configured ? " (not set up)" : c.deadline_passed && c.review_status !== "sent_back" && c.review_status !== "reopened" ? " (closed)" : ""}`;
     $("dayTitle").textContent = `${d.weekday}, ${shortDate(d.date)}`;
     $("datePick").value = d.date;
     $("datePick").max = S.strip.today;
@@ -342,10 +342,10 @@
     if (S.hintsOn && !S.readOnly) problems().forEach((p) => hints.append(h("li", { text: p })));
     const btn = $("submitBtn");
     btn.hidden = S.readOnly;
-    btn.textContent = S.day.submitted ? "Resubmit day" : "Submit day";
-    $("submitNote").textContent = S.readOnly ? "" : (S.day.submitted
-      ? "Submitted. Changing anything withdraws the submission until you submit again."
-      : "Hours are what you worked. Submitting sends the day to your manager.");
+    btn.textContent = "Submit day";
+    $("submitNote").textContent = S.readOnly ? "" : (S.day.day_reopened
+      ? "Your admin has allowed changes to this day. Fix it and submit again; it locks once you submit."
+      : "Hours are what you worked. Once you submit, the day is locked and only your admin can allow changes.");
   }
 
   // ── editing actions ───────────────────────────────────────────────────────────────
@@ -531,8 +531,7 @@
     if (S.dirty) return;                          // the save failed; its message is showing
     try {
       const day = await api("POST", `/timesheet/v2/day/${emp}/${S.date}/submit`);
-      S.day = Object.assign(S.day, { submitted: day.submitted, submitted_at: day.submitted_at, totals: day.totals });
-      renderBanners(); renderTotals(); refreshStrip();
+      await loadDay(S.date);                          // a submitted day is now locked: show it read-only
       setSaveState("ok", "Submitted ✓");
       toast("Day submitted ✓");
     } catch (err) { banner("err", err.message, true); }

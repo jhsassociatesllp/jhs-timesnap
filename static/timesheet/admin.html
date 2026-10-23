@@ -1,487 +1,124 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Professional Time Sheet</title>
-    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            --text-dark: #2c3e50;
-            --border-color: #e1e8ed;
-            --shadow-heavy: 0 20px 40px rgba(0, 0, 0, 0.2);
-            --transition: all 0.3s ease;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--primary-gradient);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 1rem;
-        }
-
-        .admin-container {
-            background: white;
-            padding: 2.5rem 3rem;
-            border-radius: 20px;
-            box-shadow: var(--shadow-heavy);
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-            animation: fadeInUp 0.6s ease-out;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .admin-container h2 {
-            margin-bottom: 2rem;
-            color: var(--text-dark);
-            font-weight: 500;
-            font-size: 2rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.8rem;
-            text-align: left;
-            position: relative;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 0.6rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 1.2rem;
-            border: 2px solid var(--border-color);
-            border-radius: 15px;
-            font-size: 1.1rem;
-            transition: var(--transition);
-        }
-
-        .form-group input:focus {
-            border-color: #171817;
-            box-shadow: 0 0 0 4px rgba(99, 100, 99, 0.2);
-            outline: none;
-        }
-
-        .submit-btn {
-            background: var(--success-gradient);
-            color: white;
-            border: none;
-            padding: 1.2rem;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            font-weight: 600;
-            width: 100%;
-            transition: var(--transition);
-            letter-spacing: 0.5px;
-        }
-
-        .submit-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .submit-btn:active {
-            transform: translateY(0);
-        }
-
-        .message {
-            margin-top: 1.2rem;
-            font-weight: 500;
-            display: none;
-        }
-
-        .success {
-            color: #11998e;
-        }
-
-        .error {
-            color: #e74c3c;
-        }
-    </style>
-</head>
-<body>
-    <div class="admin-container">
-        <h2>Admin Login</h2>
-
-        <div class="form-group">
-            <label for="adminUserId">Admin ID</label>
-            <input type="text" id="adminUserId" placeholder="Enter admin ID">
-        </div>
-
-        <div class="form-group">
-            <label for="adminPassword">Password</label>
-            <input type="password" id="adminPassword" placeholder="Enter password">
-        </div>
-
-        <button class="submit-btn" onclick="submitAdminLogin()">Submit</button>
-        <div id="message" class="message"></div>
-    </div>
-    <script>
-// const API_URL = "http://127.0.0.1:8000";
-const API_URL = "";
-
-
-
-async function submitAdminLogin() {
-    const userid = document.getElementById("adminUserId").value.trim();
-    const password = document.getElementById("adminPassword").value.trim();
-
-    if (!userid || !password) {
-        showMessage("Please fill all fields", "error");
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/admin-login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userid, password })
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            // ✅ Store token & userid in localStorage
-            localStorage.setItem("access_token", result.access_token);
-            localStorage.setItem("admin_userid", result.userid);
-
-            showMessage("Login successful!", "success");
-
-            // ✅ Redirect to dashboard
-            setTimeout(() => {
-                window.location.href = "/admin-dashboard";
-            }, 1200);
-        } else {
-            showMessage(result.detail || "Invalid credentials", "error");
-        }
-    } catch (err) {
-        showMessage("Error: " + err.message, "error");
-    }
-}
-
-function showMessage(text, type) {
-    const message = document.getElementById("message");
-    message.className = `message ${type}`;
-    message.textContent = text;
-    message.style.display = "block";
-    setTimeout(() => (message.style.display = "none"), 4000);
-}
-</script>
-
-</body>
-</html> -->
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Login - JHS Time Sheet</title>
-<link rel="icon" type="image/png" href="/static/jhs_logo.jpg">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Admin setup — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
+    <link rel="stylesheet" href="/static/timesheet/my-day.css" />
+    <link rel="stylesheet" href="/static/timesheet/review.css" />
+    <link rel="stylesheet" href="/static/timesheet/admin.css" />
+  </head>
+  <body>
+    <div id="appNav" data-active="admin"></div>
 
-<style>
-    :root {
-        --primary: #5d5fef;
-        --primary-light: #e8e8ff;
-        --success: #10b981;
-        --danger: #ef4444;
-        --gray-100: #f8fafc;
-        --gray-200: #e2e8f0;
-        --gray-300: #cbd5e1;
-        --gray-600: #475569;
-        --gray-800: #1e293b;
-        --shadow-sm: 0 4px 12px rgba(0,0,0,0.08);
-        --shadow-md: 0 10px 30px rgba(0,0,0,0.1);
-        --shadow-lg: 0 20px 50px rgba(0,0,0,0.15);
-        --radius: 16px;
-        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-sliders"></i> Admin setup</h1></div>
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+      <div class="md-body">
+        <div id="banners" aria-live="polite"></div>
+        <nav class="tabs" id="tabs" aria-label="Setup sections">
+          <button type="button" class="on" data-tab="payrolls"><i class="fas fa-calendar-days"></i> Payrolls &amp; cycles</button>
+          <button type="button" data-tab="rules"><i class="fas fa-business-time"></i> Working rules</button>
+          <button type="button" data-tab="access"><i class="fas fa-user-check"></i> Who uses My day</button>
+          <button type="button" data-tab="reopen"><i class="fas fa-lock-open"></i> Allow changes to a day</button>
+        </nav>
 
-    body {
-        font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 1rem;
-        position: relative;
-        overflow: hidden;
-    }
+        <!-- 1. payrolls -->
+        <section class="card tabpane" id="pane-payrolls">
+          <div class="pane-head">
+            <div><h3><i class="fas fa-calendar-days"></i> Payrolls and 10-day cycles</h3>
+              <p class="sub">Employees can fill, and team leads can review, only the cycles listed here. A payroll runs from the 21st to the 20th and has three sub-cycles.</p></div>
+            <button class="btn good" id="newPayroll" type="button"><i class="fas fa-plus"></i> Create payroll</button>
+          </div>
+          <div id="payrollList"></div>
+        </section>
 
-    /* Subtle background accent */
-    body::before {
-        content: '';
-        position: absolute;
-        width: 600px;
-        height: 600px;
-        background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
-        border-radius: 50%;
-        top: -20%;
-        left: -15%;
-        opacity: 0.3;
-        filter: blur(100px);
-        z-index: 0;
-    }
+        <!-- 2. rules -->
+        <section class="card tabpane" id="pane-rules" hidden>
+          <h3><i class="fas fa-business-time"></i> Working rules</h3>
+          <p class="sub">These drive the allotted hours on the Review screen and the working days in the day strip.</p>
+          <div class="rules-grid">
+            <div class="form-group"><label for="stdHours">Hours in a working day</label><input class="inp" id="stdHours" type="number" min="1" max="24" step="0.25" /></div>
+            <div class="form-group"><label for="deadlineDays">Days allowed to fill after a cycle ends</label><input class="inp" id="deadlineDays" type="number" min="0" max="60" step="1" /></div>
+          </div>
+          <div class="form-group"><label>Week-off days</label><div class="weekoff" id="weekOff"></div></div>
+          <div class="form-group"><label>Holidays (not counted as working days)</label>
+            <div class="hol-add"><input class="inp" id="holDate" type="date" aria-label="Holiday date" /><input class="inp" id="holName" type="text" maxlength="80" placeholder="Name (optional)" aria-label="Holiday name" />
+              <button class="btn small" id="holAdd" type="button"><i class="fas fa-plus"></i> Add</button></div>
+            <ul class="hol-list" id="holList"></ul>
+          </div>
+          <div class="rv-actions"><button class="btn primary" id="saveRules" type="button"><i class="fas fa-floppy-disk"></i> Save working rules</button><span class="save-note" id="rulesNote"></span></div>
+        </section>
 
-    body::after {
-        content: '';
-        position: absolute;
-        width: 500px;
-        height: 500px;
-        background: linear-gradient(135deg, #bfdbfe, #93c5fd);
-        border-radius: 50%;
-        bottom: -20%;
-        right: -10%;
-        opacity: 0.3;
-        filter: blur(100px);
-        z-index: 0;
-    }
+        <!-- 3. access -->
+        <section class="card tabpane" id="pane-access" hidden>
+          <h3><i class="fas fa-user-check"></i> Who uses My day</h3>
+          <p class="sub">Everyone else keeps the classic timesheet. Staff of the free-text partner (JHS01) and JHS1562 always use the classic one unless listed under "Always include".</p>
+          <div class="scope" role="radiogroup" aria-label="Who uses My day">
+            <label class="opt"><input type="radio" name="scope" value="all" /> <span><b>All employees</b><br /><small>Everyone sees My day when they log in.</small></span></label>
+            <label class="opt"><input type="radio" name="scope" value="pilot" /> <span><b>Only the employees I list</b><br /><small>A staged roll-out: add the codes below.</small></span></label>
+          </div>
+          <div class="form-group" id="pilotBox"><label for="pilotIn">Employees on My day (when "only listed")</label>
+            <div class="chips-in"><div class="chip-list" id="pilotChips"></div><input class="inp" id="pilotIn" type="text" maxlength="20" placeholder="Type a code and press Enter, e.g. JHS1223" /></div></div>
+          <div class="form-group"><label for="incIn">Always include (even free-text staff)</label>
+            <div class="chips-in"><div class="chip-list" id="incChips"></div><input class="inp" id="incIn" type="text" maxlength="20" placeholder="Type a code and press Enter" /></div></div>
+          <div class="rv-actions"><button class="btn primary" id="saveAccess" type="button"><i class="fas fa-floppy-disk"></i> Save</button><span class="save-note" id="accessNote"></span></div>
+        </section>
 
-    .login-card {
-        background: white;
-        backdrop-filter: blur(20px);
-        border-radius: var(--radius);
-        padding: 3rem 2.5rem;
-        width: 100%;
-        max-width: 440px;
-        box-shadow: var(--shadow-lg);
-        position: relative;
-        z-index: 1;
-        animation: slideUp 0.7s ease-out;
-        border: 1px solid var(--gray-200);
-    }
-
-    @keyframes slideUp {
-        from { opacity: 0; transform: translateY(30px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .logo {
-        width: 90px;
-        height: 90px;
-        background: linear-gradient(135deg, #5d5fef, #8b5cf6);
-        border-radius: 50%;
-        margin: 0 auto 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: var(--shadow-md);
-    }
-
-    .logo i {
-        font-size: 2.8rem;
-        color: white;
-    }
-
-    h2 {
-        font-size: 2.4rem;
-        font-weight: 700;
-        text-align: center;
-        margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, #5d5fef, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    p.subtitle {
-        text-align: center;
-        color: var(--gray-600);
-        font-size: 1.1rem;
-        margin-bottom: 2.5rem;
-    }
-
-    .form-group {
-        position: relative;
-        margin-bottom: 1.8rem;
-    }
-
-    .form-group input {
-        width: 100%;
-        padding: 1.3rem 1.2rem 1.3rem 3.5rem;
-        border: 2px solid var(--gray-300);
-        border-radius: 12px;
-        font-size: 1.1rem;
-        transition: var(--transition);
-        background: var(--gray-100);
-    }
-
-    .form-group input::placeholder {
-        color: var(--gray-600);
-    }
-
-    .form-group input:focus {
-        outline: none;
-        border-color: var(--primary);
-        background: white;
-        box-shadow: 0 0 0 4px rgba(93, 95, 239, 0.15);
-    }
-
-    .form-group i {
-        position: absolute;
-        left: 1.1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--gray-600);
-        font-size: 1.2rem;
-        pointer-events: none;
-    }
-
-    .submit-btn {
-        background: var(--primary);
-        color: white;
-        border: none;
-        padding: 1.3rem;
-        border-radius: 12px;
-        font-size: 1.15rem;
-        font-weight: 600;
-        width: 100%;
-        cursor: pointer;
-        transition: var(--transition);
-        margin-top: 1rem;
-        box-shadow: var(--shadow-md);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .submit-btn:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-        background: #4c4cc7;
-    }
-
-    .submit-btn:active {
-        transform: translateY(-1px);
-    }
-
-    .message {
-        margin-top: 1.5rem;
-        padding: 1rem 1.2rem;
-        border-radius: 12px;
-        font-weight: 600;
-        text-align: center;
-        display: none;
-        animation: fadeIn 0.5s ease;
-    }
-
-    .success {
-        background: #ecfdf5;
-        color: #10b981;
-        border: 1px solid #86efac;
-    }
-
-    .error {
-        background: #fef2f2;
-        color: #ef4444;
-        border: 1px solid #fca5a5;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Responsive */
-    @media (max-width: 480px) {
-        .login-card {
-            padding: 2rem 1.5rem;
-        }
-        h2 { font-size: 2rem; }
-    }
-</style>
-</head>
-<body>
-
-<div class="login-card">
-    <div class="logo">
-        <i class="fas fa-shield-alt"></i>
-    </div>
-    <h2>Admin Login</h2>
-    <p class="subtitle">Welcome back! Please sign in to continue</p>
-
-    <div class="form-group">
-        <i class="fas fa-user"></i>
-        <input type="text" id="adminUserId" placeholder="Enter Admin ID" autocomplete="username">
+        <!-- 4. reopen -->
+        <section class="card tabpane" id="pane-reopen" hidden>
+          <h3><i class="fas fa-lock-open"></i> Allow changes to a submitted day</h3>
+          <p class="sub">A submitted day is locked. Find the employee's day and press <b>Allow</b>: they can then change it once and submit again. Every permission is logged.</p>
+          <div class="filters">
+            <div class="form-group"><label for="rEmp">Employee code</label><input class="inp" id="rEmp" type="text" maxlength="20" placeholder="e.g. JHS1223" /></div>
+            <div class="form-group"><label for="rFrom">From</label><input class="inp" id="rFrom" type="date" /></div>
+            <div class="form-group"><label for="rTo">To</label><input class="inp" id="rTo" type="date" /></div>
+            <button class="btn small" id="rFind" type="button"><i class="fas fa-magnifying-glass"></i> Find days</button>
+          </div>
+          <p class="sub" id="rWho"></p>
+          <div class="table-responsive"><table class="tbl"><thead><tr><th>Date</th><th>Location</th><th class="num">Hours</th><th>Submitted</th><th>Status</th><th></th></tr></thead><tbody id="rRows"></tbody></table></div>
+        </section>
+      </div>
     </div>
 
-    <div class="form-group">
-        <i class="fas fa-lock"></i>
-        <input type="password" id="adminPassword" placeholder="Enter Password" autocomplete="current-password">
+    <!-- create payroll -->
+    <div class="modal" id="mPayroll" role="dialog" aria-modal="true" aria-labelledby="mpT" hidden>
+      <div class="modal-box small" tabindex="-1">
+        <div class="modal-head"><div><h2 id="mpT">Create a payroll</h2><div class="sub">Pick the month the payroll ends in. The three sub-cycles appear automatically.</div></div>
+          <button type="button" class="modal-x" data-close aria-label="Close">&times;</button></div>
+        <div class="modal-body">
+          <div class="rules-grid">
+            <div class="form-group"><label for="mpMonth">Payroll ends in</label><input class="inp" id="mpMonth" type="month" /></div>
+            <div class="form-group"><label for="mpDays">Days allowed to fill after each cycle ends</label><input class="inp" id="mpDays" type="number" min="0" max="60" /></div>
+          </div>
+          <div id="mpPreview"></div>
+          <div class="m-msg" id="mpMsg" role="alert"></div>
+          <div class="rv-actions"><button class="btn good" id="mpCreate" type="button"><i class="fas fa-check"></i> Create payroll</button><button class="btn" data-close type="button">Cancel</button></div>
+        </div>
+      </div>
     </div>
 
-    <button class="submit-btn" onclick="submitAdminLogin()">
-        Login Securely
-    </button>
+    <!-- allow a day -->
+    <div class="modal" id="mReopen" role="dialog" aria-modal="true" aria-labelledby="mrT" hidden>
+      <div class="modal-box small" tabindex="-1">
+        <div class="modal-head"><div><h2 id="mrT">Allow changes</h2><div class="sub" id="mrSub"></div></div>
+          <button type="button" class="modal-x" data-close aria-label="Close">&times;</button></div>
+        <div class="modal-body">
+          <label for="mrReason" class="lbl">Reason (kept in the log)</label>
+          <textarea class="inp" id="mrReason" maxlength="500" placeholder="e.g. Wrong project selected, employee asked for a correction"></textarea>
+          <div class="m-msg" id="mrMsg" role="alert"></div>
+          <div class="rv-actions"><button class="btn good" id="mrOk" type="button"><i class="fas fa-lock-open"></i> Allow changes</button><button class="btn" data-close type="button">Cancel</button></div>
+        </div>
+      </div>
+    </div>
 
-    <div id="message" class="message"></div>
-</div>
-
-<script>
-const API_URL = "";
-
-async function submitAdminLogin() {
-    const userid = document.getElementById("adminUserId").value.trim();
-    const password = document.getElementById("adminPassword").value.trim();
-
-    if (!userid || !password) {
-        showMessage("Please fill all fields", "error");
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/admin-login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userid, password })
-        });
-
-        const result = await response.json();
-        console.log(`Result: ${result}`)
-        if (response.ok && result.success) {
-            localStorage.setItem("admin_token", result.access_token);
-            localStorage.setItem("admin_userid", result.userid);
-            showMessage("Login successful! Redirecting...", "success");
-            setTimeout(() => {
-                window.location.href = "/admin-dashboard";
-            }, 1200);
-        } else {
-            showMessage(result.detail || "Invalid credentials", "error");
-        }
-    } catch (err) {
-        showMessage("Error: " + err.message, "error");
-    }
-}
-
-function showMessage(text, type) {
-    const message = document.getElementById("message");
-    message.className = `message ${type}`;
-    message.textContent = text;
-    message.style.display = "block";
-    setTimeout(() => message.style.display = "none", 4000);
-}
-</script>
-
-</body>
+    <script src="/static/timesheet/shell.js"></script>
+    <script src="/static/timesheet/admin.js"></script>
+  </body>
 </html>

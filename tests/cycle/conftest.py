@@ -35,7 +35,7 @@ def cdb(monkeypatch):
     names = {"entries": "c_entries", "submissions": "c_submissions", "hrms": "c_hrms", "uploads": "c_uploads",
              "reco": "c_reco", "reviews": "c_reviews", "email_log": "c_email_log", "job_runs": "c_job_runs",
              "config": "c_config", "employees": "c_employees",
-             "drafts": "c_drafts", "legacy": "c_legacy", "payroll_cycles": "c_pcycles", "pending": "c_pending", "approved": "c_approved",
+             "drafts": "c_drafts", "payrolls": "c_payrolls", "legacy": "c_legacy", "payroll_cycles": "c_pcycles", "pending": "c_pending", "approved": "c_approved",
              "rejected": "c_rejected", "approval_history": "c_apphist"}
     for attr, coll in names.items():
         db[coll].drop()
@@ -44,6 +44,10 @@ def cdb(monkeypatch):
     from backend.hrms import reco as hrms_reco
     for attr in ("entries", "submissions", "hrms", "uploads", "reco", "config", "employees"):
         monkeypatch.setattr(hrms_reco.store, attr, db[names[attr]])
+    from backend.timesheet import payrolls
+    for month in ("2026-10", "2026-11", "2026-12"):                         # payrolls an admin has created
+        db["c_payrolls"].insert_one(payrolls.build_payroll(month, 5, "JHS9000"))
+    payrolls.invalidate()
     db["c_config"].insert_one({"_id": "timesheet", "timesheet_scope": "pilot", "pilot_employees": ["JHS9101", "JHS9102", "JHS9103"],
                                "holidays": ["2026-10-02"]})
     db["c_employees"].insert_many([

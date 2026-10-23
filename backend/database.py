@@ -115,6 +115,9 @@ day_submissions_collection    = db["day_submissions"]
 # day_drafts: {employee_id, date, location, saved_at} - the not-yet-submitted state of a day (its location,
 #   and a day off with no rows). day_submissions only ever holds SUBMITTED days.
 day_drafts_collection         = db["day_drafts"]
+# timesheet_payrolls: the payrolls an ADMIN created (Admin setup): {_id: "2026-10", label, start, end, created_by, created_at,
+#   cycles: [{id: "2026-09-C3", label, start, end, deadline}]} - only these cycles are open for filling and review.
+timesheet_payrolls_collection = db["timesheet_payrolls"]
 hrms_attendance_collection    = db["hrms_attendance"]
 config_collection             = db["config"]
 hrms_uploads_collection       = db["hrms_uploads"]

@@ -20,7 +20,7 @@ from backend.auth import get_current_user
 from backend.cycle.store import store as cycle_store
 from backend.hrms import reco as hrms_reco
 from backend.nq import cache, repository
-from backend.timesheet import daily
+from backend.timesheet import daily, payrolls
 from tests.nq.conftest import DEV_PORT, dev_settings
 
 MONGO_PORT = int(os.getenv("MONGO_DEV_PORT", "27018"))
@@ -53,6 +53,11 @@ def api(monkeypatch):
     for attr in ("entries", "submissions", "hrms", "uploads", "reco", "config", "employees"):
         monkeypatch.setattr(hrms_reco.store, attr, db[f"t_{attr}"])
     monkeypatch.setattr(cycle_store, "reviews", db["t_reviews"])
+    monkeypatch.setattr(cycle_store, "payrolls", db["t_payrolls"])
+    db["t_payrolls"].drop()
+    for month in ("2026-10", "2026-11"):                                   # the payrolls an admin has created
+        db["t_payrolls"].insert_one(payrolls.build_payroll(month, 5, "JHS9000"))
+    payrolls.invalidate()
     monkeypatch.setattr(daily, "_now_ist", lambda: NOW)
     db["t_config"].insert_one({"_id": "timesheet", "timesheet_scope": "pilot", "pilot_employees": ["JHS9101", "JHS9102", "JHS1562"],
                                "holidays": ["2026-10-02"]})
@@ -223,13 +228,43 @@ def test_submit_marks_the_day_and_clears_the_draft(api):
     assert api.db["t_drafts"].count_documents({}) == 0 and r.json()["location"] == "Client Site"
 
 
-def test_editing_a_submitted_day_withdraws_the_submission(api):
+def test_a_submitted_day_is_locked_until_an_admin_allows_changes(api):
+    put(api, [row(1, 8)])
+    assert submit(api).status_code == 200 and states(strip(api))[DAY] == "submitted"
+    r = put(api, [row(1, 7.5)])
+    assert r.status_code == 409 and "submitted" in r.json()["detail"]                       # no editing ...
+    assert submit(api).status_code == 409                                                  # ... and no second submit
+    b = get_day(api).json()
+    assert b["read_only"] is True and b["read_only_reason"] == "submitted" and b["submitted"] is True
+    api.db["t_submissions"].update_one({"date": DAY}, {"$set": {"reopened": {"by": "JHS9000", "reason": "wrong hours"}}})
+    assert get_day(api).json()["read_only"] is False and get_day(api).json()["day_reopened"] is True
+    assert put(api, [row(1, 7.5)]).json()["submitted"] is False                            # allowed once; the submission is withdrawn
+    assert submit(api).status_code == 200
+    assert "reopened" not in api.db["t_submissions"].find_one({"date": DAY})
+    assert put(api, [row(1, 6)]).status_code == 409                                         # locked again after the new submit
+
+
+def test_sending_a_cycle_back_opens_its_submitted_days(api):
     put(api, [row(1, 8)])
     submit(api)
-    assert states(strip(api))[DAY] == "submitted"
-    assert put(api, [row(1, 7.5)]).json()["submitted"] is False
-    assert states(strip(api))[DAY] == "saved" and api.db["t_submissions"].count_documents({}) == 0
-    assert submit(api).status_code == 200 and states(strip(api))[DAY] == "submitted"           # resubmit
+    api.db["t_reviews"].insert_one({"kind": "approval", "employee_id": "JHS9101", "cycle_id": "2026-10-C2",
+                                    "status": "sent_back", "note": "check"})
+    assert put(api, [row(1, 7)]).status_code == 200
+
+
+def test_days_outside_an_admin_created_payroll_are_closed(api):
+    b = get_day(api, day="2026-09-10").json()                                              # no payroll for early September yet
+    assert b["read_only_reason"] == "no_cycle" and b["cycle"]["configured"] is False
+    assert put(api, [row(1, 4)], day="2026-09-10").status_code == 409
+    assert get_day(api).json()["cycle"]["configured"] is True
+
+
+def test_the_admins_deadline_is_used(api):
+    api.db["t_payrolls"].update_one({"_id": "2026-10"}, {"$set": {"cycles.$[c].deadline": "2026-10-22"}}, array_filters=[{"c.id": "2026-10-C2"}])
+    payrolls.invalidate()
+    b = get_day(api).json()
+    assert b["cycle"]["deadline"] == "2026-10-22"
+    assert put(api, [row(1, 4)], day=DAY).status_code == 200                                # still open on the 16th
 
 
 def test_day_off_needs_no_rows(api):
