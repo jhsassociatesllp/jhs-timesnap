@@ -233,7 +233,9 @@
           task,
           h("td", { class: "num", text: fmt(e.hours) }),
           h("td", { class: "num", text: e.task_id == null ? "—" : fmt(e.total_on_task) }),
-          h("td", { class: "num", text: e.allotted_hours == null ? "—" : fmt(e.allotted_hours) }),
+          h("td", { class: "num" }, e.allotted_hours == null ? "—" : fmt(e.allotted_hours),
+            e.allotted_days != null ? h("div", { class: "m", text: `${e.allotted_days} working day${e.allotted_days === 1 ? "" : "s"}` }) : null,
+            e.task_start ? h("div", { class: "m", text: `${shortDate(e.task_start)} – ${shortDate(e.task_end)}` }) : null),
           h("td", {}, verdictBadge(e.verdict))));
       });
     });

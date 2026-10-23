@@ -357,6 +357,7 @@ def _review_rows(emp: str, cyc: rules.Cycle, st: dict):
                     "hours": r.get("hours"), "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned")),
                     "remarks": r.get("remarks") or "", "extra_remarks": r.get("extra_remarks") or "",
                     "total_on_task": round(total, 2) if total is not None else None, "allotted_hours": allot,
+                    "allotted_days": rules.working_days(t.start_date, t.end_date, hol, st["week_off"]) if t and t.start_date and t.end_date else None,
                     "task_start": t.start_date if t else None, "task_end": t.end_date if t else None,
                     "verdict": _verdict(r, total or 0.0, allot), "location": r.get("location")})
     return out, nq_down

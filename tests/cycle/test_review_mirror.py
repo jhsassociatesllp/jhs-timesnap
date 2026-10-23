@@ -230,6 +230,8 @@ def test_review_detail_shows_tasks_against_allotted_hours_and_both_remarks(api):
     assert planned["cycle_hours"] == 17.0 and planned["rows"] == 2 and planned["hours_so_far"] == 17.0
     assert planned["allotted_hours"] == 178.5 and planned["pct_used"] == 10 and planned["over_allotted"] is False   # 21 working days x 8.5
     assert planned["task_start"] == "2026-10-01" and body["nq_unavailable"] is False
+    first = next(e for d in body["days"] for e in d["entries"] if e["task_id"] == 1)
+    assert first["allotted_days"] == 21 and first["task_end"] == "2026-10-31"
     unplanned = next(t for t in body["tasks"] if t["task_id"] is None)
     assert unplanned["cycle_hours"] == 1.0 and unplanned["allotted_hours"] is None
     day12 = next(d for d in body["days"] if d["date"] == "2026-10-12")
