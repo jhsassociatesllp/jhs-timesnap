@@ -11,7 +11,7 @@ from backend.timesheet import rules as ts_rules
 #   absent   : no attendance
 DEFAULT_STATUS_CODES: Dict[str, str] = {
     "PST": "working", "HD": "working",
-    "WEO": "weekly_off", "HOL": "holiday",
+    "WEO": "weekly_off", "HOL": "holiday", "PHY": "holiday",
     "CL": "leave", "SL": "leave", "PL": "leave",
     "ABS": "absent",
 }
@@ -31,15 +31,24 @@ def seconds(t: time) -> int:
     return t.hour * 3600 + t.minute * 60 + t.second
 
 
+OVERNIGHT_BEFORE_HOUR = 6          # an out punch before 06:00 that is earlier than the in punch is after midnight
+MAX_GROSS_HOURS = 18.0
+
+
 def gross_hours(t_in: Optional[time], t_out: Optional[time]) -> Optional[float]:
-    """out - in in decimal hours. None if either punch is missing.
-    Raises ValueError if out is before in (never silently negative).
+    """out - in in decimal hours. None if either punch is missing. An out punch shortly after midnight (before 06:00)
+    that is earlier than the in punch is taken as the next morning. Raises ValueError for any other out-before-in and for
+    more than 18 hours between the punches (never silently negative or absurd).
     NOTE: the HRMS 'Total Hours' column is hours.minutes, NOT decimal - never use it."""
     if t_in is None or t_out is None:
         return None
     diff = seconds(t_out) - seconds(t_in)
     if diff < 0:
-        raise ValueError("out time is before in time")
+        if t_out.hour >= OVERNIGHT_BEFORE_HOUR:
+            raise ValueError("out time is before in time")
+        diff += 24 * 3600
+    if diff > MAX_GROSS_HOURS * 3600:
+        raise ValueError("more than 18 hours between in and out - please check the punches")
     return round(diff / 3600.0, 2)
 
 

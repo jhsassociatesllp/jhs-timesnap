@@ -1,12 +1,9 @@
 # backend/hrms/router.py
 """
-HRMS upload (admin only) and the reconciliation views.
+HRMS attendance upload (admin only). The comparison of typed hours with HRMS hours is shown per employee in
+Review team (backend/cycle/router.py), computed on demand from what is stored here.
 
-Roles (checked on EVERY endpoint):
-  admin    = has_admin_module(user, "timesheet"): upload, history, firm-wide reco, review any row
-  manager  = has reportees (Employee_details.ReportingEmpCode == user): reco for own reportees only,
-             accept / send back only for own reportees
-  employee = nothing here (own reco status is shown on the daily timesheet)
+Roles (checked on EVERY endpoint): admin = has_admin_module(user, "timesheet"): upload and history.
 """
 import hashlib
 import os
@@ -170,8 +167,8 @@ def upload_preview(file: UploadFile = File(...), current_user: str = Depends(get
 
 @router.post("/upload/commit")
 def upload_commit(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
-    """Import the file (upsert by employee_id + date, so re-importing is harmless),
-    record it, derive holidays and reconcile (typed hours are never changed)."""
+    """Import the file (upsert by employee_id + date, so re-importing is harmless), record it and derive holidays.
+    Typed hours are never changed; the comparison with HRMS is shown per employee in Review team."""
     me = _require_admin(current_user)
     content, res = _parse(file)
     if not res.rows:
@@ -197,7 +194,7 @@ def upload_commit(file: UploadFile = File(...), current_user: str = Depends(get_
         if holidays:
             store.config.update_one({"_id": reco.CONFIG_ID}, {"$addToSet": {"holidays": {"$each": holidays}}},
                                     upsert=True)
-        outcome = reco.recompute_range(res.date_from, res.date_to)
+        outcome = {}              # hours are compared with HRMS on demand in Review team; nothing is precomputed per row
     except Exception:
         # the log must never claim an import that did not finish (re-running the same file is safe)
         store.uploads.update_one({"_id": upload_id}, {"$set": {"status": "failed"}})
@@ -219,70 +216,3 @@ def list_uploads(current_user: str = Depends(get_current_user)):
     today = _today()
     return {"uploads": uploads, "last_upload": _last_upload(),
             "awaiting_dates": _awaiting_dates(today - timedelta(days=30), today)}
-
-
-@router.get("/reco")
-def reco_view(date_from: str = Query(..., alias="from"), date_to: str = Query(..., alias="to"),
-              manager: Optional[str] = None, current_user: str = Depends(get_current_user)):
-    me = _me(current_user)
-    a, b = _parse_range(date_from, date_to)
-    admin = _is_admin(me)
-    query = {"date": {"$gte": a.isoformat(), "$lte": b.isoformat()}}
-    if admin:
-        if manager:
-            query["employee_id"] = {"$in": _reportee_ids(manager.strip().upper())}
-    else:
-        team = _reportee_ids(me)
-        if not team:
-            raise HTTPException(403, "Only managers and admins can view reconciliation")
-        query["employee_id"] = {"$in": team}
-    rows = list(store.reco.find(query).sort([("date", -1), ("employee_id", 1)]).limit(5000))
-    names = {d["EmpID"].strip().upper(): d.get("Emp Name", "") for d in
-             store.employees.find({"EmpID": {"$in": list({r["employee_id"] for r in rows})}},
-                                  {"EmpID": 1, "Emp Name": 1}) if d.get("EmpID")}
-    summary = {k: 0 for k in ("matched", "short", "over", "no_punch", "not_filled", "leave")}
-    out = []
-    for r in rows:
-        summary[r["result"]] = summary.get(r["result"], 0) + 1
-        out.append({"employee_id": r["employee_id"], "employee_name": names.get(r["employee_id"], ""),
-                    "date": r["date"], "hrms_net": r.get("hrms_net"), "timesheet_hours": r.get("timesheet_hours"),
-                    "diff": r.get("diff"), "result": r["result"], "reason": r.get("reason", ""),
-                    "status": r.get("status", "open"), "manager_note": r.get("manager_note", "")})
-    return {"summary": summary, "rows": out, "last_upload": _last_upload(admin),
-            "awaiting_dates": _awaiting_dates(a, b)}
-
-
-class ReviewIn(BaseModel):
-    note: str = Field("", max_length=500)
-
-
-def _review(employee_id: str, day: str, status: str, note: str, current_user: str) -> dict:
-    me = _me(current_user)
-    emp = employee_id.strip().upper()
-    if not _can_review(me, emp):
-        raise HTTPException(403, "Unauthorized")
-    try:
-        iso = date.fromisoformat(day).isoformat()
-    except ValueError:
-        raise HTTPException(400, "date must be YYYY-MM-DD")
-    row = store.reco.find_one({"employee_id": emp, "date": iso})
-    if not row:
-        raise HTTPException(404, "No reconciliation row for that day")
-    if row["result"] not in FLAGGED_RESULTS:
-        raise HTTPException(422, "Only flagged days (short, over, no punch, not filled) can be reviewed")
-    note = (note or "").strip()
-    if status == "sent_back" and not note:
-        raise HTTPException(422, "Add a comment explaining what to fix")
-    store.reco.update_one({"employee_id": emp, "date": iso}, {"$set": {
-        "status": status, "manager_note": note, "reviewed_by": me, "reviewed_at": datetime.utcnow()}})
-    return {"employee_id": emp, "date": iso, "status": status, "manager_note": note}
-
-
-@router.post("/reco/{employee_id}/{day}/accept")
-def accept(employee_id: str, day: str, body: ReviewIn, current_user: str = Depends(get_current_user)):
-    return _review(employee_id, day, "accepted", body.note, current_user)
-
-
-@router.post("/reco/{employee_id}/{day}/send-back")
-def send_back(employee_id: str, day: str, body: ReviewIn, current_user: str = Depends(get_current_user)):
-    return _review(employee_id, day, "sent_back", body.note, current_user)

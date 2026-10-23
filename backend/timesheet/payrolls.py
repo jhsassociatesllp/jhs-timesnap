@@ -63,8 +63,17 @@ def settings_from(doc: Optional[dict]) -> dict:
             dd = DEFAULT_DEADLINE_DAYS
     except (TypeError, ValueError):
         dd = DEFAULT_DEADLINE_DAYS
+    def _num(key, default, lo, hi):
+        try:
+            v = float(doc.get(key, default))
+            return v if lo <= v <= hi else default
+        except (TypeError, ValueError):
+            return default
+
     return {"standard_hours": std, "week_off": off if 0 < len(off) < 7 else rules.WEEK_OFF_DEFAULT,
-            "deadline_days": dd, "holidays": hol}
+            "deadline_days": dd, "holidays": hol,
+            "lunch_hours": _num("lunch_hours", rules.LUNCH_HOURS, 0.0, 3.0),            # taken off HRMS gross hours
+            "tolerance_hours": _num("tolerance_hours", rules.TOLERANCE_HOURS, 0.0, 4.0)}  # typed vs HRMS counts as matched within this
 
 
 def settings() -> dict:

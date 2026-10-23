@@ -42,6 +42,7 @@ class ParseResult:
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     unknown_codes: Dict[str, int] = field(default_factory=dict)
+    ignored_blank: int = 0                                  # rows with no status and no punches
 
 
 def _norm(h: Any) -> str:
@@ -118,20 +119,28 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
     raw = _read_rows(content, filename)
     if not raw:
         raise HrmsFileError("The file is empty")
-    header = [_norm(h) for h in raw[0]]
+    # The column titles are normally the first row, but some exports put a title line above them
+    # (e.g. "Attendance Type"): use the first of the top rows that holds every required column.
+    header_row = 0
+    for i, row in enumerate(raw[:10]):
+        names = {_norm(h) for h in row}
+        if all(k in names for k in REQUIRED):
+            header_row = i
+            break
+    header = [_norm(h) for h in raw[header_row]]
     wanted = {**REQUIRED, **OPTIONAL}
     idx = {wanted[h]: i for i, h in enumerate(header) if h in wanted}
     missing = [h for h, key in REQUIRED.items() if key not in idx]
     if missing:
         raise HrmsFileError("Missing required column(s): " + ", ".join(m.title() for m in missing))
-    body = raw[1:]
+    body = raw[header_row + 1:]
     if len(body) > MAX_ROWS:
         raise HrmsFileError(f"Too many rows (limit {MAX_ROWS})")
 
     res = ParseResult()
     seen = set()
     dates = []
-    for n, r in enumerate(body, start=2):                     # n = spreadsheet row number
+    for n, r in enumerate(body, start=header_row + 2):        # n = spreadsheet row number
         get = lambda k: (r[idx[k]] if k in idx and idx[k] < len(r) else None)
         if all(c is None or str(c).strip() == "" for c in r):
             continue                                           # blank line
@@ -144,7 +153,6 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
                 raise ValueError("invalid employee code")
             d = parse_date(get("date"))
             t_in, t_out = parse_time(get("in_time")), parse_time(get("out_time"))
-            gross = rules.gross_hours(t_in, t_out)
         except ValueError as e:
             res.errors.append({"row": n, "message": str(e)})
             continue
@@ -152,13 +160,22 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
         if key in seen:
             res.errors.append({"row": n, "message": f"duplicate row for {emp} on {d.isoformat()}"})
             continue
-        seen.add(key)
         code = str(get("muster") or get("final_status") or "").strip().upper()
         if not MUSTER_RE.match(code):
             res.errors.append({"row": n, "message": "invalid Muster code"})
-            seen.discard(key)
+            continue
+        if not code and t_in is None and t_out is None:
+            res.ignored_blank += 1                             # a day with no status and no punches (e.g. before joining)
             continue
         kind = rules.classify(code, status_codes)
+        try:
+            gross = rules.gross_hours(t_in, t_out)
+        except ValueError as e:
+            if kind == "working":                              # a bad punch only matters on a day the person was present
+                res.errors.append({"row": n, "message": str(e)})
+                continue
+            gross = None
+        seen.add(key)
         if kind == "unknown":
             res.unknown_codes[code or "(blank)"] = res.unknown_codes.get(code or "(blank)", 0) + 1
         net = rules.net_from_gross(gross)
@@ -173,6 +190,8 @@ def parse_hrms(content: bytes, filename: str, status_codes: Optional[Dict[str, s
         dates.append(d)
     if dates:
         res.date_from, res.date_to = min(dates).isoformat(), max(dates).isoformat()
+    if res.ignored_blank:
+        res.warnings.append(f"{res.ignored_blank} row(s) with no status and no punches were ignored")
     for code, count in sorted(res.unknown_codes.items()):
         res.warnings.append(f"Unknown Muster code '{code}' on {count} row(s) - imported but not reconciled")
     return res

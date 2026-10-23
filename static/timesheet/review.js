@@ -41,6 +41,7 @@
   const shortDate = (s) => (s ? new Date(s + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
   const longDate = (s) => new Date(s + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const fmt = (v) => (v == null ? "—" : String(Math.round(v * 100) / 100));
+  const signed = (v) => (v == null ? "—" : (v > 0 ? "+" : "") + String(Math.round(v * 100) / 100));
 
   function banner(kind, text) {
     const b = h("div", { class: "banner " + kind }, h("span", { text }), h("button", { type: "button", "aria-label": "Dismiss", onclick: () => b.remove(), text: "×" }));
@@ -103,7 +104,7 @@
     $("cycleInfo").textContent = `Cycle ${c.label} · employees fill by ${shortDate(c.deadline)}${c.past_deadline ? " (closed)" : ""}`;
     const body = $("rows"); body.textContent = "";
     $("confirmWrap").hidden = true; $("confirm").checked = false;
-    if (!S.data.rows.length) body.append(h("tr", {}, h("td", { colspan: "8", class: "empty", text: "No employees on the daily timesheet in this team yet." })));
+    if (!S.data.rows.length) body.append(h("tr", {}, h("td", { colspan: "10", class: "empty", text: "No employees on the daily timesheet in this team yet." })));
     S.data.rows.forEach((r) => {
       const cb = h("input", { type: "checkbox", "data-emp": r.employee_id, "aria-label": "Select " + r.employee_id, disabled: r.status === "approved" });
       body.append(h("tr", {},
@@ -112,6 +113,8 @@
           h("div", { class: "cap", text: r.employee_id })),
         h("td", { class: "num", text: `${r.days_filled} / ${r.days_required}` }),
         h("td", { class: "num hide-s", text: fmt(r.timesheet_hours) }),
+        h("td", { class: "num hide-s", text: r.hrms_hours ? fmt(r.hrms_hours) : "—" }),
+        h("td", { class: "num hide-s" + (r.hrms_hours && Math.abs(r.diff_hours) > 0.5 ? " bad" : ""), text: r.hrms_hours ? signed(r.diff_hours) : "—" }),
         h("td", { class: "num hide-s", text: String(r.unplanned) }),
         h("td", {}, statusBadge(r), r.mirror === "error" ? h("div", { class: "warn-text", text: "Copy to classic reports failed" }) : null),
         h("td", { class: "hide-s" }, r.warnings.length ? h("span", { class: "warn-text", text: r.warnings.join("; ") }) : "—"),
@@ -202,6 +205,16 @@
     body.append(h("p", { class: "m-rule" }, h("i", { class: "fas fa-circle-info" }),
       ` Allotted hours = the working days between a task's start and end date in Nexus Quant × ${fmt(d.rules.standard_hours)} hours a day, leaving out ${off} and holidays.`));
 
+    body.append(h("p", { class: "m-rule" }, h("i", { class: "fas fa-circle-info" }),
+      ` HRMS hours = out punch minus in punch minus ${fmt(d.rules.lunch_hours)} h lunch. Typed hours match when they are within ${fmt(d.rules.tolerance_hours)} h of the HRMS hours.`));
+
+    // 1. typed hours against HRMS, per date
+    body.append(h("h3", { class: "rv-h", text: "Typed hours against HRMS hours" }));
+    body.append(hrmsTable(d));
+
+    // 2. what was done, per date and task
+    body.append(h("h3", { class: "rv-h", text: "Tasks, per date" }));
+
     // summary of the cycle's tasks
     const s = d.summary;
     body.append(h("div", { class: "m-sum" },
@@ -215,21 +228,22 @@
       const entries = day.entries;
       const dayOff = day.location && ["Leave", "Week Off", "PHY"].includes(day.location);
       if (!entries.length) {
-        if (day.state === "missing") tbody.append(h("tr", { class: "r-missing" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "5", text: "Not submitted" })));
-        else if (dayOff) tbody.append(h("tr", { class: "r-off" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "5", text: `Day off: ${day.location}` })));
-        else if (day.holiday != null) tbody.append(h("tr", { class: "r-off" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "5", text: "Holiday" + (day.holiday ? `: ${day.holiday}` : "") })));
+        if (day.state === "missing") tbody.append(h("tr", { class: "r-missing" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "7", text: "Not submitted" })));
+        else if (dayOff) tbody.append(h("tr", { class: "r-off" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "7", text: `Day off: ${day.location}` })));
+        else if (day.holiday != null) tbody.append(h("tr", { class: "r-off" }, h("td", { class: "dc", text: longDate(day.date) }), h("td", { colspan: "7", text: "Holiday" + (day.holiday ? `: ${day.holiday}` : "") })));
         return;
       }
       entries.forEach((e, i) => {
         const task = h("td", {},
           h("div", { class: "tn", text: e.is_unplanned || e.task_id == null ? "Unplanned work" : e.task_name }),
-          h("div", { class: "m", text: [e.client, e.project, e.project_code].filter(Boolean).join(" › ") }),
           e.task_status ? h("span", { class: "sc " + e.task_status, text: STATUS_LABEL[e.task_status] || e.task_status }) : null,
           e.remarks ? h("div", { class: "w", text: "What I did: " + e.remarks }) : null,
           e.extra_remarks ? h("div", { class: "w", text: "Remarks: " + e.extra_remarks }) : null);
         const first = i === 0;
         tbody.append(h("tr", { class: e.verdict === "completed_over" || e.verdict === "in_progress_over" ? "r-over" : "" },
           first ? h("td", { class: "dc", rowspan: String(entries.length) }, longDate(day.date), h("div", { class: "m", text: `${day.location || ""}${day.state === "saved" ? " · not submitted" : ""}` }), h("div", { class: "m", text: `${fmt(day.hours)} h` })) : null,
+          h("td", { class: "cl", text: e.client || "—" }),
+          h("td", { class: "pj" }, e.project || "—", e.project_code ? h("div", { class: "m", text: e.project_code }) : null),
           task,
           h("td", { class: "num", text: fmt(e.hours) }),
           h("td", { class: "num", text: e.task_id == null ? "—" : fmt(e.total_on_task) }),
@@ -240,7 +254,7 @@
       });
     });
     body.append(h("div", { class: "table-responsive" }, h("table", { class: "tbl mt" },
-      h("thead", {}, h("tr", {}, h("th", { text: "Date" }), h("th", { text: "Task and what was done" }), h("th", { class: "num", text: "Hours that day" }),
+      h("thead", {}, h("tr", {}, h("th", { text: "Date" }), h("th", { text: "Client" }), h("th", { text: "Project" }), h("th", { text: "Task and what was done" }), h("th", { class: "num", text: "Hours that day" }),
         h("th", { class: "num", text: "Total on task" }), h("th", { class: "num", text: "Allotted" }), h("th", { text: "Result" }))),
       tbody)));
 
@@ -276,6 +290,41 @@
     }
     body.append(decision);
     if (d.history.length) body.append(h("ul", { class: "hist" }, d.history.map((x) => h("li", { text: `${x.action.replace("_", " ")} by ${x.by}${x.note ? ": " + x.note : ""}` }))));
+  }
+
+  const HR_RESULT = {
+    matched: ["Matched", "ok"], short: ["Typed less than HRMS", "warn"], over: ["Typed more than HRMS", "bad"],
+    no_punch: ["Hours typed, no punch", "warn"], not_filled: ["Punched, nothing typed", "bad"], leave: ["Off / leave", "none"],
+  };
+  const KIND_LABEL = { working: "Present", absent: "Absent", weekly_off: "Week off", holiday: "Holiday", leave: "Leave", unknown: "Other" };
+
+  function hrmsTable(d) {
+    const s = d.hrms_summary, wrap = h("div", {});
+    if (!s.has_data) {
+      wrap.append(h("div", { class: "banner warn" }, h("span", { text: "No HRMS attendance has been uploaded for this cycle yet, so the hours cannot be compared. An admin can upload it from HRMS upload." })));
+      return wrap;
+    }
+    wrap.append(h("div", { class: "m-sum" },
+      ...["matched", "short", "over", "no_punch", "not_filled", "leave"].map((k) => h("span", { class: "chipv " + HR_RESULT[k][1] }, h("b", { text: String(s[k]) }), " ", HR_RESULT[k][0])),
+      h("span", { class: "chipv none" }, `HRMS ${fmt(s.hrms_hours)} h · typed ${fmt(s.typed_hours)} h · difference ${signed(s.diff_hours)} h`)));
+    const tbody = h("tbody", {});
+    d.days.forEach((day) => {
+      const c = day.hrms;
+      if (!c.has_data && !day.hours) return;                          // nothing from HRMS and nothing typed
+      const res = c.result ? HR_RESULT[c.result] : null;
+      tbody.append(h("tr", { class: c.result === "over" || c.result === "not_filled" ? "r-over" : "" },
+        h("td", { class: "dc", text: longDate(day.date) }),
+        h("td", { text: c.has_data ? (KIND_LABEL[c.kind] || c.kind) + (c.status_code ? ` (${c.status_code})` : "") : "No HRMS data" }),
+        h("td", { text: c.in_time && c.out_time ? `${c.in_time} – ${c.out_time}` : "—" }),
+        h("td", { class: "num", text: c.net_hours == null ? "—" : fmt(c.net_hours) }),
+        h("td", { class: "num", text: fmt(day.hours) }),
+        h("td", { class: "num" + (c.diff != null && Math.abs(c.diff) > d.rules.tolerance_hours ? " bad" : ""), text: c.diff == null ? "—" : signed(c.diff) }),
+        h("td", {}, res ? h("span", { class: "vb " + res[1], text: res[0] }) : h("span", { class: "m", text: c.has_data ? "Nothing expected" : "—" }))));
+    });
+    wrap.append(h("div", { class: "table-responsive" }, h("table", { class: "tbl mt" },
+      h("thead", {}, h("tr", {}, h("th", { text: "Date" }), h("th", { text: "HRMS status" }), h("th", { text: "In – Out" }), h("th", { class: "num", text: "HRMS hours" }),
+        h("th", { class: "num", text: "Typed hours" }), h("th", { class: "num", text: "Difference" }), h("th", { text: "Result" }))), tbody)));
+    return wrap;
   }
 
   function sumChip(kind, n) { const [t, k] = VERDICT[kind]; return h("span", { class: "chipv " + k }, h("b", { text: String(n) }), " ", t); }

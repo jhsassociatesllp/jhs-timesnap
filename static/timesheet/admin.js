@@ -162,6 +162,7 @@
   function renderRules() {
     const st = S.data.settings;
     $("stdHours").value = st.standard_hours; $("deadlineDays").value = st.deadline_days;
+    $("lunchHours").value = st.lunch_hours; $("tolHours").value = st.tolerance_hours;
     S.off = [...st.week_off_days]; S.hol = st.holidays.map((x) => ({ ...x }));
     const box = $("weekOff"); box.textContent = "";
     DAYS.forEach((d, i) => {
@@ -187,11 +188,12 @@
     S.hol.push({ date: d, name: $("holName").value.trim() }); $("holDate").value = ""; $("holName").value = "";
     renderHolidays(); dirty("rulesNote");
   });
-  ["stdHours", "deadlineDays"].forEach((id) => $(id).addEventListener("input", () => dirty("rulesNote")));
+  ["stdHours", "deadlineDays", "lunchHours", "tolHours"].forEach((id) => $(id).addEventListener("input", () => dirty("rulesNote")));
   $("saveRules").addEventListener("click", async () => {
     const n = $("rulesNote");
     try {
-      await api("PUT", `${B}/settings`, { standard_hours: Number($("stdHours").value), week_off_days: S.off, deadline_days: Number($("deadlineDays").value), holidays: S.hol });
+      await api("PUT", `${B}/settings`, { standard_hours: Number($("stdHours").value), week_off_days: S.off, deadline_days: Number($("deadlineDays").value),
+        lunch_hours: Number($("lunchHours").value), tolerance_hours: Number($("tolHours").value), holidays: S.hol });
       n.textContent = "Saved"; n.className = "save-note ok"; await load(false);
     } catch (err) { n.textContent = err.message; n.className = "save-note err"; }
   });

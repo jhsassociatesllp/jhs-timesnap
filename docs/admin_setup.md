@@ -24,3 +24,17 @@ After "Submit day" the day is read-only. It opens again only when an admin allow
   for a confirmation because it locks the days not yet filled).
 
 Removed for now (to be rebuilt step by step): Team dashboard, Reconciliation, Late projects.
+
+
+## HRMS attendance and the typed-hours comparison
+- **Upload** (menu: HRMS upload, admins): the HRMS "Attendance" export (.xlsx or .csv) with one row per employee per day. The column titles may
+  sit below a title line. Read: Employee Code, Date, Muster, In Time, Out Time. One document per employee per date is stored in
+  `hrms_attendance` (status, in, out, gross hours = out - in; the "Total Hours" column is hours.minutes and is never used). Re-uploading is safe.
+  An out punch after midnight (before 06:00) counts as the next morning; a present day with out before in, or more than 18 hours, is
+  reported as a row error and skipped. Rows with no status and no punches are ignored. Muster PST = present, ABS = absent, WEO = weekly off,
+  PHY / HOL = holiday, CL / SL / PL = leave. Dates where almost everyone is on holiday are added to the holiday list automatically.
+- **Review team**, per employee: the team table shows Typed hrs, HRMS hrs and Difference; the modal shows, per date, the HRMS status, in and
+  out times, HRMS hours (gross minus lunch), typed hours, the difference and a result (matched, typed less, typed more, hours typed with no
+  punch, punched with nothing typed, off/leave). Lunch (0.5 h) and the matching tolerance (0.5 h) are set in Admin setup, Working rules.
+- The task table in the modal has **Client** and **Project** columns right after the date.
+- Nothing is precomputed: the comparison is calculated when a team lead opens the screen.

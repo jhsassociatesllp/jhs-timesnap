@@ -57,3 +57,7 @@ body.modal-open{overflow:hidden}
 .m-decision{margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border-color)}
 .m-msg{min-height:1.2rem;margin-top:.5rem;font-size:.9rem;color:#b91c1c;font-weight:500}
 @media (max-width:820px){ .tbl .hide-s{display:none} .modal{padding:0} .modal-box{border-radius:0;min-height:100vh} .modal-head{border-radius:0} }
+
+.tbl .bad,.tbl td.bad{color:#b91c1c;font-weight:600}
+.tbl.mt td.cl{font-weight:600;min-width:130px}
+.tbl.mt td.pj{min-width:150px}

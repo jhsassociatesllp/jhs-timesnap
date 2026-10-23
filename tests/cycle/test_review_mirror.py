@@ -277,7 +277,7 @@ def test_review_table_verdicts_per_date_and_task(api):
     assert by_task[None][0]["verdict"] == "unplanned"
     s = body["summary"]
     assert (s["completed_within"], s["completed_over"], s["in_progress_within"], s["unplanned"]) == (1, 1, 1, 1)
-    assert body["rules"] == {"standard_hours": 8.5, "week_off_days": [5, 6]}
+    assert body["rules"] == {"standard_hours": 8.5, "week_off_days": [5, 6], "lunch_hours": 0.5, "tolerance_hours": 0.5}
 
 
 def test_allotted_hours_follow_the_admins_week_off_days_and_hours_per_day(api):
@@ -286,3 +286,38 @@ def test_allotted_hours_follow_the_admins_week_off_days_and_hours_per_day(api):
     assert task()["allotted_hours"] == 178.5                                     # Oct 1-31: 21 working days (Sat/Sun off, 2 Oct holiday) x 8.5
     api.db["c_config"].update_one({"_id": "timesheet"}, {"$set": {"week_off_days": [6], "standard_hours": 8}})
     assert task()["allotted_hours"] == 26 * 8.0                                  # only Sunday off: 27 days minus the holiday = 26 x 8
+
+
+def test_review_shows_hrms_hours_against_typed_hours_per_date(api):
+    seed(api.db)                                                           # typed: 12th 8.5, 13th 9.5 (8.5 + 1 unplanned), 14th day off
+    hr = lambda day, **kw: api.db["c_hrms"].insert_one({"employee_id": "JHS9101", "date": day, "kind": "working", "status_code": "PST", **kw})
+    hr("2026-10-12", gross_hours=9.0, in_time="09:30", out_time="18:30")        # net 8.5 -> typed 8.5 matched
+    hr("2026-10-13", gross_hours=8.0, in_time="10:00", out_time="18:00")        # net 7.5 -> typed 9.5 over by 2
+    hr("2026-10-15", gross_hours=9.0, in_time="09:30", out_time="18:30")        # punch but nothing typed -> not filled
+    hr("2026-10-16", gross_hours=None)                                           # present, no punch, nothing typed -> nothing expected
+    api.db["c_hrms"].insert_one({"employee_id": "JHS9101", "date": "2026-10-14", "kind": "leave", "status_code": "CL", "leave_flag": True})
+    api.db["c_entries"].insert_one(entry("JHS9101", "2026-10-17", 3))            # typed on a Saturday, no HRMS row at all
+    body = api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()
+    by = {d["date"]: d["hrms"] for d in body["days"]}
+    assert by["2026-10-12"]["result"] == "matched" and by["2026-10-12"]["diff"] == 0.0 and by["2026-10-12"]["net_hours"] == 8.5
+    assert by["2026-10-13"]["result"] == "over" and by["2026-10-13"]["diff"] == 2.0 and by["2026-10-13"]["typed_hours"] == 9.5
+    assert by["2026-10-14"]["result"] == "leave" and by["2026-10-15"]["result"] == "not_filled"
+    assert by["2026-10-16"]["result"] is None and by["2026-10-17"] == {"has_data": False}
+    assert (by["2026-10-12"]["in_time"], by["2026-10-12"]["out_time"]) == ("09:30", "18:30")
+    s = body["hrms_summary"]
+    assert (s["matched"], s["over"], s["not_filled"], s["leave"]) == (1, 1, 1, 1) and s["has_data"] is True
+    assert (s["hrms_hours"], s["typed_hours"], s["diff_hours"]) == (24.5, 18.0, -6.5)             # 8.5 + 7.5 + 8.5 net; typed 8.5 + 9.5 + 0
+    team = next(r for r in api.get(f"/timesheet/v2/cycles/{CYCLE}/team").json()["rows"] if r["employee_id"] == "JHS9101")
+    assert team["hrms_hours"] == 24.5 and team["diff_hours"] == -6.5 and team["reco_gaps"] == 2
+    assert any("differ from HRMS" in w for w in team["warnings"])
+
+
+def test_lunch_and_tolerance_come_from_the_admin_settings(api):
+    seed(api.db)
+    api.db["c_hrms"].insert_one({"employee_id": "JHS9101", "date": "2026-10-12", "kind": "working", "gross_hours": 9.0})
+    day = lambda: next(d for d in api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()["days"] if d["date"] == "2026-10-12")["hrms"]
+    assert day()["net_hours"] == 8.5 and day()["result"] == "matched"
+    api.db["c_config"].update_one({"_id": "timesheet"}, {"$set": {"lunch_hours": 1.5, "tolerance_hours": 0.25}})
+    assert day()["net_hours"] == 7.5 and day()["result"] == "over"                  # typed 8.5 vs net 7.5, outside 0.25
+    api.db["c_config"].update_one({"_id": "timesheet"}, {"$set": {"tolerance_hours": 1.0}})
+    assert day()["result"] == "matched"

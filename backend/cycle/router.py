@@ -23,6 +23,7 @@ from backend.access_manager.router import has_admin_module
 from backend.auth import get_current_user
 from backend.cycle import digest, mirror
 from backend.cycle.store import config_doc, holidays_set, pilot_set, store
+from backend.hrms import rules as hrms_rules
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
 from backend.timesheet import payrolls, project_health, rules
@@ -90,11 +91,41 @@ def _authorise_all(me: str, ids: List[str], admin: bool) -> None:
 
 # ─────────────────────────── team table ──────────────────────────────────────
 
-def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: set,
-                  week_off=rules.WEEK_OFF_DEFAULT) -> dict:
+GAP_RESULTS = ("short", "over", "no_punch", "not_filled")
+
+
+def _compare_day(h: Optional[dict], typed: float, n_rows: int, st: dict) -> dict:
+    """Typed hours of one day against the HRMS row of that day (gross hours stored at upload; net = gross - lunch)."""
+    if not h:
+        return {"has_data": False}
+    kind = h.get("kind") or hrms_rules.classify(h.get("status_code"))
+    gross = h.get("gross_hours")
+    net = hrms_rules.net_from_gross(gross, st["lunch_hours"])
+    result = hrms_rules.reco_result(kind, n_rows, typed, net, st["tolerance_hours"])
+    return {"has_data": True, "status_code": h.get("status_code"), "kind": kind, "in_time": h.get("in_time"),
+            "out_time": h.get("out_time"), "gross_hours": gross, "net_hours": net, "typed_hours": round(typed, 2),
+            "diff": round(typed - net, 2) if (kind == "working" and net is not None) else None, "result": result}
+
+
+def _hrms_and_typed(emp: str, cyc: rules.Cycle, st: dict):
+    """({date: hrms row}, {date: (typed hours, rows with hours)}) for the cycle: two small queries."""
     start, end = cyc.start.isoformat(), cyc.end.isoformat()
-    off_days = {h["date"] for h in store.hrms.find(
-        {"employee_id": emp, "date": {"$gte": start, "$lte": end}, "leave_flag": True}, {"date": 1})}
+    hrms = {h["date"]: h for h in store.hrms.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}},
+                                                  {"date": 1, "kind": 1, "status_code": 1, "in_time": 1, "out_time": 1,
+                                                   "gross_hours": 1, "leave_flag": 1})}
+    typed: dict = {}
+    for r in store.entries.find({"employee_id": emp, "cycle_id": cyc.id, "hours": {"$ne": None}}, {"date": 1, "hours": 1}):
+        t = typed.setdefault(r["date"], [0.0, 0])
+        t[0] += r["hours"]; t[1] += 1
+    return hrms, {d: (v[0], v[1]) for d, v in typed.items()}
+
+
+def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: set,
+                  week_off=rules.WEEK_OFF_DEFAULT, st: Optional[dict] = None) -> dict:
+    st = st or payrolls.settings()
+    start, end = cyc.start.isoformat(), cyc.end.isoformat()
+    hrms_by_day, typed_by_day = _hrms_and_typed(emp, cyc, st)
+    off_days = {d for d, h in hrms_by_day.items() if h.get("leave_flag")}
     required, d = [], cyc.start
     while d <= min(cyc.end, today):
         iso = d.isoformat()
@@ -105,11 +136,16 @@ def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: 
         {"employee_id": emp, "date": {"$gte": start, "$lte": end}}, {"date": 1})}
     missing = [x for x in required if x not in submitted]
     entries = list(store.entries.find({"employee_id": emp, "cycle_id": cyc.id}, {"hours": 1, "is_unplanned": 1}))
-    hrms_hours = round(sum(h.get("net_hours") or 0 for h in store.hrms.find(
-        {"employee_id": emp, "date": {"$gte": start, "$lte": end}}, {"net_hours": 1})), 2)
-    reco_open = store.reco.count_documents({
-        "employee_id": emp, "date": {"$gte": start, "$lte": end},
-        "result": {"$in": ["short", "over", "no_punch", "not_filled"]}, "status": "open"})
+    hrms_hours, diff_hours, reco_open = 0.0, 0.0, 0
+    for day, h in hrms_by_day.items():
+        typed, n = typed_by_day.get(day, (0.0, 0))
+        c = _compare_day(h, typed, n, st)
+        if c["kind"] == "working" and c["net_hours"] is not None:
+            hrms_hours += c["net_hours"]
+            diff_hours += typed - c["net_hours"]
+        if c["result"] in GAP_RESULTS:
+            reco_open += 1
+    hrms_hours, diff_hours = round(hrms_hours, 2), round(diff_hours, 2)
     review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
     resubmitted = False
     if review.get("status") == "sent_back" and review.get("sent_back_at"):
@@ -119,11 +155,11 @@ def _employee_row(emp: str, name: str, cyc: rules.Cycle, today: date, holidays: 
     if missing:
         warnings.append(f"{len(missing)} day(s) not submitted")
     if reco_open:
-        warnings.append(f"{reco_open} open hours gap(s)")
+        warnings.append(f"{reco_open} day(s) where typed hours differ from HRMS")
     return {
         "employee_id": emp, "employee_name": name, "days_required": len(required),
         "days_filled": len(required) - len(missing), "missing_dates": missing[:31],
-        "hrms_hours": hrms_hours,
+        "hrms_hours": hrms_hours, "diff_hours": diff_hours,
         "timesheet_hours": round(sum(e["hours"] for e in entries if e.get("hours") is not None), 2),
         "unplanned": sum(1 for e in entries if e.get("is_unplanned")), "reco_gaps": reco_open,
         "status": review.get("status", "pending"), "approved_by": review.get("approved_by"),
@@ -173,7 +209,7 @@ def team(cycle_id: str, manager: Optional[str] = None, current_user: str = Depen
     today, hol, st = _today(), holidays_set(), payrolls.settings()
     return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end,
                       "deadline": cyc.deadline, "past_deadline": today > cyc.deadline},
-            "rows": [_employee_row(i, names.get(i, ""), cyc, today, hol, st["week_off"]) for i in ids],
+            "rows": [_employee_row(i, names.get(i, ""), cyc, today, hol, st["week_off"], st) for i in ids],
             "is_admin": admin}
 
 
@@ -202,7 +238,7 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
         if not (store.entries.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})
                 or store.submissions.find_one({"employee_id": i, "cycle_id": cyc.id}, {"_id": 1})):
             raise HTTPException(422, f"{i} has no entries or submitted days in this cycle")
-        rows[i] = _employee_row(i, "", cyc, today, hol, st["week_off"])
+        rows[i] = _employee_row(i, "", cyc, today, hol, st["week_off"], st)
         if today <= cyc.end:                       # approving early locks the days the employee has not filled yet
             rows[i]["warnings"].append(f"the cycle has not ended (it ends on {cyc.end.isoformat()}): the employee cannot fill any more days after approval")
     flagged = {i: r["warnings"] for i, r in rows.items() if r["warnings"]}
@@ -404,6 +440,7 @@ def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends
     subs = {x["date"]: x for x in store.submissions.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
     drafts = {x["date"]: x for x in store.drafts.find({"employee_id": emp, "date": {"$gte": start, "$lte": end}})}
     rows, nq_down = _review_rows(emp, cyc, st)
+    hrms_by_day, typed_by_day = _hrms_and_typed(emp, cyc, st)
     by_day: dict = {}
     for r in rows:
         by_day.setdefault(r["date"], []).append(r)
@@ -420,15 +457,28 @@ def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends
             "holiday": st["holidays"].get(d) if d in st["holidays"] else None,
             "state": "submitted" if sub else ("saved" if day_rows or iso in drafts else ("missing" if working and d <= today else "none")),
             "hours": round(sum(r["hours"] for r in day_rows if r["hours"] is not None), 2),
+            "hrms": _compare_day(hrms_by_day.get(iso), *typed_by_day.get(iso, (0.0, 0)), st),
             "entries": day_rows})
         d += timedelta(days=1)
     tasks, summary = _task_rollup(rows)
+    hrms_summary = {k: 0 for k in ("matched", "short", "over", "no_punch", "not_filled", "leave")}
+    hrms_net = typed_on_hrms_days = 0.0
+    for day in days:
+        c = day["hrms"]
+        if c.get("result") in hrms_summary:
+            hrms_summary[c["result"]] += 1
+        if c.get("kind") == "working" and c.get("net_hours") is not None:
+            hrms_net += c["net_hours"]; typed_on_hrms_days += c["typed_hours"]
+    hrms_summary.update({"has_data": bool(hrms_by_day), "hrms_hours": round(hrms_net, 2),
+                         "typed_hours": round(typed_on_hrms_days, 2), "diff_hours": round(typed_on_hrms_days - hrms_net, 2)})
     name = (store.employees.find_one({"EmpID": emp}, {"Emp Name": 1}) or {}).get("Emp Name", "")
     review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
-    row = _employee_row(emp, name, cyc, today, hol, st["week_off"])
+    row = _employee_row(emp, name, cyc, today, hol, st["week_off"], st)
     return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline},
-            "employee": row, "days": days, "tasks": tasks, "summary": summary, "nq_unavailable": nq_down,
-            "rules": {"standard_hours": st["standard_hours"], "week_off_days": list(st["week_off"])},
+            "employee": row, "days": days, "tasks": tasks, "summary": summary, "hrms_summary": hrms_summary,
+            "nq_unavailable": nq_down,
+            "rules": {"standard_hours": st["standard_hours"], "week_off_days": list(st["week_off"]),
+                      "lunch_hours": st["lunch_hours"], "tolerance_hours": st["tolerance_hours"]},
             "history": [{"action": h.get("action"), "by": h.get("by"), "at": h.get("at"),
                          "note": h.get("note") or h.get("reason")} for h in review.get("history", [])][-20:]}
 

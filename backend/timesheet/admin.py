@@ -62,6 +62,7 @@ def _codes(raw: List[str]) -> List[str]:
 
 def _settings_out(s: dict, doc: dict) -> dict:
     return {"standard_hours": s["standard_hours"], "week_off_days": list(s["week_off"]), "deadline_days": s["deadline_days"],
+            "lunch_hours": s["lunch_hours"], "tolerance_hours": s["tolerance_hours"],
             "holidays": [{"date": d.isoformat(), "name": n} for d, n in sorted(s["holidays"].items())]}
 
 
@@ -152,6 +153,8 @@ class SettingsIn(BaseModel):
     standard_hours: float = Field(..., gt=0, le=24)
     week_off_days: List[int]
     deadline_days: int = Field(..., ge=0, le=60)
+    lunch_hours: float = Field(0.5, ge=0, le=3)
+    tolerance_hours: float = Field(0.5, ge=0, le=4)
     holidays: List[HolidayIn] = []
 
 
@@ -170,6 +173,7 @@ def save_settings(body: SettingsIn, current_user: str = Depends(get_current_user
         names[iso] = h.name.strip()
     store.config.update_one({"_id": CONFIG_ID}, {"$set": {
         "standard_hours": round(body.standard_hours, 2), "week_off_days": off, "deadline_days": body.deadline_days,
+        "lunch_hours": round(body.lunch_hours, 2), "tolerance_hours": round(body.tolerance_hours, 2),
         "holidays": sorted(days), "holiday_names": names}}, upsert=True)
     _log(me, "working rules changed", {"standard_hours": body.standard_hours, "week_off_days": off,
                                        "deadline_days": body.deadline_days, "holidays": len(days)})

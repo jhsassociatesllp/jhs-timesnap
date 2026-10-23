@@ -33,7 +33,6 @@ from backend.database import (
     employee_details_collection,
     timesheet_entries_collection,
 )
-from backend.hrms import reco as hrms_reco
 from backend.nq import cache as nq_cache
 from backend.nq import repository as nq_repo
 from backend.nq.models import NQUnavailable
@@ -422,7 +421,6 @@ def save_day(employee_id: str, date: str, body: DayIn, current_user: str = Depen
     store.drafts.update_one({"employee_id": emp, "date": iso},
                             {"$set": {"employee_id": emp, "date": iso, "location": body.location.strip(),
                                       "cycle_id": rules.cycle_for(d).id, "saved_at": datetime.utcnow()}}, upsert=True)
-    hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)
 
 
@@ -449,5 +447,4 @@ def submit_day(employee_id: str, date: str, current_user: str = Depends(get_curr
         {"$set": {"employee_id": emp, "date": iso, "submitted_at": datetime.utcnow(), "location": location,
                   "cycle_id": rules.cycle_for(d).id}, "$unset": {"reopened": ""}}, upsert=True)
     store.drafts.delete_one({"employee_id": emp, "date": iso})
-    hrms_reco.safe_recompute_day(emp, iso)
     return _day_payload(emp, d, cfg)

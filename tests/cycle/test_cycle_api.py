@@ -45,9 +45,12 @@ def seed_cycle(db):
     db["c_entries"].insert_many([entry("JHS9102", "2026-10-12", 5, is_unplanned=True, task_id=None),
                                  entry("JHS9102", "2026-10-13", 3)])
     for day in ("2026-10-12", "2026-10-13", "2026-10-14"):
-        db["c_hrms"].insert_one({"employee_id": "JHS9101", "date": day, "net_hours": 8.5, "leave_flag": False})
-    db["c_hrms"].insert_one({"employee_id": "JHS9102", "date": "2026-10-12", "net_hours": 7.0, "leave_flag": False})
-    db["c_hrms"].insert_one({"employee_id": "JHS9103", "date": "2026-10-13", "net_hours": None, "leave_flag": True})
+        db["c_hrms"].insert_one({"employee_id": "JHS9101", "date": day, "gross_hours": 9.0, "net_hours": 8.5, "kind": "working",
+                                 "status_code": "PST", "leave_flag": False})
+    db["c_hrms"].insert_one({"employee_id": "JHS9102", "date": "2026-10-12", "gross_hours": 7.5, "net_hours": 7.0, "kind": "working",
+                             "status_code": "PST", "leave_flag": False})
+    db["c_hrms"].insert_one({"employee_id": "JHS9103", "date": "2026-10-13", "gross_hours": None, "net_hours": None, "kind": "leave",
+                             "status_code": "CL", "leave_flag": True})
     db["c_reco"].insert_one({"employee_id": "JHS9102", "date": "2026-10-12", "result": "short",
                              "status": "open", "diff": -2.0})
     db["c_entries"].insert_one(entry("JHS9103", "2026-10-12", 8))
