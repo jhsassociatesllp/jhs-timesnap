@@ -331,5 +331,11 @@
 
   $("go").addEventListener("click", () => { $("banners").textContent = ""; load(); });
   $("cycleSel").addEventListener("change", () => { $("banners").textContent = ""; load(); });
-  (async () => { if (await fillCycles()) await load(); })();
+  (async () => {
+    if (!(await fillCycles())) return;
+    const q = new URLSearchParams(location.search), want = q.get("cycle"), who = (q.get("emp") || "").toUpperCase();
+    if (want && [...$("cycleSel").options].some((o) => o.value === want)) $("cycleSel").value = want;
+    await load();
+    if (who && S.data && S.data.rows.some((r) => r.employee_id === who)) openModal(who, null);      // link from the Team dashboard
+  })();
 })();

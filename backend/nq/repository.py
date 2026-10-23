@@ -218,6 +218,23 @@ def get_tasks_for_project(project_code: str) -> List[NQTask]:
     return _cached(("tasks_for_project", project_code), load)
 
 
+def get_tasks_for_projects(project_codes) -> dict:
+    """{project code: [live tasks]} for many projects in ONE query (the team dashboard)."""
+    codes = sorted({str(c).strip() for c in project_codes if str(c or "").strip()})
+    if not codes:
+        return {}
+
+    def load():
+        rows = _run(f"SELECT {_TASK_COLS} {_TASK_FROM} WHERE t.is_deleted = '0' AND p.project_id IN ({_in_clause(len(codes))}) "
+                    "ORDER BY p.project_id, t.id", tuple(codes))
+        out: dict = {c: [] for c in codes}
+        for r in rows:
+            t = task_from_row(r, date.today())
+            out.setdefault(t.project_code, []).append(t)
+        return out
+    return _cached(("tasks_for_projects", tuple(codes), date.today().isoformat()), load)
+
+
 def get_task(task_id: int) -> Optional[NQTask]:
     def load():
         rows = _run(

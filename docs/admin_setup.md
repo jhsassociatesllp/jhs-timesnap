@@ -38,3 +38,13 @@ Removed for now (to be rebuilt step by step): Team dashboard, Reconciliation, La
   punch, punched with nothing typed, off/leave). Lunch (0.5 h) and the matching tolerance (0.5 h) are set in Admin setup, Working rules.
 - The task table in the modal has **Client** and **Project** columns right after the date.
 - Nothing is precomputed: the comparison is calculated when a team lead opens the screen.
+
+
+## Team dashboard (team leads, partners, admins; menu: Team dashboard)
+Filters: Payroll (admin-created), Period (whole payroll or one 10-day cycle), Client, Project, and for admins and partners a Team picker.
+Sections: tiles (hours, typed vs HRMS, days filled, tasks done, overdue, unplanned), Needs attention, Hours per day, Projects (Late / Watch / On track),
+People (with a Review link that opens that employee in Review team), Clients. "Download this view" gives the same view as Excel.
+- A team lead sees their own reportees; admins and partners see everyone or one manager's team.
+- Hours come from the new timesheet only. Allotted hours = NQ task working days x hours per day (admin working rules) per assigned person.
+- Late: an overdue unfinished task, or hours so far over the allotted hours. Watch: 80% or more of the allotted hours used with fewer than 80% of tasks
+  done, or no hours for 14 days while tasks are open. Calculated when the page opens; needs the NQ connection for project status.
