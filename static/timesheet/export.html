@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Data export — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
+    <link rel="stylesheet" href="/static/timesheet/my-day.css" />
+    <link rel="stylesheet" href="/static/timesheet/daily.css" />
+    <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
+    <link rel="stylesheet" href="/static/timesheet/dash-theme.css" />
+    <link rel="stylesheet" href="/static/timesheet/export.css" />
+  </head>
+  <body>
+    <div id="appNav" data-active="export"></div>
+
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-file-export"></i> Data export</h1></div>
+
+      <div class="md-body">
+        <div id="msg" class="dt-banner"></div>
+
+        <section class="day-head filters">
+          <div class="form-group"><label for="from">From</label><input type="date" id="from" /></div>
+          <div class="form-group"><label for="to">To</label><input type="date" id="to" /></div>
+          <div class="form-group"><label for="emp">Employees (optional)</label>
+            <input type="text" id="emp" placeholder="e.g. JHS1223, JHS1120" maxlength="1200" /></div>
+          <div class="form-group"><label for="fmt">Format</label>
+            <select id="fmt"><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV (.csv)</option></select></div>
+          <div class="presets" id="presets" aria-label="Quick date ranges"></div>
+        </section>
+
+        <p class="sub" id="limits"></p>
+        <div class="datasets" id="datasets"></div>
+
+        <div class="dt-card">
+          <h3><i class="fas fa-sitemap"></i> Nested view in MongoDB Compass</h3>
+          <p class="sub">The database also has a read-only view, <b>employee_timesheets</b>: one document per employee, with payrolls
+            (21st to 20th), the three 10-day cycles inside each, and the entries inside those. It is created once by an admin with
+            <code>python -m backend.timesheet.nested_view create --yes</code>. It is a view, so it never goes out of date and
+            adds no load to the app. Edit entries only in <b>timesheet_entries</b>.</p>
+        </div>
+      </div>
+    </div>
+    <script src="/static/timesheet/shell.js"></script>
+    <script src="/static/timesheet/export.js"></script>
+  </body>
+</html>

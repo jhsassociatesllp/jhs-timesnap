@@ -22,6 +22,7 @@
     { id: "reco", href: "/static/timesheet/reco.html", icon: "fa-scale-balanced", label: "Reconciliation",
       when: (m) => m.is_admin || m.is_manager },
     { id: "hrms", href: "/static/timesheet/hrms.html", icon: "fa-upload", label: "HRMS upload", when: (m) => m.is_admin },
+    { id: "export", href: "/static/timesheet/export.html", icon: "fa-file-export", label: "Data export", when: (m) => m.is_admin },
     { id: "classic", href: "/static/timesheet/index.html", icon: "fa-table-list", label: "Classic timesheet & approvals" },
     { id: "modules", href: "/modules", icon: "fa-th-large", label: "Modules" },
   ];

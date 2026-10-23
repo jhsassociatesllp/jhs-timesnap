@@ -132,6 +132,23 @@ def cycle_for(d: date) -> Cycle:
     )
 
 
+def payroll_id_for_cycle(cycle_id: str) -> str:
+    """The classic payroll (21st to 20th) a 10-day cycle belongs to, named by the month it ENDS in.
+    '2026-09-C3' (21-30 Sep), '2026-10-C1' and '2026-10-C2' all belong to payroll '2026-10' (21 Sep - 20 Oct)."""
+    cyc = cycle_from_id(cycle_id)
+    y, m = cyc.start.year, cyc.start.month
+    if cycle_id.endswith("C3"):
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return f"{y}-{m:02d}"
+
+
+def payroll_label(payroll_id: str) -> str:
+    """'2026-10' -> '21 Sep - 20 Oct 2026'."""
+    y, m = (int(x) for x in payroll_id.split("-"))
+    py, pm = (y - 1, 12) if m == 1 else (y, m - 1)
+    return f"21 {date(py, pm, 1).strftime('%b')} - 20 {date(y, m, 1).strftime('%b')} {y}"
+
+
 # ── the day-by-day timesheet ("My day") ─────────────────────────────────────────────────────────────
 # Stored values (the labels shown to the employee are friendlier: "Client site", "WFH", "Week off").
 LOCATIONS = ("Office", "Client Site", "Work From Home", "Leave", "Week Off", "PHY")

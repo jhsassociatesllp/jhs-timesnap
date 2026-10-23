@@ -35,7 +35,7 @@ def cdb(monkeypatch):
     names = {"entries": "c_entries", "submissions": "c_submissions", "hrms": "c_hrms", "uploads": "c_uploads",
              "reco": "c_reco", "reviews": "c_reviews", "email_log": "c_email_log", "job_runs": "c_job_runs",
              "config": "c_config", "employees": "c_employees",
-             "legacy": "c_legacy", "payroll_cycles": "c_pcycles", "pending": "c_pending", "approved": "c_approved",
+             "drafts": "c_drafts", "legacy": "c_legacy", "payroll_cycles": "c_pcycles", "pending": "c_pending", "approved": "c_approved",
              "rejected": "c_rejected", "approval_history": "c_apphist"}
     for attr, coll in names.items():
         db[coll].drop()
