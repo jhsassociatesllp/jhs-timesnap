@@ -94,10 +94,10 @@ select.inp{width:auto;min-width:200px}
 
 /* work rows */
 .whead,.wrow{display:grid;grid-template-columns:minmax(0,1fr) 120px max-content 36px;gap:.6rem .8rem;align-items:start;
-  grid-template-areas:"task hours status x" "what what what what"}
+  grid-template-areas:"task hours status x" "what what what what" "extra extra extra extra"}
 .whead{grid-template-areas:"task hours status x";background:var(--dark-bg);color:#fff;border-radius:10px;padding:.8rem 1rem;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
 .wrow>:nth-child(1){grid-area:task}.wrow>:nth-child(2){grid-area:what}.wrow>:nth-child(3){grid-area:hours}
-.wrow>:nth-child(4){grid-area:status}.wrow>:nth-child(5){grid-area:x}
+.wrow>:nth-child(4){grid-area:status}.wrow>:nth-child(5){grid-area:x}.wrow>:nth-child(6){grid-area:extra}
 .whead>:nth-child(1){grid-area:task}.whead>:nth-child(2){grid-area:hours}.whead>:nth-child(3){grid-area:status}
 .wrow{padding:.9rem 1rem;border-bottom:1px solid var(--border-color)}
 .wrow:nth-child(even){background:#f8f9fa}
@@ -149,7 +149,7 @@ select.inp{width:auto;min-width:200px}
   .day-head{padding:1rem 1.1rem}
   .strip,.stripfoot,.legend{justify-content:flex-start}
   .whead{display:none}
-  .wrow{grid-template-columns:minmax(0,1fr) 36px;grid-template-areas:"task x" "what what" "hours hours" "status status";gap:.6rem;border:2px solid var(--border-color);border-radius:12px;margin-bottom:.8rem}
+  .wrow{grid-template-columns:minmax(0,1fr) 36px;grid-template-areas:"task x" "what what" "extra extra" "hours hours" "status status";gap:.6rem;border:2px solid var(--border-color);border-radius:12px;margin-bottom:.8rem}
   .wrow.unplanned{margin:0 0 .8rem}
   .hoursbox input{text-align:left}
   .chips{justify-content:flex-start}

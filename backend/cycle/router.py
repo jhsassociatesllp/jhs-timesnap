@@ -155,6 +155,7 @@ def team(cycle_id: str, manager: Optional[str] = None, current_user: str = Depen
 class ApproveIn(BaseModel):
     employee_ids: List[str]
     confirm_warnings: bool = False
+    note: str = Field("", max_length=500)                # optional remark kept with the approval
 
 
 @router.post("/{cycle_id}/approve")
@@ -193,7 +194,8 @@ def approve(cycle_id: str, body: ApproveIn, current_user: str = Depends(get_curr
             {"$set": {"status": "approved", "approved_by": me, "approved_at": now,
                       "warnings_confirmed": bool(flagged.get(i))},
              "$unset": {"note": "", "sent_back_at": "", "sent_back_by": ""},
-             "$push": {"history": {"action": "approved", "by": me, "at": now, "warnings": flagged.get(i, [])}}},
+             "$push": {"history": {"action": "approved", "by": me, "at": now, "warnings": flagged.get(i, []),
+                                   **({"note": body.note.strip()} if body.note.strip() else {})}}},
             upsert=True)
     # the lock above is what matters; a failed copy to the classic collection is recorded and can be re-run
     mirror_failed = []
@@ -290,6 +292,44 @@ def send_back(cycle_id: str, body: SendBackIn, current_user: str = Depends(get_c
     return {"employee_id": emp, "status": "sent_back"}
 
 
+def _task_summary(emp: str, cyc: rules.Cycle):
+    """Per task the employee worked on in this cycle: hours this cycle, hours so far on the task, and the hours
+    allotted to it (working days x 8.5, from its Nexus Quant dates). Unplanned work is one extra line."""
+    rows = list(store.entries.find({"employee_id": emp, "cycle_id": cyc.id, "hours": {"$ne": None}},
+                                   {"task_id": 1, "task_name": 1, "client": 1, "project": 1, "project_code": 1, "hours": 1,
+                                    "task_status": 1, "is_unplanned": 1, "date": 1}).sort("date", 1))
+    ids = sorted({r["task_id"] for r in rows if r.get("task_id") is not None})
+    used = {x["_id"]: round(x["h"], 2) for x in store.entries.aggregate([
+        {"$match": {"employee_id": emp, "task_id": {"$in": ids}, "hours": {"$ne": None}}},
+        {"$group": {"_id": "$task_id", "h": {"$sum": "$hours"}}}])} if ids else {}
+    nq, nq_down = {}, False
+    if ids:
+        try:
+            nq = {t.id: t for t in nq_repo.get_tasks_by_ids(ids)}
+        except NQUnavailable:
+            nq_down = True
+    hol = {date.fromisoformat(h) for h in holidays_set()}
+    by: dict = {}
+    for r in rows:
+        key = r["task_id"] if r.get("task_id") is not None else "unplanned"
+        g = by.setdefault(key, {"task_id": r.get("task_id"), "task_name": r.get("task_name") or ("Unplanned work" if key == "unplanned" else ""),
+                                "client": r.get("client") or "", "project": r.get("project") or "", "project_code": r.get("project_code") or "",
+                                "cycle_hours": 0.0, "rows": 0, "days": set(), "last_status": None})
+        g["cycle_hours"] += r["hours"]; g["rows"] += 1; g["days"].add(r["date"]); g["last_status"] = r.get("task_status")
+    out = []
+    for key, g in by.items():
+        t = nq.get(key) if key != "unplanned" else None
+        budget = rules.budget_hours(t.start_date, t.end_date, hol) if t else None
+        total = used.get(key) if key != "unplanned" else None
+        out.append({**{k: v for k, v in g.items() if k != "days"}, "days": len(g["days"]), "cycle_hours": round(g["cycle_hours"], 2),
+                    "hours_so_far": total, "allotted_hours": budget,
+                    "pct_used": round(100 * total / budget) if (budget and total is not None) else None,
+                    "over_allotted": bool(budget and total is not None and total > budget),
+                    "task_start": t.start_date if t else None, "task_end": t.end_date if t else None})
+    out.sort(key=lambda x: (x["task_id"] is None, -x["cycle_hours"]))
+    return out, nq_down
+
+
 @router.get("/{cycle_id}/employee/{employee_id}")
 def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends(get_current_user)):
     """Day-by-day rows of one employee for the review screen. Reporting manager or admin only."""
@@ -321,14 +361,16 @@ def employee_detail(cycle_id: str, employee_id: str, current_user: str = Depends
             "entries": [{"task_name": r.get("task_name") or "", "client": r.get("client") or "",
                          "project": r.get("project") or "", "project_code": r.get("project_code") or "",
                          "remarks": r.get("remarks") or "", "hours": r.get("hours"),
-                         "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned"))}
+                         "task_status": r.get("task_status"), "is_unplanned": bool(r.get("is_unplanned")),
+                         "extra_remarks": r.get("extra_remarks") or ""}
                         for r in rows]})
         d += timedelta(days=1)
     name = (store.employees.find_one({"EmpID": emp}, {"Emp Name": 1}) or {}).get("Emp Name", "")
     review = store.reviews.find_one({"kind": "approval", "employee_id": emp, "cycle_id": cyc.id}) or {}
     row = _employee_row(emp, name, cyc, today, hol)
+    tasks, nq_down = _task_summary(emp, cyc)
     return {"cycle": {"id": cyc.id, "label": cyc.label, "start": cyc.start, "end": cyc.end, "deadline": cyc.deadline},
-            "employee": row, "days": days,
+            "employee": row, "days": days, "tasks": tasks, "nq_unavailable": nq_down,
             "history": [{"action": h.get("action"), "by": h.get("by"), "at": h.get("at"),
                          "note": h.get("note") or h.get("reason")} for h in review.get("history", [])][-20:]}
 

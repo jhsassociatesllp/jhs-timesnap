@@ -145,7 +145,7 @@ def _q(field_date: str, a: str, b: str, emps: Optional[List[str]], emp_field: st
 def ds_entries(a, b, emps):
     people = _people()
     header = ["Employee ID", "Employee name", "Reporting manager", "Payroll", "Cycle", "Date", "Location", "Client", "Project",
-              "Project code", "Task", "Task status", "Hours", "Remarks", "Unplanned work", "Approved", "Locked",
+              "Project code", "Task", "Task status", "Hours", "What I did", "Remarks", "Unplanned work", "Approved", "Locked",
               "Source", "Saved at"]
 
     def rows():
@@ -153,7 +153,7 @@ def ds_entries(a, b, emps):
             name, mgr = people.get(e["employee_id"], ("", ""))
             yield [e["employee_id"], name, e.get("reporting_manager_name") or mgr, _payroll(e.get("cycle_id")), e.get("cycle_id"),
                    e.get("date"), e.get("location"), e.get("client"), e.get("project"), e.get("project_code"),
-                   e.get("task_name"), e.get("task_status"), e.get("hours"), e.get("remarks"),
+                   e.get("task_name"), e.get("task_status"), e.get("hours"), e.get("remarks"), e.get("extra_remarks"),
                    "Yes" if e.get("is_unplanned") else "", "Yes" if e.get("approved") else "", "Yes" if e.get("locked") else "",
                    "classic (migrated)" if e.get("legacy") else "My day", _plain(e.get("updated_at") or e.get("created_at"))]
     return header, rows()

@@ -51,7 +51,7 @@
     taskQuery: "", taskOpen: new Set(),         // search text and which task groups the person opened
   };
   let seq = 0;
-  const newRow = (init) => Object.assign({ key: ++seq, task_id: null, unplanned: false, hours: "", status: "in_progress", remarks: "", info: null }, init || {});
+  const newRow = (init) => Object.assign({ key: ++seq, task_id: null, unplanned: false, hours: "", status: "in_progress", remarks: "", extra: "", info: null }, init || {});
   const locKey = `myday_location_${emp}`;
   const remembered = () => { try { const v = localStorage.getItem(locKey) || ""; return DAY_OFF.includes(v) ? "" : v; } catch (_) { return ""; } };
   const remember = (v) => { if (DAY_OFF.includes(v)) return; try { localStorage.setItem(locKey, v); } catch (_) { /* ignore */ } };
@@ -97,7 +97,7 @@
     S.readOnly = !!day.read_only;
     S.rows = day.entries.map((e) => newRow({
       task_id: e.task_id, unplanned: !!e.is_unplanned, hours: e.hours == null ? "" : String(e.hours),
-      status: e.task_status || "in_progress", remarks: e.remarks || "",
+      status: e.task_status || "in_progress", remarks: e.remarks || "", extra: e.extra_remarks || "",
       info: { name: e.task_name || (e.is_unplanned ? "Unplanned work" : ""), client: e.client, project: e.project, code: e.project_code },
     }));
     S.hintsOn = false;
@@ -288,6 +288,12 @@
     row.append(h("div", {}, seg));
 
     row.append(h("div", {}, ro ? null : h("button", { class: "x", type: "button", "aria-label": "Remove this row", title: "Remove", onclick: () => removeRow(r) }, "×")));
+
+    // optional free-text remarks, after "What I did"
+    const extra = h("input", { class: "inp", type: "text", "aria-label": "Remarks (optional)", maxlength: "1000", disabled: ro,
+      placeholder: "Remarks (optional)", value: r.extra });
+    extra.addEventListener("input", () => { r.extra = extra.value; touched(); });
+    row.append(h("div", {}, extra));
     return row;
   }
 
@@ -349,7 +355,7 @@
     if (S.readOnly || isDayOff()) return;
     const existing = S.rows.find((r) => r.task_id === t.task_id);
     if (existing) { const el = document.querySelector(`[data-hours="${existing.key}"]`); if (el) el.focus(); return; }
-    const blank = S.rows.find((r) => r.task_id == null && !r.unplanned && !r.hours && !r.remarks);
+    const blank = S.rows.find((r) => r.task_id == null && !r.unplanned && !r.hours && !r.remarks && !r.extra);
     if (blank) { blank.task_id = t.task_id; blank.info = taskInfo(t); } else S.rows.push(newRow({ task_id: t.task_id, info: taskInfo(t) }));
     renderWork(); renderTasks(); touched();
     const last = S.rows.find((r) => r.task_id === t.task_id);
@@ -495,7 +501,7 @@
     for (const r of rowsToSave()) {
       const hv = hoursValue(r);
       if (Number.isNaN(hv) || (hv !== null && (hv < 0 || hv > MAX_HOURS))) { setSaveState("err", "Fix the hours to save"); return; }
-      entries.push({ task_id: r.unplanned ? null : r.task_id, hours: hv, task_status: r.status, remarks: r.remarks, is_unplanned: r.unplanned });
+      entries.push({ task_id: r.unplanned ? null : r.task_id, hours: hv, task_status: r.status, remarks: r.remarks, extra_remarks: r.extra, is_unplanned: r.unplanned });
     }
     setSaveState("", "Saving…");
     try {

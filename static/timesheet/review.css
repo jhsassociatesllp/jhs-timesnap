@@ -31,3 +31,15 @@ textarea.inp{height:auto;min-height:80px;padding:.6rem .85rem;resize:vertical}
 
 .rv-tools{margin:0 0 1.2rem;font-size:.9rem;color:var(--text-light)}
 .rv-tools a{color:#1d6fa5;font-weight:600}
+
+.rv-h{margin:1.1rem 0 .4rem;font-size:.9rem;color:var(--text-dark);text-transform:uppercase;letter-spacing:.5px}
+.tk{border:2px solid var(--border-color);border-radius:12px;padding:.6rem .8rem;margin:.4rem 0}
+.tk.over{border-color:#fca5a5;background:#fff7f7}.tk.unplanned{border-color:#fcd34d;background:#fffbeb}
+.tk1{font-weight:600;font-size:.9rem}
+.tk .m{font-size:.75rem;color:var(--text-light);margin:.15rem 0 .4rem}
+.tbar{height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin:.2rem 0}.tbar i{display:block;height:100%;background:#22c55e;border-radius:6px}
+.tbar.over i{background:#ef4444}
+.tk2{font-size:.78rem;color:#475569}.tk2.bad{color:#b91c1c;font-weight:600}
+.er .w{font-size:.8rem;color:#334155;margin-top:.15rem}
+.rv-tools{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.rv-tools .btn{height:38px}

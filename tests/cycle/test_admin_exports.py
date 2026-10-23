@@ -65,7 +65,7 @@ def test_entries_export_has_payroll_cycle_names_and_neutralises_formulas(api):
     first = rows[1]
     assert first[0] == "JHS9101" and first[1] == "Emp One" and first[2] in ("", None) and first[3] == "2026-10" and first[4] == "2026-10-C2"
     assert str(first[13]).startswith("'=")                                   # =HYPERLINK(...) cannot run in Excel
-    assert any(row[14] == "Yes" for row in rows[1:])                         # the unplanned row
+    assert rows[0][13:15] == ["What I did", "Remarks"] and any(row[15] == "Yes" for row in rows[1:])      # the unplanned row
 
 
 def test_filters_and_csv(api):

@@ -175,6 +175,19 @@ def _employee_task_rows(employee_id: str) -> list:
     )
 
 
+def get_tasks_by_ids(task_ids) -> List[NQTask]:
+    """The live NQ tasks with these ids (any assignee, any date) - used to show a reviewer the allotted dates/budget."""
+    ids = sorted({int(i) for i in task_ids})
+    if not ids:
+        return []
+
+    def load():
+        rows = _run(f"SELECT {_TASK_COLS} {_TASK_FROM} WHERE t.is_deleted = '0' AND t.id IN ({_in_clause(len(ids))}) ORDER BY t.id",
+                    tuple(ids))
+        return [task_from_row(r) for r in rows]
+    return _cached(("tasks_by_ids", tuple(ids)), load)
+
+
 def list_tasks_assigned_to(employee_id: str, since: date) -> List[NQTask]:
     """Every live task assigned to an employee (Timesnap EmpID == tbl_user.emp_id) in an ACTIVE project
     (project_status = '1'): all open tasks, plus completed ones that ended on/after `since` (so a task

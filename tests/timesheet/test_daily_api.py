@@ -406,3 +406,13 @@ def test_page_endpoint_gives_enabled_day_and_strip_in_one_request(api):
     assert api.get("/timesheet/v2/page/JHS1562").json() == {"enabled": False, "reason": "free_text_employee"}
     _user["id"] = "JHS9101"
     assert api.get("/timesheet/v2/page/JHS9102").status_code == 403                               # only your own page
+
+
+def test_the_optional_remarks_box_is_stored_returned_and_copied(api):
+    b = put(api, [row(1, 4, remarks="reviewed the file", extra_remarks="client asked for another sample")]).json()
+    assert b["entries"][0]["remarks"] == "reviewed the file" and b["entries"][0]["extra_remarks"] == "client asked for another sample"
+    assert api.db["t_entries"].find_one({"employee_id": "JHS9101"})["extra_remarks"] == "client asked for another sample"
+    assert get_day(api).json()["entries"][0]["extra_remarks"] == "client asked for another sample"
+    assert put(api, [row(1, 4)]).json()["entries"][0]["extra_remarks"] == ""                 # optional: empty is fine
+    assert put(api, [unplanned(2, "did an unplanned thing")]).status_code == 200            # unplanned still needs only its reason
+    assert put(api, [row(1, 4, extra_remarks="x" * 1001)]).status_code == 422               # same 1000-character limit

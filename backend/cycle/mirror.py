@@ -51,7 +51,7 @@ def _legacy_rows(emp: str, cyc: rules.Cycle) -> List[dict]:
             "reportingManagerEntry": e.get("reporting_manager_name") or "",
             "activity": e.get("task_name") or ("Unplanned work" if unplanned else ""),
             "projectHours": "" if e.get("hours") is None else str(e["hours"]),
-            "remarks": e.get("remarks") or "",
+            "remarks": e.get("remarks") or "", "extraRemarks": e.get("extra_remarks") or "",
             "nqTaskId": e.get("task_id"), "activityOther": unplanned,
             "activityReason": (e.get("remarks") or "") if unplanned else "",
             "v2_mirror": True, "v2_cycle_id": cyc.id,

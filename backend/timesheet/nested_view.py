@@ -23,7 +23,7 @@ from typing import List
 VIEW_NAME = "employee_timesheets"
 
 _ENTRY_FIELDS = ["date", "location", "client", "project", "project_code", "task_id", "task_name", "hours",
-                 "task_status", "remarks", "is_unplanned", "reporting_manager_name", "approved", "locked", "legacy"]
+                 "task_status", "remarks", "extra_remarks", "is_unplanned", "reporting_manager_name", "approved", "locked", "legacy"]
 
 
 def pipeline(reviews: str = "cycle_reviews", employees: str = "Employee_details") -> List[dict]:

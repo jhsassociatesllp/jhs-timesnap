@@ -1,5 +1,11 @@
 # Step 4 – Manager review, locks and the mirror to the classic reports
 
+## What the manager sees (Review team)
+For the chosen employee and 10-day cycle: **Tasks worked on this cycle** (hours this cycle, hours so far, and the hours allotted to the
+task = its working days x 8.5 from Nexus Quant, shown red when over), **Day by day** (task, hours, status, "What I did" and the optional
+"Remarks"), then **Your decision**: one remarks box, optional when approving, required when sending back (rejecting).
+"Remind employees with missing days" is on the same page; "Late projects" (menu) is where task end dates and hours needed are updated.
+
 ## Manager screen: `/static/timesheet/review.html`
 ("Review" link in the My day header, shown only to managers and admins.)
 - Pick a 10-day cycle. The table lists your pilot reportees: days filled, hours, unplanned rows, status, open items.

@@ -17,6 +17,8 @@ from backend.cycle.store import store
 from backend.timesheet import rules
 from tests.cycle.conftest import entry
 from tests.cycle.test_cycle_api import fill_cycle
+from backend.nq import repository
+from tests.nq.conftest import dev_settings
 
 CYCLE = "2026-10-C2"
 PAYROLL_ID = ObjectId("65f000000000000000000001")
@@ -28,6 +30,7 @@ _user = {"id": "JHS9001"}
 def api(cdb, monkeypatch):
     monkeypatch.setattr(cr, "has_admin_module", lambda emp, key: emp in ADMINS and key == "timesheet")
     monkeypatch.setattr(cr, "_today", lambda: date(2026, 10, 21))
+    repository.configure(dev_settings())                                  # the fake NQ in Docker, never the real one
     cdb["c_pcycles"].insert_one({"_id": PAYROLL_ID, "cycle_label": "Sep-Oct 2026",
                                  "start_date": "2026-09-21", "end_date": "2026-10-20"})
     app = FastAPI()
@@ -217,3 +220,41 @@ def test_employee_detail_rows_and_roles(api):
     _user["id"] = "JHS9000"
     assert api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").status_code == 200
     assert api.get("/timesheet/v2/cycles/2026-10-C9/employee/JHS9101").status_code == 400
+
+
+def test_review_detail_shows_tasks_against_allotted_hours_and_both_remarks(api):
+    seed(api.db)
+    api.db["c_entries"].update_one({"employee_id": "JHS9101", "date": "2026-10-12"}, {"$set": {"extra_remarks": "waiting for client data"}})
+    body = api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()
+    by_name = {t["task_name"]: t for t in body["tasks"]}
+    planned = next(t for t in body["tasks"] if t["task_id"] == 1)
+    assert planned["cycle_hours"] == 17.0 and planned["rows"] == 2 and planned["hours_so_far"] == 17.0
+    assert planned["allotted_hours"] == 178.5 and planned["pct_used"] == 10 and planned["over_allotted"] is False   # 21 working days x 8.5
+    assert planned["task_start"] == "2026-10-01" and body["nq_unavailable"] is False
+    unplanned = next(t for t in body["tasks"] if t["task_id"] is None)
+    assert unplanned["cycle_hours"] == 1.0 and unplanned["allotted_hours"] is None
+    day12 = next(d for d in body["days"] if d["date"] == "2026-10-12")
+    assert day12["entries"][0]["remarks"] == "did it" and day12["entries"][0]["extra_remarks"] == "waiting for client data"
+    assert by_name
+
+
+def test_over_allotted_is_flagged_and_nq_outage_is_reported(api):
+    seed(api.db)
+    api.db["c_entries"].insert_one(entry("JHS9101", "2026-10-14", 200, task_id=1))
+    body = api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()
+    assert next(t for t in body["tasks"] if t["task_id"] == 1)["over_allotted"] is True
+    from tests.nq.conftest import dev_settings as ds
+    repository.configure(ds(port=1, connect_timeout=1))
+    from backend.nq import cache
+    cache.clear()
+    body = api.get(f"/timesheet/v2/cycles/{CYCLE}/employee/JHS9101").json()
+    assert body["nq_unavailable"] is True and next(t for t in body["tasks"] if t["task_id"] == 1)["allotted_hours"] is None
+    repository.configure(ds())
+
+
+def test_approve_can_carry_a_remark(api):
+    seed(api.db)
+    r = api.post(f"/timesheet/v2/cycles/{CYCLE}/approve", json={"employee_ids": ["JHS9101"], "confirm_warnings": True, "note": "Good work"})
+    assert r.status_code == 200
+    hist = api.db["c_reviews"].find_one({"employee_id": "JHS9101"})["history"]
+    assert hist[-1]["action"] == "approved" and hist[-1]["note"] == "Good work"

@@ -8,7 +8,7 @@ A free-text employee who should still see it (for testing) is added with
 
 ## What it does
 - Pick a task (searchable, grouped by client › project); client, project and code fill in from Nexus Quant.
-- Type hours per row, optional "What I did", Status (Done / In progress / Blocked).
+- Type hours per row, "What I did", an optional "Remarks" box after it, Status (Done / In progress / Blocked).
 - Location per day: Office, Client site, WFH, Leave, Week off, PHY (Leave / Week off / PHY need no rows).
 - "Unplanned work" row: the description is required (it is the reason); the manager reviews it.
 - Autosave ("Saved ✓"), "Submit day", day strip for the 10-day cycle (submitted / saved / missing / off).

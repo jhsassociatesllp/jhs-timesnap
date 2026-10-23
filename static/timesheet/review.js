@@ -116,11 +116,11 @@
 
   function selectedIds() { return [...document.querySelectorAll("#rows input[type=checkbox]:checked")].map((c) => c.getAttribute("data-emp")); }
 
-  async function approve(ids) {
+  async function approve(ids, note) {
     if (!ids.length) { banner("info", "Select at least one employee."); return; }
     const confirmed = $("confirm").checked;
     try {
-      const r = await api("POST", `/timesheet/v2/cycles/${S.cycleId}/approve`, { employee_ids: ids, confirm_warnings: confirmed });
+      const r = await api("POST", `/timesheet/v2/cycles/${S.cycleId}/approve`, { employee_ids: ids, confirm_warnings: confirmed, note: note || "" });
       banner(r.mirror_failed.length ? "warn" : "ok", `Approved and locked: ${r.approved.join(", ")}.` +
         (r.mirror_failed.length ? ` The copy to the classic reports failed for ${r.mirror_failed.join(", ")} - ask an admin to re-run it.` : ""));
       await load();
@@ -145,26 +145,51 @@
     box.append(h("h2", { text: row.employee_name || id }),
       h("p", { class: "sub", text: `${shortDate(d.cycle.start)} – ${shortDate(d.cycle.end)} · ${fmt(row.timesheet_hours)} h · ` }, statusBadge(row)));
     if (row.note) box.append(h("div", { class: "banner warn" }, h("span", { text: "Sent back: " + row.note + (row.resubmitted ? " (the employee has resubmitted)" : "") })));
+    if (d.nq_unavailable) box.append(h("div", { class: "banner warn" }, h("span", { text: "Project data from Nexus Quant is unavailable, so the allotted hours cannot be shown right now." })));
+
+    // 1. By task: hours given this cycle against the hours allotted to the task
+    box.append(h("h3", { class: "rv-h", text: "Tasks worked on this cycle" }));
+    if (!d.tasks.length) box.append(h("div", { class: "empty", text: "No hours entered in this cycle." }));
+    d.tasks.forEach((t) => {
+      const pct = t.pct_used;
+      const bar = h("div", { class: "tbar" + (t.over_allotted ? " over" : "") }, h("i", { style: `width:${Math.max(0, Math.min(100, pct || 0))}%` }));
+      const nums = t.task_id == null
+        ? `${fmt(t.cycle_hours)} h this cycle · not part of the assigned plan`
+        : `${fmt(t.cycle_hours)} h this cycle · ${fmt(t.hours_so_far)} h so far of ${t.allotted_hours == null ? "—" : fmt(t.allotted_hours) + " h allotted"}${pct == null ? "" : " (" + pct + "%)"}`;
+      box.append(h("div", { class: "tk" + (t.task_id == null ? " unplanned" : "") + (t.over_allotted ? " over" : "") },
+        h("div", { class: "tk1", text: t.task_name }),
+        h("div", { class: "m", text: [t.client, t.project, t.project_code].filter(Boolean).join(" › ") + (t.task_end ? ` · task ${shortDate(t.task_start)} – ${shortDate(t.task_end)}` : "") }),
+        t.task_id == null ? null : bar,
+        h("div", { class: "tk2" + (t.over_allotted ? " bad" : ""), text: nums + (t.over_allotted ? " - over the allotted hours" : "") })));
+    });
+
+    // 2. Day by day
+    box.append(h("h3", { class: "rv-h", text: "Day by day" }));
     d.days.forEach((day) => {
       if (day.state === "none" && !day.entries.length && !day.location) return;
       const entries = day.entries.map((e) => h("div", { class: "er" + (e.is_unplanned ? " unplanned" : "") },
         h("div", { text: `${e.is_unplanned ? "Unplanned work" : (e.task_name || "—")} · ${e.hours == null ? "—" : e.hours + " h"}${e.task_status ? " · " + e.task_status.replace("_", " ") : ""}` }),
-        h("div", { class: "m", text: [e.client, e.project, e.project_code].filter(Boolean).join(" › ") + (e.remarks ? " — " + e.remarks : "") })));
+        h("div", { class: "m", text: [e.client, e.project, e.project_code].filter(Boolean).join(" › ") }),
+        e.remarks ? h("div", { class: "w", text: "What I did: " + e.remarks }) : null,
+        e.extra_remarks ? h("div", { class: "w", text: "Remarks: " + e.extra_remarks }) : null));
       box.append(h("div", { class: "dayrow" + (day.state === "missing" ? " missing" : "") },
         h("div", {}, h("div", { class: "d", text: `${day.weekday} ${shortDate(day.date)}` }), h("div", { class: "loc", text: day.state === "missing" ? "Not submitted" : (day.location || "") + (day.state === "saved" ? " · saved, not submitted" : "") })),
         h("div", {}, entries.length ? entries : (day.location && ["Leave", "Week Off", "PHY"].includes(day.location) ? h("span", { class: "m", text: "Day off" }) : null)),
         h("div", { class: "num", text: day.hours ? fmt(day.hours) : "" })));
     });
+
+    // 3. Decision: one remark box; approving is optional, sending back needs it
     if (row.status !== "approved") {
-      const note = h("textarea", { class: "inp", maxlength: "500", placeholder: "What should the employee fix? (required)", "aria-label": "Note to the employee" });
-      box.append(h("div", { class: "rv-actions" },
-        h("button", { class: "btn primary small", type: "button", disabled: !ended(), onclick: () => approve([id]) }, "Approve & lock"),
-      ), h("div", { style: "margin-top:14px" }, note,
-        h("div", { class: "rv-actions" }, h("button", { class: "btn small", type: "button", disabled: !ended(), onclick: async () => {
-          if (note.value.trim().length < 3) { banner("info", "Write a short note so the employee knows what to fix."); return; }
-          try { await api("POST", `/timesheet/v2/cycles/${S.cycleId}/send-back`, { employee_id: id, note: note.value.trim() }); banner("ok", "Sent back to " + id + "."); await load(); }
-          catch (err) { banner("err", err.message); }
-        } }, "Send back with note"))));
+      const note = h("textarea", { class: "inp", maxlength: "500", placeholder: "Remarks for the employee (optional when approving, required when sending back)", "aria-label": "Remarks for the employee" });
+      box.append(h("h3", { class: "rv-h", text: "Your decision" }), note,
+        h("div", { class: "rv-actions" },
+          h("button", { class: "btn good small", type: "button", disabled: !ended(), onclick: () => approve([id], note.value.trim()) }, h("i", { class: "fas fa-lock" }), " Approve & lock"),
+          h("button", { class: "btn small", type: "button", disabled: !ended(), onclick: async () => {
+            if (note.value.trim().length < 3) { banner("info", "Write a short remark so the employee knows what to fix."); return; }
+            try { await api("POST", `/timesheet/v2/cycles/${S.cycleId}/send-back`, { employee_id: id, note: note.value.trim() }); banner("ok", "Sent back to " + id + "."); await load(); }
+            catch (err) { banner("err", err.message); }
+          } }, h("i", { class: "fas fa-rotate-left" }), " Send back with remarks")),
+        ended() ? null : h("p", { class: "sub", text: "You can decide once this cycle has ended." }));
     } else if (S.admin) {
       box.append(h("div", { class: "rv-actions" }, h("button", { class: "btn small", type: "button", onclick: async () => {
         const reason = prompt("Why are you unlocking this approved cycle? (shown in the audit trail)");
@@ -175,6 +200,17 @@
     }
     if (d.history.length) box.append(h("ul", { class: "hist" }, d.history.map((x) => h("li", { text: `${x.action.replace("_", " ")} by ${x.by}${x.note ? ": " + x.note : ""}` }))));
   }
+
+  $("remindBtn").addEventListener("click", async () => {
+    if (!S.data) return;
+    const ids = S.data.rows.filter((r) => r.status !== "approved" && r.days_filled < r.days_required).map((r) => r.employee_id);
+    if (!ids.length) { banner("ok", "Everyone has filled all their days in this cycle."); return; }
+    try {
+      const r = await api("POST", `/timesheet/v2/cycles/${S.cycleId}/remind`, { employee_ids: ids });
+      const skipped = (r.skipped || []).map((x) => `${x.employee_id} (${x.reason || x.status})`).join(", ");
+      banner(r.sent.length ? "ok" : "warn", `Reminders sent: ${r.sent.length}.` + (skipped ? ` Not sent: ${skipped}.` : ""));
+    } catch (err) { banner("err", err.message); }
+  });
 
   $("go").addEventListener("click", load);
   $("cycleSel").addEventListener("change", load);

@@ -1,4 +1,4 @@
-// static/timesheet/cycle.js — 10-day cycle review. Talks to /timesheet/v2/cycles/*.
+// static/timesheet/cycle.js — late projects: update a task's hours needed / end date. Talks to /timesheet/v2/cycles/*/at-risk.
 // All server text goes through textContent.
 (function () {
   const token = localStorage.getItem("access_token") || localStorage.getItem("token") ||
@@ -6,8 +6,6 @@
   if (!token) { window.location.href = "/static/login.html"; return; }
   const $ = (id) => document.getElementById(id);
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-  let isAdmin = false;
-  let pendingWarnings = null;     // set when the server asks for confirmation
 
   function banner(text, kind) {
     const el = $("msg");
@@ -33,7 +31,7 @@
   }
 
   function cell(tr, text) { tr.insertCell().textContent = text === null || text === undefined ? "—" : text; }
-  const tag = (text, cls) => { const s = document.createElement("span"); s.className = "dt-tag " + (cls || ""); s.textContent = text; return s; };
+  const tag = (text, cls) => { const x = document.createElement("span"); x.className = "dt-tag " + (cls || ""); x.textContent = text; return x; };
 
   // cycle ids look like 2026-10-C2: offer the current and the three previous cycles
   function cycleFor(d) { const c = d.getDate() <= 10 ? 1 : d.getDate() <= 20 ? 2 : 3; return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-C${c}`; }
@@ -46,32 +44,6 @@
       if (!seen.has(id)) { seen.add(id); const o = document.createElement("option"); o.value = id; o.textContent = id; sel.append(o); }
       d.setDate(d.getDate() - 10);
     }
-  }
-
-  const selected = () => Array.from(document.querySelectorAll("#rows input[type=checkbox]:checked")).map((c) => c.value);
-
-  function renderTeam(d) {
-    $("cycleInfo").textContent = `${d.cycle.label} · ${d.cycle.start} to ${d.cycle.end} · fill by ${d.cycle.deadline}` +
-      (d.cycle.past_deadline ? " (deadline passed)" : "");
-    const body = $("rows"); body.textContent = "";
-    if (!d.rows.length) {
-      const td = body.insertRow().insertCell(); td.colSpan = 9; td.className = "empty-row"; td.textContent = "No employees on the daily timesheet in this team."; return;
-    }
-    d.rows.forEach((r) => {
-      const tr = body.insertRow();
-      const c = tr.insertCell(); const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = r.employee_id; c.append(cb);
-      const who = tr.insertCell();
-      const nm = document.createElement("b"); nm.textContent = r.employee_name || r.employee_id;
-      const cd = document.createElement("div"); cd.className = "cap"; cd.textContent = r.employee_id;
-      who.append(nm, cd);
-      cell(tr, `${r.days_filled} / ${r.days_required}`);
-      cell(tr, r.hrms_hours); cell(tr, r.timesheet_hours); cell(tr, r.unplanned); cell(tr, r.reco_gaps);
-      tr.insertCell().append(tag(r.status === "approved" ? "Approved & locked" : r.status === "reopened" ? "Reopened" : r.status === "sent_back" ? "Sent back" : "Pending",
-        r.status === "approved" ? "green" : r.status === "reopened" || r.status === "sent_back" ? "amber" : ""));
-      const w = tr.insertCell(); w.textContent = r.warnings.join("; ");
-    });
-    const heads = [...body.closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
-    [...body.rows].forEach((tr) => [...tr.cells].forEach((td, i) => { if (heads[i]) td.setAttribute("data-label", heads[i]); }));
   }
 
   async function renderRisk(cycleId) {
@@ -116,63 +88,17 @@
   }
 
   async function load() {
-    banner(""); $("confirmWrap").style.display = "none"; pendingWarnings = null;
-    const id = $("cycleSel").value;
-    const team = $("team").value.trim();
-    try {
-      renderTeam(await call("GET", `/timesheet/v2/cycles/${id}/team${team ? "?manager=" + encodeURIComponent(team) : ""}`));
-      await renderRisk(id);
-    } catch (err) { banner(err.message, "err"); }
+    banner("");
+    try { await renderRisk($("cycleSel").value); } catch (err) { banner(err.message, "err"); }
   }
-
-  $("approveBtn").onclick = async () => {
-    const ids = selected();
-    if (!ids.length) { banner("Select at least one employee.", "warn"); return; }
-    banner("");
-    try {
-      const r = await call("POST", `/timesheet/v2/cycles/${$("cycleSel").value}/approve`,
-        { employee_ids: ids, confirm_warnings: $("confirm").checked && !!pendingWarnings });
-      banner(`Approved and locked: ${r.approved.join(", ")}.`, "ok");
-      await load();
-    } catch (err) {
-      if (err.status === 409 && err.detail && err.detail.warnings) {
-        pendingWarnings = err.detail.warnings;
-        $("confirmText").textContent = " I understand: " + Object.entries(pendingWarnings).map(([e, w]) => `${e} (${w.join(", ")})`).join("; ") + " — approve anyway.";
-        $("confirm").checked = false; $("confirmWrap").style.display = "block";
-        banner("Some selected employees have open items. Tick the confirmation box and press Approve again.", "warn");
-      } else banner(err.message, "err");
-    }
-  };
-
-  $("remindBtn").onclick = async () => {
-    const ids = selected();
-    if (!ids.length) { banner("Select at least one employee.", "warn"); return; }
-    banner("");
-    try {
-      const r = await call("POST", `/timesheet/v2/cycles/${$("cycleSel").value}/remind`, { employee_ids: ids });
-      banner(`Reminders sent: ${r.sent.length}. Skipped: ${r.skipped.map((s) => `${s.employee_id} (${s.reason || s.status})`).join(", ") || "none"}.`, r.sent.length ? "ok" : "warn");
-    } catch (err) { banner(err.message, "err"); }
-  };
-
-  $("unlockBtn").onclick = async () => {
-    const ids = selected();
-    if (ids.length !== 1) { banner("Select exactly one employee to unlock.", "warn"); return; }
-    const reason = window.prompt("Reason for unlocking (recorded in the audit log):");
-    if (!reason || reason.trim().length < 3) return;
-    try {
-      await call("POST", `/timesheet/v2/cycles/${$("cycleSel").value}/unlock`, { employee_id: ids[0], reason: reason.trim() });
-      banner(`${ids[0]} unlocked.`, "ok"); await load();
-    } catch (err) { banner(err.message, "err"); }
-  };
 
   $("go").onclick = load;
   fillCycles();
   (async () => {
     try {
       const a = await call("GET", "/hrms/access");
-      isAdmin = a.is_admin;
-      if (a.is_admin) { $("teamWrap").style.display = "block"; $("unlockBtn").style.display = "inline-block"; }
-      if (!a.is_admin && !a.is_manager) { banner("Only managers and admins can review cycles.", "err"); return; }
+      if (a.is_admin) $("teamWrap").style.display = "flex";
+      if (!a.is_admin && !a.is_manager) { banner("Only managers and admins can use this page.", "err"); return; }
       await load();
     } catch (err) { banner(err.message, "err"); }
   })();

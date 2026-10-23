@@ -64,7 +64,8 @@ class EntryIn(BaseModel):
     task_id: Optional[int] = None                       # an NQ task assigned to the employee, or None when unplanned
     hours: Optional[float] = None                       # may be empty while drafting; required at submit
     task_status: Literal["done", "in_progress", "blocked"] = "in_progress"
-    remarks: str = Field("", max_length=1000)           # "what I did"; required for unplanned work
+    remarks: str = Field("", max_length=1000)           # "what I did" (stored as `remarks`); required for unplanned work
+    extra_remarks: str = Field("", max_length=1000)     # the optional "Remarks" box that follows it
     is_unplanned: bool = False
 
 
@@ -158,7 +159,7 @@ def _task_view(t, used: dict, holidays) -> dict:
 
 
 def _entry_view(e: dict) -> dict:
-    return {k: e.get(k) for k in ("task_id", "task_name", "client", "project", "project_code", "remarks",
+    return {k: e.get(k) for k in ("task_id", "task_name", "client", "project", "project_code", "remarks", "extra_remarks",
                                   "hours", "task_status", "is_unplanned", "legacy")}
 
 
@@ -276,7 +277,7 @@ def _build_entry_docs(emp: str, d: date, body: DayIn) -> List[dict]:
         remarks = (e.remarks or "").strip()
         doc = {
             "employee_id": emp, "date": d.isoformat(), "location": location,
-            "remarks": remarks, "activity": remarks,           # `activity` mirrors remarks for older readers (digest)
+            "remarks": remarks, "extra_remarks": (e.extra_remarks or "").strip(), "activity": remarks,           # `activity` mirrors remarks for older readers (digest)
             "hours": None if e.hours is None else round(float(e.hours), 2),
             "task_status": e.task_status, "cycle_id": cyc.id,
             "reporting_manager": (mgr.get("ReportingEmpCode") or "").strip().upper(),

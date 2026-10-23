@@ -15,6 +15,8 @@
     { id: "myday", href: "/timesheet", icon: "fa-clock", label: "My day" },
     { id: "review", href: "/static/timesheet/review.html", icon: "fa-clipboard-check", label: "Review team",
       when: (m) => m.is_admin || m.has_reportees },
+    { id: "late", href: "/static/timesheet/cycle.html", icon: "fa-triangle-exclamation", label: "Late projects",
+      when: (m) => m.is_admin || m.is_manager },
     { id: "team", href: "/static/timesheet/manager.html", icon: "fa-gauge-high", label: "Team dashboard",
       when: (m) => m.is_manager || m.is_admin || m.is_partner },
     { id: "portfolio", href: "/static/timesheet/portfolio.html", icon: "fa-chart-pie", label: "Portfolio",
