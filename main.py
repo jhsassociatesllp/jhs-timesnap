@@ -180,7 +180,9 @@ async def warmup_chatbot():
             logging.info("[RCM Chatbot] Ready.")
         except Exception as e:
             logging.warning(f"[RCM Chatbot] Warm-up skipped: {e}")
-    await loop.run_in_executor(None, _warmup)
+    # Warm up in the background: the app accepts requests straight away instead of waiting ~10 s for the
+    # embedding model, and the first chat message is still fast once the warm-up has finished.
+    app.state.chatbot_warmup = loop.run_in_executor(None, _warmup)
 
 
 static_root = os.path.join(os.path.dirname(__file__), "static")

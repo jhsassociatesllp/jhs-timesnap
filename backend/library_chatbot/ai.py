@@ -4,13 +4,13 @@ JHS Library project — reads its own OpenAI key from library_settings."""
 import json
 import logging
 
-from openai import OpenAI
+from backend.library_chatbot.lazy_openai import LazyOpenAI
 
 from backend.chatbot import usage
 from backend.library_chatbot.config import library_settings
 
 logger = logging.getLogger(__name__)
-_openai = OpenAI(api_key=library_settings.OPENAI_API_KEY)
+_openai = LazyOpenAI(library_settings.OPENAI_API_KEY)
 CHAT_MODEL = library_settings.CHAT_MODEL
 
 

@@ -17,16 +17,21 @@ from io import BytesIO
 from typing import List
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from backend.hr_policy_quiz.config import settings
 
-try:
-    from openai import OpenAI
-    _client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
-except Exception:
-    _client = None
+_client_cache = []                      # the OpenAI client is created on first use (importing `openai` takes ~2 s)
+
+
+def _get_client():
+    """The OpenAI client, or None when no key is configured / the package is unavailable (same as before)."""
+    if not _client_cache:
+        try:
+            from openai import OpenAI
+            _client_cache.append(OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None)
+        except Exception:
+            _client_cache.append(None)
+    return _client_cache[0]
 
 
 def extract_text(file_bytes: bytes, filename: str) -> str:
@@ -70,12 +75,14 @@ def build_tfidf_matrix(chunks: List[str]):
     """Used for retrieval if we ever need to fetch the most relevant chunks
     for a specific topic. Returns the vectorizer and matrix as plain lists
     so they are JSON/Mongo friendly."""
+    from sklearn.feature_extraction.text import TfidfVectorizer          # imported on use: scikit-learn is slow to import
     vectorizer = TfidfVectorizer(stop_words="english", max_features=2000)
     matrix = vectorizer.fit_transform(chunks)
     return vectorizer, matrix
 
 
 def most_relevant_chunks(query: str, chunks: List[str], vectorizer, matrix, top_k: int = 3) -> List[str]:
+    from sklearn.metrics.pairwise import cosine_similarity
     query_vec = vectorizer.transform([query])
     scores = cosine_similarity(query_vec, matrix).flatten()
     top_idx = np.argsort(scores)[::-1][:top_k]
@@ -102,11 +109,12 @@ Excerpt:
 
 
 def generate_questions_for_chunk(chunk: str, n: int) -> List[dict]:
-    if _client is None:
+    client = _get_client()
+    if client is None:
         raise RuntimeError(
             "OPENAI_API_KEY is not configured. Add it to .env to enable question generation."
         )
-    resp = _client.chat.completions.create(
+    resp = client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=1500,
         messages=[{"role": "user", "content": QUESTION_PROMPT.format(n=n, excerpt=chunk)}],
