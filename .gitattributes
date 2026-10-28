@@ -1,0 +1,2 @@
+# Server-side files must keep LF line endings (systemd rejects CRLF)
+deploy/* text eol=lf

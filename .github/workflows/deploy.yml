@@ -184,6 +184,7 @@ jobs:
               docker run -d \
                 --name "$APP_NAME" \
                 -p "$PORT:8000" \
+                --add-host=host.docker.internal:host-gateway \
                 -v "${APP_NAME}_resume_uploads:/app/data/resume_ranker/uploads" \
                 -e APP_ENV="$ENV" \
                 -e MONGO_CONNECTION_STRING="${{ secrets.MONGO_CONNECTION_STRING }}" \
@@ -220,6 +221,11 @@ jobs:
                 -e GRAPH_SENDER="${{ secrets.GRAPH_SENDER }}" \
                 -e HR_NOTIFY_EMAIL="${{ secrets.HR_NOTIFY_EMAIL }}" \
                 -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
+                -e NQ_DB_HOST="host.docker.internal" \
+                -e NQ_DB_LOCAL_PORT="${{ secrets.NQ_DB_LOCAL_PORT }}" \
+                -e NQ_DB_NAME="${{ secrets.NQ_DB_NAME }}" \
+                -e NQ_DB_USER="${{ secrets.NQ_DB_USER }}" \
+                -e NQ_DB_PASS="${{ secrets.NQ_DB_PASS }}" \
                 "$IMAGE"
 
               echo "🧹 Cleaning dangling images..."
