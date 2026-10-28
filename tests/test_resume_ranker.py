@@ -530,12 +530,16 @@ def test_recommend_roles_needs_real_evidence():
     assert recommend_roles({"skills": ["Communication"], "experience": [{"title": "Associate", "summary": "cafe and ca"}]}) == []
 
 
-def test_recommended_roles_are_stored_and_returned(api, fake_llm):
+def test_recommended_roles_are_shown_but_never_written_to_the_resume(api):
     from backend.resume_ranker.db import resumes
-    from backend.resume_ranker.router import _resume_row, backfill_recommended_roles
-    rid = resumes.insert_one({"status": "parsed", "filename": "a.pdf", "parsed": {
-        "skills": ["Python", "SQL", "Power BI"], "experience": [{"title": "Data Analyst"}]}}).inserted_id
-    assert backfill_recommended_roles() == 1                     # older CV gets them with no AI call
-    row = _resume_row(resumes.find_one({"_id": rid}))
+    doc = {"status": "parsed", "filename": "a.pdf", "uploaded_at": __import__("datetime").datetime.utcnow(), "parsed": {
+        "skills": ["Python", "SQL", "Power BI"], "experience": [{"title": "Data Analyst"}]}}
+    rid = resumes.insert_one(doc).inserted_id
+    before = resumes.find_one({"_id": rid})
+    listing = api.get("/resume-ranker/resumes").json()["resumes"]
+    row = next(r for r in listing if r["id"] == str(rid))
     assert row["recommended_roles"][0]["department"] == "Data Analytics"
-    assert backfill_recommended_roles() == 0                     # idempotent
+    detail = api.get(f"/resume-ranker/resumes/{rid}").json()
+    assert detail["recommended_roles"][0]["department"] == "Data Analytics"
+    assert resumes.find_one({"_id": rid}) == before                 # the stored CV is byte-for-byte unchanged
+    assert "recommended_roles" not in resumes.find_one({"_id": rid})

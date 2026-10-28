@@ -72,17 +72,6 @@ def backfill_general_scores() -> int:
     return n
 
 
-def backfill_recommended_roles() -> int:
-    """CVs parsed before role recommendations existed: compute them from the stored parsed data
-    (keyword scoring — no AI call, no cost). Returns how many were filled."""
-    n = 0
-    for r in resumes.find({"status": "parsed", "recommended_roles": {"$exists": False}, "parsed": {"$exists": True}},
-                          {"parsed": 1}):
-        resumes.update_one({"_id": r["_id"]}, {"$set": {"recommended_roles": recommend_roles(r["parsed"])}})
-        n += 1
-    return n
-
-
 def startup() -> None:
     """Called once from main.py's startup hook."""
     ensure_indexes()
@@ -92,12 +81,6 @@ def startup() -> None:
             log.info("ranked %d previously-uploaded CV(s) (free, no AI)", filled)
     except Exception:
         log.exception("general-score backfill skipped")
-    try:
-        filled = backfill_recommended_roles()
-        if filled:
-            log.info("recommended departments for %d previously-uploaded CV(s) (free, no AI)", filled)
-    except Exception:
-        log.exception("role backfill skipped")
     worker.pool.start()
 
 
@@ -625,6 +608,15 @@ def retry_failed(batch_id: str, _: str = Depends(require_access)):
 # Resume list / search / ranking
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _attach_roles(rows: list) -> None:
+    """Department recommendations (see roles.py), worked out when a page of results is shown and
+    NEVER written back: the resume documents are not touched. One read-only query for the page."""
+    ids = [_oid(r["id"]) for r in rows]
+    parsed = {str(d["_id"]): d.get("parsed") for d in resumes.find({"_id": {"$in": ids}}, {"parsed": 1})}
+    for r in rows:
+        r["recommended_roles"] = recommend_roles(parsed.get(r["id"]))
+
+
 def _resume_row(r: dict) -> dict:
     p = r.get("parsed") or {}
     latest = (p.get("experience") or [{}])[0] if p.get("experience") else {}
@@ -640,8 +632,6 @@ def _resume_row(r: dict) -> dict:
         # Free, job-independent ranking score computed at parse time (see parser.general_score) —
         # this is what "AI ranks every resume, top shows first" runs on when no job is picked.
         "general_score": r.get("general_score"), "general_breakdown": r.get("general_breakdown"),
-        # departments this CV could fit (free keyword scoring, see roles.py); [] when there is too little to go on
-        "recommended_roles": r.get("recommended_roles") or [],
     }
 
 
@@ -1232,7 +1222,9 @@ def list_resumes(
                 hide_duplicates=hide_duplicates, must_haves_ok=must_haves_ok, sort=sort, order=order, ai_rank=ai_rank)
     rows = _search(f)
     start = (page - 1) * page_size
-    out = {"total": len(rows), "page": page, "page_size": page_size, "resumes": rows[start:start + page_size]}
+    page_rows = rows[start:start + page_size]
+    _attach_roles(page_rows)
+    out = {"total": len(rows), "page": page, "page_size": page_size, "resumes": page_rows}
     if job_id:
         parsed_ids = {str(d["_id"]) for d in resumes.find({"status": "parsed", **NOT_HARD_DUP}, {"_id": 1})}
         handled = {s["resume_id"] for s in scores.find({"job_id": job_id}, {"resume_id": 1})}
@@ -1245,6 +1237,7 @@ def list_resumes(
 def resume_detail(resume_id: str, _: str = Depends(require_access)):
     r = _get_resume(resume_id)
     row = _resume_row(r)
+    row["recommended_roles"] = recommend_roles(r.get("parsed"))
     row.update({"text": r.get("text"), "parsed": r.get("parsed"), "size": r.get("size"),
                 "notes": [{**n, "at": _iso(n.get("at"))} for n in r.get("notes", [])]})
     job_map = {str(j["_id"]): j for j in jobs.find()}

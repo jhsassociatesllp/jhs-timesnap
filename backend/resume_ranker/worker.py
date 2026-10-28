@@ -30,7 +30,6 @@ from backend.resume_ranker.embeddings import embed_resume
 from backend.resume_ranker import filestore
 from backend.resume_ranker.extract import ExtractionError, extract_text
 from backend.resume_ranker.parser import general_score, parse_resume, phone_key, skill_key, EDU_RANKS
-from backend.resume_ranker.roles import recommend_roles
 from backend.resume_ranker.scoring import criteria_signature, score_resume
 
 log = logging.getLogger("resume_ranker.worker")
@@ -162,8 +161,6 @@ def _handle_parse(task: dict) -> None:
     gs = general_score(parsed)
     update["general_score"] = gs["total"]
     update["general_breakdown"] = gs["breakdown"]
-    # Which departments could this person fit (HR, Data Analytics, Audit...) — free keyword scoring.
-    update["recommended_roles"] = recommend_roles(parsed)
     # Best-effort: powers the relevance pre-filter only (see prefilter.py). A
     # failure here never fails parsing — this resume just won't be
     # pre-filterable and will always be fully LLM-scored, the safe fallback.
