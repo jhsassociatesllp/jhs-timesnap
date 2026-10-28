@@ -51,6 +51,10 @@ def tidy_audit_type(raw: Optional[str]) -> str:
     return s if len(s) > 1 else "Not set"
 
 
+def _overdue(t: NQTask, today: date) -> bool:
+    return bool(t.end_date and t.end_date < today and not t.is_complete)
+
+
 def task_state(t: NQTask) -> str:
     if t.is_complete:
         return "Completed"
@@ -88,7 +92,7 @@ def live_status(state: str, project_status: str, deadline: Optional[date], stage
     if not stages and not deadline:
         return "no_plan"
     open_stages = [s for s in stages if not s.is_complete]
-    if (deadline and deadline < today) or any(s.is_overdue for s in open_stages):
+    if (deadline and deadline < today) or any(_overdue(s, today) for s in open_stages):
         return "delayed"
     before_final = [s for s in open_stages if not FINAL_REPORT.search(s.name)]
     if deadline and (deadline - today).days <= AT_RISK_DAYS and before_final:
@@ -187,7 +191,7 @@ def build_tracker(me: str, firm: bool, reportees: List[str], manager: Optional[s
             task_rows.append({"name": t.name, "sub_task": t.parent_task_id is not None, "start": _iso(t.start_date), "end": _iso(t.end_date),
                               "assignees": [name_by_uid.get(i, f"NQ user {i}") for i in t.assignee_ids], "state": task_state(t),
                               "planned": bool(t.start_date and t.end_date), "assigned": bool(t.assignee_ids),
-                              "overdue": bool(t.is_overdue and not t.is_complete)})
+                              "overdue": _overdue(t, today)})
         wk = [{"name": emp_names.get(e) or e, "hours": round(h, 1)} for e, h in week.get(p.project_code, Counter()).most_common()]
         rows.append({
             "code": p.project_code, "project": p.project_name or p.project_code, "client": p.client_name or "No client",
@@ -199,7 +203,7 @@ def build_tracker(me: str, firm: bool, reportees: List[str], manager: Optional[s
             "stages_ongoing": sum(1 for s in stages if not s.is_complete and s.status_id == 2),
             "stages_pending": sum(1 for s in stages if not s.is_complete and s.status_id == 1),
             "stages_hold": sum(1 for s in stages if not s.is_complete and s.status_id == 3),
-            "stages_overdue": sum(1 for s in stages if s.is_overdue and not s.is_complete),
+            "stages_overdue": sum(1 for s in stages if _overdue(s, today)),
             "stages_unassigned": sum(1 for s in stages if not s.assignee_ids),
             "stages_undated": sum(1 for s in stages if not (s.start_date and s.end_date)),
             "next_stage": open_stages[0].name if open_stages else "", "next_stage_due": _iso(open_stages[0].end_date) if open_stages else "",

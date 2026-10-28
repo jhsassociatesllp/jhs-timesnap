@@ -7,7 +7,7 @@ import pytest
 
 os.environ.setdefault("MONGO_CONNECTION_STRING", "mongodb://localhost:27018/")
 
-from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient  # the real client: tests/conftest.py swaps pymongo.MongoClient for mongomock
 
 from backend.timesheet import nested_view, rules
 
