@@ -424,6 +424,27 @@
         </a>`;
     }
 
+    function buildResumeRankerCard() {
+      return `
+        <a href="/resume-ranker" class="module-card card-cb clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-ranking-star"></i></div>
+            <span class="card-tag">HR</span>
+          </div>
+          <h2 class="card-title">Resume Ranker</h2>
+          <p class="card-desc">Bulk-upload CVs, parse them with AI and rank candidates against each job's requirements, with a score breakdown and must-have flags.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-cloud-arrow-up"></i> Bulk Upload</span>
+            <span class="chip"><i class="fas fa-scale-balanced"></i> Weighted Scoring</span>
+            <span class="chip"><i class="fas fa-file-export"></i> Excel / CSV Export</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">HR recruitment access</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
     // ── Main init ──
     async function initModules() {
       let qaAccess  = null;
@@ -492,6 +513,13 @@
         if (res.ok) declIsAdmin = (await res.json()).is_admin;
       } catch(e) {}
 
+      // Resume Ranker — only for people listed in Resume_Ranker.Holders (HR, partners, owner)
+      let rrAccess = false;
+      try {
+        const res = await fetch('/resume-ranker/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) rrAccess = (await res.json()).allowed === true;
+      } catch(e) {}
+
       // Show Control Panel button if user has any admin module access
       // (timesheet/QA/KRA) or Employee Declaration admin access
       if (moduleAccess?.is_admin || declIsAdmin) {
@@ -524,6 +552,11 @@
 
       // Employee Declaration Form — always shown, like Timesheet
       grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
+
+      // Resume Ranker — holders only, outside the Control Panel
+      if (rrAccess) {
+        grid.innerHTML += buildResumeRankerCard();
+      }
 
       // CV Builder — always shown
       grid.innerHTML += CARD_CV;
