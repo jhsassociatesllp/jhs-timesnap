@@ -40,6 +40,7 @@ from backend.resume_ranker.embeddings import cosine_similarity, embed_job
 from backend.resume_ranker.parser import EDU_LABELS, EDU_RANKS, general_score, skill_key
 from backend.resume_ranker.extract import sniff_kind
 from backend.resume_ranker.prefilter import screened_out_result, split_candidates
+from backend.resume_ranker.roles import recommend_roles
 from backend.resume_ranker.scoring import (CRITERIA, CRITERION_LABELS, DEFAULT_WEIGHTS, active_criteria,
                                            criteria_signature, effective_weights, extract_criteria, score_resume)
 
@@ -606,6 +607,15 @@ def retry_failed(batch_id: str, _: str = Depends(require_access)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Resume list / search / ranking
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _attach_roles(rows: list) -> None:
+    """Department recommendations (see roles.py), worked out when a page of results is shown and
+    NEVER written back: the resume documents are not touched. One read-only query for the page."""
+    ids = [_oid(r["id"]) for r in rows]
+    parsed = {str(d["_id"]): d.get("parsed") for d in resumes.find({"_id": {"$in": ids}}, {"parsed": 1})}
+    for r in rows:
+        r["recommended_roles"] = recommend_roles(parsed.get(r["id"]))
+
 
 def _resume_row(r: dict) -> dict:
     p = r.get("parsed") or {}
@@ -1212,7 +1222,9 @@ def list_resumes(
                 hide_duplicates=hide_duplicates, must_haves_ok=must_haves_ok, sort=sort, order=order, ai_rank=ai_rank)
     rows = _search(f)
     start = (page - 1) * page_size
-    out = {"total": len(rows), "page": page, "page_size": page_size, "resumes": rows[start:start + page_size]}
+    page_rows = rows[start:start + page_size]
+    _attach_roles(page_rows)
+    out = {"total": len(rows), "page": page, "page_size": page_size, "resumes": page_rows}
     if job_id:
         parsed_ids = {str(d["_id"]) for d in resumes.find({"status": "parsed", **NOT_HARD_DUP}, {"_id": 1})}
         handled = {s["resume_id"] for s in scores.find({"job_id": job_id}, {"resume_id": 1})}
@@ -1225,6 +1237,7 @@ def list_resumes(
 def resume_detail(resume_id: str, _: str = Depends(require_access)):
     r = _get_resume(resume_id)
     row = _resume_row(r)
+    row["recommended_roles"] = recommend_roles(r.get("parsed"))
     row.update({"text": r.get("text"), "parsed": r.get("parsed"), "size": r.get("size"),
                 "notes": [{**n, "at": _iso(n.get("at"))} for n in r.get("notes", [])]})
     job_map = {str(j["_id"]): j for j in jobs.find()}

@@ -1421,3 +1421,10 @@ body { background: var(--pg); background-attachment: fixed; }
 @media (max-width: 760px) {
   .page { margin: 0; border-radius: 0; padding: 1.2rem 1rem 2rem; }
 }
+
+/* Recommended departments */
+.role-tags{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem;margin-top:.4rem}
+.role-lbl{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.role-row{padding:.55rem 0;border-bottom:1px solid var(--border)}
+.role-row:last-of-type{border-bottom:0}
+.role-h{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.35rem}
