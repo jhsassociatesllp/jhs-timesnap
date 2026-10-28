@@ -331,7 +331,7 @@
       const s = r.score;                       // present only when "AI Rank" was used for this search
       const dup = r.duplicate_of;
       const badges = (dup ? `<span class="chip amber" title="${esc(r.duplicate_reason || '')}"><i class="fas fa-clone"></i> ${r.duplicate_confidence === 'possible' ? 'Possible duplicate' : 'Duplicate'}</span> ` : '');
-      const cand = `<div class="cand-name"><a data-view="${r.id}">${esc(r.name || r.filename)}</a></div><div class="sub">${esc([r.current_title, r.current_company].filter(Boolean).join(' · ') || r.headline || '')}</div><div class="sub">${esc([r.email, cityState(r.location)].filter(Boolean).join(' · '))}</div>${badges}`;
+      const cand = `<div class="cand-name"><a data-view="${r.id}">${esc(r.name || r.filename)}</a></div><div class="sub">${esc([r.current_title, r.current_company].filter(Boolean).join(' · ') || r.headline || '')}</div><div class="sub">${esc([r.email, cityState(r.location)].filter(Boolean).join(' · '))}</div>${roleTags(r)}${badges}`;
       const skills = `<div class="tagline">${(r.skills || []).slice(0, 5).map((k) => `<span class="chip">${esc(k)}</span>`).join('')}</div>`;
 
       let scoreCell, breakdownCell;
@@ -439,6 +439,21 @@
     return '';
   }
 
+  // "Where could this person go?" — department tags from roles.py (free keyword scoring, no AI call).
+  const FIT_CLASS = { Strong: 'green', Good: 'blue', Possible: 'gray' };
+  function roleTags(r) {
+    const roles = r.recommended_roles || [];
+    if (!roles.length) return '';
+    return `<div class="role-tags"><span class="role-lbl">Fits</span>${roles.map((x) => `<span class="chip ${FIT_CLASS[x.fit] || 'gray'}" title="${esc(x.fit)} fit (${num(x.score)}%) — matched: ${esc((x.reasons || []).join(', '))}">${esc(x.department)}</span>`).join('')}</div>`;
+  }
+  function rolesCard(r) {
+    const roles = r.recommended_roles || [];
+    const body = roles.length
+      ? roles.map((x) => `<div class="role-row"><div class="role-h"><b>${esc(x.department)}</b><span class="chip ${FIT_CLASS[x.fit] || 'gray'}">${esc(x.fit)} fit</span></div><div class="sbar"><div style="width:${Math.min(x.score, 100)}%"></div></div><div class="sub">Based on: ${esc((x.reasons || []).join(', '))}</div></div>`).join('')
+      : '<p class="muted">Not enough skills or experience in this CV to suggest a department.</p>';
+    return `<div class="d-card"><h4>Recommended departments</h4>${body}<p class="sub" style="margin-top:.6rem">Suggested from the CV's skills, job titles, certifications and education.</p></div>`;
+  }
+
   function generalScoreBlock(r) {
     const gs = r.general_score; const b = r.general_breakdown || {};
     if (gs == null) return '<p class="muted">Not yet ranked.</p>';
@@ -466,6 +481,7 @@
       <div class="d-cols">
         <div>
           <div class="d-card"><h4>Ranking</h4>${generalScoreBlock(r)}</div>
+          ${rolesCard(r)}
           ${aiScores.length ? `<div class="d-card"><h4>AI Rank evaluation</h4>${aiScoreBlock(aiScores[0])}</div>` : ''}
           ${(p.skills || []).length ? `<div class="d-card"><h4>Skills</h4><div class="tagline">${p.skills.map((s) => `<span class="chip">${esc(s)}</span>`).join('')}</div></div>` : ''}
           ${(p.certifications || []).length ? `<div class="d-card"><h4>Certifications</h4><div class="tagline">${p.certifications.map((s) => `<span class="chip green">${esc(s)}</span>`).join('')}</div></div>` : ''}

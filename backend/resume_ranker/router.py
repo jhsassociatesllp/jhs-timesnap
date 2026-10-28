@@ -40,6 +40,7 @@ from backend.resume_ranker.embeddings import cosine_similarity, embed_job
 from backend.resume_ranker.parser import EDU_LABELS, EDU_RANKS, general_score, skill_key
 from backend.resume_ranker.extract import sniff_kind
 from backend.resume_ranker.prefilter import screened_out_result, split_candidates
+from backend.resume_ranker.roles import recommend_roles
 from backend.resume_ranker.scoring import (CRITERIA, CRITERION_LABELS, DEFAULT_WEIGHTS, active_criteria,
                                            criteria_signature, effective_weights, extract_criteria, score_resume)
 
@@ -71,6 +72,17 @@ def backfill_general_scores() -> int:
     return n
 
 
+def backfill_recommended_roles() -> int:
+    """CVs parsed before role recommendations existed: compute them from the stored parsed data
+    (keyword scoring — no AI call, no cost). Returns how many were filled."""
+    n = 0
+    for r in resumes.find({"status": "parsed", "recommended_roles": {"$exists": False}, "parsed": {"$exists": True}},
+                          {"parsed": 1}):
+        resumes.update_one({"_id": r["_id"]}, {"$set": {"recommended_roles": recommend_roles(r["parsed"])}})
+        n += 1
+    return n
+
+
 def startup() -> None:
     """Called once from main.py's startup hook."""
     ensure_indexes()
@@ -80,6 +92,12 @@ def startup() -> None:
             log.info("ranked %d previously-uploaded CV(s) (free, no AI)", filled)
     except Exception:
         log.exception("general-score backfill skipped")
+    try:
+        filled = backfill_recommended_roles()
+        if filled:
+            log.info("recommended departments for %d previously-uploaded CV(s) (free, no AI)", filled)
+    except Exception:
+        log.exception("role backfill skipped")
     worker.pool.start()
 
 
@@ -622,6 +640,8 @@ def _resume_row(r: dict) -> dict:
         # Free, job-independent ranking score computed at parse time (see parser.general_score) —
         # this is what "AI ranks every resume, top shows first" runs on when no job is picked.
         "general_score": r.get("general_score"), "general_breakdown": r.get("general_breakdown"),
+        # departments this CV could fit (free keyword scoring, see roles.py); [] when there is too little to go on
+        "recommended_roles": r.get("recommended_roles") or [],
     }
 
 

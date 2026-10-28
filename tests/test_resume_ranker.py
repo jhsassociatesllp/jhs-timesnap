@@ -503,3 +503,39 @@ def test_cvs_uploaded_before_auto_ranking_get_ranked_without_any_ai_call(api, fa
     row = api.get("/resume-ranker/resumes").json()["resumes"][0]
     assert row["general_score"] > 0 and row["rank"] == 1
     assert len(fake_llm.calls) == calls                                                   # free: no AI used
+
+
+# ── department recommendations ──────────────────────────────────────────────
+
+def test_recommend_roles_picks_the_right_departments():
+    from backend.resume_ranker.roles import recommend_roles
+    hr = {"headline": "HR Executive", "skills": ["Recruitment", "Onboarding", "Payroll", "HRMS"],
+          "education": [{"degree": "MBA", "field": "Human Resources"}], "experience": [{"title": "HR Executive"}]}
+    data = {"headline": "Data Analyst", "skills": ["Python", "SQL", "Power BI", "Pandas"], "experience": [{"title": "Data Analyst"}]}
+    audit = {"skills": ["Statutory audit", "Internal audit", "Tally"], "certifications": ["CA"],
+             "experience": [{"title": "Audit Executive"}]}
+    assert recommend_roles(hr)[0]["department"] == "Human Resources" and recommend_roles(hr)[0]["fit"] == "Strong"
+    assert recommend_roles(data)[0]["department"] == "Data Analytics"
+    assert recommend_roles(audit)[0]["department"] == "Audit & Assurance"
+    mixed = recommend_roles({"skills": ["Python", "SQL", "Recruitment", "HRMS", "Power BI"], "experience": [{"title": "HR Analyst"}]})
+    assert {r["department"] for r in mixed} >= {"Human Resources", "Data Analytics"}
+    assert all(r["reasons"] for r in mixed)
+
+
+def test_recommend_roles_needs_real_evidence():
+    from backend.resume_ranker.roles import recommend_roles
+    assert recommend_roles(None) == [] and recommend_roles({}) == []
+    assert recommend_roles({"skills": ["Microsoft Word"], "experience": []}) == []
+    # "CA" only counts as a certification/skill/degree, never as a fragment of ordinary words
+    assert recommend_roles({"skills": ["Communication"], "experience": [{"title": "Associate", "summary": "cafe and ca"}]}) == []
+
+
+def test_recommended_roles_are_stored_and_returned(api, fake_llm):
+    from backend.resume_ranker.db import resumes
+    from backend.resume_ranker.router import _resume_row, backfill_recommended_roles
+    rid = resumes.insert_one({"status": "parsed", "filename": "a.pdf", "parsed": {
+        "skills": ["Python", "SQL", "Power BI"], "experience": [{"title": "Data Analyst"}]}}).inserted_id
+    assert backfill_recommended_roles() == 1                     # older CV gets them with no AI call
+    row = _resume_row(resumes.find_one({"_id": rid}))
+    assert row["recommended_roles"][0]["department"] == "Data Analytics"
+    assert backfill_recommended_roles() == 0                     # idempotent
