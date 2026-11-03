@@ -78,6 +78,7 @@ jobs:
           case "$BRANCH" in
             main)
               ENV="production"
+              MONGO_URI="${{ secrets.MONGO_CONNECTION_STRING }}"
               APP_NAME="jhs_timesnap_production"
               PORT=8011
               SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
@@ -91,6 +92,7 @@ jobs:
               ;;
             staging)
               ENV="staging"
+              MONGO_URI="mongodb://45.198.225.149:27017/"
               APP_NAME="jhs_timesnap_staging"
               PORT=8010
               SMTP="${{ secrets.SMTP_KEY_STAGING }}"
@@ -187,7 +189,7 @@ jobs:
                 --add-host=host.docker.internal:host-gateway \
                 -v "${APP_NAME}_resume_uploads:/app/data/resume_ranker/uploads" \
                 -e APP_ENV="$ENV" \
-                -e MONGO_CONNECTION_STRING="${{ secrets.MONGO_CONNECTION_STRING }}" \
+                -e MONGO_CONNECTION_STRING="$MONGO_URI" \
                 -e SMTP_KEY="$SMTP" \
                 -e JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
                 -e HR_QUIZ_DB_NAME="$HR_QUIZ_DB_NAME" \
