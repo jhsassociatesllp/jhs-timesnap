@@ -50,13 +50,65 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 });
 
 // ---------------------------------------------------------------------------
+// Date filter (From / To are calendar days; timestamps from the server are UTC) - also applied to the downloads
+// ---------------------------------------------------------------------------
+const utc = (s) => (/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z");
+function inRange(iso, from, to) {
+  if (!from && !to) return true;
+  if (!iso) return false;
+  const t = new Date(utc(iso)).getTime();
+  if (from && t < new Date(from + "T00:00:00").getTime()) return false;
+  if (to && t > new Date(to + "T23:59:59.999").getTime()) return false;
+  return true;
+}
+function dateFilter() {
+  return { by: document.getElementById("dfBy").value, from: document.getElementById("dfFrom").value, to: document.getElementById("dfTo").value };
+}
+function dateQuery() {
+  const { by, from, to } = dateFilter();
+  return [from && "date_from=" + from, to && "date_to=" + to, (from || to) && "by=" + by].filter(Boolean).join("&");
+}
+["dfBy", "dfFrom", "dfTo"].forEach((id) => document.getElementById(id).addEventListener("change", () => loadCandidates()));
+document.getElementById("dfClear").addEventListener("click", () => {
+  document.getElementById("dfFrom").value = ""; document.getElementById("dfTo").value = ""; loadCandidates();
+});
+
+// ---------------------------------------------------------------------------
+// Paging: at most one page of candidates on screen (10 / 25 / 50 / 100 per page); the numbers above the table
+// (total / completed / average) still cover every candidate that matches the date filter.
+// ---------------------------------------------------------------------------
+const quizPg = { page: 1, size: 10, sig: null };
+function renderQuizPager(total) {
+  const box = document.getElementById("pgQuiz");
+  const pages = Math.max(1, Math.ceil(total / quizPg.size));
+  if (!total) { box.innerHTML = ""; return; }
+  box.innerHTML = `<span>Rows per page <select id="pgQuizSize">${[10, 25, 50, 100].map((n) => `<option${n === quizPg.size ? " selected" : ""}>${n}</option>`).join("")}</select></span>
+    <span>${(quizPg.page - 1) * quizPg.size + 1}-${Math.min(total, quizPg.page * quizPg.size)} of ${total}</span>
+    <span><button type="button" class="btn btn-ghost btn-sm" id="pgQuizPrev" ${quizPg.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button>
+      Page ${quizPg.page} of ${pages}
+      <button type="button" class="btn btn-ghost btn-sm" id="pgQuizNext" ${quizPg.page >= pages ? "disabled" : ""}>Next &rsaquo;</button></span>`;
+  document.getElementById("pgQuizSize").addEventListener("change", (e) => { quizPg.size = +e.target.value; quizPg.page = 1; loadCandidates(); });
+  document.getElementById("pgQuizPrev").addEventListener("click", () => { quizPg.page--; loadCandidates(); });
+  document.getElementById("pgQuizNext").addEventListener("click", () => { quizPg.page++; loadCandidates(); });
+}
+
+// ---------------------------------------------------------------------------
 // Candidate table + stats
 // ---------------------------------------------------------------------------
 async function loadCandidates() {
-  const rows = await apiRequest("/api/hr/candidates", { role: "hr" });
+  let rows = await apiRequest("/api/hr/candidates", { role: "hr" });
+  const total = rows.length;
+  const { by, from, to } = dateFilter();
+  if (from || to) rows = rows.filter((r) => inRange(r[by], from, to));
+  document.getElementById("dfInfo").textContent = from || to ? `showing ${rows.length} of ${total} candidates` : "";
   const tbody = document.getElementById("candidateTableBody");
   const empty = document.getElementById("candidateEmpty");
   tbody.innerHTML = "";
+  const sig = [by, from, to].join("|");                      // a new date filter starts on page 1
+  if (quizPg.sig !== sig) { quizPg.sig = sig; quizPg.page = 1; }
+  quizPg.page = Math.min(quizPg.page, Math.max(1, Math.ceil(rows.length / quizPg.size)));
+  const pageStart = (quizPg.page - 1) * quizPg.size, pageEnd = pageStart + quizPg.size;
+  renderQuizPager(rows.length);
 
   if (rows.length === 0) {
     empty.style.display = "block";
@@ -66,9 +118,10 @@ async function loadCandidates() {
 
   let completed = 0, inProgress = 0, scoreSum = 0, scoreCount = 0;
 
-  rows.forEach((r) => {
+  rows.forEach((r, idx) => {
     if (r.status === "completed") { completed++; scoreSum += r.score; scoreCount++; }
     if (r.status === "in_progress") inProgress++;
+    if (idx < pageStart || idx >= pageEnd) return;           // counted above, just not drawn on this page
 
     const tr = document.createElement("tr");
     const badgeClass = r.status === "completed" ? "badge-completed" : r.status === "in_progress" ? "badge-progress" : "badge-pending";
@@ -128,7 +181,8 @@ async function downloadReport(format) {
   downloadBtn.disabled = true;
   downloadBtn.textContent = "Preparing...";
   try {
-    const res = await fetch(`${API_BASE}/api/hr/candidates/export.${format}`, {
+    const qs = dateQuery();
+    const res = await fetch(`${API_BASE}/api/hr/candidates/export.${format}${qs ? "?" + qs : ""}`, {
       headers: { Authorization: "Bearer " + getToken("hr") },
     });
     if (!res.ok) throw new Error("Could not generate the report");
@@ -175,7 +229,7 @@ function quickRegenerate(email) {
           role: "hr",
           body: { emails: [email] },
         });
-        showPasswordModal(email, data.password);
+        showPasswordModal(email, data.password, data.mail);
       } catch (err) {
         alert(err.message);
       }
@@ -210,7 +264,7 @@ function showConfirmModal(messageHtml, confirmText, onConfirm) {
   });
 }
 
-function showPasswordModal(email, password) {
+function showPasswordModal(email, password, mail) {
   const root = document.getElementById("attemptModalRoot");
   root.innerHTML = `
     <div class="modal-overlay" id="passwordModalOverlay">
@@ -219,7 +273,7 @@ function showPasswordModal(email, password) {
           <h3>New password generated</h3>
           <button class="btn btn-ghost btn-sm" id="passwordModalClose">Close</button>
         </div>
-        <p class="hint" style="margin-bottom:14px;">For <strong>${escapeHtml(email)}</strong>. Their old password stopped working - share this with them directly.</p>
+        <p class="hint" style="margin-bottom:14px;">For <strong>${escapeHtml(email)}</strong>. Their old password stopped working.</p>${mail ? mailNote(mail) : ""}
         <div class="password-display">
           <span id="passwordText">${escapeHtml(password)}</span>
           <button class="btn btn-secondary btn-sm" id="copyPasswordBtn">Copy</button>
@@ -248,6 +302,113 @@ document.getElementById("refreshBtn").addEventListener("click", loadCandidates);
 // ---------------------------------------------------------------------------
 let allDocuments = [];
 
+function mailNote(m) {
+  m = m || {};
+  if (m.configured === false) return `<div class="hint" style="margin-top:10px;color:#b9770e;"><strong>Email not sent</strong> - ${escapeHtml(m.error || "the mail service is not set up")} Share the password yourself.</div>`;
+  if ((m.failed || []).length) return `<div class="hint" style="margin-top:10px;color:#b9770e;">Email sent to ${(m.sent || []).length}. <strong>Could not email:</strong> ${m.failed.map(escapeHtml).join(", ")}. ${escapeHtml(m.error || "")} Share the password yourself.</div>`;
+  return `<div class="hint" style="margin-top:10px;color:#0d7a70;"><strong>Email sent</strong> to ${(m.sent || []).length} candidate(s) with the new password.</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Question review: HR reads every question of a document, and edits or deletes the ones that are not good
+// ---------------------------------------------------------------------------
+let QV = { docId: null, title: "", all: [], page: 1, q: "", editing: null };
+const QV_PAGE = 8;
+
+async function viewQuestions(documentId, title) {
+  try {
+    const d = await apiRequest(`/api/hr/documents/${encodeURIComponent(documentId)}/questions`, { role: "hr" });
+    QV = { docId: documentId, title, all: d.questions, page: 1, q: "", editing: null };
+    let root = document.getElementById("qvRoot");
+    if (!root) { root = document.createElement("div"); root.id = "qvRoot"; document.body.appendChild(root); }
+    root.innerHTML = `
+      <div class="modal-overlay" id="qvOverlay">
+        <div class="modal-box" style="max-width:900px;width:94vw;max-height:88vh;display:flex;flex-direction:column;">
+          <div class="modal-header"><h3 id="qvTitle"></h3><button class="btn btn-ghost btn-sm" id="qvClose">Close</button></div>
+          <div style="padding:10px 16px;border-bottom:1px solid #e1e8ed;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input id="qvSearch" placeholder="Search questions..." style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #d5d9e4;border-radius:8px;">
+            <span class="hint" style="margin:0;">Edit or delete anything unclear, trivial or silly. Changes apply to quizzes started from now on.</span>
+          </div>
+          <div id="qvList" style="overflow:auto;padding:12px 16px;flex:1;"></div>
+          <div id="qvPager" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid #e1e8ed;font-size:13px;color:#7f8c8d;"></div>
+        </div>
+      </div>`;
+    const close = () => { root.innerHTML = ""; loadDocuments(); };
+    document.getElementById("qvClose").addEventListener("click", close);
+    document.getElementById("qvOverlay").addEventListener("click", (e) => { if (e.target.id === "qvOverlay") close(); });
+    document.getElementById("qvSearch").addEventListener("input", (e) => { QV.q = e.target.value.toLowerCase(); QV.page = 1; renderQv(); });
+    document.getElementById("qvList").addEventListener("click", qvClick);
+    renderQv();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function renderQv() {
+  const rows = QV.all.filter((x) => !QV.q || (x.question + " " + x.options.join(" ")).toLowerCase().includes(QV.q));
+  const pages = Math.max(1, Math.ceil(rows.length / QV_PAGE));
+  QV.page = Math.min(QV.page, pages);
+  const start = (QV.page - 1) * QV_PAGE;
+  document.getElementById("qvTitle").innerHTML = `Questions - ${escapeHtml(QV.title)} <span style="font-weight:400;font-size:13px;color:#7f8c8d;">(${QV.all.length})</span>`;
+  document.getElementById("qvList").innerHTML = rows.length ? rows.slice(start, start + QV_PAGE).map((x, i) => {
+    if (QV.editing === x.id) {
+      return `<div class="qv-card" data-id="${x.id}" style="border:2px solid #667eea;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:600;color:#7f8c8d;">Question</label>
+        <textarea id="qvEq" rows="2" style="width:100%;padding:8px;border:1px solid #d5d9e4;border-radius:8px;margin:4px 0 8px;font-family:inherit;">${escapeHtml(x.question)}</textarea>
+        ${x.options.map((o, j) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;"><input type="radio" name="qvCorrect" value="${j}" ${j === x.correct_index ? "checked" : ""} title="Correct answer"><span style="width:18px;font-weight:700;color:#7f8c8d;">${"ABCD"[j]}</span><input class="qvEo" value="${escapeHtml(o)}" style="flex:1;padding:7px 9px;border:1px solid #d5d9e4;border-radius:8px;"></div>`).join("")}
+        <div class="hint" style="margin:4px 0 8px;">The dot marks the correct answer.</div>
+        <button class="btn btn-primary btn-sm" data-act="save">Save</button> <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
+        <span class="hint" id="qvErr" style="color:#c0392b;margin-left:8px;"></span></div>`;
+    }
+    return `<div class="qv-card" data-id="${x.id}" style="border:1px solid #e1e8ed;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:600;">${start + i + 1}. ${escapeHtml(x.question)}</div>
+        <div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-act="edit">Edit</button> <button class="btn btn-ghost btn-sm" data-act="delete">Delete</button></div></div>
+      <ul style="list-style:none;margin:8px 0 0;padding:0;">${x.options.map((o, j) => `<li style="padding:3px 0;${j === x.correct_index ? "color:#0d7a70;font-weight:600;" : ""}">${"ABCD"[j]}. ${escapeHtml(o)}${j === x.correct_index ? " &#10003;" : ""}</li>`).join("")}</ul>
+      ${x.source ? `<div class="hint" style="margin:8px 0 0;">From the document: &ldquo;${escapeHtml(x.source)}&rdquo;</div>` : ""}</div>`;
+  }).join("") : `<div class="empty-state">No questions match.</div>`;
+  document.getElementById("qvPager").innerHTML = `<span>${rows.length ? start + 1 : 0}-${Math.min(rows.length, start + QV_PAGE)} of ${rows.length}</span>
+    <span><button class="btn btn-ghost btn-sm" id="qvPrev" ${QV.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button> Page ${QV.page} of ${pages} <button class="btn btn-ghost btn-sm" id="qvNext" ${QV.page >= pages ? "disabled" : ""}>Next &rsaquo;</button></span>`;
+  document.getElementById("qvPrev").addEventListener("click", () => { QV.page--; QV.editing = null; renderQv(); });
+  document.getElementById("qvNext").addEventListener("click", () => { QV.page++; QV.editing = null; renderQv(); });
+}
+
+async function qvClick(e) {
+  const btn = e.target.closest("[data-act]"); if (!btn) return;
+  const card = btn.closest(".qv-card"), id = card.dataset.id, item = QV.all.find((x) => x.id === id), act = btn.dataset.act;
+  if (act === "edit") { QV.editing = id; renderQv(); return; }
+  if (act === "cancel") { QV.editing = null; renderQv(); return; }
+  const base = `/api/hr/documents/${encodeURIComponent(QV.docId)}/questions/${encodeURIComponent(id)}`;
+  if (act === "delete") {
+    if (!confirm("Delete this question?\n\n" + item.question)) return;
+    try { await apiRequest(base, { method: "DELETE", role: "hr" }); QV.all = QV.all.filter((x) => x.id !== id); renderQv(); }
+    catch (err) { alert(err.message); }
+    return;
+  }
+  if (act === "save") {
+    const body = {
+      question: document.getElementById("qvEq").value,
+      options: [...card.querySelectorAll(".qvEo")].map((i) => i.value),
+      correct_index: Number((card.querySelector('input[name="qvCorrect"]:checked') || {}).value),
+    };
+    try {
+      const saved = await apiRequest(base, { method: "PUT", role: "hr", body });
+      Object.assign(item, saved); QV.editing = null; renderQv();
+    } catch (err) { document.getElementById("qvErr").textContent = err.message; }
+  }
+}
+
+async function cleanDocumentQuestions(documentId, title) {
+  if (!confirm(`Remove the vague or weak questions from the question bank of "${title}"?\n\nThe AI reviews every question; unclear, trivial or silly ones are removed. Quizzes already taken are not affected.`)) return;
+  try {
+    const r = await apiRequest(`/api/hr/documents/${encodeURIComponent(documentId)}/clean-questions`, { method: "POST", role: "hr" });
+    alert(`Done. ${r.removed_count} weak question(s) removed; ${r.after} good questions remain (was ${r.before}).` +
+      (r.removed.length ? "\n\nExamples removed:\n- " + r.removed.map((x) => x.question).join("\n- ") : ""));
+    loadDocuments();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
 async function loadDocuments() {
   const docs = await apiRequest("/api/hr/documents", { role: "hr" });
   allDocuments = docs;
@@ -269,8 +430,12 @@ async function loadDocuments() {
       <td>${escapeHtml(d.filename)}</td>
       <td>${d.question_pool_size}</td>
       <td>${formatDateTime(d.uploaded_at)}</td>
-      <td><button class="btn btn-ghost btn-sm" data-action="delete-doc">Delete</button></td>
+      <td><button class="btn btn-secondary btn-sm" data-action="view-questions" title="Read every question, then edit or delete the ones that are not good">View questions</button>
+          <button class="btn btn-ghost btn-sm" data-action="clean-doc" title="Remove vague or trivial questions from this document's question bank">Clean up questions</button>
+          <button class="btn btn-ghost btn-sm" data-action="delete-doc">Delete</button></td>
     `;
+    tr.querySelector('[data-action="view-questions"]').addEventListener("click", () => viewQuestions(d.document_id, d.title));
+    tr.querySelector('[data-action="clean-doc"]').addEventListener("click", () => cleanDocumentQuestions(d.document_id, d.title));
     tr.querySelector('[data-action="delete-doc"]').addEventListener("click", () => deleteDocument(d.document_id, d.title));
     tbody.appendChild(tr);
   });
@@ -511,6 +676,18 @@ document.getElementById("quizSetForm").addEventListener("submit", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
+function parseEmailList(raw) {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(/[\r\n,;\s]+/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
 // Add candidates
 // ---------------------------------------------------------------------------
 document.getElementById("addForm").addEventListener("submit", async (e) => {
@@ -521,10 +698,7 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
   hideError(errorBox);
   successBox.style.display = "none";
 
-  const emails = document.getElementById("emails").value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const emails = parseEmailList(document.getElementById("emails").value);
   const quizSetId = document.getElementById("quizSetSelect").value;
 
   if (emails.length === 0) { showError(errorBox, "Add at least one email"); return; }
@@ -543,6 +717,16 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
         <strong>${escapeHtml(data.password)}</strong>
         <button type="button" class="btn btn-secondary btn-sm" id="addCopyBtn">Copy</button>
       </div>`;
+    const m = data.mail || {};
+    let mailMsg;
+    if (m.configured === false) {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#b9770e;"><strong>Emails were not sent</strong> - ${escapeHtml(m.error || "the mail service is not set up")} Share the password with the candidates yourself.</div>`;
+    } else if ((m.failed || []).length) {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#b9770e;">Email sent to ${(m.sent || []).length} candidate(s). <strong>Could not email:</strong> ${m.failed.map(escapeHtml).join(", ")}. ${escapeHtml(m.error || "")} Share the password with them yourself.</div>`;
+    } else {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#0d7a70;"><strong>Email sent</strong> to ${(m.sent || []).length} candidate(s) with the quiz link and their login.</div>`;
+    }
+    successBox.innerHTML += mailMsg;
     successBox.style.display = "block";
     wireCopyButton("addCopyBtn", data.password);
     document.getElementById("addForm").reset();
@@ -566,10 +750,7 @@ document.getElementById("regenForm").addEventListener("submit", async (e) => {
   hideError(errorBox);
   successBox.style.display = "none";
 
-  const emails = document.getElementById("regenEmails").value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const emails = parseEmailList(document.getElementById("regenEmails").value);
 
   if (emails.length === 0) { showError(errorBox, "Add at least one email"); return; }
 
@@ -585,7 +766,7 @@ document.getElementById("regenForm").addEventListener("submit", async (e) => {
       <div class="password-inline">
         <strong>${escapeHtml(data.password)}</strong>
         <button type="button" class="btn btn-secondary btn-sm" id="regenCopyBtn">Copy</button>
-      </div>`;
+      </div>${mailNote(data.mail)}`;
     successBox.style.display = "block";
     wireCopyButton("regenCopyBtn", data.password);
     document.getElementById("regenForm").reset();

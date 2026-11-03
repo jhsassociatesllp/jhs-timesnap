@@ -7,9 +7,11 @@ get their own separate JWT (see security.py), stored in the frontend
 under a different localStorage key.
 """
 import random
+from typing import List
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, status
 
 from backend.auth import get_current_user
@@ -31,13 +33,18 @@ from backend.hr_policy_quiz.security import (
     get_current_hr,
     get_current_candidate,
 )
-from backend.hr_policy_quiz import rag, reports
+from backend.hr_policy_quiz import mailer, rag, reports
 
 router = APIRouter(prefix="/hr-quiz", tags=["HR Policy Quiz"])
 
 
 def now():
     return datetime.now(timezone.utc)
+
+
+# Sentinel used as a sort-key fallback for records with a missing timestamp.
+# Using a named constant avoids Pylance's red-underline on datetime.min.replace() in lambdas.
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 def _is_admin_empid(empid: str) -> bool:
@@ -82,7 +89,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Could not read any usable text from this file")
 
     doc_id = str(uuid.uuid4())
-    pool = rag.build_question_pool(chunks)
+    pool = rag.build_question_pool(chunks, title=title, category=category.strip())
     if len(pool) < settings.QUIZ_QUESTION_COUNT:
         raise HTTPException(
             status_code=422,
@@ -113,6 +120,87 @@ def list_documents(hr=Depends(get_current_hr)):
         d["document_id"] = d.pop("_id")
         d["question_pool_size"] = pools.get(d["document_id"], 0)
     return docs
+
+
+@router.post("/api/hr/documents/{document_id}/clean-questions")
+def clean_document_questions(document_id: str, hr=Depends(get_current_hr)):
+    """Remove vague / trivial / silly questions from the bank generated earlier for this document.
+    Nothing is changed if too few good questions would be left (then the document should be uploaded again)."""
+    doc = documents.find_one({"_id": document_id})
+    pool_doc = questions.find_one({"_id": document_id})
+    if not doc or not pool_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    before = pool_doc["pool"]
+    kept, removed = rag.clean_pool(doc.get("title", ""), before)
+    if len(kept) < settings.QUIZ_QUESTION_COUNT:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Only {len(kept)} good questions would be left out of {len(before)} (a quiz needs at least "
+                   f"{settings.QUIZ_QUESTION_COUNT}), so nothing was changed. Please upload this document again to "
+                   "generate a fresh, better question bank.",
+        )
+    questions.update_one({"_id": document_id}, {"$set": {"pool": kept}})
+    return {"before": len(before), "after": len(kept), "removed": removed[:10], "removed_count": len(removed)}
+
+
+def _pool_doc(document_id: str) -> dict:
+    pool_doc = questions.find_one({"_id": document_id})
+    if not pool_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return pool_doc
+
+
+@router.get("/api/hr/documents/{document_id}/questions")
+def list_document_questions(document_id: str, hr=Depends(get_current_hr)):
+    """Every question in this document's bank, with the correct answer, so HR can review them."""
+    doc = documents.find_one({"_id": document_id})
+    pool_doc = _pool_doc(document_id)
+    return {"title": (doc or {}).get("title", ""), "questions": pool_doc["pool"]}
+
+
+class EditQuestionRequest(BaseModel):
+    question: str
+    options: List[str]
+    correct_index: int
+
+
+@router.put("/api/hr/documents/{document_id}/questions/{question_id}")
+def edit_document_question(document_id: str, question_id: str, body: EditQuestionRequest, hr=Depends(get_current_hr)):
+    """HR fixes the wording / the options / which option is correct. Only future quizzes are affected."""
+    question = " ".join(body.question.split())
+    options = [" ".join(o.split()) for o in body.options]
+    if len(question) < 10:
+        raise HTTPException(status_code=422, detail="The question is too short")
+    if len(options) != 4 or any(not o for o in options):
+        raise HTTPException(status_code=422, detail="A question needs exactly 4 options, none of them empty")
+    if len({o.lower() for o in options}) != 4:
+        raise HTTPException(status_code=422, detail="Two options are the same")
+    if not 0 <= body.correct_index <= 3:
+        raise HTTPException(status_code=422, detail="Choose which option is correct")
+    pool_doc = _pool_doc(document_id)
+    for q in pool_doc["pool"]:
+        if q["id"] == question_id:
+            q.update({"question": question, "options": options, "correct_index": body.correct_index, "edited_by": hr["sub"]})
+            questions.update_one({"_id": document_id}, {"$set": {"pool": pool_doc["pool"]}})
+            return q
+    raise HTTPException(status_code=404, detail="Question not found")
+
+
+@router.delete("/api/hr/documents/{document_id}/questions/{question_id}")
+def delete_document_question(document_id: str, question_id: str, hr=Depends(get_current_hr)):
+    """Remove one question from the bank. Refused if a quiz set still needs that many questions from this document."""
+    pool_doc = _pool_doc(document_id)
+    if not any(q["id"] == question_id for q in pool_doc["pool"]):
+        raise HTTPException(status_code=404, detail="Question not found")
+    needed = max([d["count"] for qs in quiz_sets.find({"documents.document_id": document_id}) for d in qs["documents"]
+                  if d["document_id"] == document_id] or [0])
+    if len(pool_doc["pool"]) - 1 < needed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A quiz set takes {needed} questions from this document, so at least {needed} must stay. "
+                   "Lower that number in the quiz set first, or edit this question instead of deleting it.")
+    questions.update_one({"_id": document_id}, {"$pull": {"pool": {"id": question_id}}})
+    return {"deleted": True, "remaining": len(pool_doc["pool"]) - 1}
 
 
 @router.delete("/api/hr/documents/{document_id}")
@@ -257,7 +345,14 @@ def add_candidates(body: AddCandidatesRequest, hr=Depends(get_current_hr)):
         )
         created.append(email)
 
-    return {"emails": created, "password": shared_password, "quiz_set_name": quiz_set["name"]}
+    # Each new joiner is e-mailed the quiz link + login (Microsoft Graph). A mail problem never undoes the
+    # candidates just created: the result tells HR who did not get one so the password can be shared by hand.
+    try:
+        mail = mailer.send_invites([(e, shared_password) for e in created])
+    except Exception as exc:
+        mail = {"configured": True, "sent": [], "failed": created, "error": f"Could not send the e-mails: {str(exc)[:160]}"}
+
+    return {"emails": created, "password": shared_password, "quiz_set_name": quiz_set["name"], "mail": mail}
 
 
 @router.post("/api/hr/candidates/regenerate-password")
@@ -279,7 +374,15 @@ def regenerate_password(body: RegeneratePasswordRequest, hr=Depends(get_current_
     if not updated:
         raise HTTPException(status_code=404, detail="None of these emails are registered candidates yet")
 
-    return {"emails": updated, "password": new_password}
+    # Send the new password to each updated candidate by e-mail (Microsoft Graph).
+    # A mail failure never rolls back the password change: the result tells HR
+    # who did not get one so the password can be shared by hand.
+    try:
+        mail = mailer.send_invites([(e, new_password) for e in updated], reset=True)
+    except Exception as exc:
+        mail = {"configured": True, "sent": [], "failed": updated, "error": f"Could not send the e-mails: {str(exc)[:160]}"}
+
+    return {"emails": updated, "password": new_password, "mail": mail}
 
 
 @router.delete("/api/hr/candidates/{email}")
@@ -336,13 +439,13 @@ def list_candidates(hr=Depends(get_current_hr)):
                 "submitted_at": latest_attempt["submitted_at"] if latest_attempt else None,
             }
         )
-    result.sort(key=lambda r: r["created_at"], reverse=True)
+    result.sort(key=lambda r: r["created_at"] or _EPOCH, reverse=True)
     return result
 
 
 @router.get("/api/hr/candidates/export.xlsx")
-def export_candidates_xlsx(hr=Depends(get_current_hr)):
-    content = reports.generate_excel(reports.gather_report_rows())
+def export_candidates_xlsx(date_from: str = "", date_to: str = "", by: str = "created_at", hr=Depends(get_current_hr)):
+    content = reports.generate_excel(reports.gather_report_rows(date_from, date_to, by))
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -351,8 +454,8 @@ def export_candidates_xlsx(hr=Depends(get_current_hr)):
 
 
 @router.get("/api/hr/candidates/export.docx")
-def export_candidates_docx(hr=Depends(get_current_hr)):
-    content = reports.generate_docx(reports.gather_report_rows())
+def export_candidates_docx(date_from: str = "", date_to: str = "", by: str = "created_at", hr=Depends(get_current_hr)):
+    content = reports.generate_docx(reports.gather_report_rows(date_from, date_to, by))
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -361,8 +464,8 @@ def export_candidates_docx(hr=Depends(get_current_hr)):
 
 
 @router.get("/api/hr/candidates/export.pdf")
-def export_candidates_pdf(hr=Depends(get_current_hr)):
-    content = reports.generate_pdf(reports.gather_report_rows())
+def export_candidates_pdf(date_from: str = "", date_to: str = "", by: str = "created_at", hr=Depends(get_current_hr)):
+    content = reports.generate_pdf(reports.gather_report_rows(date_from, date_to, by))
     return Response(
         content=content,
         media_type="application/pdf",
@@ -433,7 +536,7 @@ def candidate_attempts(email: str, hr=Depends(get_current_hr)):
         d["score_by_document"] = _score_by_document(d)
         d.pop("question_snapshot", None)  # internal only (has correct_index/ids) - not part of the public shape
         d["attempt_id"] = str(d.pop("_id"))
-    docs.sort(key=lambda d: d.get("started_at") or now(), reverse=True)
+    docs.sort(key=lambda d: d.get("started_at") or _EPOCH, reverse=True)
     return docs
 
 
@@ -443,8 +546,10 @@ def candidate_attempts(email: str, hr=Depends(get_current_hr)):
 
 @router.post("/api/candidate/login")
 def candidate_login(body: CandidateLoginRequest):
-    user = candidates.find_one({"email": body.email.lower()})
-    if not user or not verify_password(body.password, user["password_hash"]):
+    # Passwords are generated (never contain a space), but copying one out of an e-mail often brings a space or a
+    # line break along: ignore whitespace around both the e-mail and the password.
+    user = candidates.find_one({"email": body.email.strip().lower()})
+    if not user or not verify_password(body.password.strip(), user["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
     token = create_token(user["email"], "candidate", settings.CANDIDATE_TOKEN_EXPIRE_MINUTES)
     return {"access_token": token, "quiz_set_name": user.get("quiz_set_name")}

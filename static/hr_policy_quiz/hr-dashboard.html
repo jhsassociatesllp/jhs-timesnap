@@ -52,6 +52,14 @@
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
+          <div style="display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid #e1e8ed;">
+            <strong style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#7f8c8d;">Date</strong>
+            <select id="dfBy" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"><option value="created_at">Added on</option><option value="submitted_at">Quiz submitted on</option></select>
+            <label style="font-size:12px;color:#7f8c8d;">From <input type="date" id="dfFrom" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"></label>
+            <label style="font-size:12px;color:#7f8c8d;">To <input type="date" id="dfTo" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"></label>
+            <button type="button" class="btn btn-ghost btn-sm" id="dfClear">Clear</button>
+            <span class="hint" id="dfInfo" style="margin:0;"></span>
+          </div>
           <table id="candidateTable">
             <thead>
               <tr>
@@ -67,6 +75,7 @@
             </thead>
             <tbody id="candidateTableBody"></tbody>
           </table>
+          <div id="pgQuiz" style="display:flex;gap:10px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;font-size:13px;color:#7f8c8d;"></div>
           <div class="empty-state" id="candidateEmpty" style="display:none;">No candidates added yet. Use "Add new joiners" to get started.</div>
         </div>
       </div>
@@ -154,13 +163,13 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;">Add new joiners</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Paste one or more emails, comma separated. Everyone you add in this batch gets the same password - share it with them directly.</p>
+          <p class="hint" style="margin-bottom:18px;">Paste one or more emails (one per line or separated by commas). Everyone you add in this batch gets the same password - share it with them directly.</p>
           <div class="error-box" id="addError"></div>
           <div class="success-box" id="addSuccess" style="display:none;"></div>
           <form id="addForm">
             <div class="field">
               <label for="emails">New joiner emails</label>
-              <textarea id="emails" placeholder="priya@company.com, rahul@company.com"></textarea>
+              <textarea id="emails" rows="4" style="min-height:96px;" placeholder="priya@company.com&#10;rahul@company.com"></textarea>
             </div>
             <div class="field">
               <label for="quizSetSelect">Assign quiz set</label>
@@ -174,13 +183,13 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;">Regenerate a password</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Passwords can't be recovered once set, only replaced. Use this if a candidate forgot theirs - works for one email, or several at once.</p>
+          <p class="hint" style="margin-bottom:18px;">Passwords can't be recovered once set, only replaced. Use this if a candidate forgot theirs - works for one email, or several at once (one per line or separated by commas).</p>
           <div class="error-box" id="regenError"></div>
           <div class="success-box" id="regenSuccess" style="display:none;"></div>
           <form id="regenForm">
             <div class="field">
               <label for="regenEmails">Candidate email(s)</label>
-              <textarea id="regenEmails" placeholder="priya@company.com"></textarea>
+              <textarea id="regenEmails" rows="3" style="min-height:80px;" placeholder="priya@company.com&#10;rahul@company.com"></textarea>
             </div>
             <button type="submit" class="btn btn-secondary" id="regenBtn">Regenerate password</button>
           </form>
