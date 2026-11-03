@@ -7,9 +7,6 @@ document and signs it once; two allowlisted employee codes (see db.py's
 Uses the platform's normal get_current_user - unlike HR Policy Quiz there's
 no separate non-employee login to bridge from, so no extra JWT domain here.
 """
-import base64
-import html as html_lib
-import re
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -21,6 +18,7 @@ from backend.auth import get_current_user
 from backend.database import employee_details_collection
 from backend.employee_declaration.db import submissions, admins
 from backend.employee_declaration.html_render import DECLARATION_HTML
+from backend.employee_declaration.pdf_render import generate_declaration_pdf
 
 router = APIRouter(prefix="/employee-declaration", tags=["Employee Declaration"])
 
@@ -168,108 +166,44 @@ def admin_submissions(current_user: str = Depends(get_current_user)):
     return {"rows": _gather_roster()}
 
 
-def _declaration_paragraphs() -> list[str]:
-    """Strip mammoth's simple HTML down to plain paragraphs for the PDF."""
-    text = re.sub(r"</(p|h1|h2|h3|h4|h5|h6|li|tr|div)>", "\n", DECLARATION_HTML, flags=re.I)
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = html_lib.unescape(text)
-    return [ln.strip() for ln in text.split("\n") if ln.strip()]
-
-
-# fpdf2's core Helvetica font only supports Latin-1, but the source .docx
-# (and Word docs in general) is full of "smart" punctuation outside that
-# range - typing any of it straight into pdf.cell()/multi_cell() throws and
-# was silently turning every PDF download into a 500.
-_PDF_UNICODE_REPLACEMENTS = {
-    "‘": "'", "’": "'", "‚": "'",
-    "“": '"', "”": '"', "„": '"',
-    "–": "-", "—": "-", "−": "-",
-    "…": "...", " ": " ", "•": "-",
-}
-
-
-def _pdf_safe(text: str) -> str:
-    for uni, ascii_ in _PDF_UNICODE_REPLACEMENTS.items():
-        text = text.replace(uni, ascii_)
-    return text.encode("latin-1", "replace").decode("latin-1")
-
-
 def _generate_declaration_pdf(empid: str, name: str, submitted_at, signature: str | None) -> bytes:
-    from fpdf import FPDF
-    from fpdf.enums import XPos, YPos
+    date_str = _format_ist(submitted_at).split(",")[0] if submitted_at else ""
+    return generate_declaration_pdf(name, signature, date_str)
 
-    submitted_str = _format_ist(submitted_at)
-    name = _pdf_safe(name)
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Employee Declaration & Undertaking", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(90, 90, 90)
-    pdf.cell(0, 6, "Code of Conduct, Confidentiality & Compliance", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(4)
-
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, f"Employee: {name} ({empid})", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Submitted: {submitted_str}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(4)
-
-    pdf.set_draw_color(180, 180, 180)
-    pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + 190, pdf.get_y())
-    pdf.ln(6)
-
-    pdf.set_font("Helvetica", "", 9.5)
-    for para in _declaration_paragraphs():
-        try:
-            pdf.multi_cell(0, 5.2, _pdf_safe(para), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(1.5)
-        except Exception:
-            continue
-
-    pdf.ln(2)
-    pdf.set_draw_color(180, 180, 180)
-    pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + 190, pdf.get_y())
-    pdf.ln(6)
-
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Signed acknowledgement", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 9.5)
-    pdf.multi_cell(
-        0, 5.2,
-        "I have read, understood, and agree to comply with the above Code of Conduct, "
-        "Confidentiality & Compliance declaration.",
-        new_x=XPos.LMARGIN, new_y=YPos.NEXT,
+def _pdf_response(pdf_bytes: bytes, filename: str, inline: bool) -> Response:
+    disposition = "inline" if inline else "attachment"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
     )
-    pdf.ln(4)
 
-    col_w = 63
-    pdf.set_font("Helvetica", "B", 8.5)
-    pdf.set_fill_color(245, 245, 245)
-    pdf.cell(col_w, 7, "Employee Name", border=1, fill=True)
-    pdf.cell(col_w, 7, "Date", border=1, fill=True)
-    pdf.cell(col_w, 7, "Signature", border=1, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    pdf.set_font("Helvetica", "", 9)
-    sig_row_h = 22
-    pdf.cell(col_w, sig_row_h, name, border=1)
-    pdf.cell(col_w, sig_row_h, submitted_str, border=1)
-    sig_x, sig_y = pdf.get_x(), pdf.get_y()
-    pdf.cell(col_w, sig_row_h, "", border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+@router.get("/my-pdf")
+def my_declaration_pdf(download: bool = False, current_user: str = Depends(get_current_user)):
+    """The signed declaration of the logged-in employee (view inline or download)."""
+    empid = current_user.strip().upper()
+    record = submissions.find_one({"empid": empid})
+    if not record:
+        raise HTTPException(status_code=404, detail="You have not submitted the declaration yet")
+    name = record.get("employee_name") or _employee_name(empid)
+    pdf_bytes = _generate_declaration_pdf(empid, name, record.get("submitted_at"), record.get("signature"))
+    return _pdf_response(pdf_bytes, f"declaration-{empid}.pdf", inline=not download)
 
-    if signature and signature.startswith("data:image"):
-        try:
-            img_bytes = base64.b64decode(signature.split(",", 1)[1])
-            pdf.image(BytesIO(img_bytes), x=sig_x + 2, y=sig_y + 2, w=col_w - 4, h=sig_row_h - 4, type="PNG")
-        except Exception:
-            pass
 
-    return bytes(pdf.output())
+class PreviewRequest(BaseModel):
+    signature: str | None = None
+
+
+@router.post("/preview-pdf")
+def preview_declaration_pdf(body: PreviewRequest, current_user: str = Depends(get_current_user)):
+    """How the PDF will look with the employee's name, today's date and the
+    signature they have drawn/typed/uploaded - nothing is saved."""
+    empid = current_user.strip().upper()
+    sig = body.signature if body.signature and body.signature.startswith("data:image") else None
+    pdf_bytes = _generate_declaration_pdf(empid, _employee_name(empid), now(), sig)
+    return _pdf_response(pdf_bytes, f"declaration-preview-{empid}.pdf", inline=True)
 
 
 @router.get("/admin/submissions/{empid}/pdf")
@@ -288,11 +222,7 @@ def admin_submission_pdf(empid: str, current_user: str = Depends(get_current_use
         print(f"[DeclarationPDF] Failed to generate PDF for {empid}: {e}")
         raise HTTPException(status_code=500, detail="Could not generate the declaration PDF")
 
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=declaration-{empid}.pdf"},
-    )
+    return _pdf_response(pdf_bytes, f"declaration-{empid}.pdf", inline=False)
 
 
 @router.get("/admin/export.xlsx")

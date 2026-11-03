@@ -372,6 +372,27 @@
         </div>`;
     }
 
+    function buildEmployeeFormAdminCard() {
+      return `
+        <div class="module-card card-bradm" onclick="window.location.href='/employee-form-admin'">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-file-signature"></i></div>
+            <span class="card-tag">Admin</span>
+          </div>
+          <h2 class="card-title">Employee Application Form</h2>
+          <p class="card-desc">View and edit the application forms employees have filled in, and export them to Excel.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-eye"></i> View</span>
+            <span class="chip"><i class="fas fa-pen"></i> Edit</span>
+            <span class="chip"><i class="fas fa-file-excel"></i> Excel</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">Form admin access</span>
+            <span class="card-btn">Open Admin &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }
+
     function buildComplianceAdminCard() {
       return `
         <div class="module-card card-bradm" onclick="window.location.href='/compliance-admin'">
@@ -553,6 +574,7 @@
       let cvIsAdmin = false;
       let referralIsAdmin = false;
       let complianceIsAdmin = false;
+      let employeeFormIsAdmin = false;
       let isManager = false;
 
       try {
@@ -584,6 +606,13 @@
       } catch(e) {}
 
       try {
+        const res = await fetch('/employee-form/admin/access-check', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) employeeFormIsAdmin = (await res.json()).is_admin;
+      } catch(e) {}
+
+      try {
         const res = await fetch('/compliance-calendar/admin/access-check', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -601,7 +630,7 @@
 
       // If no admin access at all (neither module access nor declaration
       // admin access), redirect back to modules
-      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin && !cvIsAdmin && !referralIsAdmin && !complianceIsAdmin && !isManager) {
+      if ((!moduleAccess || !moduleAccess.is_admin) && !declIsAdmin && !cvIsAdmin && !referralIsAdmin && !complianceIsAdmin && !employeeFormIsAdmin && !isManager) {
         window.location.href = '/modules';
         return;
       }
@@ -627,6 +656,9 @@
       }
       if (referralIsAdmin) {
         grid.innerHTML += buildReferralAdminCard();
+      }
+      if (employeeFormIsAdmin) {
+        grid.innerHTML += buildEmployeeFormAdminCard();
       }
       if (complianceIsAdmin) {
         grid.innerHTML += buildComplianceAdminCard();

@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>Employee Application Form — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem}
+    .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:1.2rem}
+    .sub-title{font-size:.85rem;font-weight:700;color:var(--accent);margin:1.2rem 0 .8rem;text-transform:uppercase;letter-spacing:.5px}
+    .opts{display:flex;gap:1.2rem;flex-wrap:wrap;align-items:center;padding:.5rem 0}
+    .opts label{display:inline-flex;align-items:center;gap:.4rem;font-size:.9rem;font-weight:500;text-transform:none;letter-spacing:0;cursor:pointer}
+    .tbl-wrap{overflow-x:auto;margin-bottom:.6rem}
+    table.rows{width:100%;border-collapse:collapse;min-width:640px}
+    table.rows th{background:#eef0fb;font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;padding:.55rem .5rem;text-align:left;color:var(--text)}
+    table.rows td{padding:.3rem .3rem;border-bottom:1px solid var(--border)}
+    table.rows td .fi{padding:.5rem .6rem;font-size:.85rem}
+    table.rows td.sr{width:40px;text-align:center;color:var(--muted);font-weight:600}
+    table.rows td.chk{text-align:center;width:46px}
+    .rm{background:none;border:none;color:#e74c3c;cursor:pointer;font-size:.95rem}
+    .qrow{padding:.9rem 0;border-bottom:1px solid var(--border)}
+    .qrow:last-child{border-bottom:none}
+    .qtext{font-weight:600;font-size:.92rem;margin-bottom:.3rem}
+    .qdetail{margin-top:.5rem;display:none}
+    .qdetail.open{display:block}
+    .decl{font-size:.88rem;color:var(--text);line-height:1.7;background:#fff;border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem}
+    .pill-draft{background:rgba(243,156,18,.15);color:#b9770e}
+    .hub-intro{color:var(--muted);margin:.2rem 0 1.4rem;font-size:.95rem}
+    .hub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4rem}
+    .hub-card{--c:#667eea;text-align:left;font-family:inherit;background:#fff;border:2px solid var(--border);border-top:5px solid var(--c);border-radius:16px;padding:1.5rem;cursor:pointer;display:flex;flex-direction:column;gap:.7rem;transition:var(--tr);box-shadow:var(--sh-s)}
+    .hub-card:hover{transform:translateY(-5px);box-shadow:var(--sh-m);border-color:var(--c)}
+    .hub-card.c2{--c:#e84393}.hub-card.c3{--c:#11998e}
+    .hub-top{display:flex;justify-content:space-between;align-items:flex-start}
+    .hub-icon{width:62px;height:62px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.7rem;color:var(--c);background:color-mix(in srgb,var(--c) 12%,#fff)}
+    .hub-card h3{font-size:1.1rem;color:var(--text);margin:.3rem 0 0}
+    .hub-card p{font-size:.85rem;color:var(--muted);line-height:1.55;flex:1}
+    .hub-foot{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:.88rem;color:var(--c);padding-top:.8rem;border-top:1px solid var(--border)}
+    .back-row{display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap}
+    .sec-title{font-size:1.15rem;font-weight:700;color:var(--text)}
+    @media(max-width:900px){.hub-grid{grid-template-columns:1fr}}
+    /* signature: full-width row, segmented Sign / Type / Upload control */
+    .form-group:has(> .sigbox){grid-column:1/-1}
+    .g3:has(.sigbox){grid-template-columns:1fr 1fr}
+    .sigbox{background:#fff;border:2px solid var(--border);border-radius:12px;padding:.9rem 1rem 1rem;transition:var(--tr)}
+    .sigbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,126,234,.12)}
+    .sig-modes{display:inline-flex;background:#eef0fb;border-radius:10px;padding:3px;gap:2px;margin-bottom:.9rem;max-width:100%}
+    .sig-modes button{white-space:nowrap;border:none;background:transparent;border-radius:8px;padding:.4rem 1.1rem;font-size:.82rem;font-weight:600;font-family:inherit;color:var(--muted);cursor:pointer;transition:var(--tr)}
+    .sig-modes button i{margin-right:.4rem}
+    .sig-modes button:hover{color:var(--accent)}
+    .sig-modes button.on{background:#fff;color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.14)}
+    .sig-pane{display:none}.sig-pane.on{display:block}
+    .sig-pane canvas{width:100%;max-width:560px;aspect-ratio:760/300;height:auto;border:2px dashed #c3c9ea;border-radius:10px;background:#fcfcff linear-gradient(#0000 0 0);touch-action:none;cursor:crosshair;display:block}
+    .sig-hint{font-size:.75rem;color:var(--muted);margin-top:.4rem;display:flex;justify-content:space-between;align-items:center}
+    .sig-type-prev{font-family:'Segoe Script','Brush Script MT',cursive;font-size:1.9rem;margin-top:.8rem;height:3.2rem;line-height:3rem;color:#1a2a6c;border-bottom:2px solid #c3c9ea;padding:0 .4rem;overflow:hidden;white-space:nowrap}
+    .sig-type-prev:empty::before{content:'Your signature preview';font-family:'Inter',sans-serif;font-size:.85rem;color:#b0b6cf}
+    .sig-drop{display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:1.4rem 1rem;border:2px dashed #c3c9ea;border-radius:10px;background:#fcfcff;color:var(--muted);font-size:.85rem;cursor:pointer;text-align:center;transition:var(--tr)}
+    .sig-drop:hover{border-color:var(--accent);color:var(--accent);background:#f6f7ff}
+    .sig-drop i{font-size:1.6rem;color:var(--accent)}
+    .sig-drop input{display:none}
+    .sig-pane .sig-prev{max-width:260px;max-height:100px;margin-top:.7rem;border:1px solid var(--border);border-radius:8px;padding:4px;background:#fff;display:none}
+    @media(max-width:820px){.g3:has(.sigbox){grid-template-columns:1fr}.sig-modes button{padding:.4rem .7rem}}
+    .undertaking{max-height:380px;overflow-y:auto;margin-bottom:0}
+    .undertaking h4{font-size:.86rem;margin:1rem 0 .4rem;color:var(--accent)}
+    .undertaking p{margin:0 0 .5rem}
+    .status-bar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;background:#fff;border:1px solid var(--border);border-radius:12px;padding:.8rem 1.2rem;margin-bottom:1.6rem;font-size:.88rem}
+    .locked-note{color:var(--muted);font-size:.8rem}
+    #toastWrap{position:fixed;top:1.2rem;right:1.2rem;z-index:999;display:flex;flex-direction:column;gap:.5rem}
+    .toast{background:#fff;border-radius:10px;padding:.75rem 1.1rem;box-shadow:var(--sh-m);font-size:.88rem;display:flex;gap:.5rem;align-items:center;border-left:4px solid #11998e;max-width:380px}
+    .toast.error{border-left-color:#e74c3c}
+    .loader{display:flex;align-items:center;justify-content:center;gap:.8rem;min-height:100vh;color:#fff;font-weight:600}
+    .spin{width:22px;height:22px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    @media(max-width:820px){.g2,.g3,.g4{grid-template-columns:1fr}.body{padding:1.2rem}.hdr h1{font-size:1.6rem}}
+  </style>
+</head>
+<body>
+<div id="ls" class="loader"><div class="spin"></div> Loading Employee Application Form…</div>
+<div id="toastWrap"></div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div style="display:flex;align-items:center;gap:.9rem">
+      <button type="button" class="nav-btn" id="menuBtn" aria-label="Menu" onclick="toggleMenu()" style="padding:.5rem .8rem"><i class="fas fa-bars"></i></button>
+      <div class="brand"><i class="fas fa-file-signature"></i> JHS Employee Application Form</div>
+    </div>
+    <div class="nav-r">
+      <span class="emp-badge" id="empBadge"></span>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+  <div id="menuOv" onclick="toggleMenu(false)"></div>
+  <aside id="sideMenu">
+    <div class="sm-head"><span><i class="fas fa-file-signature"></i> Menu</span><button type="button" onclick="toggleMenu(false)" aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+    <div class="sm-sec" style="border-top:0;margin-top:0">Forms</div>
+    <a href="#" onclick="menuGo('app');return false"><i class="fas fa-file-signature"></i> Employee Application Form</a>
+    <a href="#" onclick="menuGo('und');return false"><i class="fas fa-scale-balanced"></i> Declaration &amp; Undertaking</a>
+    <a href="#" onclick="menuGo('pol');return false"><i class="fas fa-file-contract"></i> Undertaking</a>
+    <a href="/kyc-form"><i class="fas fa-id-card"></i> KYC Details Form</a>
+  </aside>
+
+  <div class="wrap">
+    <div class="hdr">
+      <h1>Employee Application Form</h1>
+      <p>HR Employee Personal Data</p>
+    </div>
+
+    <div class="body">
+      <div id="hub" style="display:none">
+        <p class="hub-intro">Choose a form to fill in. Each one is saved and submitted separately.</p>
+        <div class="hub-grid">
+          <button type="button" class="hub-card c1" onclick="openSection('app')">
+            <div class="hub-top"><div class="hub-icon"><i class="fas fa-file-signature"></i></div><span class="pill pill-draft" id="pill-app">New</span></div>
+            <h3>Employee Application Form</h3>
+            <p>Personal, contact, family, education, employment details, references and declaration.</p>
+            <div class="hub-foot"><span>Open form</span><i class="fas fa-arrow-right"></i></div>
+          </button>
+          <button type="button" class="hub-card c2" onclick="openSection('und')">
+            <div class="hub-top"><div class="hub-icon"><i class="fas fa-scale-balanced"></i></div><span class="pill pill-draft" id="pill-und">New</span></div>
+            <h3>Employee Declaration &amp; Undertaking</h3>
+            <p>Code of Conduct, Confidentiality, Data Protection and Compliance declaration.</p>
+            <div class="hub-foot"><span>Open form</span><i class="fas fa-arrow-right"></i></div>
+          </button>
+          <button type="button" class="hub-card c3" onclick="openSection('pol')">
+            <div class="hub-top"><div class="hub-icon"><i class="fas fa-file-contract"></i></div><span class="pill pill-draft" id="pill-pol">New</span></div>
+            <h3>Undertaking</h3>
+            <p>Organisation policies, confidentiality, PF / ESIC requirements and your joining details.</p>
+            <div class="hub-foot"><span>Open form</span><i class="fas fa-arrow-right"></i></div>
+          </button>
+        </div>
+      </div>
+
+      <div id="formView" style="display:none">
+      <div class="back-row" style="display:none">
+        <span class="sec-title" id="secTitle"></span>
+      </div>
+      <div class="status-bar" style="display:none">
+        <div><i class="fas fa-info-circle" style="color:var(--accent)"></i> <span id="stText">New</span> <span class="locked-note" id="stSub"></span></div>
+        <div class="locked-note">Fields marked <span style="color:#e74c3c">*</span> are required to submit.</div>
+      </div>
+
+      <form id="efForm" autocomplete="off" onsubmit="return false">
+      <div class="tc active" id="tc-app">
+
+        <!-- 1. Personal data -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-user"></i> HR Employee Personal Data</div>
+          <div class="form-group" style="margin-bottom:1.2rem"><label>Photograph</label>
+            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+              <img id="photoPrev" alt="Photo preview" style="display:none;width:110px;height:140px;object-fit:cover;border-radius:8px;border:1px solid #d5d9e4">
+              <div>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer"><i class="fas fa-camera"></i> <span id="photoBtnTxt">Upload photo</span><input type="file" id="photoFile" accept="image/png,image/jpeg" style="display:none"></label>
+                <button type="button" class="btn btn-ghost btn-sm" id="photoRemove" style="display:none"><i class="fas fa-trash"></i> Remove</button>
+                <div class="hint" style="margin-top:.4rem">PNG or JPEG, passport-size photo</div>
+              </div>
+            </div>
+          </div>
+          <div class="g3">
+            <div class="form-group"><label>Surname <span class="req">*</span></label><input class="fi" data-s="personal" data-k="surname"></div>
+            <div class="form-group"><label>First Name <span class="req">*</span></label><input class="fi" data-s="personal" data-k="first_name"></div>
+            <div class="form-group"><label>Middle Name</label><input class="fi" data-s="personal" data-k="middle_name"></div>
+          </div>
+          <div class="g3" style="margin-top:1.2rem">
+            <div class="form-group"><label>Sex <span class="req">*</span></label>
+              <div class="opts"><label><input type="radio" name="sex" data-s="personal" data-k="sex" value="Male"> Male</label><label><input type="radio" name="sex" data-s="personal" data-k="sex" value="Female"> Female</label></div></div>
+            <div class="form-group"><label>Nationality <span class="req">*</span></label><input class="fi" data-s="personal" data-k="nationality"></div>
+            <div class="form-group"><label>Birth Date <span class="req">*</span></label><input class="fi" type="date" data-s="personal" data-k="birth_date"></div>
+            <div class="form-group"><label>Religion</label><input class="fi" data-s="personal" data-k="religion"></div>
+            <div class="form-group"><label>Birth Place</label><input class="fi" data-s="personal" data-k="birth_place"></div>
+            <div class="form-group"><label>Category</label><input class="fi" data-s="personal" data-k="category"></div>
+            <div class="form-group"><label>Mother Tongue</label><input class="fi" data-s="personal" data-k="mother_tongue"></div>
+            <div class="form-group"><label>Height (cms)</label><input class="fi" type="number" min="0" data-s="personal" data-k="height_cm"></div>
+            <div class="form-group"><label>Weight (KGs)</label><input class="fi" type="number" min="0" data-s="personal" data-k="weight_kg"></div>
+            <div class="form-group"><label>Blood Group</label>
+              <select class="fi" data-s="personal" data-k="blood_group"><option value=""></option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+            <div class="form-group"><label>Marital Status <span class="req">*</span></label>
+              <div class="opts"><label><input type="radio" name="marital" data-s="personal" data-k="marital_status" value="Married"> Married</label><label><input type="radio" name="marital" data-s="personal" data-k="marital_status" value="Unmarried"> Unmarried</label><label><input type="radio" name="marital" data-s="personal" data-k="marital_status" value="Separated"> Separated</label></div></div>
+          </div>
+          <div class="sub-title">Identity Documents</div>
+          <div class="g3">
+            <div class="form-group"><label>PAN No.</label><input class="fi" data-s="personal" data-k="pan_no" style="text-transform:uppercase"></div>
+            <div class="form-group"><label>Aadhar Card No.</label><input class="fi" data-s="personal" data-k="aadhar_no"></div>
+            <div class="form-group"><label>Aadhar — Self-attested Copy</label><div class="opts"><label><input type="radio" name="aadhar_copy" data-s="personal" data-k="aadhar_copy" value="YES"> YES</label><label><input type="radio" name="aadhar_copy" data-s="personal" data-k="aadhar_copy" value="NO"> NO</label></div></div>
+            <div class="form-group"><label>Driving License No.</label><input class="fi" data-s="personal" data-k="dl_no"></div>
+            <div class="form-group"><label>Driving License — Self-attested Copy</label><div class="opts"><label><input type="radio" name="dl_copy" data-s="personal" data-k="dl_copy" value="YES"> YES</label><label><input type="radio" name="dl_copy" data-s="personal" data-k="dl_copy" value="NO"> NO</label></div></div>
+            <div></div>
+            <div class="form-group"><label>Passport No.</label><input class="fi" data-s="personal" data-k="passport_no"></div>
+            <div class="form-group"><label>Date of Issue</label><input class="fi" type="date" data-s="personal" data-k="passport_issue_date"></div>
+            <div class="form-group"><label>Place of Issue</label><input class="fi" data-s="personal" data-k="passport_issue_place"></div>
+            <div class="form-group"><label>Valid Till</label><input class="fi" type="date" data-s="personal" data-k="passport_valid_till"></div>
+          </div>
+        </div>
+
+        <!-- 2. Contact -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-address-book"></i> Employee Contact Details</div>
+          <div class="g2">
+            <div class="form-group"><label>Professional Name</label><input class="fi" data-s="contact" data-k="professional_name"></div>
+            <div class="form-group"><label>E-Mail ID <span class="req">*</span></label><input class="fi" type="email" data-s="contact" data-k="email"></div>
+            <div class="form-group"><label>Emergency Contact No. <span class="req">*</span></label><input class="fi" data-s="contact" data-k="emergency_contact_no"></div>
+            <div class="form-group"><label>LinkedIn ID</label><input class="fi" data-s="contact" data-k="linkedin"></div>
+            <div class="form-group"><label>Facebook ID</label><input class="fi" data-s="contact" data-k="facebook"></div>
+          </div>
+          <div class="sub-title">Present Address</div>
+          <div class="g2" id="addrPresent"></div>
+          <div class="sub-title" style="display:flex;justify-content:space-between;align-items:center">Permanent Address
+            <label style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text);cursor:pointer"><input type="checkbox" id="sameAddr"> Same as present address</label></div>
+          <div class="g2" id="addrPermanent"></div>
+        </div>
+
+        <!-- 3. Family -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-people-roof"></i> Employee Family Details</div>
+          <div class="tbl-wrap"><table class="rows" id="t-family"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('family')"><i class="fas fa-plus"></i> Add row</button>
+        </div>
+
+        <!-- 4. Education -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-graduation-cap"></i> Educational Background</div>
+          <div class="tbl-wrap"><table class="rows" id="t-education"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('education')"><i class="fas fa-plus"></i> Add row</button>
+        </div>
+
+        <!-- 5. Languages -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-language"></i> Languages Known</div>
+          <p class="hint" style="margin:0 0 .8rem">R – Read &nbsp; W – Write &nbsp; S – Speak</p>
+          <div class="tbl-wrap"><table class="rows" id="t-languages"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('languages')"><i class="fas fa-plus"></i> Add language</button>
+        </div>
+
+        <!-- 6. Training -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-chalkboard-teacher"></i> Training Details</div>
+          <div class="tbl-wrap"><table class="rows" id="t-training"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('training')"><i class="fas fa-plus"></i> Add row</button>
+          <div class="form-group" style="margin-top:1.2rem"><label>Honors / Scholarship / Project Work / Publications</label>
+            <textarea class="fi" rows="3" data-s="interests" data-k="honors"></textarea></div>
+        </div>
+
+        <!-- 7. Achievements + hobbies -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-trophy"></i> Extra-Curricular Achievement</div>
+          <div class="tbl-wrap"><table class="rows" id="t-achievements"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('achievements')"><i class="fas fa-plus"></i> Add row</button>
+          <div class="sub-title">Hobbies &amp; Interests</div>
+          <div class="g3">
+            <div class="form-group"><label>Hobbies</label><textarea class="fi" rows="2" data-s="interests" data-k="hobbies"></textarea></div>
+            <div class="form-group"><label>Sports</label><textarea class="fi" rows="2" data-s="interests" data-k="sports"></textarea></div>
+            <div class="form-group"><label>Books</label><textarea class="fi" rows="2" data-s="interests" data-k="books"></textarea></div>
+          </div>
+        </div>
+
+        <!-- 8. Employment history -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-briefcase"></i> Employment History</div>
+          <div class="tbl-wrap"><table class="rows" id="t-employment_history"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('employment_history')"><i class="fas fa-plus"></i> Add employer</button>
+        </div>
+
+        <!-- 9. Present employment -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-building"></i> Present Employment</div>
+          <div class="g2" id="presentEmp"></div>
+          <div class="sub-title">Exit formalities and Full &amp; Final Settlement</div>
+          <div class="opts"><label><input type="radio" name="ffs" data-s="present_employment" data-k="ffs_status" value="Complete"> Complete</label><label><input type="radio" name="ffs" data-s="present_employment" data-k="ffs_status" value="Pending"> Pending</label></div>
+          <div class="form-group" style="margin-top:.6rem"><label>Pending — when?</label><input class="fi" data-s="present_employment" data-k="ffs_pending_when"></div>
+        </div>
+
+        <!-- 10. Questionnaire -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-clipboard-question"></i> Other Information</div>
+          <div id="questions"></div>
+        </div>
+
+        <!-- 11. References -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-user-check"></i> References (other than relatives)</div>
+          <div class="tbl-wrap"><table class="rows" id="t-references"></table></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addRow('references')"><i class="fas fa-plus"></i> Add row</button>
+        </div>
+
+        <!-- 12. Declaration -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-signature"></i> Declaration</div>
+          <div class="decl">
+            I declare that the above information is true. In case any information given above is found to be partially / completely incorrect, my appointment may be cancelled/withdrawn and my services terminated at any time.<br><br>
+            I also hereby authorize The FIRM and/or its representatives to independently verify the information provided above and, in my resume, and to conduct enquiries as The JHS deems fit. I also authorize The JHS to share this information with its representatives to verify its authenticity. In case The FIRM finds any information on this form and/or in my resume false or misleading, or The FIRM is informed by its representatives that the information contained herein and/or in my resume, is false or misleading, I accept The FIRM’s decision to withdraw the employment offer made to me unconditionally.
+          </div>
+          <label style="display:flex;gap:.5rem;align-items:center;font-weight:600;font-size:.9rem;margin-bottom:1rem;cursor:pointer"><input type="checkbox" data-s="declaration" data-k="agreed"> I have read and agree to the above declaration <span class="req">*</span></label>
+          <div class="g3">
+            <div class="form-group"><label>Place <span class="req">*</span></label><input class="fi" data-s="declaration" data-k="place"></div>
+            <div class="form-group"><label>Date <span class="req">*</span></label><input class="fi" type="date" data-s="declaration" data-k="date"></div>
+            <div class="form-group"><label>Signature <span class="req">*</span></label><div class="sigbox" data-sig="declaration.signature"></div></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" onclick="save('draft')"><i class="fas fa-floppy-disk"></i> Save Draft</button>
+          <button type="button" class="btn btn-ghost btn-preview" onclick="previewForm('app')"><i class="fas fa-eye"></i> Preview</button>
+          <button type="button" class="btn btn-pri" id="submitBtn-app" onclick="save('application')"><i class="fas fa-paper-plane"></i> Submit Application Form</button>
+        </div>
+      </div>
+
+      <div class="tc" id="tc-und">
+        <!-- Employee Declaration and Undertaking -->
+        <div class="card">
+          <div class="card-title"><i class="fas fa-scale-balanced"></i> Employee Declaration and Undertaking</div>
+          <p class="hint" style="margin:0 0 .8rem">Code of Conduct, Confidentiality, Data Protection and Compliance Declaration</p>
+          <div class="decl undertaking" tabindex="0">
+            <p>This Declaration and Undertaking (this "Declaration") is made and executed voluntarily by the undersigned employee (the "Employee") in favour of JHS (the "Organisation"), its affiliates, clients and representatives, as a condition of, and in consideration of, the Employee’s employment or continued employment with the Organisation.</p>
+            <p>I, the undersigned, being an employee of the Organisation, do hereby solemnly and sincerely declare, affirm and undertake as follows:</p>
+
+            <h4>1. DECLARATION AS TO ACCURACY OF INFORMATION</h4>
+            <p>1.1 I declare that all information, particulars, documents, certificates, identification proofs, educational qualifications, experience letters and other details submitted by me to the Organisation, whether at the time of my application for employment or at any time during the course of my employment, are true, genuine, accurate and complete to the best of my knowledge, information and belief, and that no material fact has been withheld, suppressed or misrepresented.</p>
+            <p>1.2 I acknowledge and agree that any discrepancy, falsification, forgery, concealment of facts, or submission of misleading, incomplete or fraudulent information, whether discovered before or after my joining the Organisation, shall render me liable to immediate termination of employment without notice or compensation, in addition to such civil and/or criminal legal action as the Organisation may deem fit and as may be permissible under applicable law.</p>
+
+            <h4>2. WORKPLACE CONDUCT, RECORDING AND MEDIA RESTRICTIONS</h4>
+            <p>2.1 I shall not record, capture or create any reels, videos, or other social media content within the office premises, at client premises, or in connection with the Organisation’s business, whether using personal or Organisation-owned devices.</p>
+            <p>2.2 I shall not take, publish, or distribute any photographs within the office premises or at client premises without the prior written authorization of the Organisation.</p>
+            <p>2.3 I shall not record any meetings, telephone or video calls, screens, or conversations conducted by or on behalf of the Organisation without proper prior authorization from the Organisation.</p>
+
+            <h4>3. PROHIBITED SUBSTANCES AND CONDUCT ON PREMISES</h4>
+            <p>3.1 I shall not consume, possess, distribute, or be under the influence of any drugs, narcotics, or other prohibited substances within the Organisation’s premises, at client premises, or while representing the Organisation in any capacity.</p>
+            <p>3.2 I shall not smoke, vape, or use tobacco products of any kind within the office premises or at client premises.</p>
+            <p>3.3 I shall not play mobile games, cards, chess, or any other recreational games whether on personal or Organisation-owned devices within the office premises or at client premises during working hours.</p>
+            <p>3.4 I shall not use earphones, headphones, or similar devices to listen to music, videos, or other content for personal, non-work-related purposes during working hours, except with the prior permission of my reporting manager.</p>
+
+            <h4>4. CONFIDENTIALITY AND PROTECTION OF INFORMATION</h4>
+            <p>4.1 I shall hold in strict confidence, and shall not disclose, share, publish or part with, any confidential information belonging to the Company or its clients, including but not limited to client data, internal communications, source code, reports, financial information, business strategies, passwords, and any other proprietary or confidential information (collectively, "Confidential Information"), to any unauthorized person.</p>
+            <p>4.2 I shall not share, upload, or transmit any Confidential Information via WhatsApp, personal e-mail accounts, social media platforms, personal or unauthorized cloud storage, or any other unauthorized medium. I shall also refrain from using WhatsApp or other personal messaging platforms to circulate Organisation documents or files for routine work purposes, and shall use only official/authorised channels for such sharing.</p>
+            <p>4.3 I shall not copy, forward, download, print, photograph or otherwise circulate any office documents, client information, screenshots, recordings, or Organisation materials without proper authorization.</p>
+            <p>4.4 I shall maintain, and shall continue to maintain, the confidentiality of all Confidential Information both during the term of my employment and at all times thereafter, without limit of time, save and except where disclosure is required by law or by a competent court or regulatory authority.</p>
+
+            <h4>5. USE OF ORGANISATION ASSETS, SYSTEMS AND ACCESS CREDENTIALS</h4>
+            <p>5.1 I shall not misuse, misappropriate, or effect any theft or unauthorized removal of Organisation assets, equipment, documents, or data, whether tangible or intangible.</p>
+            <p>5.2 I shall not install any unauthorized software, applications, or devices on Organisation-owned systems or networks.</p>
+            <p>5.3 I shall not share my access credentials, passwords, one-time passwords (OTPs), or Organisation accounts with any other person, whether internal or external to the Organisation.</p>
+            <p>5.4 I shall use Organisation-issued devices, systems, e-mail accounts, and internet services solely for authorized business purposes and in accordance with the Organisation’s IT and acceptable-use policies.</p>
+
+            <h4>6. SECURITY, SAFETY AND REPORTING OBLIGATIONS</h4>
+            <p>6.1 I shall comply with all security, safety, and compliance policies of the Organisation, as amended and communicated to me from time to time.</p>
+            <p>6.2 I shall immediately report to management any security incident, data breach, theft, policy violation, or suspicious activity that comes to my knowledge or attention.</p>
+
+            <h4>7. WORKPLACE BEHAVIOUR AND ANTI-HARASSMENT</h4>
+            <p>7.1 I shall conduct myself with professionalism, courtesy and respect towards all employees, clients, and other stakeholders of the Organisation, and shall not engage in any act of harassment, discrimination, violence, misconduct, or other inappropriate behaviour within the workplace.</p>
+            <p>7.2 I acknowledge that any breach of this Clause 7 shall attract disciplinary action in accordance with the Organisation’s applicable policies and prevailing law.</p>
+
+            <h4>8. CONSEQUENCES OF BREACH</h4>
+            <p>8.1 I acknowledge and agree that any breach of this Declaration, the Organisation’s Code of Conduct, my confidentiality obligations, or any applicable legal requirements, may result in disciplinary action against me, up to and including termination of my employment, without prejudice to any other right or remedy available to the Organisation under applicable law, including recovery of damages and/or injunctive relief.</p>
+            <p>8.2 I understand that the obligations undertaken by me under this Declaration are in addition to, and not in derogation of, any obligations imposed upon me under my employment agreement/appointment letter, the Organisation’s policies, or applicable law.</p>
+
+            <h4>9. RETURN OF ORGANISATION PROPERTY ON SEPARATION</h4>
+            <p>9.1 Upon separation from the Organisation, howsoever arising, I shall promptly return to the Organisation all of its assets, documents, access cards, equipment, devices, and Confidential Information in my possession or control, and shall not retain any copies, extracts or reproductions thereof in any form.</p>
+
+            <h4>10. GENERAL PROVISIONS</h4>
+            <p>10.1 Severability: If any provision of this Declaration is held to be invalid, illegal, or unenforceable under applicable law, the remaining provisions shall continue in full force and effect, and shall be construed so as to give effect to the intent of this Declaration to the maximum extent permitted by law.</p>
+            <p>10.2 Governing Law and Jurisdiction: This Declaration shall be governed by and construed in accordance with the laws of India, and shall be subject to the exclusive jurisdiction of the competent courts at the place of the Organisation’s registered/branch office where the Employee is engaged.</p>
+            <p>10.3 Entire Undertaking: This Declaration constitutes a binding undertaking given by me to the Organisation and shall be read together with, and shall not derogate from, the terms of my appointment letter, employment agreement, and the Organisation’s policies, as may be amended from time to time.</p>
+
+            <h4>11. ANTI-BRIBERY, GIFTS AND FAVOURS</h4>
+            <p>11.1 I shall not offer, give, solicit, or accept any bribe, kickback, illegal gratification, or improper payment, whether in cash or in kind, to or from any client, vendor, government official, or other third party in connection with the Organisation’s business.</p>
+            <p>11.2 I shall not accept any gift, favour, hospitality, or other benefit of significant value from clients, vendors, or other stakeholders that could reasonably be perceived to influence my professional judgment, without prior disclosure to and approval of management.</p>
+          </div>
+          <label style="display:flex;gap:.5rem;align-items:center;font-weight:600;font-size:.9rem;margin:1rem 0;cursor:pointer"><input type="checkbox" data-s="undertaking" data-k="agreed"> I have read, understood and agree to this Employee Declaration and Undertaking <span class="req">*</span></label>
+          <div class="g3">
+            <div class="form-group"><label>Employee Name <span class="req">*</span></label><input class="fi" data-s="undertaking" data-k="employee_name"></div>
+            <div class="form-group"><label>Signature <span class="req">*</span></label><div class="sigbox" data-sig="undertaking.signature"></div></div>
+            <div class="form-group"><label>Date <span class="req">*</span></label><input class="fi" type="date" data-s="undertaking" data-k="date"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" onclick="save('draft')"><i class="fas fa-floppy-disk"></i> Save Draft</button>
+          <button type="button" class="btn btn-ghost btn-preview" onclick="previewForm('und')"><i class="fas fa-eye"></i> Preview</button>
+          <button type="button" class="btn btn-pri" id="submitBtn-und" onclick="save('undertaking')"><i class="fas fa-paper-plane"></i> Submit Undertaking</button>
+        </div>
+      </div>
+
+      <div class="tc" id="tc-pol">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-file-contract"></i> Undertaking</div>
+          <div class="decl undertaking" tabindex="0">
+            <p><b>I, the undersigned, hereby Undertake</b></p>
+            <p>I have read and understood the organization policies on Independence, Confidentiality, Code of Conduct, and other important matters described in this Handbook. I understand that these policies and procedures are subject to change from time to time due to changes in ICAI regulations, regulatory changes, and organizational practices. Any such changes will be communicated in writing or through official electronic media. It is my responsibility to read and follow the same.</p>
+            <p>I understand that the Organization may take appropriate disciplinary action in case of my non-compliance with any of the Organization policies. I confirm that if there is any damage or loss to Organization assets (such as laptops, computers, mobile phones, misuse of e-mail, misuse of client facilities, etc.) due to my negligence, I shall indemnify the Organization for such damage, financial losses, or legal claims.</p>
+            <p>I will keep confidential and cause my subordinates, as the case may be, to keep confidential during the term of my employment/consultancy and thereafter any information pertaining to the Firm's business ("Confidential Information") which I may acquire or be provided during my term. I shall neither use (directly or indirectly) nor disclose such Confidential Information nor permit (intentionally or otherwise) such Confidential Information to be used or disclosed, except with the prior written consent of the Firm. I will also maintain confidentiality in respect of all details and matters related to my compensation and will not share such information with others (including other employees of the Firm) unless specifically requested by the relevant authority in the Firm. I shall not misuse or personally carry on any medium client information made available to me for audit purposes. All client material shall be returned by me on completion of client work or expiry of client contract, whichever is earlier. I fully understand that any breach of this condition will result in legal notice and consequential legal action pursued by the Firm or clients as the case may be, and I shall be responsible to indemnify the Firm against my negligence.</p>
+            <p>All intellectual property rights and intellectual property materials and work execution materials such as SOPs, RCMs, manuals, client reports, working papers, files of the Firm shall be the exclusive property of the Firm and that I shall make no claims in respect thereto. If during the course of the performance of my duties, I make or discover jointly or individually any intellectual property (the "Works For Hire"), I shall disclose and assign to the Firm full details of such intellectual property rights (including all present and future copyright and copyright revisions and extensions) together with the right to apply for and hold any trademarks in respect of such intellectual property rights which assignment shall take effect upon the creation of each of the intellectual property rights. I will assign to the Firm (including present assignment of future rights) absolutely and free from all encumbrances all my rights including moral rights, title, and interest in any and all intellectual property rights together with all accrued rights of action in respect of any infringement of such intellectual property rights.</p>
+            <p><b>Conduct and Discipline:</b> I shall at all times render high standards of services, ensure proper care, and exercise independent professional judgment. I shall not, directly or indirectly, make any statement or become privy to any act, omission, practice or competition which is harmful or likely to be harmful to the interest of the Firm. During my term with the organization, I will be governed by the rules and regulations with respect to conduct and discipline and other matters as may be framed by the Firm from time to time. I shall comply with the "Code of Conduct" and the Firm's Policy and confirm periodically as and when required, the policy/procedures spelt out in the "Code of Conduct" and the Firm's Policy.</p>
+            <p>I declare that I have read and understood the Information Security Guidelines and shall abide by them under all circumstances.</p>
+            <p>I declare that there are no pending civil and/or criminal legal proceedings/notices or disciplinary proceedings from ICAI or FIRs registered against me or my immediate family members.</p>
+            <p>I declare that I shall not abscond from my daily responsibilities and in the event I don't report without due intimation, then I shall compensate and indemnify the firm as per the discretion of the management.</p>
+            <p>I declare that I am not conflicted in continuing as an employee/partner/consultant in the Firm and shall disclose any other business interests in my annual or need-based declaration(s) to the Firm.</p>
+            <p>I declare that I am not associated with any activity, group, social media connect that are advocating radical or terrorist activities, activities related to money laundering or illegal activities, or any fraudulent activities of any type.</p>
+            <p>I declare that I shall abide by all policies and procedures of ethics, confidentiality, information security, and behaviour at any of the JHS office as well as any of the client office I am deputed to.</p>
+            <p>During and after employment/consultancy with JHS, I shall not use any of the information that I get access to for my personal benefit, like insider trading activities, sharing of client confidential information for or without any consideration to any person.</p>
+            <p>You understand and acknowledge the fact that we have clarified you about the procedures to be completed by you with respect to P.F. and E.S.I.C, for example, updating your KYC details for UAN number on P.F. website. Accordingly, JHS &amp; Associates LLP will not be responsible for any issues that may arise at a future date out of your not updating these details. The following is a summary of requirements to be completed by you:</p>
+            <ul style="margin:0 0 .6rem 1.4rem">
+              <li>Activating UAN and updating KYC on PF Portal</li>
+              <li>Updating KYC Form for ESIC and providing necessary documents for self &amp; family members</li>
+              <li>Going to the ESIC Doctor and getting registered in order to avail benefit in near future</li>
+              <li>Applying and obtaining PAN Card and Aadhaar Card</li>
+              <li>Opening of a salary bank account</li>
+            </ul>
+            <p>I hereby confirm my acceptance of the above.</p>
+          </div>
+          <label style="display:flex;gap:.5rem;align-items:center;font-weight:600;font-size:.9rem;margin:1rem 0;cursor:pointer"><input type="checkbox" data-s="policy" data-k="read_accepted"> Read and Accepted <span class="req">*</span></label>
+          <div class="g3">
+            <div class="form-group"><label>Name <span class="req">*</span></label><input class="fi" data-s="policy" data-k="accepted_name"></div>
+            <div class="form-group"><label>Signature <span class="req">*</span></label><div class="sigbox" data-sig="policy.accepted_signature"></div></div>
+            <div class="form-group"><label>Date <span class="req">*</span></label><input class="fi" type="date" data-s="policy" data-k="accepted_date"></div>
+          </div>
+          <div class="sub-title">Employee Details</div>
+          <div class="g2">
+            <div class="form-group"><label>Name of the Person <span class="req">*</span></label><input class="fi" data-s="policy" data-k="person_name"></div>
+            <div class="form-group"><label>Job Role</label><input class="fi" data-s="policy" data-k="job_role"></div>
+            <div class="form-group"><label>Designation <span class="req">*</span></label><input class="fi" data-s="policy" data-k="designation"></div>
+            <div class="form-group"><label>Client Name</label><input class="fi" data-s="policy" data-k="client_name"></div>
+            <div class="form-group"><label>Client Location</label><input class="fi" data-s="policy" data-k="client_location"></div>
+            <div class="form-group"><label>Partner's Name</label><input class="fi" data-s="policy" data-k="partner_name"></div>
+            <div class="form-group"><label>Roster Role</label>
+              <div class="opts"><label><input type="radio" name="roster" data-s="policy" data-k="roster_role" value="YES"> YES</label><label><input type="radio" name="roster" data-s="policy" data-k="roster_role" value="NO"> NO</label></div></div>
+            <div class="form-group"><label>Date of Joining <span class="req">*</span></label><input class="fi" type="date" data-s="policy" data-k="date_of_joining"></div>
+          </div>
+          <label style="display:flex;gap:.5rem;align-items:center;font-weight:600;font-size:.9rem;margin:1.2rem 0 1rem;cursor:pointer"><input type="checkbox" data-s="policy" data-k="agree"> I Agree to the above as per our Discussion <span class="req">*</span></label>
+          <div class="form-group"><label>Signature <span class="req">*</span></label><div class="sigbox" data-sig="policy.agree_signature"></div></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" onclick="save('draft')"><i class="fas fa-floppy-disk"></i> Save Draft</button>
+          <button type="button" class="btn btn-ghost btn-preview" onclick="previewForm('pol')"><i class="fas fa-eye"></i> Preview</button>
+          <button type="button" class="btn btn-pri" id="submitBtn-pol" onclick="save('policy')"><i class="fas fa-paper-plane"></i> Submit Undertaking</button>
+        </div>
+      </div>
+      </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>.req{color:#e74c3c}
+#menuOv{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:900}
+#sideMenu{position:fixed;top:0;left:0;bottom:0;width:290px;max-width:85vw;background:#fff;z-index:950;transform:translateX(-102%);transition:transform .25s ease;box-shadow:4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding-bottom:1rem}
+#sideMenu.open{transform:none}
+#sideMenu .sm-head{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.1rem;background:#2c3e50;color:#fff;font-weight:700}
+#sideMenu .sm-head button{background:none;border:0;color:#fff;font-size:1.1rem;cursor:pointer}
+#sideMenu a{display:flex;align-items:center;gap:.7rem;padding:.8rem 1.1rem;color:#1f2937;text-decoration:none;font-weight:500;font-size:.92rem}
+#sideMenu a:hover{background:#eef0fb;color:#667eea}
+#sideMenu a i{width:1.2rem;text-align:center;color:#667eea}
+#sideMenu .sm-sec{padding:.9rem 1.1rem .3rem;font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#6b7280;border-top:1px solid #e5e7eb;margin-top:.4rem}
+</style>
+<style>
+#pvModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:1000;overflow:auto;padding:1.5rem 1rem}
+#pvModal .pv-box{max-width:980px;margin:0 auto;background:#f4f6fb;border-radius:14px;overflow:hidden}
+#pvModal .pv-head{display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.2rem;background:#fff;border-bottom:1px solid #e3e6ef;font-weight:700}
+#pvModal .pv-head small{display:block;font-weight:500;color:#6b7280}
+#pvModal .pv-foot{display:flex;justify-content:flex-end;gap:.6rem;padding:.9rem 1.2rem;background:#fff;border-top:1px solid #e3e6ef;position:sticky;bottom:0}
+#pvBody{padding:1.2rem}
+#pvBody .tc{display:block}
+#pvBody .pv-val{display:block;padding:.45rem .7rem;background:#fff;border:1px solid #e3e6ef;border-radius:8px;min-height:2rem;font-weight:500;white-space:pre-wrap;word-break:break-word}
+#pvBody .pv-missing{border-color:#e74c3c;color:#e74c3c;background:#fff5f5}
+#pvBody .decl{max-height:none!important;overflow:visible!important}
+.paper{max-width:794px;margin:0 auto;background:#fff;padding:14px;box-shadow:0 2px 12px rgba(0,0,0,.15);font:12.5px/1.35 Calibri,Arial,sans-serif;color:#000}
+.paper table.pb{width:100%;border-collapse:collapse;table-layout:auto}
+.paper table.pb td{border:1px solid #555;padding:.4em .48em;vertical-align:middle;word-break:break-word}
+.paper table.gfix{table-layout:fixed}
+.pgbox{width:794px!important;max-width:none!important;height:1122px!important;min-height:0!important;box-sizing:border-box;position:relative;overflow:hidden;margin:0!important;box-shadow:none!important;background:#fff}
+.pgbox.pgform{padding:34px 30px}
+.pgbox.docp{padding:34px 52px 60px}.pgbox.docq{padding:48px 52px}
+.pgbox .lg{display:block;margin:0 0 6px auto;height:40px}
+.pgno{position:absolute;bottom:22px;left:0;right:0;text-align:center;font:12.5px "Times New Roman",serif}
+.paper td.l{background:#fff;width:auto;white-space:normal}
+.paper table.fixed{table-layout:fixed}
+.paper table.fixed4 td.l{width:22%}.paper table.fixed4 td.v{width:28%}
+.paper table.fixed6 td.l{width:15%}.paper table.fixed6 td.v{width:18%}
+.paper td.t{text-align:center;font-weight:700;font-size:1rem}
+.paper td.ph{text-align:center;color:#bbb;letter-spacing:.05em;font-weight:500;padding:2px;line-height:2}
+.paper td.ph img{width:100%;max-height:190px;object-fit:cover;display:block}
+.paper .bar{background:#d9d9d9;border:1px solid #555;border-top:0;text-align:center;padding:2px 6px}
+.paper .nm{display:flex;justify-content:space-around;gap:6px}.paper .nm i{color:#bbb}
+.paper tr.hd td{text-align:center;background:#fff;font-weight:500}
+.paper tr.rw td{height:2.1em}.paper tr.rw.tall td{height:4.8em;vertical-align:top;white-space:pre-wrap}
+.paper td.c{text-align:center}.paper td.legend{width:14%;font-size:.8rem}
+.paper .on{font-weight:700}.paper .sg{font-family:"Segoe Script","Brush Script MT",cursive;font-size:1.2rem}
+.paper .decl-p{border:1px solid #555;border-top:0;padding:4px 6px}.paper .decl-p p{margin:3px 0}
+.paper.doc{padding:36px 44px;font-size:13px;line-height:1.5}
+.doc .card{background:#fff;border:0;box-shadow:none;padding:0;border-radius:0;margin:0}
+.doc .card::before,.doc .card::after{display:none}
+.doc .card-title{text-align:center;font-size:1.15rem;font-weight:700;text-transform:uppercase;color:#000;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:12px}
+.doc .card-title i{display:none}
+.doc .hint{text-align:center;color:#000;font-style:italic}
+.doc .decl{border:0;background:none;padding:0;max-height:none;font-size:13px;line-height:1.5;text-align:justify;color:#000}
+.doc .decl h4,.doc .sub-title{color:#000}
+.doc .sub-title{border-bottom:1px solid #000;padding-bottom:3px}
+.doc .pv-val{border:0;border-bottom:1px solid #000;border-radius:0;background:none;padding:2px 4px;min-height:1.7rem}
+.doc .pv-missing{border-bottom-color:#e74c3c;background:none}
+.doc .form-group label{color:#000;font-weight:700;font-size:.78rem;text-transform:none}
+.doc .g2,.doc .g3{gap:1rem 1.5rem;margin-top:.8rem}
+.paper.docp{max-width:794px;min-height:1000px;padding:40px 52px 48px;font:13px/1.5 "Times New Roman",Times,serif;color:#000}
+.docp .lg{display:block;margin:0 0 -10px auto;height:42px}
+.docp h2{text-align:center;font-size:19px;font-weight:700;margin:0 0 2px}
+.docp .sub{text-align:center;font-style:italic;font-size:12px;margin-bottom:16px}
+.docp h3{font-size:15px;font-weight:700;margin:20px 0 8px;padding-bottom:3px;border-bottom:1px solid #000}
+.docp p{margin:0 0 10px;text-align:justify}
+.docp .cl{display:grid;grid-template-columns:38px 1fr;gap:0 4px;margin:0 0 9px;padding-left:2px;text-align:justify}
+.docp ul{margin:0 0 10px 38px;padding-left:18px}
+.docp .tail{margin-top:30px}
+.docp .ag{margin:14px 0 8px;font-weight:700}
+.docp .ln{display:flex;align-items:flex-end;gap:6px;margin:12px 0}
+.docp .ln .u{flex:0 1 320px;min-width:200px;border-bottom:1px solid #000;min-height:20px;padding:0 4px}
+.docp .ln .u img{max-height:54px;display:block}.docp .sg{font-family:"Segoe Script","Brush Script MT",cursive;font-size:1.2rem}
+.tc.locked .card{pointer-events:none}.tc.locked .card .fi,.tc.locked .card .sigbox{opacity:.8}
+.lock-note{margin:1rem 0;padding:.8rem 1rem;border-radius:10px;background:#eefaf3;border:1px solid #b7e4c7;color:#1b6b3a;font-weight:600;font-size:.9rem}
+.sig-modes button:disabled{opacity:.35;cursor:not-allowed}
+.sigbox.sig-missing{border-color:#e74c3c;box-shadow:0 0 0 3px rgba(231,76,60,.15)}
+.paper.docq{max-width:794px;min-height:1000px;padding:48px 52px;font:13.5px/1.55 Calibri,Carlito,Arial,sans-serif;color:#000}
+.docq h2{text-align:center;font-size:18px;font-weight:700;margin:0 0 28px}
+.docq .op{margin:0 0 12px}
+.docq .u{border-bottom:1px solid #000;padding:0 4px}.docq .u.wide{display:inline-block;min-width:320px}
+.docq .it{display:grid;grid-template-columns:32px 1fr;margin:0 0 10px;padding-left:20px;text-align:justify}
+.docq ul{margin:0 0 10px 52px;padding-left:18px;text-align:justify}
+.docq .cf{margin:20px 0 8px}
+.docq .acc{margin:8px 0}.docq .dl{margin:7px 0}.docq .det{margin-top:34px}.docq .ag{margin-top:16px;font-size:12px}
+.docq .dl img,.docq .sgn img{max-height:50px;vertical-align:middle}.docq .sg{font-family:"Segoe Script","Brush Script MT",cursive;font-size:1.2rem}
+.docq .sgn{margin:50px 0 0 auto;width:230px;text-align:center}.docq .sgn .line{border-top:1px solid #000;margin-top:4px}
+@media print{body>*:not(#pvModal){display:none!important}#pvModal{position:static;background:none;padding:0}#pvModal .pv-head,#pvModal .pv-foot{display:none}#pvModal .pv-box{box-shadow:none;background:none}#pvBody{padding:0}.paper{box-shadow:none;padding:0}.paper .bar,.paper tr.hd td{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+<div id="pvModal"><div class="pv-box">
+  <div class="pv-head"><div><span id="pvTitle">Preview</span><small>Review how your form will look. Nothing is submitted until you click Submit.</small></div>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="closePreview()"><i class="fas fa-xmark"></i> Close</button></div>
+  <div id="pvBody"></div>
+  <div class="pv-foot">
+    <button type="button" class="btn btn-ghost hr-only" style="display:none" onclick="downloadPdf(curPv, EDIT_EMP)"><i class="fas fa-file-pdf"></i> Download PDF</button>
+    <button type="button" class="btn btn-ghost hr-only" style="display:none" onclick="window.print()"><i class="fas fa-print"></i> Print / Save as PDF</button>
+    <button type="button" class="btn btn-ghost hr-only" style="display:none" onclick="closePreview()"><i class="fas fa-pen"></i> Back to edit</button>
+    <button type="button" class="btn btn-pri" id="pvSubmit"><i class="fas fa-paper-plane"></i> Submit</button>
+  </div>
+</div></div>
+<script>
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+const IS_JOINER = localStorage.getItem('userRole') === 'joiner';   // new joiner: Employee Application Form only
+document.getElementById('empBadge').textContent = IS_JOINER ? (localStorage.getItem('loggedInEmail') || 'New joiner') : empId;
+// new joiners see all the forms in the ☰ menu, like everybody else (they just sign in with a personal email)
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t); setTimeout(()=>t.remove(),4500);
+}
+async function api(url, opts={}){
+  const res = await fetch(url, Object.assign({}, opts, {headers:Object.assign({}, AUTH, opts.headers||{})}));
+  let data=null; try{ data=await res.json(); }catch(e){}
+  if (res.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (!res.ok) throw new Error((data&&data.detail)||'Request failed');
+  return data;
+}
+
+// ── Table definitions: [key, header, input type] ─────────────────────────────
+const TABLES = {
+  family: {cols:[['name','Name of Family Member'],['age','Age (Years)','number'],['relation','Relation'],['occupation','Occupation'],['contact','Contact Number']],
+           seed:[{relation:'Father'},{relation:'Mother'},{},{},{},{}]},
+  education: {cols:[['degree','Degree / Diploma'],['board','Board / University'],['school','Name of School'],['year','Year of Passing'],['marks','% Marks / Division']], seed:[{},{},{}]},
+  languages: {cols:[['language','Language'],['r','R','check'],['w','W','check'],['s','S','check']], seed:[{},{},{}]},
+  training: {cols:[['course','Training / Course Attended'],['period','Period'],['institution','Institution']], seed:[{},{}]},
+  achievements: {cols:[['achievement','Achievement'],['activity','Activity'],['year','Year'],['level','Level / Prize']], seed:[{},{}]},
+  employment_history: {cols:[['employer','Employer’s Name & Address'],['designation','Designation & Job Description'],['from','From','date'],['to','To','date'],['salary','Salary Last Drawn'],['employer_contact','Contact details of the previous Employer']], seed:[{},{}]},
+  references: {cols:[['name','Full Name'],['designation','Designation'],['organization','Organization'],['contact','Contact Number']], seed:[{},{}]},
+};
+const ADDR = [['address','Address'],['street','Street'],['landmark','Landmark'],['city','City'],['state','State'],['pin','Pin Code'],['landline','Landline No.'],['mobile','Mobile No.']];
+const PRESENT = [['employer','Employer’s Name'],['employer_contact','Employer’s Contact'],['address','Address'],['employee_code','Employee Code'],['date_of_joining','Date of Joining','date'],['position_joined','Position Joined'],['present_position','Present Position'],['job_description','Brief Job Description'],['total_ctc','Total Annual CTC'],['fixed_ctc','Fixed CTC'],['variable_ctc','Variable CTC'],['perquisites','Perquisites / Superannuation'],['joining_time','Joining Time Required'],['ctc_expected','CTC Expected'],['reason_for_change','Reason for Change'],['liked_most','What aspects of your job did you like most?'],['worked_before_when','Have you worked for The FIRM before? If yes, when?'],['worked_before_position','Your Position'],['worked_before_reporting','Reporting to']];
+const QUESTIONS = [
+  ['worked_before','Have you been worked for The FIRM before?',null],
+  ['related','Are you related to any present employee of the company?','If yes, give name of person and describe the relationship'],
+  ['terminated','Have you been Terminated / Investigated in reference with Misconduct in previous Employment?','If yes, give details'],
+  ['health','Do you have any specific health problems/issues?','If yes, give details'],
+  ['bond','Is there any balance period of service bond, if any, with the present employer?','If yes, give details'],
+];
+
+function inp(s,k,t){ return `<input class="fi" ${t&&t!=='check'?`type="${t}"`:''} data-s="${s}" data-k="${k}">`; }
+
+function buildStatic(){
+  const addr = p => ADDR.map(([k,l]) => `<div class="form-group"${k==='address'?' style="grid-column:1/-1"':''}><label>${l}${p==='present'&&['street','city','state','pin','mobile'].includes(k)?' <span class="req">*</span>':''}</label>${inp('contact',p+'_'+k)}</div>`).join('');
+  document.getElementById('addrPresent').innerHTML = addr('present');
+  document.getElementById('addrPermanent').innerHTML = addr('permanent');
+  document.getElementById('presentEmp').innerHTML = PRESENT.map(([k,l,t]) => `<div class="form-group"><label>${l}</label>${inp('present_employment',k,t)}</div>`).join('');
+  document.getElementById('questions').innerHTML = QUESTIONS.map(([k,q,d]) => `
+    <div class="qrow"><div class="qtext">${q}</div>
+      <div class="opts"><label><input type="radio" name="q_${k}" data-s="questionnaire" data-k="${k}" value="Yes" onchange="qToggle('${k}')"> Yes</label><label><input type="radio" name="q_${k}" data-s="questionnaire" data-k="${k}" value="No" onchange="qToggle('${k}')"> No</label></div>
+      ${d?`<div class="qdetail" id="qd_${k}"><label class="hint" style="margin:0">${d}</label><textarea class="fi" rows="2" data-s="questionnaire" data-k="${k}_details"></textarea></div>`:''}
+    </div>`).join('');
+}
+function qToggle(k){
+  const d = document.getElementById('qd_'+k); if(!d) return;
+  const v = document.querySelector(`input[name="q_${k}"]:checked`);
+  d.classList.toggle('open', !!v && v.value==='Yes');
+}
+
+// ── Row tables ───────────────────────────────────────────────────────────────
+function buildTable(name){
+  const t = TABLES[name];
+  document.getElementById('t-'+name).innerHTML =
+    `<thead><tr><th>Sr.</th>${t.cols.map(c=>`<th${c[2]==='check'?' style="text-align:center"':''}>${c[1]}</th>`).join('')}<th></th></tr></thead><tbody></tbody>`;
+}
+function addRow(name, vals={}){
+  const t = TABLES[name], body = document.querySelector(`#t-${name} tbody`), tr = document.createElement('tr');
+  tr.innerHTML = `<td class="sr"></td>` + t.cols.map(([k,,type]) => type==='check'
+      ? `<td class="chk"><input type="checkbox" data-k="${k}" ${vals[k]?'checked':''}></td>`
+      : `<td><input class="fi" ${type?`type="${type}"`:''} data-k="${k}" value="${esc(vals[k]||'')}"></td>`).join('')
+    + `<td><button type="button" class="rm" title="Remove row" onclick="this.closest('tr').remove();renumber('${name}')"><i class="fas fa-trash"></i></button></td>`;
+  body.appendChild(tr); renumber(name);
+}
+function renumber(name){ document.querySelectorAll(`#t-${name} tbody tr`).forEach((tr,i)=>tr.querySelector('.sr').textContent=i+1); }
+
+
+// ── Signature widget: draw / type / upload ───────────────────────────────────
+const SIG = {};   // "section.key" -> {mode, text, draw, upload}
+function sigInit(box){
+  const id = box.dataset.sig, st = SIG[id] = {mode:'type', text:'', draw:'', upload:''};
+  box.innerHTML = `
+    <div class="sig-modes">
+      <button type="button" data-m="draw"><i class="fas fa-pen-nib"></i>Sign</button>
+      <button type="button" data-m="type"><i class="fas fa-keyboard"></i>Type name</button>
+      <button type="button" data-m="upload"><i class="fas fa-image"></i>Upload</button>
+    </div>
+    <div class="sig-pane" data-p="draw"><canvas width="760" height="300"></canvas>
+      <div class="sig-hint"><span><i class="fas fa-hand-pointer"></i> Draw your signature above using mouse, finger or stylus</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-clear><i class="fas fa-eraser"></i> Clear</button></div></div>
+    <div class="sig-pane" data-p="type"><input class="fi" placeholder="Type your full name"><div class="sig-type-prev"></div></div>
+    <div class="sig-pane" data-p="upload"><label class="sig-drop"><i class="fas fa-cloud-arrow-up"></i><span><b>Click to choose</b> a PNG or JPEG of your signature</span><input type="file" accept="image/png,image/jpeg"></label><img class="sig-prev" alt="Signature preview"></div>`;
+  const cv = box.querySelector('canvas'), ctx = cv.getContext('2d');
+  ctx.lineWidth = 4.4; ctx.lineCap = 'round'; ctx.strokeStyle = '#1a2a6c';
+  let down = false;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX-r.left)*cv.width/r.width, (e.clientY-r.top)*cv.height/r.height]; };
+  cv.addEventListener('pointerdown', e => { down = true; cv.setPointerCapture(e.pointerId); const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+.1,y); ctx.stroke(); });
+  cv.addEventListener('pointermove', e => { if(!down) return; const [x,y]=pos(e); ctx.lineTo(x,y); ctx.stroke(); });
+  const end = () => { if(!down) return; down = false; st.draw = cv.toDataURL('image/png'); sigSync(box); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  box.querySelector('[data-clear]').onclick = () => { ctx.clearRect(0,0,cv.width,cv.height); st.draw = ''; sigSync(box); };
+  const ti = box.querySelector('[data-p="type"] input'), tp = box.querySelector('.sig-type-prev');
+  ti.addEventListener('input', () => { st.text = ti.value; tp.textContent = ti.value; sigSync(box); });
+  const up = box.querySelector('input[type=file]'), im = box.querySelector('.sig-prev');
+  up.addEventListener('change', () => {
+    const f = up.files[0]; if (!f) return;
+    if (!/^image\/(png|jpeg)$/.test(f.type)) { toast('Please choose a PNG or JPEG image', 'error'); up.value=''; return; }
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 400/img.width, 150/img.height), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width*k)); c.height = Math.max(1, Math.round(img.height*k));
+      const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0,0,c.width,c.height); cx.drawImage(img,0,0,c.width,c.height);
+      st.upload = c.toDataURL('image/jpeg', .85); im.src = st.upload; im.style.display = 'block'; URL.revokeObjectURL(img.src); sigSync(box);
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  box.querySelectorAll('.sig-modes button').forEach(b => b.onclick = () => sigMode(box, b.dataset.m));
+  sigMode(box, 'type');
+}
+// One signature method for ALL forms: once a signature is given with one method (Sign / Type name / Upload),
+// every signature box in every form has to use the same method and the other options are closed.
+function sigHas(st){ return !!(st.mode === 'draw' ? st.draw : st.mode === 'upload' ? st.upload : st.text.trim()); }
+function sigSync(anyBox){
+  const boxes = [...document.querySelectorAll('#efForm [data-sig]')].filter(b => SIG[b.dataset.sig]), first = boxes.find(b => sigHas(SIG[b.dataset.sig]));
+  const lock = first ? SIG[first.dataset.sig].mode : null;
+  boxes.forEach(b => {
+    if (lock && !sigHas(SIG[b.dataset.sig]) && SIG[b.dataset.sig].mode !== lock) sigMode(b, lock, true);
+    b.querySelectorAll('.sig-modes button').forEach(btn => {
+      const closed = !!lock && btn.dataset.m !== lock;
+      btn.disabled = closed; btn.title = closed ? 'Locked: you already signed with a different method. Use the same signature method in all forms (clear the other signature to change)' : '';
+    });
+  });
+}
+function sigMode(box, m, quiet){
+  SIG[box.dataset.sig].mode = m;
+  box.querySelectorAll('.sig-modes button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  box.querySelectorAll('.sig-pane').forEach(p => p.classList.toggle('on', p.dataset.p === m));
+  if (!quiet) sigSync(box);
+}
+function sigCollect(out){
+  document.querySelectorAll('#efForm [data-sig]').forEach(box => {
+    const [s,k] = box.dataset.sig.split('.'), st = SIG[box.dataset.sig]; out[s] = out[s] || {};
+    out[s][k] = st.mode === 'type' ? st.text : '';
+    out[s][k+'_mode'] = st.mode;
+    out[s][k+'_image'] = st.mode === 'draw' ? st.draw : (st.mode === 'upload' ? st.upload : '');
+  });
+}
+function sigFill(data){
+  document.querySelectorAll('#efForm [data-sig]').forEach(box => {
+    const [s,k] = box.dataset.sig.split('.'), d = data[s] || {}, st = SIG[box.dataset.sig];
+    const mode = d[k+'_mode'] || 'type', img = d[k+'_image'] || '';
+    st.text = d[k] || ''; box.querySelector('[data-p="type"] input').value = st.text; box.querySelector('.sig-type-prev').textContent = st.text;
+    if (mode === 'draw' && img) {
+      st.draw = img; const cv = box.querySelector('canvas'), im = new Image();
+      im.onload = () => cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); im.src = img;
+    }
+    if (mode === 'upload' && img) { st.upload = img; const pv = box.querySelector('.sig-prev'); pv.src = img; pv.style.display = 'block'; }
+    sigMode(box, mode, true);
+  });
+  document.querySelectorAll('#efForm [data-sig]').forEach(box => sigSync(box));
+}
+
+// ── Photo upload (stored as a small JPEG data URL in personal.photo_image) ───
+let PHOTO = '';
+function photoSet(url){
+  PHOTO = url || '';
+  const pv = document.getElementById('photoPrev');
+  pv.src = PHOTO; pv.style.display = PHOTO ? 'block' : 'none';
+  document.getElementById('photoRemove').style.display = PHOTO ? '' : 'none';
+  document.getElementById('photoBtnTxt').textContent = PHOTO ? 'Change photo' : 'Upload photo';
+}
+document.getElementById('photoFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (!/^image\/(png|jpeg)$/.test(f.type)) { toast('Please choose a PNG or JPEG image', 'error'); e.target.value=''; return; }
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 300/img.width, 400/img.height), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.width*k)); c.height = Math.max(1, Math.round(img.height*k));
+    const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0,0,c.width,c.height); cx.drawImage(img,0,0,c.width,c.height);
+    photoSet(c.toDataURL('image/jpeg', .8)); URL.revokeObjectURL(img.src); e.target.value = '';
+  };
+  img.src = URL.createObjectURL(f);
+});
+document.getElementById('photoRemove').addEventListener('click', () => photoSet(''));
+
+// ── Collect / fill ───────────────────────────────────────────────────────────
+function collect(){
+  const out = {};
+  document.querySelectorAll('#efForm [data-s]').forEach(el => {
+    const s = el.dataset.s, k = el.dataset.k; out[s] = out[s] || {};
+    if (el.type==='radio') { if (el.checked) out[s][k] = el.value; }
+    else if (el.type==='checkbox') out[s][k] = el.checked;
+    else out[s][k] = el.value;
+  });
+  Object.keys(TABLES).forEach(name => {
+    out[name] = [...document.querySelectorAll(`#t-${name} tbody tr`)].map(tr => {
+      const row = {}; tr.querySelectorAll('[data-k]').forEach(el => row[el.dataset.k] = el.type==='checkbox' ? el.checked : el.value); return row;
+    });
+  });
+  sigCollect(out);
+  out.personal = out.personal || {}; out.personal.photo_image = PHOTO;
+  return out;
+}
+function fill(data){
+  document.querySelectorAll('#efForm [data-s]').forEach(el => {
+    const v = (data[el.dataset.s]||{})[el.dataset.k]; if (v===undefined) return;
+    if (el.type==='radio') el.checked = (el.value===v);
+    else if (el.type==='checkbox') el.checked = !!v;
+    else el.value = v;
+  });
+  Object.keys(TABLES).forEach(name => {
+    const rows = data[name]; if (!rows || !rows.length) return;
+    document.querySelector(`#t-${name} tbody`).innerHTML = '';
+    rows.forEach(r => addRow(name, r));
+  });
+  QUESTIONS.forEach(q => qToggle(q[0]));
+  sigFill(data);
+  photoSet((data.personal||{}).photo_image);
+}
+
+// ── Same-as-present ──────────────────────────────────────────────────────────
+document.addEventListener('change', e => { if (e.target.id==='sameAddr') copyAddr(); });
+document.addEventListener('input', e => { if (document.getElementById('sameAddr')?.checked && /present_/.test(e.target.dataset?.k||'')) copyAddr(); });
+function copyAddr(){
+  const on = document.getElementById('sameAddr').checked;
+  ADDR.forEach(([k]) => {
+    const p = document.querySelector(`[data-k="present_${k}"]`), q = document.querySelector(`[data-k="permanent_${k}"]`);
+    if (on) q.value = p.value; q.readOnly = on;
+  });
+}
+
+// ── Side menu (toggle) ───────────────────────────────────────────────────────
+function toggleMenu(open){
+  const m = document.getElementById('sideMenu'), on = open === undefined ? !m.classList.contains('open') : open;
+  m.classList.toggle('open', on); document.getElementById('menuOv').style.display = on ? 'block' : 'none';
+}
+function menuGo(where){ toggleMenu(false); openSection(where); }
+
+// ── Preview (read-only copy of the active form, shown before submitting) ─────
+const SUBMIT_MODE = {app:'application', und:'undertaking', pol:'policy'};
+// Paper-form layout of the Application Form (mirrors the printed Employee Application Form)
+function paperForm(d, pdf){
+  const g = (s,k) => ((d[s]||{})[k] ?? ''), E = esc;
+  const dt = x => /^\d{4}-\d{2}-\d{2}$/.test(x||'') ? x.split('-').reverse().join('-') : (x||'');
+  const v = (s,k,date) => E(date ? dt(g(s,k)) : g(s,k));
+  const lbl = t => `<td class="l">${t}</td>`, val = (x,cs) => `<td class="v"${cs?` colspan="${cs}"`:''}>${x}</td>`;
+  const opts = (s,k,list) => list.map(o => g(s,k)===o ? `<b class="on">☑ ${o}</b>` : `<span>☐ ${o}</span>`).join(' ');
+  const yn = (s,k) => g(s,k)==='Yes' ? '<b class="on">✔ Yes</b>' : 'Yes';
+  const nn = (s,k) => g(s,k)==='No' ? '<b class="on">✔ No</b>' : 'No';
+  const bar = t => `<div class="bar">${t}</div>`;
+  const pad = (a,n) => { const r = (a||[]).slice(); while (r.length < n) r.push({}); return r; };
+  const GW = {family:[6,34,10,16,16,18], education:[22,22,28,13,15], employment_history:[22,22,9,9,12,26], references:[6,28,22,22,22]};
+  // rows [from, to) of a table; head=false gives the continuation of a table that started on the previous PDF page
+  const grid = (name, heads, minRows, num, from = 0, to = Infinity, head = true) => {
+    const cols = TABLES[name].cols, rows = pad(d[name], minRows);
+    const gw = GW[name], cg = gw ? `<colgroup>${gw.map(w => `<col style="width:${w}%">`).join('')}</colgroup>` : '';
+    return `<table class="pb${gw?' gfix':''}">${cg}` +
+      (head ? `<tr class="hd">${num?'<td>Sr.</td>':''}${heads.map(h=>`<td>${h}</td>`).join('')}</tr>` : '') +
+      rows.map((r,i) => i<from||i>=to ? '' : `<tr class="rw">${num?`<td class="c">${i+1}</td>`:''}${cols.map(([k,,t]) => `<td>${E(t==='date'?dt(r[k]):(r[k]||''))}</td>`).join('')}</tr>`).join('') + '</table>';
+  };
+  const PB = '<!--PB-->';
+  // split(a, h, rows, n, num, at): on screen one table; in the PDF the table is cut after row `at`
+  const split = (name, heads, rows, num, at) => pdf ? grid(name,heads,rows,num,0,at) + PB + grid(name,heads,rows,num,at,Infinity,false) : grid(name,heads,rows,num);
+  const lines = (txt,n,numbered) => { const a = String(txt||'').split(/\r?\n/).filter(x=>x.trim()); while (a.length<n) a.push(''); return a; };
+  const photo = (d.personal||{}).photo_image;
+  const L = pad(d.languages, 9), lr = Math.max(3, Math.ceil((d.languages||[]).length/3));
+  const lang = i => { const r = (d.languages||[])[i] || {}; return `<td>${r.language ? (i+1)+'. '+E(r.language) : (i+1)+'.'}</td><td class="c">${r.r?'✔':''}</td><td class="c">${r.w?'✔':''}</td><td class="c">${r.s?'✔':''}</td>`; };
+  let langRows = '';
+  for (let i=0;i<lr;i++) langRows += `<tr class="rw">${lang(i)}${lang(i+lr)}${lang(i+2*lr)}</tr>`;
+  const langHead = `<tr class="hd"><td rowspan="${lr+1}" class="legend">Languages Known<br>R – Read<br>W – Write<br>S – Speak</td><td>Languages</td><td>R</td><td>W</td><td>S</td><td>Languages</td><td>R</td><td>W</td><td>S</td><td>Languages</td><td>R</td><td>W</td><td>S</td></tr>`;
+  const hon = lines(g('interests','honors'),3), pe = k => v('present_employment',k), pd = k => E(dt(g('present_employment',k)));
+  const ffs = g('present_employment','ffs_status');
+  const decl = d.declaration || {};
+  const sigHtml = decl.signature_image ? `<img src="${decl.signature_image}" alt="Signature" style="max-height:60px;max-width:100%">`
+    : (decl.signature ? `<span class="sg">${E(decl.signature)}</span>` : '');
+  const trainRows = pad(d.training,3).map((r,i)=>`<tr class="rw"><td>${i+1}. ${E(r.course||'')}</td><td>${E(r.period||'')}</td><td>${E(r.institution||'')}</td></tr>`).join('');
+  const achRows = pad(d.achievements,3).map((r,i)=>`<tr class="rw"><td>${i+1}. ${E(r.achievement||'')}</td><td>${E(r.activity||'')}</td><td>${E(r.year||'')}</td><td>${E(r.level||'')}</td></tr>`).join('');
+  return pageWrap('paper', `
+  <table class="pb"><tr><td class="l" style="width:17%">The Firm Name</td><td class="t">EMPLOYEE APPLICATION FORM</td><td class="t" style="width:17%;font-size:.8rem">HR</td></tr></table>
+  ${bar('EMPLOYEE PERSONAL DATA')}
+  <table class="pb fixed"><colgroup><col style="width:19%"><col style="width:29%"><col style="width:16%"><col style="width:13%"><col style="width:23%"></colgroup>
+    <tr>${lbl('Name:')}<td class="v" colspan="4"><div class="nm"><span>${v('personal','surname')||'<i>Surname</i>'}</span><span>${v('personal','first_name')||'<i>First Name</i>'}</span><span>${v('personal','middle_name')||'<i>Middle Name</i>'}</span></div></td></tr>
+    <tr>${lbl('Sex:')}${val(opts('personal','sex',['Male','Female']))}${lbl('Nationality:')}${val(v('personal','nationality'),2)}</tr>
+    <tr>${lbl('Birth Date:')}${val(v('personal','birth_date',1))}${lbl('Religion:')}${val(v('personal','religion'),2)}</tr>
+    <tr>${lbl('Birth Place:')}${val(v('personal','birth_place'))}${lbl('Category:')}${val(v('personal','category'))}<td class="ph" rowspan="8">${photo?`<img src="${photo}" alt="Photo">`:'PASSPORT<br>SIZE<br>PHOTO'}</td></tr>
+    <tr>${lbl('Mother Tongue:')}${val(v('personal','mother_tongue'))}${lbl('Height:')}${val(v('personal','height_cm')+(g('personal','height_cm')?' cms':''))}</tr>
+    <tr>${lbl('Blood Group:')}${val(v('personal','blood_group'))}${lbl('Weight:')}${val(v('personal','weight_kg')+(g('personal','weight_kg')?' KGs':''))}</tr>
+    <tr>${lbl('Marital Status:')}${val(opts('personal','marital_status',['Married','Unmarried','Separated']))}${lbl('PAN No:')}${val(v('personal','pan_no'))}</tr>
+    <tr>${lbl('Aadhar Card No.:')}${val(v('personal','aadhar_no'))}${lbl('Self-attested Copy: YES / NO')}${val(v('personal','aadhar_copy'))}</tr>
+    <tr>${lbl('Driving License No.:')}${val(v('personal','dl_no'))}${lbl('Self-attested Copy: YES / NO')}${val(v('personal','dl_copy'))}</tr>
+    <tr>${lbl('Passport No.:')}${val(v('personal','passport_no'))}${lbl('Date of Issue:')}${val(v('personal','passport_issue_date',1))}</tr>
+    <tr>${lbl('Place of Issue:')}${val(v('personal','passport_issue_place'))}${lbl('Valid Till:')}${val(v('personal','passport_valid_till',1))}</tr>
+  </table>
+  ${bar('EMPLOYEE CONTACT DETAILS')}
+  <table class="pb fixed4">
+    <tr>${lbl('Professional Name:')}${val(v('contact','professional_name'),3)}</tr>
+    <tr>${lbl('E-Mail ID:')}${val(v('contact','email'))}${lbl('Emergency Contact No:')}${val(v('contact','emergency_contact_no'))}</tr>
+    <tr>${lbl('LinkedIn ID:')}${val(v('contact','linkedin'))}${lbl('Facebook ID:')}${val(v('contact','facebook'))}</tr>
+  </table>
+  ${['present','permanent'].map(p => `<table class="pb fixed6">
+    <tr>${lbl(p==='present'?'Present Address:':'Permanent Address:')}${val(v('contact',p+'_address'),3)}${lbl('Landline No.:')}${val(v('contact',p+'_landline'))}</tr>
+    <tr>${lbl('Street:')}${val(v('contact',p+'_street'),3)}${lbl('Mobile No.:')}${val(v('contact',p+'_mobile'))}</tr>
+    <tr>${lbl('')}${val('',3)}${lbl('Pin Code:')}${val(v('contact',p+'_pin'))}</tr>
+    <tr>${lbl('City:')}${val(v('contact',p+'_city'))}${lbl('State:')}${val(v('contact',p+'_state'))}${lbl('Landmark:')}${val(v('contact',p+'_landmark'))}</tr>
+  </table>`).join('')}
+  ${bar('Employee Family Details')}${split('family',['Name of Family Member','Age (Years)','Relation','Occupation','Contact Number'],6,true,4)}
+  ${bar('Educational Background')}${grid('education',['Degree / Diploma','Board University','Name of School','Year of Passing','% Marks / Division'],5)}
+  ${bar('Languages Known')}<table class="pb">${langHead}${langRows}</table>
+  ${bar('Training Details')}<table class="pb"><tr class="hd"><td>Training / Course Attended</td><td>Period</td><td>Institution</td></tr>${trainRows}</table>
+  ${bar('Honors / Scholarship / Project Work / Publications')}<table class="pb">${hon.map((h,i)=>`<tr class="rw"><td>${i+1}. ${E(h)}</td></tr>`).join('')}</table>
+  ${bar('Extra-Curricular Achievement')}<table class="pb"><tr class="hd"><td>Achievement</td><td>Activity</td><td>Year</td><td>Level Prize</td></tr>${achRows}</table>
+  ${bar('Hobbies &amp; Interests')}<table class="pb"><tr class="hd"><td>Hobbies</td><td>Sports</td><td>Books</td></tr><tr class="rw tall"><td>${v('interests','hobbies')}</td><td>${v('interests','sports')}</td><td>${v('interests','books')}</td></tr></table>
+  ${bar('Employment History')}${split('employment_history',['Employer’s Name &amp; Address','Designation &amp; Job Description','From','To','Salary Last Drawn','Contact details of the previous Employer.'],6,false,1)}
+  ${bar('Present Employment')}
+  <table class="pb fixed4">
+    <tr>${lbl('Employer’s Name')}${val(pe('employer'),3)}</tr>
+    <tr>${lbl('Employer’s Contact')}${val(pe('employer_contact'),3)}</tr>
+    <tr>${lbl('Address')}${val(pe('address'),3)}</tr>
+    <tr>${lbl('Employee code')}${val(pe('employee_code'))}${lbl('Date of Joining')}${val(pd('date_of_joining'))}</tr>
+    <tr>${lbl('Position Joined')}${val(pe('position_joined'))}${lbl('Present position')}${val(pe('present_position'))}</tr>
+    <tr>${lbl('Brief Job Description')}${val(pe('job_description'),3)}</tr>
+    <tr>${lbl('Total Annual CTC')}${val(pe('total_ctc'))}${lbl('Fixed CTC')}${val(pe('fixed_ctc'))}</tr>
+    <tr>${lbl('Variable CTC')}${val(pe('variable_ctc'))}${lbl('Perquisites / Superannuation')}${val(pe('perquisites'))}</tr>
+    <tr>${lbl('Joining Time Required')}${val(pe('joining_time'))}${lbl('CTC Expected')}${val(pe('ctc_expected'))}</tr>
+    <tr>${lbl('Reason for Change')}${val(pe('reason_for_change'),3)}</tr>
+    <tr>${lbl('What aspects of your job did you like most?')}${val(pe('liked_most'),3)}</tr>
+    <tr>${lbl('Exit formalities and Full &amp; Final Settlement')}${val(`${ffs==='Complete'?'<b class="on">✔ Complete</b>':'Complete'} &nbsp; ${ffs==='Pending'?'<b class="on">✔ Pending</b>':'Pending'}`)}${lbl('Pending, When?')}${val(pe('ffs_pending_when'))}</tr>
+    <tr>${lbl('Have you been worked for The FIRM before?')}${val(yn('questionnaire','worked_before')+' / '+nn('questionnaire','worked_before'))}${lbl('If yes When?')}${val(pe('worked_before_when'))}</tr>
+    <tr>${lbl('Your Position')}${val(pe('worked_before_position'))}${lbl('Reporting to')}${val(pe('worked_before_reporting'))}</tr>
+    ${QUESTIONS.slice(1).map(([k,q,dd]) => `<tr>${lbl(q)}${val(yn('questionnaire',k)+' / '+nn('questionnaire',k))}${lbl(dd)}${val(v('questionnaire',k+'_details'))}</tr>`).join('')}
+  </table>
+  ${bar('References (other than relatives)')}${split('references',['Full Name','Designation','Organization','Contact Number'],3,true,2)}
+  ${bar('Declaration')}
+  <div class="decl-p"><p>I declare that the above information is true. In case any information given above is found to be partially / completely incorrect, my appointment may be cancelled/withdrawn and my services terminated at any time.</p>
+  <p>I also hereby authorize The FIRM and/or its representatives to independently verify the information provided above and, in my resume, and to conduct enquiries as The JHS deems fit. I also authorize The JHS to share this information with its representatives to verify its authenticity.</p>
+  <p>In case The FIRM finds any information on this form and/or in my resume false or misleading, or The FIRM is informed by its representatives that the information contained herein and/or in my resume, is false or misleading, I accept The FIRM’s decision to withdraw the employment offer made to me unconditionally.</p></div>
+  <table class="pb fixed6"><tr>${lbl('Place:')}${val(E(decl.place||''))}${lbl('Date:')}${val(E(dt(decl.date)))}${lbl('Signature:')}${val(sigHtml)}</tr></table>`, pdf);
+}
+// On screen: one sheet. For the PDF (pdf=true): an array of page contents, split at the <!--PB--> markers.
+function pageWrap(cls, inner, pdf){
+  return pdf ? inner.split('<!--PB-->') : `<div class="${cls}">${inner.replace(/<!--PB-->/g, '')}</div>`;
+}
+
+// Undertaking: mirrors the Word "Undertaking" document (sans-serif, numbered clauses, details block, signature at right)
+function polHtml(d, pdf){
+  const p = d.policy || {}, E = esc;
+  const dt = x => /^\d{4}-\d{2}-\d{2}$/.test(x||'') ? x.split('-').reverse().join('-') : (x||'');
+  const sigH = k => p[k+'_image'] ? `<img src="${p[k+'_image']}" alt="Signature">` : (p[k] ? `<span class="sg">${E(p[k])}</span>` : '');
+  const items = [...document.querySelector('#tc-pol .decl').children], last = items.length - 1;
+  const ulAt = items.findIndex(n => n.tagName === 'UL');
+  let n = 0, html = '';
+  items.forEach((el, i) => {
+    if (i === 0) return;
+    if (el.tagName === 'UL') html += `<!--PB--><ul>${[...el.children].map(li => `<li>${E(li.textContent)}</li>`).join('')}</ul>`;
+    else if (i === last) html += `<p class="cf">${el.innerHTML}</p>`;
+    else html += `<div class="it"><span>${++n}.</span><span>${el.innerHTML}</span></div>${n === 4 ? '<!--PB-->' : ''}`;
+  });
+  const dl = (l, v) => `<div class="dl">${l}: <span class="u">${E(v||'')}</span></div>`;
+  const yn = x => p.roster_role === x ? `<b><u>${x}</u></b>` : x;
+  return pageWrap('paper docq', `<h2>Undertaking</h2>
+    <p class="op">I, the undersigned, <span class="u wide">${E(p.person_name || p.accepted_name || '')}</span> hereby Undertake</p>${html}
+    <div class="acc"><span>${p.read_accepted ? '☑' : '☐'} Read and Accepted</span></div>
+    <div class="dl">Name: ${E(p.accepted_name||'')}</div>
+    <div class="dl">Signature: ${sigH('accepted_signature')}</div>
+    <div class="dl">Date: ${E(dt(p.accepted_date))}</div>
+<!--PB--><div class="det">${dl('Name of the Person', p.person_name)}${dl('Job Role', p.job_role)}${dl('Designation', p.designation)}${dl('Client Name', p.client_name)}${dl('Client Location', p.client_location)}${dl('Partner’s Name', p.partner_name)}
+    <div class="dl">Roster Role: &nbsp; ${yn('YES')} &nbsp;/&nbsp; ${yn('NO')}</div>
+    <div class="dl">Date of joining: ${E(dt(p.date_of_joining))}</div>
+    <div class="dl ag">${p.agree ? '☑' : '☐'} I Agree to the above as per our Discussion</div></div>
+    <div class="sgn">${sigH('agree_signature')}<div class="line"></div><div>Signature</div></div>`, pdf);
+}
+
+// HTML of the filled-in form (same markup is used for the on-screen preview and the HR PDF download).
+// pdf=true returns an array of page contents instead of one sheet.
+function previewHtml(name, d, pdf){
+  if (name === 'app') return paperForm(d, pdf);
+  if (name === 'pol') return polHtml(d, pdf);
+  return undHtml(d, pdf);
+}
+function previewForm(name){
+  document.getElementById('pvTitle').textContent = 'Preview — ' + SECTION_TITLES[name];
+  document.getElementById('pvBody').innerHTML = previewHtml(name, collect());
+  openPreview(name);
+}
+function undHtml(d, pdf){
+  const name = 'und', src = document.getElementById('tc-und'), E = esc;
+  const dt = x => /^\d{4}-\d{2}-\d{2}$/.test(x||'') ? x.split('-').reverse().join('-') : (x||'');
+  const sigH = (s,k) => { const o = d[s]||{}; return o[k+'_image'] ? `<img src="${o[k+'_image']}" alt="Signature">` : (o[k] ? `<span class="sg">${E(o[k])}</span>` : ''); };
+  const ln = (label, html) => `<div class="ln"><span>${label}:</span><span class="u">${html || '&nbsp;'}</span></div>`;
+  const chk = (s,k) => (d[s]||{})[k] ? '☑' : '☐';
+  let body = '';
+  src.querySelector('.decl').childNodes.forEach(n => {
+    if (n.nodeType !== 1) return;
+    if (n.tagName === 'H4') body += `${/^(4|8)\./.test(n.textContent.trim()) ? '<!--PB-->' : ''}<h3>${E(n.textContent)}</h3>`;   // PDF pages start at clauses 4 and 8
+    else if (n.tagName === 'UL') body += `<ul>${[...n.children].map(li => `<li>${E(li.textContent)}</li>`).join('')}</ul>`;
+    else {
+      const m = /^(\d+\.\d+)\s+([\s\S]*)$/.exec(n.textContent.trim());
+      body += m ? `<div class="cl"><span>${m[1]}</span><span>${E(m[2])}</span></div>` : `<p>${n.innerHTML}</p>`;
+    }
+  });
+  const u = d.undertaking || {};
+  const tail = ln('Employee Name', E(u.employee_name||'')) + ln('Signature', sigH('undertaking','signature')) + ln('Date', E(dt(u.date)));
+  const sub = '<div class="sub">Code of Conduct, Confidentiality, Data Protection and Compliance Declaration</div>';
+  const logo = pdf ? '' : '<img class="lg" src="/static/hr_policy_quiz/assets/logo.svg" alt="JHS">';   // in the PDF the logo is added on every page
+  return pageWrap('paper docp', `${logo}<h2>EMPLOYEE DECLARATION AND UNDERTAKING</h2>${sub}${body}<div class="tail">${tail}</div>`, pdf);
+}
+
+// ── HR: download the filled-in form as a PDF file ────────────────────────────
+const PDF_NAMES = {app:'Application_Form', und:'Declaration_and_Undertaking', pol:'Undertaking'};
+async function downloadPdf(name, empid){
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (typeof html2canvas === 'undefined' || !JsPDF) { toast('PDF library could not load — check your internet connection', 'error'); return false; }
+  // One fixed A4 box (794x1122 px) per page, so the PDF has the same pages as the paper form
+  const pages = previewHtml(name, collect(), true), cls = {app:'paper', und:'paper docp', pol:'paper docq'}[name];
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:0;top:0;width:794px;z-index:-1;pointer-events:none;background:#fff';   // behind the page, never seen
+  host.innerHTML = pages.map((h, i) => `<div class="${cls} pgbox${name==='app'?' pgform':''}">${name==='und'?'<img class="lg" src="/static/hr_policy_quiz/assets/logo.svg" alt="JHS">':''}${h}${name==='und'?`<div class="pgno">Page ${i+1} of ${pages.length}</div>`:''}</div>`).join('');
+  document.body.appendChild(host);
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await Promise.all([...host.querySelectorAll('img')].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+    const boxes = [...host.querySelectorAll('.pgbox')];
+    boxes.forEach(box => {   // shrink the text of a page until it fits on the page
+      let fs = parseFloat(getComputedStyle(box).fontSize);
+      while (box.scrollHeight > box.clientHeight + 1 && fs > 7) { fs -= .25; box.style.fontSize = fs + 'px'; }
+    });
+    const pdf = new JsPDF({unit:'mm', format:'a4', orientation:'portrait', compress:true});
+    for (let i = 0; i < boxes.length; i++) {   // each box is captured on its own and becomes exactly one A4 page
+      const cv = await html2canvas(boxes[i], {scale:2, backgroundColor:'#fff', useCORS:true, width:794, height:1122, scrollX:0, scrollY:0, windowWidth:794});
+      if (i) pdf.addPage('a4', 'portrait');
+      pdf.addImage(cv.toDataURL('image/jpeg', .95), 'JPEG', 0, 0, 210, 297);
+    }
+    pdf.save(`${empid}_${PDF_NAMES[name]}.pdf`);
+    return true;
+  } catch(e) { console.error(e); toast('PDF could not be created', 'error'); return false; }
+  finally { host.remove(); }
+}
+let curPv = 'app';
+function openPreview(name){
+  curPv = name;
+  document.querySelectorAll('#pvModal .hr-only').forEach(b => b.style.display = EDIT_EMP ? '' : 'none');   // HR (admin edit view) only
+  const sb = document.getElementById('pvSubmit');
+  if (EDIT_EMP) { sb.innerHTML = '<i class="fas fa-floppy-disk"></i> Save Changes'; sb.onclick = () => { closePreview(); save('draft'); }; }
+  else { sb.innerHTML = '<i class="fas fa-paper-plane"></i> Submit ' + SUBMIT_LABEL[name]; sb.onclick = () => { closePreview(); save(SUBMIT_MODE[name]); }; }
+  const m = document.getElementById('pvModal'); m.style.display = 'block'; m.scrollTop = 0; document.body.style.overflow = 'hidden';
+}
+function closePreview(){ document.getElementById('pvModal').style.display = 'none'; document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
+// ── Save / submit ────────────────────────────────────────────────────────────
+const SECTION_TITLES = {app:'Employee Application Form', und:'Employee Declaration & Undertaking', pol:'Undertaking'};
+function openSection(name){
+  document.getElementById('hub').style.display = 'none';
+  document.getElementById('formView').style.display = 'block';
+  document.querySelectorAll('.tc').forEach(c => c.classList.remove('active'));
+  document.getElementById('tc-'+name).classList.add('active');
+  document.getElementById('secTitle').textContent = SECTION_TITLES[name];
+  window.scrollTo({top:0});
+}
+function showHub(){   // the card hub is not shown any more: stay on the current form (forms are switched from the ☰ menu)
+  window.scrollTo({top:0});
+}
+const PARTS = {app:'Application Form', und:'Declaration & Undertaking', pol:'Undertaking'};
+const SUBMIT_LABEL = {app:'Application Form', und:'Declaration & Undertaking', pol:'Undertaking'};
+let cur = {app:'none', und:'none', pol:'none'};
+function setStatus(d, when){
+  cur = {app: d.status || 'none', und: d.undertaking_status || 'none', pol: d.policy_status || 'none'};
+  const label = st => st==='submitted' ? 'Submitted' : (st==='draft' ? 'Draft' : 'New');
+  Object.keys(cur).forEach(k => {
+    const pill = document.getElementById('pill-'+k);
+    pill.textContent = label(cur[k]);
+    pill.className = 'pill ' + (cur[k]==='submitted' ? 'pill-yes' : 'pill-draft');
+    document.getElementById('submitBtn-'+k).innerHTML = '<i class="fas fa-paper-plane"></i> ' +
+      (cur[k]==='submitted' ? 'Re-submit ' : 'Submit ') + (k==='app' ? 'Application Form' : (k==='und' ? 'Declaration & Undertaking' : 'Undertaking'));
+  });
+  // One-time submit: once a form is submitted the employee can only view/preview it (HR can still edit)
+  if (!EDIT_EMP) Object.keys(cur).forEach(k => {
+    const tab = document.getElementById('tc-'+k), done = cur[k] === 'submitted';
+    tab.classList.toggle('locked', done);
+    tab.querySelectorAll('input,select,textarea').forEach(el => el.disabled = done);
+    tab.querySelectorAll('.actions .btn:not(.btn-preview)').forEach(b => b.style.display = done ? 'none' : '');
+    let note = tab.querySelector('.lock-note');
+    if (done && !note) { note = document.createElement('div'); note.className = 'lock-note'; note.innerHTML = '<i class="fas fa-lock"></i> This form has been submitted and cannot be changed. Please contact HR if any change is needed.'; tab.querySelector('.actions').before(note); }
+    if (note) note.style.display = done ? '' : 'none';
+  });
+  document.getElementById('stText').innerHTML =Object.keys(cur).map(k => PARTS[k] + ': <b>' + label(cur[k]) + '</b>').join(' &nbsp;·&nbsp; ');
+  document.getElementById('stSub').textContent = when ? '· last saved ' + new Date(when).toLocaleString() : '';
+}
+const EDIT_EMP = (new URLSearchParams(location.search).get('emp') || '').trim().toUpperCase();
+const MODE_KEY = {application:'app', undertaking:'und', policy:'pol'};
+// Every signature place in the form being submitted must be signed (drawn, typed or uploaded)
+function sigMissing(mode){
+  const tab = {application:'tc-app', undertaking:'tc-und', policy:'tc-pol'}[mode]; if (!tab) return null;
+  document.querySelectorAll('.sigbox.sig-missing').forEach(b => b.classList.remove('sig-missing'));
+  const empty = [...document.querySelectorAll(`#${tab} [data-sig]`)].filter(box => {
+    const st = SIG[box.dataset.sig];
+    return !(st.mode === 'draw' ? st.draw : st.mode === 'upload' ? st.upload : st.text.trim());
+  });
+  empty.forEach(b => b.classList.add('sig-missing'));
+  return empty[0] || null;
+}
+async function save(mode){
+  if (!EDIT_EMP && mode !== 'draft') {
+    const miss = sigMissing(mode);
+    if (miss) { miss.scrollIntoView({behavior:'smooth', block:'center'}); toast('Please sign in every signature place before submitting', 'error'); return; }
+  }
+  const btns = document.querySelectorAll('.actions .btn'); btns.forEach(b=>b.disabled=true);
+  try {
+    const body = JSON.stringify(collect()), headers = {'Content-Type':'application/json'};
+    if (EDIT_EMP) {
+      await api('/employee-form/admin/' + encodeURIComponent(EDIT_EMP), {method:'PUT', headers, body});
+      toast('Changes saved');
+    } else if (mode === 'draft') {
+      const r = await api('/employee-form/draft', {method:'PUT', headers, body});
+      const n = {}; Object.keys(cur).forEach(k => n[k] = cur[k]==='none' ? 'draft' : cur[k]);
+      setStatus({status:n.app, undertaking_status:n.und, policy_status:n.pol}, r.updated_at);
+      toast('Draft saved');
+    } else {
+      const r = await api('/employee-form/submit?part=' + mode, {method:'POST', headers, body});
+      const n = {}; Object.keys(cur).forEach(k => n[k] = cur[k]==='none' ? 'draft' : cur[k]);
+      n[MODE_KEY[mode]] = 'submitted';
+      setStatus({status:n.app, undertaking_status:n.und, policy_status:n.pol}, r.submitted_at);
+      toast(SUBMIT_LABEL[MODE_KEY[mode]] + ' submitted'); showHub();
+    }
+  } catch(e) { toast(e.message, 'error'); }
+  btns.forEach(b=>b.disabled=false);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(async function init(){
+  buildStatic();
+  openSection('app');   // open the Application Form directly; the other forms are in the ☰ menu
+  document.querySelectorAll('[data-sig]').forEach(sigInit);
+  Object.keys(TABLES).forEach(name => { buildTable(name); TABLES[name].seed.forEach(r => addRow(name, r)); });
+  if (EDIT_EMP) {
+    try {
+      const d = await api('/employee-form/admin/' + encodeURIComponent(EDIT_EMP));
+      fill(d.data); setStatus(d, d.updated_at);
+      document.querySelector('.hdr p').textContent = `HR view / edit — ${EDIT_EMP}${d.name ? ' · ' + d.name : ''}`;
+      document.querySelector('.nav-r').insertAdjacentHTML('afterbegin', '<a href="/employee-form-admin" class="nav-btn"><i class="fas fa-arrow-left"></i> Back to list</a>');
+      document.querySelectorAll('.actions .btn-pri').forEach(b => b.style.display = 'none');
+      document.querySelectorAll('.actions .btn-ghost:not(.btn-preview)').forEach(b => b.innerHTML = '<i class="fas fa-floppy-disk"></i> Save Changes');
+    } catch(e) { toast(e.message, 'error'); }
+    document.getElementById('ls').style.display='none';
+    document.getElementById('app').style.display='block';
+    // Opened from the HR list's PDF button: build the PDF, download it and go back to the list
+    const pdf = new URLSearchParams(location.search).get('pdf');
+    if (pdf && PDF_NAMES[pdf]) {
+      document.getElementById('app').style.visibility = 'hidden';
+      const ok = await downloadPdf(pdf, EDIT_EMP);
+      if (window.parent !== window) { window.parent.postMessage({pdfDone: !!ok}, location.origin); return; }   // opened in the admin list's hidden frame
+      if (ok) { toast('PDF downloaded'); setTimeout(() => location.replace('/employee-form-admin'), 1200); }   // replace: no blank page left in Back history
+      else document.getElementById('app').style.visibility = '';
+    }
+    return;
+  }
+  try {
+    const [me, mine] = await Promise.all([api('/employee-form/me'), api('/employee-form/my')]);
+    if (mine.status !== 'none') { fill(mine.data); setStatus(mine, mine.updated_at); }
+    else {
+      const parts = (me.name||'').trim().split(/\s+/);
+      const set = (k,v) => { const el=document.querySelector(`[data-s="personal"][data-k="${k}"]`); if(el && v) el.value=v; };
+      if (parts.length>1) { set('first_name', parts[0]); set('surname', parts[parts.length-1]); if (parts.length>2) set('middle_name', parts.slice(1,-1).join(' ')); }
+      else set('first_name', parts[0]);
+      const em = document.querySelector('[data-s="contact"][data-k="email"]'); if (em && me.email) em.value = me.email;
+      const un = document.querySelector('[data-s="undertaking"][data-k="employee_name"]'); if (un && me.name) un.value = me.name;
+      [['accepted_name'],['person_name']].forEach(([k]) => { const el = document.querySelector('[data-s="policy"][data-k="' + k + '"]'); if (el && me.name) el.value = me.name; });
+      const dj = document.querySelector('[data-s="policy"][data-k="date_of_joining"]');
+      if (dj && /^\d{4}-\d{2}-\d{2}$/.test(me.date_of_joining || '')) dj.value = me.date_of_joining;
+      const dg = document.querySelector('[data-s="policy"][data-k="designation"]'); if (dg && me.designation) dg.value = me.designation;
+      const code = document.querySelector('[data-s="present_employment"][data-k="employee_code"]'); if (code && !IS_JOINER) code.value = me.empid;
+    }
+  } catch(e) { toast(e.message, 'error'); }
+  document.getElementById('ls').style.display='none';
+  document.getElementById('app').style.display='block';
+})();
+</script>
+</body>
+</html>

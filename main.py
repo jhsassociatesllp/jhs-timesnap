@@ -75,7 +75,14 @@ from backend.resume_ranker.router      import router as resume_ranker_router    
 from backend.resume_ranker.router      import startup as resume_ranker_startup
 from backend.employee_declaration.router import router as employee_declaration_router  # ← NEW
 from backend.chatbot.router            import router as chatbot_router             # ← CHATBOT
-from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
+# JHS Library chatbot needs LIBRARY_OPENAI_API_KEY / LIBRARY_PINECONE_API_KEY / LIBRARY_MONGODB_URI at import time.
+# Without them the whole app used to crash on start-up; now only this one module is skipped.
+try:
+    from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
+except Exception as _library_err:
+    import logging as _logging
+    _logging.warning(f"[Library Chatbot] disabled - not imported: {_library_err}")
+    library_chatbot_router = None
 from backend.rcm_chatbot.router        import router as rcm_chatbot_router          # ← CHATBOT (RCM)
 from backend.cv_builder.router         import router as cv_builder_router           # ← CV Builder
 from backend.buddy_referral.router     import router as buddy_referral_router       # ← Buddy Referral
@@ -92,6 +99,8 @@ from backend.cycle.router import router as cycle_router  # ← 10-day cycle revi
 from backend.metrics.router import router as dashboard_router  # ← manager / portfolio dashboards
 from backend.metrics.exports import router as exports_router  # ← Excel exports (partners / admins)
 from backend.metrics.admin_exports import router as admin_exports_router  # ← admin data export (/admin-exports)
+from backend.employee_form.router      import router as employee_form_router       # ← Employee Application Form
+from backend.kyc_form.router           import router as kyc_form_router             # ← KYC Details Form
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -113,7 +122,7 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
                          "/employee-declaration", "/employee-declaration/admin",
                          "/resume-ranker",
-                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin"}
+                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin", "/employee-form", "/employee-form-admin", "/kyc-form", "/kyc-form-admin"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -145,9 +154,39 @@ async def start_resume_ranker():
         import logging
         logging.warning(f"[ResumeRanker] startup skipped: {e}")
 
+
+@app.on_event("startup")
+async def retry_pending_kyc_uploads():
+    """Re-try any KYC submission that was marked 'pending' (server was shut down
+    before the background task finished) or 'failed' (SharePoint was temporarily
+    unavailable). Runs once in the background after startup so it never delays
+    the server coming up."""
+    import asyncio, logging
+    async def _do():
+        await asyncio.sleep(10)          # give the server a moment to finish booting
+        try:
+            from backend.kyc_form.router import _push_to_sharepoint, kyc
+            from backend.kyc_form import sharepoint
+            if not sharepoint.is_configured():
+                return
+            pending = list(kyc.find({"status": "submitted", "sharepoint.status": {"$in": ["pending", "failed", "not_configured"]}}))
+            if not pending:
+                return
+            logging.info("[KYC] Retrying SharePoint upload for %d form(s) …", len(pending))
+            for doc in pending:
+                try:
+                    out = _push_to_sharepoint(doc["empid"])
+                    logging.info("[KYC] %s → %s", doc["empid"], out.get("status"))
+                except Exception as exc:
+                    logging.warning("[KYC] retry failed for %s: %s", doc["empid"], exc)
+        except Exception as exc:
+            logging.warning("[KYC] startup retry skipped: %s", exc)
+    asyncio.ensure_future(_do())
+
 app.include_router(employee_declaration_router)  # prefix: /employee-declaration
 app.include_router(chatbot_router)         # prefix: /chatbot
-app.include_router(library_chatbot_router) # prefix: /chatbot/library
+if library_chatbot_router is not None:
+    app.include_router(library_chatbot_router) # prefix: /chatbot/library
 app.include_router(rcm_chatbot_router)     # prefix: /chatbot/rcm
 app.include_router(cv_builder_router)      # prefix: /cv-builder
 app.include_router(buddy_referral_router)  # prefix: /buddy-referral
@@ -164,6 +203,8 @@ app.include_router(cycle_router)  # prefix: /timesheet/v2/cycles
 app.include_router(dashboard_router)  # prefix: /dashboard
 app.include_router(exports_router)  # prefix: /exports
 app.include_router(admin_exports_router)  # prefix: /admin-exports
+app.include_router(employee_form_router)   # prefix: /employee-form
+app.include_router(kyc_form_router)        # prefix: /kyc-form
 from backend.access_manager.router import seed_compliance_admin
 seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 
@@ -312,6 +353,22 @@ async def referral_admin_page():
 @app.get("/compliance-admin", response_class=FileResponse)   # ← Compliance Calendar admin (control panel)
 async def compliance_admin_page():
     return FileResponse(os.path.join(static_root, "compliance_calendar", "admin.html"))
+
+@app.get("/employee-form-admin", response_class=FileResponse)   # ← Employee Application Form admin (control panel)
+async def employee_form_admin_page():
+    return FileResponse(os.path.join(static_root, "employee_form", "admin.html"))
+
+@app.get("/employee-form", response_class=FileResponse)   # ← Employee Application Form
+async def employee_form_page():
+    return FileResponse(os.path.join(static_root, "employee_form", "index.html"))
+
+@app.get("/kyc-form-admin", response_class=FileResponse)   # ← KYC Details Form admin (HR)
+async def kyc_form_admin_page():
+    return FileResponse(os.path.join(static_root, "kyc_form", "admin.html"))
+
+@app.get("/kyc-form", response_class=FileResponse)   # ← KYC Details Form
+async def kyc_form_page():
+    return FileResponse(os.path.join(static_root, "kyc_form", "index.html"))
 
 @app.get("/buddy-referral", response_class=FileResponse)   # ← Buddy Referral
 async def buddy_referral_page():
@@ -632,7 +689,7 @@ async def set_module_access(
     if not {"timesheet", "quality_audit", "kra"}.issubset(caller_modules):
         raise HTTPException(403, "Only super admins can assign module access")
 
-    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker", "cv", "buddy_referral"}
+    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker", "cv", "buddy_referral", "employee_form"}
     modules = [m for m in request.modules if m in valid]
     empid = request.empid.strip().upper()
 

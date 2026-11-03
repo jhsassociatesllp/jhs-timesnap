@@ -4651,7 +4651,7 @@ function _promptRejectionReason(employeeId) {
 /* Navigation helper */
 async function showSection(section) {
   await checkUserRole();
-  const sections = ["timesheet", "history", "approve", "pending", "rejected"];
+  const sections = ["timesheet", "history", "approve", "pending", "rejected", "forms"];
   sections.forEach((s) => {
     const el = document.getElementById(`${s}Section`);
     if (el) el.style.display = s === section ? "block" : "none";
@@ -4673,6 +4673,7 @@ async function showSection(section) {
   if (section === "approve") await loadApprovedList();
   if (section === "pending") await loadPendingList();
   if (section === "rejected") await loadRejectedList();
+  if (section === "forms" && window.initFormsSection) await initFormsSection();
 }
 
 /* Logout & UI helpers */

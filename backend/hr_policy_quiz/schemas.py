@@ -1,5 +1,27 @@
+import re
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _split_and_dedup_emails(v):
+    if isinstance(v, str):
+        items = re.split(r"[\s,;]+", v)
+    elif isinstance(v, (list, tuple, set)):
+        items = []
+        for item in v:
+            if isinstance(item, str):
+                items.extend(re.split(r"[\s,;]+", item))
+            else:
+                items.append(item)
+    else:
+        return v
+    res, seen = [], set()
+    for x in items:
+        s = str(x).strip()
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            res.append(s)
+    return res
 
 
 class CandidateLoginRequest(BaseModel):
@@ -8,9 +30,14 @@ class CandidateLoginRequest(BaseModel):
 
 
 class AddCandidatesRequest(BaseModel):
-    # Comma separated in the UI, parsed into a list before hitting the API.
+    # One per line or comma separated in the UI, parsed into a list before hitting the API.
     emails: List[EmailStr]
     quiz_set_id: str
+
+    @field_validator("emails", mode="before")
+    @classmethod
+    def parse_emails(cls, v):
+        return _split_and_dedup_emails(v)
 
 
 class QuizSetDocumentEntry(BaseModel):
@@ -30,6 +57,11 @@ class UpdateQuizSetRequest(BaseModel):
 
 class RegeneratePasswordRequest(BaseModel):
     emails: List[EmailStr]
+
+    @field_validator("emails", mode="before")
+    @classmethod
+    def parse_emails(cls, v):
+        return _split_and_dedup_emails(v)
 
 
 class AnswerItem(BaseModel):

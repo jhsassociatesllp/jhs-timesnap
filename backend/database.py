@@ -23,6 +23,7 @@ appraisal_db = _client["Appraisal"]
 cv_db         = _client["CV_Builder"]         # cv_profiles, cv_custom_options, cv_experience
 referral_db   = _client["Buddy_Referral"]     # buddy_* collections + buddy_referral_resumes GridFS
 compliance_db = _client["Compliance_Table"]   # compliance_calendar_items
+employee_form_db = _client["Employee_Application_Form"]  # employee_application_forms
 
 # ── shared collections ────────────────────────────────────────────────────────
 sessions_collection           = db["sessions"]

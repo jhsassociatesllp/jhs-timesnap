@@ -333,6 +333,25 @@
         </div>
       </a>`;
 
+    const CARD_EF = `
+      <a href="/employee-form" class="module-card card-br clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-file-signature"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Employee Application Form</h2>
+        <p class="card-desc">Fill in your personal, contact, family, education and employment details and submit your application form.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-user"></i> Personal Data</span>
+          <span class="chip"><i class="fas fa-briefcase"></i> Employment</span>
+          <span class="chip"><i class="fas fa-signature"></i> Declaration</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Save draft &amp; submit</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
     // HR Policy Quiz — only shown to employee codes listed in the module's
     // admins collection. "Open" goes straight to the dashboard: no separate
     // login screen, the dashboard trusts this same platform token.
@@ -563,6 +582,14 @@
 
       // Buddy Referral — always shown
       grid.innerHTML += CARD_BR;
+
+      // Employee Application Form — not shown to present employees (it is for new joiners, who log in with
+      // their personal email and go straight to /employee-form; HR manages it from the Control Panel)
+
+      // Resume Ranker — holders only, outside the Control Panel
+      if (rrAccess) {
+        grid.innerHTML += buildResumeRankerCard();
+      }
 
       // Employee Declaration Admin now lives in the Control Panel only
       // (see cpBtn above) — not shown as its own card here.

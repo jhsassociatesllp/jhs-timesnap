@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Timesheet-specific styles -->
     <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500&display=swap" rel="stylesheet" />
   </head>
   <body>
     <!-- NAVBAR -->     
@@ -34,6 +35,9 @@
         </a>
         <a href="#" id="rejectedBtn" class="manager-only" onclick="showSection('rejected')">
           <i class="fas fa-times-circle"></i> Rejected
+        </a>
+        <a href="#" id="formsBtn" onclick="showSection('forms')">
+          <i class="fas fa-file-signature"></i> Forms
         </a>
         <a href="#" id="calendarBtn" onclick="openLdCalendar(); return false;">
           <i class="fas fa-calendar-days"></i> Calendar
@@ -153,6 +157,9 @@
           <button class="export-btn" onclick="exportHistoryToExcel()"><i class="fas fa-file-excel"></i> Export History to Excel</button>
         </div>
       </div>
+
+      <!-- FORMS SECTION (Employee Declaration etc.) -->
+      <div id="formsSection" style="display:none"></div>
 
       <!-- PENDING SECTION -->
       <div class="pending-section" id="pendingSection" style="display:none">
@@ -276,6 +283,7 @@
     <!-- Timesheet-specific script -->
     <script src="/static/timesheet/script.js"></script>
     <script src="/static/timesheet/calendar-modal.js"></script>
+    <script src="/static/timesheet/forms.js"></script>
       <script src="/static/chatbot/chat-core.js"></script>
       <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
