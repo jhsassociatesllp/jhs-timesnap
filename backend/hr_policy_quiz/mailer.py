@@ -6,8 +6,8 @@ When HR adds new joiners ("Add and generate password") each one gets an e-mail w
 login, their login e-mail and password, and the "one attempt only" note. It goes out through Microsoft Graph,
 using the same app registration as the other JHS mails (see backend/buddy_referral/notify.py). Environment:
 
-  GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET   the Azure app (needs the Mail.Send application permission)
-  GRAPH_SENDER     the mailbox the mail is sent from (falls back to OUTLOOK_EMAIL)
+  MS_MAIL_TENANT_ID, MS_MAIL_CLIENT_ID, MS_MAIL_CLIENT_SECRET   the Azure app (needs the Mail.Send application permission)
+  MS_MAIL_SENDER     the mailbox the mail is sent from (falls back to OUTLOOK_EMAIL)
   QUIZ_LOGIN_URL   optional, defaults to https://jhstimesnap.in/hr-quiz/candidate-login
 
 One mail per candidate (nobody sees anybody else's address). A mail that cannot be sent never stops the
@@ -29,10 +29,10 @@ SUBJECT_RESET = "Your new password — Onboarding Quiz, JHS Associates"
 
 def _settings() -> dict:
     return {
-        "tenant": os.getenv("GRAPH_TENANT_ID", "").strip(),
-        "client_id": os.getenv("GRAPH_CLIENT_ID", "").strip(),
-        "secret": os.getenv("GRAPH_CLIENT_SECRET", "").strip(),
-        "sender": os.getenv("GRAPH_SENDER", "").strip() or os.getenv("OUTLOOK_EMAIL", "").strip(),
+        "tenant": (os.getenv("MS_MAIL_TENANT_ID") or os.getenv("GRAPH_TENANT_ID", "")).strip(),
+        "client_id": (os.getenv("MS_MAIL_CLIENT_ID") or os.getenv("GRAPH_CLIENT_ID", "")).strip(),
+        "secret": (os.getenv("MS_MAIL_CLIENT_SECRET") or os.getenv("GRAPH_CLIENT_SECRET", "")).strip(),
+        "sender": (os.getenv("MS_MAIL_SENDER") or os.getenv("GRAPH_SENDER", "")).strip() or os.getenv("OUTLOOK_EMAIL", "").strip(),
         "url": os.getenv("QUIZ_LOGIN_URL", "").strip() or DEFAULT_LOGIN_URL,
     }
 
@@ -118,7 +118,7 @@ def send_batch(items) -> dict:
         return result
     if not result["configured"]:
         result["failed"] = [e for e, _, _ in items]
-        result["error"] = "Microsoft Graph is not set up on the server (GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_SENDER)."
+        result["error"] = "Microsoft Graph is not set up on the server (MS_MAIL_TENANT_ID, MS_MAIL_CLIENT_ID, MS_MAIL_CLIENT_SECRET, MS_MAIL_SENDER)."
         log.warning("mails not sent: Graph settings are missing")
         return result
     s = _settings()

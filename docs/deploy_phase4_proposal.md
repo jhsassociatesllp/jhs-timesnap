@@ -22,10 +22,10 @@ docker run -d \
   -e TIMESNAP_SEND_MAIL=1 \
   -e OUTLOOK_EMAIL="${{ secrets.OUTLOOK_EMAIL }}" \
   -e OUTLOOK_APP_PASSWORD="${{ secrets.OUTLOOK_APP_PASSWORD }}" \
-  -e GRAPH_TENANT_ID="${{ secrets.GRAPH_TENANT_ID }}" \
-  -e GRAPH_CLIENT_ID="${{ secrets.GRAPH_CLIENT_ID }}" \
-  -e GRAPH_CLIENT_SECRET="${{ secrets.GRAPH_CLIENT_SECRET }}" \
-  -e GRAPH_SENDER="${{ secrets.GRAPH_SENDER }}" \
+  -e MS_MAIL_TENANT_ID="${{ secrets.GRAPH_TENANT_ID }}" \
+  -e MS_MAIL_CLIENT_ID="${{ secrets.GRAPH_CLIENT_ID }}" \
+  -e MS_MAIL_CLIENT_SECRET="${{ secrets.GRAPH_CLIENT_SECRET }}" \
+  -e MS_MAIL_SENDER="${{ secrets.GRAPH_SENDER }}" \
   -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
   "$IMAGE" python -m backend.jobs.scheduler
 ```

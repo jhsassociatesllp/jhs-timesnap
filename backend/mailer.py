@@ -38,10 +38,10 @@ def send_mail(recipients: List[str], subject: str, text: str, html_body: str) ->
         user = os.getenv("OUTLOOK_EMAIL", "").strip()
         app_password = os.getenv("OUTLOOK_APP_PASSWORD", "").replace(" ", "").strip()
         password = app_password or os.getenv("OUTLOOK_PASSWORD", "")
-        tenant = os.getenv("GRAPH_TENANT_ID", "").strip()
-        client_id = os.getenv("GRAPH_CLIENT_ID", "").strip()
-        secret = os.getenv("GRAPH_CLIENT_SECRET", "").strip()
-        graph_sender = os.getenv("GRAPH_SENDER", "").strip() or user
+        tenant = (os.getenv("MS_MAIL_TENANT_ID") or os.getenv("GRAPH_TENANT_ID", "")).strip()
+        client_id = (os.getenv("MS_MAIL_CLIENT_ID") or os.getenv("GRAPH_CLIENT_ID", "")).strip()
+        secret = (os.getenv("MS_MAIL_CLIENT_SECRET") or os.getenv("GRAPH_CLIENT_SECRET", "")).strip()
+        graph_sender = (os.getenv("MS_MAIL_SENDER") or os.getenv("GRAPH_SENDER", "")).strip() or user
         if tenant and client_id and secret and graph_sender:
             if notify._send_graph(tenant, client_id, secret, graph_sender, recipients, subject, html_body):
                 return "sent", ""
