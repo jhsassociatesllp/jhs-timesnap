@@ -3,9 +3,8 @@
 CV Builder Module
 Employees fill in their profile (dropdowns come from dropdown_masters.json,
 generated from Profile_Builder_Excel.xlsx, plus values employees added
-themselves) and download their CV as Word or PDF in one of five templates
-(see docx_fill.py / templates/). Profiles marked "PPT Profile Required" can also
-download a red & white profile slide (ppt_profile.py).
+themselves) and download their profile as a one-slide PowerPoint built from
+templates/CV builder format.pptx (see ppt_profile.py).
 """
 
 import json
@@ -15,13 +14,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.database import employee_details_collection, cv_db
-from backend.cv_builder.convert import docx_to_pdf, pdf_available
-from backend.cv_builder.docx_fill import SECTIONS, render_docx, section_spec
+from backend.cv_builder.convert import pptx_to_pdf
 from backend.cv_builder.ppt_profile import build_profile_ppt
 from backend.cv_builder.resume_parser import extract_texts, parse_resume_texts
 
@@ -31,11 +28,6 @@ cv_profiles_collection   = cv_db["cv_profiles"]
 cv_options_collection    = cv_db["cv_custom_options"]     # values employees added to the dropdowns
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-# Template preview images (rendered from the Word templates)
-_TPL_DIR = os.path.join(os.path.dirname(os.path.dirname(_HERE)), "static", "cv_builder")
-_TPL_IDS = ("1", "2", "3", "4", "5")
-_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-
 with open(os.path.join(_HERE, "dropdown_masters.json"), encoding="utf-8") as _f:
     DROPDOWN_MASTERS = json.load(_f)
 
@@ -119,24 +111,9 @@ class SectorItem(BaseModel):
     duration: Optional[str] = ""
 
 
-class AssignmentItem(BaseModel):
-    assignment: Optional[str] = ""
-    client: Optional[str] = ""
-    sector: Optional[str] = ""
-    role: Optional[str] = ""
-
-
-class CustomSection(BaseModel):
-    id: Optional[str] = ""
-    title: Optional[str] = ""
-    text: Optional[str] = ""          # one bullet per line
-    visible: Optional[bool] = True
-
-
-class SectionConfig(BaseModel):
-    hidden: Optional[List[str]] = []                 # section keys removed from the CV
-    titles: Optional[Dict[str, str]] = {}            # section key -> custom heading
-    custom: Optional[List[CustomSection]] = []       # user-added sections
+class AreaItem(BaseModel):
+    area: str
+    details: Optional[List[str]] = []
 
 
 class CVProfileModel(BaseModel):
@@ -154,32 +131,20 @@ class CVProfileModel(BaseModel):
     # {"ICAI": {"level": "Associate Member (ACA)", "number": "M.No. 123"}}
     membership_details: Optional[Dict[str, Dict[str, str]]] = {}
     membership_id: Optional[str] = ""
-    total_experience: Optional[str] = ""
     sector_experience: Optional[List[SectorItem]] = []
-    skills_expertise: Optional[List[str]] = []
-    key_skills: Optional[List[str]] = []
-    skills_highlighted: Optional[str] = ""
-    achievements: Optional[str] = ""
-    certifications: Optional[str] = ""
-    key_assignments: Optional[List[AssignmentItem]] = []
-    linkedin: Optional[str] = ""
-    portfolio: Optional[str] = ""
-    page_layout: Optional[str] = "2"          # "1" = single page, "2" = two pages
+    skills_expertise: Optional[List[str]] = []          # framework / tool chips
+    expertise_areas: Optional[List[AreaItem]] = []
     next_review_date: Optional[str] = ""
     profile_status: Optional[str] = "Draft"
     ppt_required: Optional[str] = ""
-    selected_template: Optional[str] = "1"
-    section_config: Optional[SectionConfig] = SectionConfig()
 
 
 _PROFILE_DEFAULTS: Dict[str, Any] = {
     "professional_photo": "", "email": "", "phone": "", "location": "", "summary": "",
     "qualification": [], "qualification_details": {}, "membership": [], "membership_details": {},
-    "membership_id": "", "total_experience": "", "sector_experience": [],
-    "skills_expertise": [], "key_skills": [], "skills_highlighted": "", "achievements": "",
-    "certifications": "", "key_assignments": [], "linkedin": "", "portfolio": "", "page_layout": "2",
-    "next_review_date": "", "profile_status": "Draft", "ppt_required": "", "selected_template": "1",
-    "section_config": {"hidden": [], "titles": {}, "custom": []}, "updated_at": None,
+    "membership_id": "", "sector_experience": [], "skills_expertise": [], "expertise_areas": [],
+    "next_review_date": "", "profile_status": "Draft", "ppt_required": "",
+    "updated_at": None,
 }
 
 
@@ -257,30 +222,6 @@ async def parse_resume_upload(request: Request, name: str = "", current_user: st
     return result
 
 
-@router.get("/capabilities")
-def get_capabilities():
-    return {"docx": True, "pdf": pdf_available(), "ppt": True}
-
-
-@router.get("/sections/{template_id}")
-def get_sections(template_id: str):
-    """Sections of a template the user can show / hide / rename."""
-    if template_id not in SECTIONS:
-        raise HTTPException(404, "Template not found")
-    return {"template": template_id, "sections": section_spec(template_id)}
-
-
-@router.get("/template-preview/{tpl_id}")
-def get_template_preview(tpl_id: str):
-    """Serve the preview image of a Word template."""
-    if tpl_id not in _TPL_IDS:
-        raise HTTPException(404, "Template not found")
-    path = os.path.join(_TPL_DIR, f"tpl{tpl_id}.png")
-    if not os.path.exists(path):
-        raise HTTPException(404, "Template image file not found")
-    return FileResponse(path, media_type="image/png")
-
-
 @router.get("/profile")
 def get_profile(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
@@ -305,18 +246,15 @@ def save_profile(body: CVProfileModel, current_user: str = Depends(get_current_u
     emp_info = _employee_info(empid)
     now = datetime.now(timezone.utc)
     data = body.dict()
-    data["key_assignments"] = [a for a in data.get("key_assignments") or []
-                               if any((a.get(k) or "").strip() for k in ("assignment", "client", "sector", "role"))]
+    data["expertise_areas"] = [{"area": a["area"].strip()[:26], "details": [d.strip()[:38] for d in a.get("details") or [] if d.strip()][:3]}
+                               for a in data.get("expertise_areas") or [] if (a.get("area") or "").strip()][:4]
     data["designation"] = body.designation or emp_info["designation"]
     data["department"] = body.department or emp_info["department"]
     data["profile_status"] = "Filled"
-    data["selected_template"] = body.selected_template if body.selected_template in _TPL_IDS else "1"
-    data["page_layout"] = "1" if str(body.page_layout) == "1" else "2"
     who = empid
     data["qualification"] = _canonical_list("qualification", body.qualification, who)
     data["membership"] = _canonical_list("membership", body.membership, who)
     data["skills_expertise"] = _canonical_list("skills", body.skills_expertise, who)
-    data["key_skills"] = [k for k in _canonical_list("skills", body.key_skills, who) if k in data["skills_expertise"]]
     secs = _canonical_list("sector", [x.sector for x in body.sector_experience or []], who)
     dur = {x.sector.strip().lower(): (x.duration or "") for x in body.sector_experience or []}
     data["sector_experience"] = [{"sector": x, "duration": dur.get(x.lower(), "")} for x in secs]
@@ -349,50 +287,12 @@ def _stored_profile(empid: str) -> dict:
     return profile
 
 
-def _file_stem(profile: dict, empid: str, template_id: str) -> str:
-    return "CV_" + re.sub(r"[^\w\-]", "_", (profile.get("employee_name") or empid).strip()) + f"_T{template_id}"
-
-
-def _build(template_id: str, empid: str):
-    if template_id not in _TPL_IDS:
-        raise HTTPException(400, "Invalid template ID (must be 1-5)")
-    profile = _stored_profile(empid)
-    try:
-        data = render_docx(template_id, profile, [], profile.get("employee_name") or empid)
-    except Exception as e:
-        raise HTTPException(500, f"CV generation failed: {e}")
-    return data, _file_stem(profile, empid, template_id)
-
-
-def _pdf_response(data: bytes, stem: str):
-    try:
-        pdf = docx_to_pdf(data, "cv")
-    except RuntimeError as e:
-        raise HTTPException(501 if "not available" in str(e) else 500, str(e))
-    return Response(content=pdf, media_type="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename={stem}.pdf"})
-
-
-@router.get("/download/docx/{template_id}")
-def download_cv_docx(template_id: str, current_user: str = Depends(get_current_user)):
-    data, fname = _build(template_id, current_user.strip().upper())
-    return Response(content=data, media_type=_DOCX_MIME,
-                    headers={"Content-Disposition": f"attachment; filename={fname}.docx"})
-
-
-@router.get("/download/pdf/{template_id}")
-def download_cv_pdf(template_id: str, current_user: str = Depends(get_current_user)):
-    data, fname = _build(template_id, current_user.strip().upper())
-    return _pdf_response(data, fname)
-
-
 _PPT_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 
 def _ppt_response(profile: dict, empid: str):
     try:
-        data = build_profile_ppt(profile, profile.get("employee_name") or empid,
-                                 profile.get("selected_template") or "1")
+        data = build_profile_ppt(profile, profile.get("employee_name") or empid)
     except Exception as e:
         raise HTTPException(500, f"Profile PPT generation failed: {e}")
     stem = "Profile_" + re.sub(r"[^\w\-]", "_", (profile.get("employee_name") or empid).strip())
@@ -400,31 +300,29 @@ def _ppt_response(profile: dict, empid: str):
                     headers={"Content-Disposition": f"attachment; filename={stem}.pptx"})
 
 
+def _view_response(profile: dict, empid: str):
+    """The slide as an inline PDF, for viewing in the browser."""
+    try:
+        pdf = pptx_to_pdf(build_profile_ppt(profile, profile.get("employee_name") or empid))
+    except RuntimeError as e:
+        raise HTTPException(501 if "not available" in str(e) else 500, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Profile view failed: {e}")
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": "inline; filename=profile.pdf", "Cache-Control": "no-store"})
+
+
+@router.get("/view")
+def view_profile(current_user: str = Depends(get_current_user)):
+    empid = current_user.strip().upper()
+    return _view_response(_stored_profile(empid), empid)
+
+
 @router.get("/download/ppt")
 def download_profile_ppt(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
     profile = _stored_profile(empid)
     return _ppt_response(profile, empid)
-
-
-# ── Live preview (unsaved form data) ──────────────────────────────────────────
-@router.post("/preview/docx/{template_id}")
-def preview_cv_docx(template_id: str, body: CVProfileModel, current_user: str = Depends(get_current_user)):
-    """Render the CV from the form as currently filled in (not yet saved)."""
-    if template_id not in _TPL_IDS:
-        raise HTTPException(400, "Invalid template ID (must be 1-5)")
-    empid = current_user.strip().upper()
-    emp_info = _employee_info(empid)
-    profile = body.dict()
-    profile["empid"] = empid
-    profile["employee_name"] = emp_info["name"]
-    profile["designation"] = profile.get("designation") or emp_info["designation"]
-    profile["department"] = profile.get("department") or emp_info["department"]
-    try:
-        data = render_docx(template_id, profile, [], emp_info["name"])
-    except Exception as e:
-        raise HTTPException(500, f"Preview failed: {e}")
-    return Response(content=data, media_type=_DOCX_MIME, headers={"Cache-Control": "no-store"})
 
 
 # ── Admin (control panel) ─────────────────────────────────────────────────────
@@ -452,29 +350,21 @@ def cv_admin_status(_: str = Depends(require_cv_admin)):
             "partner": emp.get("Partner") or "",
             "filled": pr is not None,
             "profile_status": (pr or {}).get("profile_status", ""),
-            "template": (pr or {}).get("selected_template", ""),
-            "ppt": pr is not None,
             "updated_at": (pr or {}).get("updated_at"),
         })
     for empid, pr in profiles.items():          # profiles of ids missing from the roster
         if empid not in seen:
             rows.append({"empid": empid, "name": pr.get("employee_name") or empid, "manager": "", "partner": "",
                          "filled": True, "profile_status": pr.get("profile_status", ""),
-                         "template": pr.get("selected_template", ""),
-                         "ppt": True,
                          "updated_at": pr.get("updated_at")})
     rows.sort(key=lambda r: (not r["filled"], r["empid"]))
     return {"total": len(rows), "filled": sum(1 for r in rows if r["filled"]), "rows": rows}
 
 
-@router.get("/admin/download/{empid}/{template_id}")
-def cv_admin_download(empid: str, template_id: str, fmt: str = "docx", _: str = Depends(require_cv_admin)):
-    """An employee's CV as saved (also used by the admin preview). fmt = docx | pdf"""
-    data, fname = _build(template_id, empid.strip().upper())
-    if fmt == "pdf":
-        return _pdf_response(data, fname)
-    return Response(content=data, media_type=_DOCX_MIME,
-                    headers={"Content-Disposition": f"attachment; filename={fname}.docx"})
+@router.get("/admin/view/{empid}")
+def cv_admin_view(empid: str, _: str = Depends(require_cv_admin)):
+    empid = empid.strip().upper()
+    return _view_response(_stored_profile(empid), empid)
 
 
 @router.get("/admin/ppt/{empid}")

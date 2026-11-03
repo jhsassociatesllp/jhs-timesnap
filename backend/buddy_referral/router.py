@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from backend.access_manager.router import is_referral_admin, require_referral_admin
 from backend.auth import get_current_user
 from backend.buddy_referral.notify import send_referral_email
-from backend.database import referral_db, employee_details_collection
+from backend.database import referral_db, employee_details_collection, timesheets_collection
 
 router = APIRouter(prefix="/buddy-referral", tags=["Buddy Referral"])
 
@@ -183,24 +183,107 @@ async def submit_referral(
     return {"success": True}
 
 
+# ── The signed-in employee's own referrals ───────────────────────────────────
+@router.get("/mine")
+def my_referrals(current_user: str = Depends(get_current_user)):
+    empid = current_user.strip().upper()
+    docs = list(existing_referrals.find({"submitted_by": empid}).sort("submitted_at", -1))
+    to_prof = _profiles_for(d.get("referral_from") for d in docs)
+    active = _active_ids(d.get("referral_from") for d in docs)
+    existing = []
+    for d in docs:
+        to_id = (d.get("referral_from") or "").strip().upper()
+        t = to_prof.get(to_id) or _profile(None, to_id)
+        existing.append({
+            "empid": to_id, "name": t["name"] or d.get("referral_from_name"), "position": d.get("position"),
+            "date_of_joining": t["date_of_joining"], "duration": _duration(t["date_of_joining"])["text"],
+            "status": "Active" if to_id in active else "Inactive", "submitted_at": _iso(d.get("submitted_at")),
+        })
+    referrals = [{"role": d.get("role"), "resume_filename": d.get("resume_filename"),
+                  "submitted_at": _iso(d.get("submitted_at"))}
+                 for d in resume_referrals.find({"submitted_by": empid}).sort("submitted_at", -1)]
+    return {"existing": existing, "referrals": referrals}
+
+
 # ── Admin (control panel: Buddy Referral) ─────────────────────────────────────
 @router.get("/admin/access-check")
 def admin_access_check(current_user: str = Depends(get_current_user)):
     return {"is_admin": is_referral_admin(current_user)}
 
 
+def _parse_date(value) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    s = str(value or "").strip()
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s[:10], fmt)
+        except ValueError:
+            pass
+    return None
+
+
+def _duration(doj) -> dict:
+    """Months + days since joining; 'buddy' once 6 months are completed."""
+    start = _parse_date(doj)
+    if not start:
+        return {"text": "", "months": None, "buddy": False}
+    today = (datetime.now(timezone.utc) + _IST).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
+    if start > today:
+        return {"text": "Not joined yet", "months": 0, "buddy": False}
+    months = (today.year - start.year) * 12 + today.month - start.month
+    if today.day < start.day:
+        months -= 1
+    y, m = divmod(start.month - 1 + months, 12)
+    anchor = start.replace(year=start.year + y, month=m + 1, day=1)
+    # clamp the day to the length of that month
+    nxt = anchor.replace(year=anchor.year + (anchor.month == 12), month=anchor.month % 12 + 1)
+    anchor = anchor.replace(day=min(start.day, (nxt - anchor).days))
+    days = (today - anchor).days
+    return {"text": f"{months} month{'s' if months != 1 else ''} {days} day{'s' if days != 1 else ''}",
+            "months": months, "buddy": months >= 6}
+
+
+def _active_ids(empids) -> set:
+    ids = sorted({(e or "").strip().upper() for e in empids if e})
+    if not ids:
+        return set()
+    return {(x or "").strip().upper()
+            for x in timesheets_collection.distinct("employeeId", {"employeeId": {"$in": ids}})}
+
+
+def _contacted(d: dict) -> str:
+    return "Yes" if d.get("contacted") == "Yes" else "No"
+
+
+def _yes_no(d: dict, field: str) -> str:
+    """'Yes' / 'No' once the admin has decided, '' while it is still open."""
+    return d.get(field) if d.get(field) in ("Yes", "No") else ""
+
+
 def _existing_rows():
     docs = list(existing_referrals.find({}).sort("submitted_at", -1))
     prof = _profiles_for(d.get("submitted_by") for d in docs)
+    to_prof = _profiles_for(d.get("referral_from") for d in docs)
+    active = _active_ids(d.get("referral_from") for d in docs)
     rows = []
     for d in docs:
         p = prof.get((d.get("submitted_by") or "").strip().upper()) or _profile(None, d.get("submitted_by") or "")
+        to_id = (d.get("referral_from") or "").strip().upper()
+        t = to_prof.get(to_id) or _profile(None, to_id)
+        dur = _duration(t["date_of_joining"])
         rows.append({
             "id": str(d["_id"]),
             "empid": d.get("submitted_by"), "name": p["name"] or d.get("submitted_by_name"),
-            "date_of_joining": p["date_of_joining"] or d.get("date_of_joining") or "",
             "manager": p["manager"], "partner": p["partner"],
-            "referral_from": d.get("referral_from"), "referral_from_name": d.get("referral_from_name"),
+            "referred_to_name": t["name"] or d.get("referral_from_name"),
+            "referred_to_position": t["designation"],
+            "referred_emp": to_id,
+            "referred_doj": t["date_of_joining"],
+            "duration": dur["text"], "buddy": dur["buddy"],
+            "status": "Active" if to_id in active else "Inactive",
+            "contacted": _contacted(d),
+            "paid": _yes_no(d, "paid"), "paid_remark": d.get("paid_remark") or "",
             "position": d.get("position"), "submitted_at": d.get("submitted_at"),
         })
     return rows
@@ -217,6 +300,8 @@ def _referral_rows():
             "empid": d.get("submitted_by"), "name": p["name"] or d.get("submitted_by_name"),
             "date_of_joining": p["date_of_joining"] or d.get("date_of_joining") or "",
             "manager": p["manager"], "partner": p["partner"],
+            "contacted": _contacted(d),
+            "shortlisted": _yes_no(d, "shortlisted"), "shortlisted_remark": d.get("shortlisted_remark") or "",
             "role": d.get("role"), "resume_filename": d.get("resume_filename"),
             "resume_size": d.get("resume_size"), "submitted_at": d.get("submitted_at"),
         })
@@ -284,15 +369,30 @@ def _xlsx(title: str, headers, rows) -> bytes:
 
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+# Column order shared by the per-tab exports and the dashboard export. The last
+# column (Submitted On) is dropped from the dashboard sheets, which lead with it.
+_EX_HEAD = ["Emp Code", "Emp Name", "Position (Referred Emp)", "Manager", "Partner", "Referred Emp Code", "Referred Emp Name",
+            "Joining Date (Referred Emp)", "Duration (Referred Emp)", "Buddy Referral", "Referred Emp Status",
+            "Contacted", "Paid", "Paid Remark", "Submitted On"]
+_RR_HEAD = ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner", "Role", "Resume File",
+            "Contacted", "Shortlisted", "Shortlisted Remark", "Submitted On"]
+
+
+def _ex_line(r):
+    return [r["empid"], r["name"], r["referred_to_position"] or r["position"], r["manager"], r["partner"],
+            r["referred_emp"], r["referred_to_name"], r["referred_doj"], r["duration"], "Buddy Referral" if r["buddy"] else "",
+            r["status"], r["contacted"], r["paid"], r["paid_remark"], _ist_text(r["submitted_at"])]
+
+
+def _rr_line(r):
+    return [r["empid"], r["name"], r["date_of_joining"], r["manager"], r["partner"], r["role"],
+            r["resume_filename"], r["contacted"], r["shortlisted"], r["shortlisted_remark"], _ist_text(r["submitted_at"])]
+
 
 @router.get("/admin/existing/export")
 def export_existing(_: str = Depends(require_referral_admin)):
     rows = _existing_rows()
-    data = _xlsx("Referred by a JHS Employee",
-                 ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner",
-                  "Referral From (Code)", "Referral From (Name)", "Position", "Submitted On"],
-                 [[r["empid"], r["name"], r["date_of_joining"], r["manager"], r["partner"],
-                   r["referral_from"], r["referral_from_name"], r["position"], _ist_text(r["submitted_at"])] for r in rows])
+    data = _xlsx("Referred by a JHS Employee", _EX_HEAD, [_ex_line(r) for r in rows])
     return Response(content=data, media_type=_XLSX,
                     headers={"Content-Disposition": "attachment; filename=Referred_by_JHS_Employee.xlsx"})
 
@@ -301,8 +401,167 @@ def export_existing(_: str = Depends(require_referral_admin)):
 def export_referrals(_: str = Depends(require_referral_admin)):
     rows = _referral_rows()
     data = _xlsx("Referred Someone",
-                 ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner", "Role", "Resume File", "Submitted On"],
-                 [[r["empid"], r["name"], r["date_of_joining"], r["manager"], r["partner"],
-                   r["role"], r["resume_filename"], _ist_text(r["submitted_at"])] for r in rows])
+                 _RR_HEAD, [_rr_line(r) for r in rows])
     return Response(content=data, media_type=_XLSX,
                     headers={"Content-Disposition": "attachment; filename=Referred_Someone.xlsx"})
+
+
+# ── Contacted flag (Yes / No, set manually by the admin) ─────────────────────
+class ContactedBody(BaseModel):
+    contacted: str
+
+
+@router.put("/admin/{kind}/{referral_id}/contacted")
+def set_contacted(kind: str, referral_id: str, body: ContactedBody, _: str = Depends(require_referral_admin)):
+    coll = {"existing": existing_referrals, "referrals": resume_referrals}.get(kind)
+    if coll is None:
+        raise HTTPException(404, "Unknown referral type")
+    value = (body.contacted or "").strip().capitalize()
+    if value not in ("Yes", "No"):
+        raise HTTPException(400, "Contacted must be Yes or No")
+    try:
+        res = coll.update_one({"_id": ObjectId(referral_id)}, {"$set": {"contacted": value}})
+    except (InvalidId, TypeError):
+        raise HTTPException(404, "Referral not found")
+    if not res.matched_count:
+        raise HTTPException(404, "Referral not found")
+    return {"success": True, "contacted": value}
+
+
+# ── Paid (Referred by a JHS Employee) / Shortlisted (Referred Someone): Yes / No + remark ──
+_DECISIONS = {"existing": ("paid", existing_referrals, "paid_remark"),
+              "referrals": ("shortlisted", resume_referrals, "shortlisted_remark")}
+
+
+class DecisionBody(BaseModel):
+    value: str
+    remark: Optional[str] = ""
+
+
+@router.put("/admin/{kind}/{referral_id}/decision")
+def set_decision(kind: str, referral_id: str, body: DecisionBody, _: str = Depends(require_referral_admin)):
+    if kind not in _DECISIONS:
+        raise HTTPException(404, "Unknown referral type")
+    field, coll, remark_field = _DECISIONS[kind]
+    value = (body.value or "").strip().capitalize()
+    if value not in ("Yes", "No"):
+        raise HTTPException(400, "Value must be Yes or No")
+    remark = (body.remark or "").strip()[:300]
+    if value == "No" and not remark:
+        raise HTTPException(400, "A remark is required when the answer is No")
+    try:
+        res = coll.update_one({"_id": ObjectId(referral_id)},
+                              {"$set": {field: value, remark_field: remark if value == "No" else ""}})
+    except (InvalidId, TypeError):
+        raise HTTPException(404, "Referral not found")
+    if not res.matched_count:
+        raise HTTPException(404, "Referral not found")
+    return {"success": True, "value": value, "remark": remark if value == "No" else ""}
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+def _in_range(dt, d_from: Optional[datetime], d_to: Optional[datetime]) -> bool:
+    if not isinstance(dt, datetime):
+        return not (d_from or d_to)
+    local = ((dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)) + _IST).replace(tzinfo=None)
+    day = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return (not d_from or day >= d_from) and (not d_to or day <= d_to)
+
+
+def _range(date_from: str, date_to: str):
+    f, t = _parse_date(date_from), _parse_date(date_to)
+    if f and t and f > t:
+        raise HTTPException(400, "'From' date is after 'To' date")
+    return f, t
+
+
+def _dashboard_data(date_from: str, date_to: str) -> dict:
+    f, t = _range(date_from, date_to)
+    ex = [r for r in _existing_rows() if _in_range(r["submitted_at"], f, t)]
+    rr = [r for r in _referral_rows() if _in_range(r["submitted_at"], f, t)]
+
+    people = {}
+    def person(code, name):
+        return people.setdefault(code, {"empid": code, "name": name, "count": 0, "referred_to": [], "referred_someone": []})
+    for r in ex:
+        p = person(r["empid"], r["name"])
+        p["count"] += 1
+        p["referred_to"].append({
+            "name": r["referred_to_name"], "empid": r["referred_emp"], "position": r["position"],
+            "doj": r["referred_doj"], "duration": r["duration"], "status": r["status"],
+            "contacted": r["contacted"], "paid": r["paid"], "paid_remark": r["paid_remark"],
+            "submitted_at": _iso(r["submitted_at"]),
+        })
+    for r in rr:
+        p = person(r["empid"], r["name"])
+        p["count"] += 1
+        p["referred_someone"].append({
+            "role": r["role"], "resume_filename": r["resume_filename"],
+            "contacted": r["contacted"], "shortlisted": r["shortlisted"], "shortlisted_remark": r["shortlisted_remark"],
+            "submitted_at": _iso(r["submitted_at"]),
+        })
+    top = sorted(people.values(), key=lambda p: (-p["count"], p["name"] or ""))[:10]
+    contacted = sum(1 for r in ex + rr if r["contacted"] == "Yes")
+    paid_yes = sum(1 for r in ex if r["paid"] == "Yes")
+    paid_no = sum(1 for r in ex if r["paid"] == "No")
+    short_yes = sum(1 for r in rr if r["shortlisted"] == "Yes")
+    short_no = sum(1 for r in rr if r["shortlisted"] == "No")
+    return {
+        "employees_referred": len(people),
+        "total_referrals": len(ex) + len(rr),
+        "referred_to_count": len(ex),
+        "referred_someone_count": len(rr),
+        "contacted": contacted, "pending": len(ex) + len(rr) - contacted,
+        "buddy_given": paid_yes, "buddy_not_given": paid_no, "buddy_awaiting": len(ex) - paid_yes - paid_no,
+        "shortlisted": short_yes, "rejected": short_no, "shortlist_awaiting": len(rr) - short_yes - short_no,
+        "top": top, "_ex": ex, "_rr": rr,
+    }
+
+
+@router.get("/admin/dashboard")
+def admin_dashboard(date_from: str = "", date_to: str = "", _: str = Depends(require_referral_admin)):
+    d = _dashboard_data(date_from, date_to)
+    d.pop("_ex"); d.pop("_rr")
+    return d
+
+
+@router.get("/admin/dashboard/export")
+def export_dashboard(date_from: str = "", date_to: str = "", _: str = Depends(require_referral_admin)):
+    from openpyxl import load_workbook
+    d = _dashboard_data(date_from, date_to)
+    ex = sorted(d["_ex"], key=lambda r: r["submitted_at"] or datetime.min)
+    rr = sorted(d["_rr"], key=lambda r: r["submitted_at"] or datetime.min)
+    summary = [
+        ["From", date_from or "All"], ["To", date_to or "All"],
+        ["Employees who referred someone (unique)", d["employees_referred"]],
+        ["Total referrals", d["total_referrals"]],
+        ["Referral To (JHS employee)", d["referred_to_count"]],
+        ["Referred Someone (resume)", d["referred_someone_count"]],
+        ["Contacted", d["contacted"]], ["Pending", d["pending"]],
+        ["Buddy referral given", d["buddy_given"]], ["Buddy referral not given", d["buddy_not_given"]],
+        ["Buddy referral awaiting", d["buddy_awaiting"]],
+        ["Shortlisted", d["shortlisted"]], ["Rejected", d["rejected"]], ["Shortlisting awaiting", d["shortlist_awaiting"]],
+    ]
+    top = [[i + 1, p["empid"], p["name"], p["count"], len(p["referred_to"]), len(p["referred_someone"])]
+           for i, p in enumerate(d["top"])]
+    wb = load_workbook(BytesIO(_xlsx("Summary", ["Metric", "Value"], summary)))
+    for title, head, rows in (
+        ("Top 10 Referrers", ["Rank", "Emp Code", "Emp Name", "Total Referrals", "Referral To", "Referred Someone"], top),
+        ("Referral To", ["Submitted On"] + _EX_HEAD[:-1], [[_ist_text(r["submitted_at"])] + _ex_line(r)[:-1] for r in ex]),
+        ("Referred Someone", ["Submitted On"] + _RR_HEAD[:-1], [[_ist_text(r["submitted_at"])] + _rr_line(r)[:-1] for r in rr]),
+    ):
+        src = load_workbook(BytesIO(_xlsx(title, head, rows))).active
+        ws = wb.create_sheet(title)
+        for row in src.iter_rows():
+            for c in row:
+                n = ws.cell(row=c.row, column=c.column, value=c.value)
+                if c.has_style:
+                    n.font, n.fill, n.alignment = c.font.copy(), c.fill.copy(), c.alignment.copy()
+        for k, dim in src.column_dimensions.items():
+            ws.column_dimensions[k].width = dim.width
+        ws.freeze_panes = "A2"
+    buf = BytesIO()
+    wb.save(buf)
+    fname = f"Buddy_Referral_Dashboard_{date_from or 'all'}_to_{date_to or 'all'}.xlsx"
+    return Response(content=buf.getvalue(), media_type=_XLSX,
+                    headers={"Content-Disposition": f"attachment; filename={fname}"})

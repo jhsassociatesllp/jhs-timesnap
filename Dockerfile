@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# LibreOffice (headless) turns the filled CV Word files into PDFs for the CV
-# Builder. Carlito/Liberation are metric-compatible with Calibri/Arial/Times so
-# the PDF lays out like the Word file. Kept in its own early layer: it is large
+# LibreOffice (headless) turns the CV Builder profile slide into a PDF for the
+# in-browser View. Carlito/Liberation are metric-compatible with Calibri/Arial/Times so
+# the PDF lays out like the slide. Kept in its own early layer: it is large
 # and rarely changes.
-RUN apt-get update     && apt-get install -y --no-install-recommends libreoffice-writer fonts-crosextra-carlito fonts-liberation fonts-dejavu-core     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update     && apt-get install -y --no-install-recommends libreoffice-impress fonts-crosextra-carlito fonts-liberation fonts-dejavu-core     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 

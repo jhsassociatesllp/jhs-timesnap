@@ -42,7 +42,7 @@
           <div class="card-title"><i class="fas fa-user-tie"></i> Referred by a JHS Employee</div>
           <div class="g2">
             <div class="form-group">
-              <label><i class="fas fa-id-badge"></i> Employee</label>
+              <label><i class="fas fa-id-badge"></i> Referred To</label>
               <input class="fi" type="text" id="me_emp" readonly />
             </div>
             <div class="form-group">
@@ -50,7 +50,7 @@
               <input class="fi" type="text" id="me_doj" readonly />
             </div>
             <div class="form-group full">
-              <label><i class="fas fa-search"></i> Referral From <span class="hint">(start typing a JHS code or name, then pick from the list)</span></label>
+              <label><i class="fas fa-search"></i> Referred Emp <span class="hint">(start typing a JHS code or name, then pick from the list)</span></label>
               <input class="fi" type="text" id="rf_input" placeholder="e.g. JHS1283 or Rahul" />
               <div class="sugg" id="rf_sugg"></div>
               <div class="picked" id="rf_picked" style="display:none">
@@ -68,6 +68,13 @@
             <button type="submit" class="btn btn-pri" id="exBtn"><i class="fas fa-paper-plane"></i> Submit</button>
           </div>
         </form>
+        <div class="my-list">
+          <h3><i class="fas fa-users"></i> Employees I have referred <span class="chip" id="my_ex_n">0</span></h3>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Emp Code</th><th>Name</th><th>Position</th><th>Joining Date</th><th>Duration</th><th>Status</th><th>Submitted</th></tr></thead>
+            <tbody id="myExBody"></tbody>
+          </table></div>
+        </div>
       </div>
 
       <!-- ══ Tab 2: Referral ══ -->
@@ -93,6 +100,13 @@
             <button type="submit" class="btn btn-pri" id="rrBtn"><i class="fas fa-paper-plane"></i> Submit Referral</button>
           </div>
         </form>
+        <div class="my-list">
+          <h3><i class="fas fa-user-plus"></i> People I have referred <span class="chip" id="my_rr_n">0</span></h3>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Role</th><th>Resume</th><th>Submitted</th></tr></thead>
+            <tbody id="myRrBody"></tbody>
+          </table></div>
+        </div>
       </div>
     </div>
   </div>
@@ -122,6 +136,24 @@ async function api(url, opts={}){
   if (res.status === 401) { window.location.href = '/login'; throw new Error('Session expired'); }
   if (!res.ok) throw new Error((data && data.detail) || 'Request failed');
   return data;
+}
+
+// ── My referrals ─────────────────────────────────────────────────────────────
+const fmtDate = d => { const x = new Date(d); return isNaN(x) ? '—' : x.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
+const cell = v => v ? esc(v) : '—';
+async function loadMine(){
+  try {
+    const d = await api('/buddy-referral/mine');
+    document.getElementById('my_ex_n').textContent = d.existing.length;
+    document.getElementById('my_rr_n').textContent = d.referrals.length;
+    document.getElementById('myExBody').innerHTML = d.existing.length ? d.existing.map(r => `<tr>
+      <td><b>${esc(r.empid)}</b></td><td>${cell(r.name)}</td><td>${cell(r.position)}</td><td>${cell(r.date_of_joining)}</td>
+      <td>${cell(r.duration)}</td><td><span class="${r.status==='Active'?'st-a':'st-i'}">${esc(r.status)}</span></td><td>${fmtDate(r.submitted_at)}</td></tr>`).join('')
+      : '<tr><td colspan="7"><div class="none">You have not referred any employee yet.</div></td></tr>';
+    document.getElementById('myRrBody').innerHTML = d.referrals.length ? d.referrals.map(r => `<tr>
+      <td>${cell(r.role)}</td><td>${cell(r.resume_filename)}</td><td>${fmtDate(r.submitted_at)}</td></tr>`).join('')
+      : '<tr><td colspan="3"><div class="none">You have not referred anyone yet.</div></td></tr>';
+  } catch(e) {}
 }
 
 function switchTab(name){
@@ -195,7 +227,7 @@ async function submitExisting(ev){
     await api('/buddy-referral/existing', {method:'POST', headers:Object.assign({'Content-Type':'application/json'},AUTH),
       body: JSON.stringify({referral_from:picked.empid, position:document.getElementById('ex_position').value.trim()})});
     toast('Referral submitted. Thank you!');
-    document.getElementById('existingForm').reset(); clearPick(); showMe();          // fresh entry
+    document.getElementById('existingForm').reset(); clearPick(); showMe(); loadMine();          // fresh entry
   } catch(e) { toast(e.message,'error'); }
   btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit';
 }
@@ -227,7 +259,7 @@ async function submitReferral(ev){
   try {
     await api('/buddy-referral/referral', {method:'POST', body: fd});   // browser sets the multipart boundary
     toast('Referral submitted. Thank you!');
-    document.getElementById('referralForm').reset(); resetFile();        // fresh entry
+    document.getElementById('referralForm').reset(); resetFile(); loadMine();        // fresh entry
   } catch(e) { toast(e.message,'error'); }
   btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Referral';
 }
@@ -238,6 +270,7 @@ function showMe(){
   document.getElementById('me_emp').value = `${meInfo.empid} — ${meInfo.name}`;
   document.getElementById('me_doj').value = meInfo.date_of_joining || '—';
 }
+loadMine();
 api('/buddy-referral/me').then(d=>{ meInfo=d; showMe(); }).catch(()=>{});
 document.getElementById('ls').style.display = 'none';
 document.getElementById('app').style.display = 'block';

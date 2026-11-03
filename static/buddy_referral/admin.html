@@ -23,6 +23,30 @@
     .vw-body .docx-wrapper{background:transparent!important;padding:1rem!important}
     .vw-msg{padding:3rem 1rem;text-align:center;color:#555}
     .x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
+    .dl-lbl{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;font-weight:600}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.7rem;margin:.4rem 0 1.1rem}
+    .kgrp{border:2px solid var(--border);border-radius:12px;padding:.55rem .7rem .7rem;background:#fff}
+    .kgrp h4{margin:0 0 .45rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#6b7280}
+    .krow{display:flex;gap:.45rem;flex-wrap:wrap}
+    .kpi{flex:1 1 74px;min-width:74px;border-radius:9px;padding:.4rem .55rem;background:#f5f7ff;border-left:4px solid var(--accent)}
+    .kpi b{display:block;font-size:1.15rem;line-height:1.2;color:var(--accent)}
+    .kpi span{font-size:.68rem;color:#555;line-height:1.15;display:block}
+    .kpi.ok{background:#ecfdf5;border-color:#10b981}.kpi.ok b{color:#047857}
+    .kpi.bad{background:#fef2f2;border-color:#ef4444}.kpi.bad b{color:#b91c1c}
+    .kpi.warn{background:#fffbeb;border-color:#f59e0b}.kpi.warn b{color:#b45309}
+    .dec .rm{font-size:.7rem;color:#b91c1c;margin-top:.2rem;max-width:170px}
+    .dec .rm span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rm-box{background:#fff;border-radius:14px;padding:1.2rem 1.3rem;width:100%;max-width:420px;margin-top:20vh;box-shadow:0 30px 70px rgba(0,0,0,.4)}
+    .rm-box h3{margin:0 0 .3rem;font-size:1rem}.rm-box p{margin:0 0 .6rem;font-size:.82rem;color:#666}
+    .rm-box textarea{width:100%;border:2px solid var(--border);border-radius:9px;padding:.5rem;font:inherit;resize:vertical}
+    .rm-box textarea.bad{border-color:#ef4444}
+    .rm-act{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.7rem}
+    .sec{font-size:1rem;margin:.6rem 0}.sec small{font-weight:400;color:#777}
+    tr.click{cursor:pointer}tr.click:hover{background:#f0f4ff}
+    .tag{display:inline-block;padding:.1rem .5rem;border-radius:99px;font-size:.72rem;font-weight:700;background:#fef3c7;color:#92400e}
+    .st-a{color:#0f766e;font-weight:700}.st-i{color:#b91c1c;font-weight:700}
+    select.ct{padding:.25rem .4rem;border:2px solid var(--border);border-radius:8px;font:inherit}
+    .dt-sec{margin:.8rem 0 .3rem;font-weight:700}
   </style>
 </head>
 <body>
@@ -47,18 +71,36 @@
 
     <div class="body">
       <div class="tabs">
-        <button class="tab active" id="tab-existing" onclick="switchTab('existing')"><i class="fas fa-user-tie"></i> Referred by a JHS Employee <span class="chip" id="c_ex">0</span></button>
+        <button class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</button>
+        <button class="tab" id="tab-existing" onclick="switchTab('existing')"><i class="fas fa-user-tie"></i> Referred by a JHS Employee <span class="chip" id="c_ex">0</span></button>
         <button class="tab" id="tab-referral" onclick="switchTab('referral')"><i class="fas fa-file-upload"></i> Referred Someone <span class="chip" id="c_rr">0</span></button>
+        <button class="btn btn-pri btn-sm" style="margin:auto 0 .5rem auto;flex:none" onclick="download('/buddy-referral/admin/dashboard/export','Buddy_Referral_Master.xlsx')"><i class="fas fa-file-excel"></i> Download Master Excel</button>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="tc active" id="tc-dashboard">
+        <div class="toolbar">
+          <label class="dl-lbl">From <input class="fi" type="date" id="dbFrom" onchange="loadDashboard()" /></label>
+          <label class="dl-lbl">To <input class="fi" type="date" id="dbTo" onchange="loadDashboard()" /></label>
+          <button class="btn btn-sm" onclick="clearDates()">Clear</button>
+          <button class="btn btn-pri btn-sm" onclick="downloadDashboard()"><i class="fas fa-file-excel"></i> Download Excel</button>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <h3 class="sec">Top 10 employees who referred someone <small>(click a row for details)</small></h3>
+        <div class="tbl-wrap"><table class="t">
+          <thead><tr><th>#</th><th>Emp Code</th><th>Emp Name</th><th>Total</th><th>Referral To</th><th>Referred Someone</th></tr></thead>
+          <tbody id="topBody"></tbody>
+        </table></div>
       </div>
 
       <!-- Existing employee -->
-      <div class="tc active" id="tc-existing">
+      <div class="tc" id="tc-existing">
         <div class="toolbar">
           <input class="fi" id="exSearch" placeholder="Search…" oninput="renderExisting()" />
           <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/existing/export','Referred_by_JHS_Employee.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
-          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Date of Joining</th><th>Manager</th><th>Partner</th><th>Referred By</th><th>Position</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Position (Referred Emp)</th><th>Manager</th><th>Partner</th><th>Referred Emp Code</th><th>Referred Emp Name</th><th>Joining Date (Referred Emp)</th><th>Duration (Referred Emp)</th><th>Referred Emp Status</th><th>Contacted</th><th>Paid</th></tr></thead>
           <tbody id="exBody"></tbody>
         </table></div>
       </div>
@@ -70,7 +112,7 @@
           <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/referrals/export','Referred_Someone.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
-          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th><th>Contacted</th><th>Shortlisted</th></tr></thead>
           <tbody id="rrBody"></tbody>
         </table></div>
       </div>
@@ -86,6 +128,14 @@
       <button class="x" onclick="closeView()"><i class="fas fa-times"></i></button>
     </div>
     <div class="vw-body" id="vwBody"></div>
+  </div>
+</div>
+<div class="vw-bg" id="rmBg">
+  <div class="rm-box">
+    <h3 id="rmTitle">Remark</h3>
+    <p>A remark is required when the answer is No.</p>
+    <textarea id="rmText" rows="3" maxlength="300" placeholder="Type the remark"></textarea>
+    <div class="rm-act"><button class="btn btn-sm" onclick="cancelRemark()">Cancel</button><button class="btn btn-pri btn-sm" onclick="submitRemark()">Save</button></div>
   </div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
@@ -167,9 +217,103 @@ function renderExisting(){
   const q=document.getElementById('exSearch').value.trim().toLowerCase();
   const rows=exRows.filter(r=>match(r,q));
   document.getElementById('exBody').innerHTML = rows.length ? rows.map(r=>`<tr>
-    <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.date_of_joining)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td>
-    <td><b>${esc(r.referral_from)}</b> — ${dash(r.referral_from_name)}</td><td>${dash(r.position)}</td>
-  </tr>`).join('') : '<tr><td colspan="7"><div class="empty"><i class="fas fa-inbox"></i>No existing-employee referrals yet.</div></td></tr>';
+    <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.referred_to_position||r.position)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td>
+    <td><b>${esc(r.referred_emp)}</b></td><td>${dash(r.referred_to_name)}</td><td>${dash(r.referred_doj)}</td>
+    <td>${dash(r.duration)} ${r.buddy?'<span class="tag">Buddy Referral</span>':''}</td>
+    <td><span class="${r.status==='Active'?'st-a':'st-i'}">${esc(r.status)}</span></td>
+    <td>${ctSelect('existing',r)}</td>
+    <td>${decSelect('existing','paid',r)}</td>
+  </tr>`).join('') : '<tr><td colspan="12"><div class="empty"><i class="fas fa-inbox"></i>No existing-employee referrals yet.</div></td></tr>';
+}
+// ── Paid (Referred by a JHS Employee) / Shortlisted (Referred Someone): Yes / No, with a remark when No ──
+const DEC = {existing:{field:'paid', remark:'paid_remark', label:'Paid'}, referrals:{field:'shortlisted', remark:'shortlisted_remark', label:'Shortlisted'}};
+function decSelect(kind,field,r){
+  const v=r[field]||'', rm=r[DEC[kind].remark]||'';
+  return `<div class="dec">
+    <select class="ct" onchange="onDecision('${kind}','${esc(r.id)}',this)">
+      <option value=""${v?'':' selected'}>— Select —</option><option value="Yes"${v==='Yes'?' selected':''}>Yes</option><option value="No"${v==='No'?' selected':''}>No</option></select>
+    ${v==='No'?`<div class="rm" title="${esc(rm)}"><span>${esc(rm)}</span> <a href="#" onclick="event.preventDefault();askRemark('${kind}','${esc(r.id)}',null)">edit</a></div>`:''}
+  </div>`;
+}
+function decRow(kind,id){ return (kind==='existing'?exRows:rrRows).find(x=>x.id===id); }
+function onDecision(kind,id,sel){
+  if(!sel.value){ sel.value=decRow(kind,id)[DEC[kind].field]||''; return; }
+  if(sel.value==='No') askRemark(kind,id,sel); else saveDecision(kind,id,'Yes','');
+}
+let rmCtx=null;
+function askRemark(kind,id,sel){
+  const row=decRow(kind,id); rmCtx={kind,id,sel};
+  document.getElementById('rmTitle').textContent=DEC[kind].label+' = No — remark';
+  const t=document.getElementById('rmText'); t.value=row[DEC[kind].remark]||''; t.classList.remove('bad');
+  document.getElementById('rmBg').classList.add('open'); setTimeout(()=>t.focus(),50);
+}
+function cancelRemark(){
+  if(rmCtx&&rmCtx.sel) rmCtx.sel.value=decRow(rmCtx.kind,rmCtx.id)[DEC[rmCtx.kind].field]||'';
+  document.getElementById('rmBg').classList.remove('open'); rmCtx=null;
+}
+async function submitRemark(){
+  const t=document.getElementById('rmText'), remark=t.value.trim();
+  if(!remark){ t.classList.add('bad'); t.focus(); return; }
+  const c=rmCtx; document.getElementById('rmBg').classList.remove('open'); rmCtx=null;
+  await saveDecision(c.kind,c.id,'No',remark);
+}
+async function saveDecision(kind,id,value,remark){
+  const row=decRow(kind,id), d=DEC[kind];
+  try{
+    const r=await fetch(`/buddy-referral/admin/${kind}/${id}/decision`,{method:'PUT',headers:{...AUTH,'Content-Type':'application/json'},body:JSON.stringify({value,remark})});
+    if(!r.ok){ let e=null; try{e=await r.json();}catch(x){} throw new Error((e&&typeof e.detail==='string'&&e.detail)||'Could not save'); }
+    row[d.field]=value; row[d.remark]=value==='No'?remark:'';
+    toast(`${d.label}: ${value}`); kind==='existing'?renderExisting():renderReferrals(); loadDashboard();
+  }catch(e){ toast(e.message,'error'); kind==='existing'?renderExisting():renderReferrals(); }
+}
+
+function ctSelect(kind,r){
+  return `<select class="ct" onchange="setContacted('${kind}','${esc(r.id)}',this)">
+    <option value="No"${r.contacted==='Yes'?'':' selected'}>No</option><option value="Yes"${r.contacted==='Yes'?' selected':''}>Yes</option></select>`;
+}
+async function setContacted(kind,id,sel){
+  const prev = sel.value==='Yes'?'No':'Yes';
+  try{
+    const r=await fetch(`/buddy-referral/admin/${kind}/${id}/contacted`,{method:'PUT',headers:{...AUTH,'Content-Type':'application/json'},body:JSON.stringify({contacted:sel.value})});
+    if(!r.ok) throw new Error('Could not save');
+    (kind==='existing'?exRows:rrRows).find(x=>x.id===id).contacted=sel.value;
+    toast('Contacted: '+sel.value); loadDashboard();
+  }catch(e){ sel.value=prev; toast(e.message,'error'); }
+}
+
+// ── dashboard ────────────────────────────────────────────────────────────────
+let dbTop=[];
+function dbQuery(){
+  const f=document.getElementById('dbFrom').value, t=document.getElementById('dbTo').value;
+  return `date_from=${encodeURIComponent(f)}&date_to=${encodeURIComponent(t)}`;
+}
+function clearDates(){ document.getElementById('dbFrom').value=''; document.getElementById('dbTo').value=''; loadDashboard(); }
+function downloadDashboard(){ download('/buddy-referral/admin/dashboard/export?'+dbQuery(),'Buddy_Referral_Dashboard.xlsx'); }
+async function loadDashboard(){
+  try{
+    const d=await getJSON('/buddy-referral/admin/dashboard?'+dbQuery());
+    dbTop=d.top;
+    const k=(n,l,cls='')=>`<div class="kpi ${cls}"><b>${n}</b><span>${l}</span></div>`;
+    const g=(t,items)=>`<div class="kgrp"><h4>${t}</h4><div class="krow">${items.join('')}</div></div>`;
+    document.getElementById('kpis').innerHTML =
+      g('Referrals',[k(d.employees_referred,'Employees who referred (unique)'),k(d.total_referrals,'Total referrals'),
+                     k(d.referred_to_count,'Referred by a JHS Employee'),k(d.referred_someone_count,'Referred Someone')])+
+      g('Contact',[k(d.contacted,'Contacted','ok'),k(d.pending,'Pending','warn')])+
+      g('Buddy referral (Referred by a JHS Employee)',[k(d.buddy_given,'Given','ok'),k(d.buddy_not_given,'Not given','bad'),k(d.buddy_awaiting,'Awaiting','warn')])+
+      g('Shortlisting (Referred Someone)',[k(d.shortlisted,'Shortlisted','ok'),k(d.rejected,'Rejected','bad'),k(d.shortlist_awaiting,'Awaiting','warn')]);
+    document.getElementById('topBody').innerHTML = d.top.length ? d.top.map((p,i)=>`<tr class="click" onclick="showPerson(${i})">
+      <td>${i+1}</td><td><b>${esc(p.empid)}</b></td><td>${dash(p.name)}</td><td><b>${p.count}</b></td><td>${p.referred_to.length}</td><td>${p.referred_someone.length}</td>
+    </tr>`).join('') : '<tr><td colspan="6"><div class="empty"><i class="fas fa-inbox"></i>No referrals in this period.</div></td></tr>';
+  }catch(e){ toast(e.message,'error'); }
+}
+function showPerson(i){
+  const p=dbTop[i]; if(!p) return;
+  const fd=s=>s?new Date(s).toLocaleDateString('en-IN'):'—';
+  const t1=p.referred_to.length?`<div class="dt-sec">Referral To (JHS employees)</div><div class="tbl-wrap"><table class="t"><thead><tr><th>Emp Code</th><th>Name</th><th>Position</th><th>Joining Date</th><th>Duration</th><th>Status</th><th>Contacted</th><th>Submitted</th></tr></thead><tbody>${p.referred_to.map(x=>`<tr><td><b>${esc(x.empid)}</b></td><td>${dash(x.name)}</td><td>${dash(x.position)}</td><td>${dash(x.doj)}</td><td>${dash(x.duration)}</td><td>${esc(x.status)}</td><td>${esc(x.contacted)}</td><td>${fd(x.submitted_at)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  const t2=p.referred_someone.length?`<div class="dt-sec">Referred Someone (resumes)</div><div class="tbl-wrap"><table class="t"><thead><tr><th>Role</th><th>Resume</th><th>Contacted</th><th>Submitted</th></tr></thead><tbody>${p.referred_someone.map(x=>`<tr><td>${dash(x.role)}</td><td>${dash(x.resume_filename)}</td><td>${esc(x.contacted)}</td><td>${fd(x.submitted_at)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  document.getElementById('vwTitle').textContent=`${p.name||p.empid} (${p.empid}) — ${p.count} referral${p.count>1?'s':''}`;
+  document.getElementById('vwBody').innerHTML=`<div style="padding:1rem;background:#fff;min-height:100%">${t1}${t2}</div>`;
+  document.getElementById('vwBg').classList.add('open');
 }
 function renderReferrals(){
   const q=document.getElementById('rrSearch').value.trim().toLowerCase();
@@ -181,7 +325,9 @@ function renderReferrals(){
       <button class="icon-btn dl" title="Download resume" onclick="download('/buddy-referral/admin/referrals/${esc(r.id)}/resume','${esc(r.resume_filename)}')"><i class="fas fa-download"></i></button>
     </td>
     <td>${dash(r.date_of_joining)}</td>
-  </tr>`).join('') : '<tr><td colspan="7"><div class="empty"><i class="fas fa-inbox"></i>No referrals yet.</div></td></tr>';
+    <td>${ctSelect('referrals',r)}</td>
+    <td>${decSelect('referrals','shortlisted',r)}</td>
+  </tr>`).join('') : '<tr><td colspan="9"><div class="empty"><i class="fas fa-inbox"></i>No referrals yet.</div></td></tr>';
 }
 
 async function init(){
@@ -189,7 +335,7 @@ async function init(){
     const [ex, rr] = await Promise.all([getJSON('/buddy-referral/admin/existing'), getJSON('/buddy-referral/admin/referrals')]);
     exRows=ex.rows; rrRows=rr.rows;
     document.getElementById('c_ex').textContent=exRows.length; document.getElementById('c_rr').textContent=rrRows.length;
-    renderExisting(); renderReferrals();
+    renderExisting(); renderReferrals(); loadDashboard();
     document.getElementById('ls').style.display='none';
     document.getElementById('app').style.display='block';
   }catch(e){ document.getElementById('ls').innerHTML='Could not load: '+esc(e.message); }

@@ -1,11 +1,9 @@
 # backend/cv_builder/convert.py
 """
-Word -> PDF conversion for the CV Builder.
+Profile slide (.pptx) -> PDF, used for the in-browser "View" of a CV.
 
   * Linux / Docker: LibreOffice in headless mode (installed in the Dockerfile).
-  * Windows (local development): Microsoft Word, driven through PowerShell COM.
-    If Word is already open it is reused and left open; we only close our own
-    document.
+  * Windows (local development): Microsoft PowerPoint, driven through PowerShell COM.
 """
 
 import os
@@ -14,81 +12,56 @@ import subprocess
 import tempfile
 import threading
 
-_word_lock = threading.Lock()          # Word handles one conversion at a time
+_ppt_lock = threading.Lock()           # PowerPoint handles one conversion at a time
 
 
 def _soffice():
     return shutil.which("soffice") or shutil.which("libreoffice")
 
 
-def _word_available() -> bool:
+def _ppt_available() -> bool:
     if os.name != "nt" or not shutil.which("powershell"):
         return False
     try:
         import winreg
-        winreg.CloseKey(winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"Word.Application"))
+        winreg.CloseKey(winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"PowerPoint.Application"))
         return True
     except OSError:
         return False
 
 
-def pdf_engine():
-    if _soffice():
-        return "libreoffice"
-    if _word_available():
-        return "word"
-    return None
-
-
-def pdf_available() -> bool:
-    return pdf_engine() is not None
-
-
-_WORD_SCRIPT = r"""
+_PPT_SCRIPT = r"""
 $ErrorActionPreference = 'Stop'
-$running = [bool](Get-Process WINWORD -ErrorAction SilentlyContinue)
-$w = New-Object -ComObject Word.Application
-if (-not $running) { $w.Visible = $false; $w.DisplayAlerts = 0 }
-$d = $null
+$p = New-Object -ComObject PowerPoint.Application
 try {
-  $d = $w.Documents.Open($env:CV_IN, $false, $true, $false)
-  $d.ExportAsFixedFormat($env:CV_OUT, 17)
-} finally {
-  if ($d) { $d.Close(0) }
-  if (-not $running) { $w.Quit() }
-}
+  $d = $p.Presentations.Open($args[0], $true, $false, $false)
+  $d.SaveAs($args[1], 32)
+  $d.Close()
+} finally { if ($p.Presentations.Count -eq 0) { $p.Quit() } }
 """
 
 
-def docx_to_pdf(data: bytes, name: str = "cv") -> bytes:
-    """Convert .docx bytes to PDF bytes. Raises RuntimeError if impossible."""
-    engine = pdf_engine()
-    if engine is None:
-        raise RuntimeError("PDF export is not available on this server")
-    with tempfile.TemporaryDirectory() as tmp:
-        src = os.path.join(tmp, name + ".docx")
-        out = os.path.join(tmp, name + ".pdf")
+def pptx_to_pdf(data: bytes) -> bytes:
+    with tempfile.TemporaryDirectory(prefix="cvppt_") as tmp:
+        src, out = os.path.join(tmp, "profile.pptx"), os.path.join(tmp, "profile.pdf")
         with open(src, "wb") as f:
             f.write(data)
-        try:
-            if engine == "libreoffice":
-                # own profile dir: parallel conversions / a read-only HOME don't clash
-                profile = os.path.join(tmp, "lo_profile")
-                subprocess.run(
-                    [_soffice(), f"-env:UserInstallation=file:///{profile.replace(os.sep, '/')}",
-                     "--headless", "--convert-to", "pdf", "--outdir", tmp, src],
-                    check=True, timeout=120, capture_output=True)
-            else:
-                env = dict(os.environ, CV_IN=src, CV_OUT=out)
-                with _word_lock:
-                    subprocess.run(
-                        ["powershell", "-NoProfile", "-NonInteractive", "-Command", _WORD_SCRIPT],
-                        check=True, timeout=120, capture_output=True, env=env)
-            with open(out, "rb") as f:
-                return f.read()
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("PDF conversion timed out")
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError("PDF conversion failed: " + (e.stderr or b"").decode("utf-8", "ignore")[:200])
-        except FileNotFoundError:
-            raise RuntimeError("PDF conversion failed")
+        if _soffice():
+            r = subprocess.run([_soffice(), "--headless", "--convert-to", "pdf", "--outdir", tmp, src],
+                               capture_output=True, timeout=90,
+                               env={**os.environ, "HOME": os.environ.get("HOME", tmp)})
+            if r.returncode != 0 or not os.path.exists(out):
+                raise RuntimeError("PDF conversion failed")
+        elif _ppt_available():
+            script = os.path.join(tmp, "convert.ps1")
+            with open(script, "w", encoding="utf-8") as f:
+                f.write(_PPT_SCRIPT)
+            with _ppt_lock:
+                r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, src, out],
+                                   capture_output=True, timeout=120)
+            if r.returncode != 0 or not os.path.exists(out):
+                raise RuntimeError("PDF conversion failed")
+        else:
+            raise RuntimeError("PDF conversion is not available on this server")
+        with open(out, "rb") as f:
+            return f.read()
