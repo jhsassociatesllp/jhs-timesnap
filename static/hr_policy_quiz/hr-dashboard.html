@@ -31,7 +31,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" data-tab="overview">Candidates</button>
-      <button class="tab-btn" data-tab="documents">Documents</button>
+      <button class="tab-btn" data-tab="bank">Question Bank</button>
       <button class="tab-btn" data-tab="quizsets">Quiz Sets</button>
       <button class="tab-btn" data-tab="add">Add new joiners</button>
     </div>
@@ -81,41 +81,18 @@
       </div>
     </div>
 
-    <!-- Documents tab -->
-    <div class="tab-panel" id="tab-documents" style="display:none;">
-      <div class="panel">
-        <div class="panel-header"><h3 style="margin:0;">Upload a document</h3></div>
-        <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Upload the onboarding material once. The whole document is read and a bank of questions is generated automatically - every candidate then receives a random 15 from that bank.</p>
-          <div class="error-box" id="uploadError"></div>
-          <div class="success-box" id="uploadSuccess" style="display:none;"></div>
-          <form id="uploadForm">
-            <div class="field">
-              <label for="docTitle">Document title</label>
-              <input type="text" id="docTitle" placeholder="e.g. Employee Handbook 2026" required />
-            </div>
-            <div class="field">
-              <label for="docCategory">Category (optional)</label>
-              <input type="text" id="docCategory" placeholder="e.g. HR, IT" list="docCategoryList" />
-              <datalist id="docCategoryList"></datalist>
-            </div>
-            <div class="field">
-              <label for="docFile">File (.pdf, .docx, .xlsx or .txt)</label>
-              <input type="file" id="docFile" accept=".pdf,.docx,.xlsx,.xlsm,.txt" required />
-            </div>
-            <button type="submit" class="btn btn-primary" id="uploadBtn">Upload and generate questions</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header"><h3 style="margin:0;">Uploaded documents</h3></div>
+    <!-- Question Bank tab: HR and IT sections, questions typed in by HR -->
+    <div class="tab-panel" id="tab-bank" style="display:none;">
+      <p class="hint" style="margin:0 0 14px;">Type your own questions here. Make a question bank in the HR or the IT section, add questions with their 4 options, and add more whenever you like. Then use these banks in <strong>Quiz Sets</strong>.</p>
+      <div id="bankSections"></div>
+      <div class="panel" id="oldDocsPanel" style="display:none;">
+        <div class="panel-header"><h3 style="margin:0;">Earlier uploaded documents</h3></div>
         <div class="panel-body" style="padding:0;">
+          <p class="hint" style="margin:12px 16px;">These were uploaded before and still feed existing quiz sets. New documents can no longer be uploaded - type questions into a bank above instead.</p>
           <table>
-            <thead><tr><th>Title</th><th>Category</th><th>File</th><th>Questions</th><th>Uploaded</th><th></th></tr></thead>
-            <tbody id="documentTableBody"></tbody>
+            <thead><tr><th>Title</th><th>Category</th><th>Questions</th><th></th></tr></thead>
+            <tbody id="oldDocBody"></tbody>
           </table>
-          <div class="empty-state" id="documentEmpty" style="display:none;">No documents uploaded yet.</div>
         </div>
       </div>
     </div>
@@ -125,7 +102,7 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;" id="quizSetFormTitle">Build a quiz set</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Tick the documents to mix into one quiz and set how many questions each contributes. The quiz set's total length is the sum of these numbers.</p>
+          <p class="hint" style="margin-bottom:18px;">Tick the question banks (HR / IT) to mix into one quiz and set how many questions each candidate gets from each bank. Every candidate gets a different random pick, in shuffled order, from everything in the bank at that moment - so questions you add later are included automatically. The quiz set's total length is the sum of these numbers.</p>
           <div class="error-box" id="quizSetError"></div>
           <div class="success-box" id="quizSetSuccess" style="display:none;"></div>
           <form id="quizSetForm">

@@ -497,6 +497,11 @@ tr:last-child td { border-bottom: none; }
 }
 .quiz-doc-count:disabled { background: var(--gray-100); color: var(--gray-400); }
 .quiz-doc-count-label { font-size: 12px; color: var(--gray-400); }
+/* the quiz-set picker sits inside a .field, whose label/input rules would otherwise stack the row and stretch the count box */
+.field .quiz-doc-row { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 13.5px; color: var(--ink); }
+.field .quiz-doc-row input[type="checkbox"] { width: 16px; height: 16px; padding: 0; }
+.field .quiz-doc-row input.quiz-doc-count { width: 64px; padding: 6px 8px; }
+.quiz-doc-row.empty { opacity: 0.6; cursor: not-allowed; }
 
 @media (max-width: 640px) {
   .stat-row { grid-template-columns: repeat(2, 1fr); }

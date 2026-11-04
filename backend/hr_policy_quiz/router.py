@@ -75,46 +75,35 @@ def platform_access(current_user: str = Depends(get_current_user)):
 # HR: document upload + RAG question generation
 # ---------------------------------------------------------------------------
 
-@router.post("/api/hr/documents")
-async def upload_document(
-    file: UploadFile = File(...),
-    title: str = Form(...),
-    category: str = Form(""),
-    hr=Depends(get_current_hr),
-):
-    raw = await file.read()
-    text = rag.extract_text(raw, file.filename)
-    chunks = rag.chunk_text(text)
-    if len(chunks) < 1:
-        raise HTTPException(status_code=400, detail="Could not read any usable text from this file")
+BANK_SECTIONS = ("HR", "IT")
 
+
+class CreateBankRequest(BaseModel):
+    title: str
+    category: str
+
+
+@router.post("/api/hr/question-banks")
+def create_question_bank(body: CreateBankRequest, hr=Depends(get_current_hr)):
+    """An empty question bank in the HR or the IT section; HR then types the questions in herself."""
+    title = " ".join(body.title.split())
+    category = body.category.strip().upper()
+    if category not in BANK_SECTIONS:
+        raise HTTPException(status_code=422, detail="Choose a section: HR or IT")
+    if len(title) < 3:
+        raise HTTPException(status_code=422, detail="Give the question bank a name")
+    if documents.find_one({"kind": "manual", "category": category, "title": title}):
+        raise HTTPException(status_code=409, detail=f"There is already a {category} question bank called \"{title}\"")
     doc_id = str(uuid.uuid4())
-    pool = rag.build_question_pool(chunks, title=title, category=category.strip())
-    if len(pool) < settings.QUIZ_QUESTION_COUNT:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Only generated {len(pool)} usable questions, need at least {settings.QUIZ_QUESTION_COUNT}. Try a longer document.",
-        )
-
-    documents.insert_one(
-        {
-            "_id": doc_id,
-            "title": title,
-            "category": category.strip(),
-            "filename": file.filename,
-            "chunk_count": len(chunks),
-            "uploaded_by": hr["sub"],
-            "uploaded_at": now(),
-        }
-    )
-    questions.insert_one({"_id": doc_id, "document_id": doc_id, "pool": pool})
-
-    return {"document_id": doc_id, "title": title, "category": category.strip(), "question_pool_size": len(pool)}
+    documents.insert_one({"_id": doc_id, "title": title, "category": category, "kind": "manual", "filename": "",
+                          "chunk_count": 0, "uploaded_by": hr["sub"], "uploaded_at": now()})
+    questions.insert_one({"_id": doc_id, "document_id": doc_id, "pool": []})
+    return {"document_id": doc_id, "title": title, "category": category, "question_pool_size": 0, "kind": "manual"}
 
 
 @router.get("/api/hr/documents")
 def list_documents(hr=Depends(get_current_hr)):
-    docs = list(documents.find({}, {"_id": 1, "title": 1, "category": 1, "filename": 1, "uploaded_at": 1, "chunk_count": 1}))
+    docs = list(documents.find({}, {"_id": 1, "title": 1, "category": 1, "filename": 1, "uploaded_at": 1, "chunk_count": 1, "kind": 1}))
     pools = {p["_id"]: len(p["pool"]) for p in questions.find({}, {"pool": 1})}
     for d in docs:
         d["document_id"] = d.pop("_id")
@@ -130,6 +119,8 @@ def clean_document_questions(document_id: str, hr=Depends(get_current_hr)):
     pool_doc = questions.find_one({"_id": document_id})
     if not doc or not pool_doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    if doc.get("kind") == "manual":
+        raise HTTPException(status_code=400, detail="This question bank was typed in by HR, so there is nothing to clean up automatically.")
     before = pool_doc["pool"]
     kept, removed = rag.clean_pool(doc.get("title", ""), before)
     if len(kept) < settings.QUIZ_QUESTION_COUNT:
@@ -164,9 +155,8 @@ class EditQuestionRequest(BaseModel):
     correct_index: int
 
 
-@router.put("/api/hr/documents/{document_id}/questions/{question_id}")
-def edit_document_question(document_id: str, question_id: str, body: EditQuestionRequest, hr=Depends(get_current_hr)):
-    """HR fixes the wording / the options / which option is correct. Only future quizzes are affected."""
+def _clean_question(body) -> tuple:
+    """Checks what HR typed (question + 4 options + which one is correct); returns (question, options)."""
     question = " ".join(body.question.split())
     options = [" ".join(o.split()) for o in body.options]
     if len(question) < 10:
@@ -177,6 +167,25 @@ def edit_document_question(document_id: str, question_id: str, body: EditQuestio
         raise HTTPException(status_code=422, detail="Two options are the same")
     if not 0 <= body.correct_index <= 3:
         raise HTTPException(status_code=422, detail="Choose which option is correct")
+    return question, options
+
+
+@router.post("/api/hr/documents/{document_id}/questions")
+def add_document_question(document_id: str, body: EditQuestionRequest, hr=Depends(get_current_hr)):
+    """HR types a new question (with its 4 options) into a question bank - this is how a bank grows later too."""
+    question, options = _clean_question(body)
+    pool_doc = _pool_doc(document_id)
+    if any(q["question"].strip().lower() == question.lower() for q in pool_doc["pool"]):
+        raise HTTPException(status_code=409, detail="This question is already in the bank")
+    q = {"id": str(uuid.uuid4()), "question": question, "options": options, "correct_index": body.correct_index, "added_by": hr["sub"]}
+    questions.update_one({"_id": document_id}, {"$push": {"pool": q}})
+    return {**q, "total": len(pool_doc["pool"]) + 1}
+
+
+@router.put("/api/hr/documents/{document_id}/questions/{question_id}")
+def edit_document_question(document_id: str, question_id: str, body: EditQuestionRequest, hr=Depends(get_current_hr)):
+    """HR fixes the wording / the options / which option is correct. Only future quizzes are affected."""
+    question, options = _clean_question(body)
     pool_doc = _pool_doc(document_id)
     for q in pool_doc["pool"]:
         if q["id"] == question_id:
