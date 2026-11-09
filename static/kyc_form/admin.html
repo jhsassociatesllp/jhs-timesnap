@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>KYC Details — HR — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    body.embed .navbar,body.embed .hdr{display:none}
+    body.embed{background:#fff}
+    body.embed .wrap{margin:0;box-shadow:none;border-radius:0;max-width:none}
+    body.embed .body{padding:.2rem 0 1rem}
+    .dbar{display:flex;gap:.5rem .7rem;flex-wrap:wrap;align-items:center}
+    .dbar label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+    .dbar .fi{padding:.5rem .7rem;font-size:.85rem;max-width:160px;width:auto}
+    .dbar select.fi{max-width:190px}
+    .pager{display:flex;gap:.6rem 1.2rem;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:.8rem .3rem 0;font-size:.84rem;color:var(--muted)}
+    .pager select{padding:.3rem .5rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-left:.3rem}
+    .pager .pg-btns{display:flex;align-items:center;gap:.6rem}
+    .pager button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:.35rem .8rem;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:600;color:var(--text)}
+    .pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+    .pager button:disabled{opacity:.4;cursor:not-allowed}
+    .tools{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center;margin-bottom:1.2rem}
+    .tools .fi{max-width:320px}
+    .tools select.fi{max-width:180px}
+    table.t{width:100%;border-collapse:collapse;min-width:900px}
+    table.t th{background:#eef0fb;font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;padding:.65rem .6rem;text-align:left}
+    table.t td{padding:.6rem;border-bottom:1px solid var(--border);font-size:.88rem;vertical-align:middle}
+    .tw{overflow-x:auto}
+    .pill{border-radius:20px;padding:.15rem .7rem;font-weight:700;font-size:.74rem}
+    .pill-sub{background:rgba(17,153,142,.15);color:#0d7a70}
+    .pill-draft{background:rgba(243,156,18,.15);color:#b9770e}
+    .muted{color:var(--muted)}
+    .empty{padding:2rem;text-align:center;color:var(--muted)}
+    #modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:900;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+    #modal .box{background:#fff;border-radius:16px;max-width:760px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden}
+    #modal .mh{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.4rem;background:#2c3e50;color:#fff;font-weight:700}
+    #modal .mh button{background:none;border:0;color:#fff;font-size:1.2rem;cursor:pointer}
+    #modal .mb{padding:1.2rem 1.4rem 1.6rem}
+    #modal h4{font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin:1.1rem 0 .5rem}
+    #modal dl{display:grid;grid-template-columns:200px 1fr;gap:.35rem .9rem;font-size:.88rem;margin:0}
+    #modal dt{color:var(--muted)} #modal dd{margin:0;font-weight:500;word-break:break-word}
+    #toastWrap{position:fixed;top:1.2rem;right:1.2rem;z-index:999;display:flex;flex-direction:column;gap:.5rem}
+    .toast{background:#fff;border-radius:10px;padding:.75rem 1.1rem;box-shadow:var(--sh-m);font-size:.88rem;display:flex;gap:.5rem;align-items:center;border-left:4px solid #11998e}
+    .toast.error{border-left-color:#e74c3c}
+    @media(max-width:700px){#modal dl{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div id="toastWrap"></div>
+<nav class="navbar">
+  <div class="brand"><i class="fas fa-id-card"></i> KYC Details — HR</div>
+  <div style="display:flex;align-items:center;gap:.9rem">
+    <span class="emp-badge" id="empBadge"></span>
+    <a class="nav-btn" href="/control-panel"><i class="fas fa-arrow-left"></i> Control Panel</a>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="hdr"><h1>KYC Responses</h1><p id="sub">Loading…</p></div>
+  <div class="body">
+    <div class="tools">
+      <input class="fi" id="search" placeholder="Search by name or employee code…" oninput="draw()">
+      <select class="fi" id="stat" onchange="draw()"><option value="">All statuses</option><option value="submitted">Submitted</option><option value="draft">Draft</option></select>
+      <span class="dbar"><label>Date</label>
+        <select class="fi" id="dBy" onchange="draw()"><option value="updated_at">Last updated</option><option value="submitted_at">Submitted on</option></select>
+        <label>From</label><input class="fi" type="date" id="dFrom" onchange="draw()">
+        <label>To</label><input class="fi" type="date" id="dTo" onchange="draw()">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('dFrom').value='';document.getElementById('dTo').value='';draw()">Clear</button></span>
+      <button class="btn btn-pri btn-sm" onclick="exportXlsx()"><i class="fas fa-file-excel"></i> Export Excel</button>
+    </div>
+    <div class="tw"><table class="t"><thead><tr><th>Emp Code</th><th>Name</th><th>Branch</th><th>Status</th><th>Mobile</th><th>PAN</th><th>Aadhaar</th><th>Files</th><th>Last updated</th><th></th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+    <div class="pager" id="pgKyc"></div>
+    <div class="empty" id="empty" style="display:none">No responses yet.</div>
+  </div>
+</div>
+<div id="modal" onclick="if(event.target===this)closeModal()"><div class="box"><div class="mh"><span id="mt"></span><button onclick="closeModal()" aria-label="Close"><i class="fas fa-xmark"></i></button></div><div class="mb" id="mb"></div></div></div>
+
+<script>
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
+if (EMBED) document.body.classList.add('embed');
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+document.getElementById('empBadge').textContent = localStorage.getItem('loggedInEmployeeId') || '';
+const AUTH = {Authorization:`Bearer ${token}`};
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toast(msg,type='success'){const w=document.getElementById('toastWrap'),t=document.createElement('div');t.className='toast '+type;t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;w.appendChild(t);setTimeout(()=>t.remove(),5000);}
+async function raw(url, opts={}){
+  const res = await fetch(url, Object.assign({}, opts, {headers:Object.assign({}, AUTH, opts.headers||{})}));
+  if (res.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (!res.ok){ let d=null; try{ d=await res.json(); }catch(e){} throw new Error((d&&d.detail)||'Request failed'); }
+  return res;
+}
+const api = async (u,o) => (await raw(u,o)).json();
+const fmt = d => d ? new Date(d).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '—';
+// ── date filter (From / To are calendar days; timestamps from the server are UTC) ──
+const utc = s => /[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z";
+const inRange = (iso, from, to) => {
+  if (!from && !to) return true;
+  if (!iso) return false;
+  const t = new Date(utc(iso)).getTime();
+  if (from && t < new Date(from + "T00:00:00").getTime()) return false;
+  if (to && t > new Date(to + "T23:59:59.999").getTime()) return false;
+  return true;
+};
+const dateQs = (by, from, to) => [from && "date_from=" + from, to && "date_to=" + to, (from || to) && by && "by=" + by].filter(Boolean).join("&");
+let ROWS = [], SPEC = {answers: [], uploads: []};
+
+function tellParent(){ if (EMBED && parent !== window) parent.postMessage({kycHeight: document.documentElement.scrollHeight}, location.origin); }
+new ResizeObserver(tellParent).observe(document.body);
+// ── paging: at most one page of rows on screen (10 / 25 / 50 / 100 per page) ──
+const PG = {};
+function pgSetup(id, fn){ PG[id] = {page: 1, size: 10, sig: null, fn}; }
+function pgSlice(id, rows, sig){
+  const p = PG[id];
+  if (p.sig !== sig) { p.sig = sig; p.page = 1; }                 // a new search / filter starts on page 1
+  p.page = Math.min(p.page, Math.max(1, Math.ceil(rows.length / p.size)));
+  return {rows: rows.slice((p.page - 1) * p.size, p.page * p.size), offset: (p.page - 1) * p.size};
+}
+function pgRender(id, total){
+  const p = PG[id], box = document.getElementById(id), pages = Math.max(1, Math.ceil(total / p.size));
+  if (!total) { box.innerHTML = ''; return; }
+  box.innerHTML = `<span>Rows per page <select onchange="pgSize('${id}', this.value)">${[10, 25, 50, 100].map(n => `<option${n === p.size ? ' selected' : ''}>${n}</option>`).join('')}</select></span>
+    <span>${(p.page - 1) * p.size + 1}–${Math.min(total, p.page * p.size)} of ${total}</span>
+    <span class="pg-btns"><button type="button" ${p.page <= 1 ? 'disabled' : ''} onclick="pgGo('${id}', -1)">‹ Prev</button><span>Page ${p.page} of ${pages}</span><button type="button" ${p.page >= pages ? 'disabled' : ''} onclick="pgGo('${id}', 1)">Next ›</button></span>`;
+}
+function pgGo(id, d){ PG[id].page += d; PG[id].fn(); }
+function pgSize(id, v){ PG[id].size = +v; PG[id].page = 1; PG[id].fn(); }
+pgSetup('pgKyc', () => draw());
+function draw(){
+  const s = document.getElementById('search').value.trim().toLowerCase(), st = document.getElementById('stat').value;
+  const by = document.getElementById('dBy').value, df = document.getElementById('dFrom').value, dt = document.getElementById('dTo').value;
+  const rows = ROWS.filter(r => (!st || r.status === st) && (!s || (r.name||'').toLowerCase().includes(s) || (r.empid||'').toLowerCase().includes(s)) && inRange(r[by], df, dt));
+  const pg = pgSlice('pgKyc', rows, [s, st, by, df, dt].join('|'));
+  pgRender('pgKyc', rows.length);
+  document.getElementById('rows').innerHTML = pg.rows.map(r => `<tr>
+    <td><b>${esc(r.empid)}</b></td><td>${esc(r.name)}</td><td>${esc(r.branch)||'—'}</td>
+    <td><span class="pill ${r.status==='submitted'?'pill-sub':'pill-draft'}">${r.status==='submitted'?'Submitted':'Draft'}</span></td>
+    <td>${esc(r.mobile)||'—'}</td><td>${esc(r.pan)||'—'}</td><td>${esc(r.aadhaar)||'—'}</td>
+    <td>${r.files}/${r.files_total}</td>
+    <td class="muted">${fmt(r.updated_at)}</td>
+    <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="view('${esc(r.empid)}')"><i class="fas fa-eye"></i> View</button>
+      ${r.status==='submitted' ? `<button class="btn btn-ghost btn-sm" onclick="reopen('${esc(r.empid)}')"><i class="fas fa-lock-open"></i> Reopen</button>` : ''}</td></tr>`).join('');
+  document.getElementById('empty').style.display = rows.length ? 'none' : 'block';
+  const sub = ROWS.filter(r => r.status === 'submitted').length;
+  document.getElementById('sub').textContent = `${ROWS.length} response${ROWS.length===1?'':'s'} · ${sub} submitted · ${ROWS.length-sub} draft`;
+}
+async function view(empid){
+  try {
+    const d = await api('/kyc-form/admin/' + encodeURIComponent(empid));
+    document.getElementById('mt').textContent = `${d.empid}${d.name ? ' · ' + d.name : ''}`;
+    const n = SPEC.answers.length;
+    document.getElementById('mb').innerHTML = `<div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;margin-bottom:.6rem">
+        <button class="btn btn-ghost btn-sm" onclick="getDetails('${esc(d.empid)}','xlsx')"><i class="fas fa-file-excel"></i> Details (Excel)</button>
+        <button class="btn btn-ghost btn-sm" onclick="getDetails('${esc(d.empid)}','pdf')"><i class="fas fa-file-pdf"></i> Details (PDF)</button></div><p class="muted" style="margin:0">${d.status==='submitted' ? 'Submitted ' + fmt(d.submitted_at) : 'Draft, last saved ' + fmt(d.updated_at)}</p>
+      ${d.source === 'sharepoint' ? '<p style="font-size:.8rem;color:#0d7a70;margin:.3rem 0 .6rem"><i class="fas fa-cloud"></i> Data read from SharePoint</p>' : ''}${d.source_error ? '<p style="font-size:.8rem;color:#e74c3c"><i class="fas fa-exclamation-triangle"></i> SharePoint read error: ' + esc(d.source_error) + '</p>' : ''}<h4>Employee details</h4><dl>${SPEC.answers.map((f, i) => `<dt>${i + 1}. ${esc(f.label)}</dt><dd>${esc(d.data[f.key] || '—')}</dd>`).join('')}</dl>
+      <h4>Documents</h4><dl>${SPEC.uploads.map((u, i) => {
+        const f = (d.files || {})[u.key];
+        let fileHtml = '<span class="muted">Not uploaded</span>';
+        if (f) {
+          if (f.sp_web_url) {
+            // File stored in SharePoint — open directly in SharePoint
+            fileHtml = `<a href="${esc(f.sp_web_url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> ${esc(f.name)}</a> <span class="muted">(${kb(f.size)})</span>`;
+          } else {
+            fileHtml = `<a href="#" onclick="getFile('${esc(d.empid)}','${u.key}','${esc(f.name).replace(/'/g, '')}');return false"><i class="fas fa-download"></i> ${esc(f.name)}</a> <span class="muted">(${kb(f.size)})</span>`;
+          }
+        }
+        return `<dt>${n + i + 1}. ${esc(u.label)}</dt><dd>${fileHtml}</dd>`; }).join('')}</dl>`;
+    document.getElementById('modal').style.display = 'flex';
+  } catch(e) { toast(e.message, 'error'); }
+}
+const kb = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+async function getDetails(empid, ext){
+  try {
+    const blob = await (await raw(`/kyc-form/admin/${encodeURIComponent(empid)}/details.${ext}`)).blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `KYC Details - ${empid}.${ext}`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function getFile(empid, field, name){
+  try {
+    const blob = await (await raw(`/kyc-form/admin/${encodeURIComponent(empid)}/file/${field}`)).blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+function closeModal(){ document.getElementById('modal').style.display = 'none'; }
+async function reopen(empid){
+  if (!confirm(`Let ${empid} edit and submit the KYC form again?`)) return;
+  try { await api(`/kyc-form/admin/${encodeURIComponent(empid)}/reopen`, {method:'POST'}); toast('Reopened'); await load(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function exportXlsx(){
+  try {
+    const qs = dateQs(document.getElementById('dBy').value, document.getElementById('dFrom').value, document.getElementById('dTo').value);
+    const blob = await (await raw('/kyc-form/admin/export' + (qs ? '?' + qs : ''))).blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'KYC_Details.xlsx'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function load(){ ROWS = (await api('/kyc-form/admin/list')).rows; draw(); }
+(async function(){
+  try {
+    const a = await api('/kyc-form/admin/access-check');
+    if (!a.is_admin) { window.location.href = '/modules'; return; }
+    SPEC = await api('/kyc-form/spec');
+    await load();
+  } catch(e) { toast(e.message, 'error'); document.getElementById('sub').textContent = 'Could not load'; }
+})();
+</script>
+</body>
+</html>

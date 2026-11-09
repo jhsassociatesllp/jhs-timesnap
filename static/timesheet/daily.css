@@ -1,0 +1,28 @@
+/* Shared card/table styles for the daily timesheet, HRMS upload and reconciliation screens. */
+.dt-card { background:#fff; border-radius:15px; box-shadow:var(--shadow-light); padding:1.2rem 1.5rem; margin:1rem 0; }
+.dt-card h3 { margin:0 0 .8rem; font-size:1rem; color:var(--text-dark); }
+.dt-banner { display:none; margin:1rem 0; padding:.8rem 1.2rem; border-radius:10px; font-weight:600; }
+.dt-banner.warn { background:#fef9c3; border:2px solid #fde047; color:#854d0e; }
+.dt-banner.err { background:#fee2e2; border:2px solid #fca5a5; color:#b91c1c; }
+.dt-banner.ok { background:#dcfce7; border:2px solid #86efac; color:#166534; }
+.dt-strip { display:flex; flex-wrap:wrap; gap:1.5rem; }
+.dt-strip div span { display:block; font-size:.75rem; color:var(--text-light); text-transform:uppercase; }
+.dt-strip div b { font-size:1.15rem; }
+.dt-grid { width:100%; border-collapse:collapse; }
+.dt-grid th { text-align:left; font-size:.78rem; text-transform:uppercase; color:var(--text-light); padding:.4rem .5rem; }
+.dt-grid td { padding:.35rem .5rem; vertical-align:top; border-top:1px solid var(--border-color); }
+.dt-grid input, .dt-grid select, .dt-card textarea, .dt-card input[type=date], .dt-card select {
+  padding:.55rem; border:1px solid var(--border-color); border-radius:8px; font-size:.9rem; font-family:inherit; }
+.dt-tag { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.72rem; font-weight:600; background:#e0e7ff; color:#3730a3; }
+.dt-tag.red { background:#fee2e2; color:#b91c1c; }
+.dt-tag.green { background:#dcfce7; color:#166534; }
+.dt-tag.amber { background:#fef3c7; color:#92400e; }
+.dt-actions { display:flex; gap:.8rem; flex-wrap:wrap; margin-top:1rem; }
+.dt-btn { border:none; border-radius:10px; padding:.8rem 1.6rem; font-weight:600; cursor:pointer; color:#fff; background:var(--secondary-gradient); }
+.dt-btn.go { background:var(--success-gradient); }
+.dt-btn.del { background:var(--danger-gradient); padding:.5rem .9rem; }
+.dt-btn.small { padding:.35rem .8rem; font-size:.8rem; }
+.dt-btn:disabled { opacity:.5; cursor:not-allowed; }
+.dt-muted { color:var(--text-light); font-size:.85rem; }
+.dt-ok { color:#15803d; } .dt-bad { color:#b91c1c; }
+@media (max-width: 800px) { .dt-grid thead { display:none; } .dt-grid td { display:block; } }

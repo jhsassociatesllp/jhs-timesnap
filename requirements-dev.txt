@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Tests (not installed in the production image)
+pytest

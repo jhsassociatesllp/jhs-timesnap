@@ -4,7 +4,7 @@ Acknowledgement e-mail to HR whenever someone submits a Buddy Referral.
 
 Sent from your Microsoft 365 mailbox. Tried in this order, the first that works wins:
   1. Microsoft Graph (recommended - no mailbox password, works when SMTP password
-     sign-in is blocked): needs GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET.
+     sign-in is blocked): needs MS_MAIL_TENANT_ID, MS_MAIL_CLIENT_ID, MS_MAIL_CLIENT_SECRET.
   2. Outlook SMTP (smtp.office365.com, port 587, STARTTLS) with a password / app password.
   3. Brevo (the service the forgot-password OTP uses) when BREVO_API_KEY is set.
 Everything is best-effort: a missing setting or a mail outage is logged (never the
@@ -12,10 +12,10 @@ password) and never stops the referral from being saved - callers run this as a
 background task.
 
 Settings (environment variables / .env):
-  GRAPH_TENANT_ID     Directory (tenant) ID of the Azure app registration
-  GRAPH_CLIENT_ID     Application (client) ID of that app
-  GRAPH_CLIENT_SECRET its client secret VALUE (the app needs the "Mail.Send" application permission)
-  GRAPH_SENDER        mailbox the mail is sent from; defaults to OUTLOOK_EMAIL
+  MS_MAIL_TENANT_ID     Directory (tenant) ID of the Azure app registration
+  MS_MAIL_CLIENT_ID     Application (client) ID of that app
+  MS_MAIL_CLIENT_SECRET its client secret VALUE (the app needs the "Mail.Send" application permission)
+  MS_MAIL_SENDER        mailbox the mail is sent from; defaults to OUTLOOK_EMAIL
   OUTLOOK_EMAIL       the mailbox the mail is sent FROM          (e.g. you@yourcompany.com)
   OUTLOOK_PASSWORD    its password
   OUTLOOK_APP_PASSWORD  an App Password (needed when the account uses two-step verification);
@@ -291,10 +291,10 @@ def send_referral_email(empid: str, name: str, kind: str, detail: str, referred_
         user = os.getenv("OUTLOOK_EMAIL", "").strip()
         app_password = os.getenv("OUTLOOK_APP_PASSWORD", "").replace(" ", "").strip()   # Microsoft shows it as "abcd efgh ijkl mnop"
         password = app_password or os.getenv("OUTLOOK_PASSWORD", "")
-        tenant = os.getenv("GRAPH_TENANT_ID", "").strip()
-        client_id = os.getenv("GRAPH_CLIENT_ID", "").strip()
-        secret = os.getenv("GRAPH_CLIENT_SECRET", "").strip()
-        graph_sender = os.getenv("GRAPH_SENDER", "").strip() or user
+        tenant = (os.getenv("MS_MAIL_TENANT_ID") or os.getenv("GRAPH_TENANT_ID", "")).strip()
+        client_id = (os.getenv("MS_MAIL_CLIENT_ID") or os.getenv("GRAPH_CLIENT_ID", "")).strip()
+        secret = (os.getenv("MS_MAIL_CLIENT_SECRET") or os.getenv("GRAPH_CLIENT_SECRET", "")).strip()
+        graph_sender = (os.getenv("MS_MAIL_SENDER") or os.getenv("GRAPH_SENDER", "")).strip() or user
         if tenant and client_id and secret and graph_sender:
             if _send_graph(tenant, client_id, secret, graph_sender, recipients, subject, body):
                 return True

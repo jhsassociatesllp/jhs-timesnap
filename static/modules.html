@@ -333,6 +333,25 @@
         </div>
       </a>`;
 
+    const CARD_EF = `
+      <a href="/employee-form" class="module-card card-br clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-file-signature"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Employee Application Form</h2>
+        <p class="card-desc">Fill in your personal, contact, family, education and employment details and submit your application form.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-user"></i> Personal Data</span>
+          <span class="chip"><i class="fas fa-briefcase"></i> Employment</span>
+          <span class="chip"><i class="fas fa-signature"></i> Declaration</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Save draft &amp; submit</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
     // HR Policy Quiz — only shown to employee codes listed in the module's
     // admins collection. "Open" goes straight to the dashboard: no separate
     // login screen, the dashboard trusts this same platform token.
@@ -424,6 +443,27 @@
         </a>`;
     }
 
+    function buildResumeRankerCard() {
+      return `
+        <a href="/resume-ranker" class="module-card card-cb clickable">
+          <div class="card-top">
+            <div class="card-icon"><i class="fas fa-ranking-star"></i></div>
+            <span class="card-tag">HR</span>
+          </div>
+          <h2 class="card-title">Resume Ranker</h2>
+          <p class="card-desc">Bulk-upload CVs, parse them with AI and rank candidates against each job's requirements, with a score breakdown and must-have flags.</p>
+          <div class="card-features">
+            <span class="chip"><i class="fas fa-cloud-arrow-up"></i> Bulk Upload</span>
+            <span class="chip"><i class="fas fa-scale-balanced"></i> Weighted Scoring</span>
+            <span class="chip"><i class="fas fa-file-export"></i> Excel / CSV Export</span>
+          </div>
+          <div class="card-footer">
+            <span class="card-footer-label">HR recruitment access</span>
+            <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>`;
+    }
+
     // ── Main init ──
     async function initModules() {
       let qaAccess  = null;
@@ -492,6 +532,13 @@
         if (res.ok) declIsAdmin = (await res.json()).is_admin;
       } catch(e) {}
 
+      // Resume Ranker — only for people listed in Resume_Ranker.Holders (HR, partners, owner)
+      let rrAccess = false;
+      try {
+        const res = await fetch('/resume-ranker/access-check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) rrAccess = (await res.json()).allowed === true;
+      } catch(e) {}
+
       // Show Control Panel button if user has any admin module access
       // (timesheet/QA/KRA) or Employee Declaration admin access
       if (moduleAccess?.is_admin || declIsAdmin) {
@@ -525,11 +572,24 @@
       // Employee Declaration Form — always shown, like Timesheet
       grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
 
+      // Resume Ranker — holders only, outside the Control Panel
+      if (rrAccess) {
+        grid.innerHTML += buildResumeRankerCard();
+      }
+
       // CV Builder — always shown
       grid.innerHTML += CARD_CV;
 
       // Buddy Referral — always shown
       grid.innerHTML += CARD_BR;
+
+      // Employee Application Form — not shown to present employees (it is for new joiners, who log in with
+      // their personal email and go straight to /employee-form; HR manages it from the Control Panel)
+
+      // Resume Ranker — holders only, outside the Control Panel
+      if (rrAccess) {
+        grid.innerHTML += buildResumeRankerCard();
+      }
 
       // Employee Declaration Admin now lives in the Control Panel only
       // (see cpBtn above) — not shown as its own card here.

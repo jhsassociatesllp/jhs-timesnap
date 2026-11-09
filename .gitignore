@@ -6,3 +6,5 @@ __pycache__/
 
 venv/
 venv
+# Resume Ranker uploaded CVs (personal data — never commit)
+data/

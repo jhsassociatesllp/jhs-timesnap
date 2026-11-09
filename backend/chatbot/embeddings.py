@@ -3,15 +3,17 @@ Embeddings run locally via sentence-transformers — completely free, no API key
 Model is loaded once (singleton) for speed across requests.
 """
 from functools import lru_cache
-from typing import List
-
-from sentence_transformers import SentenceTransformer
+from typing import TYPE_CHECKING, List
 
 from backend.chatbot.config import chatbot_settings
 
+if TYPE_CHECKING:                       # sentence-transformers (and torch) take ~9 s to import: load it on first use
+    from sentence_transformers import SentenceTransformer
+
 
 @lru_cache(maxsize=1)
-def _get_model() -> SentenceTransformer:
+def _get_model() -> "SentenceTransformer":
+    from sentence_transformers import SentenceTransformer
     # Once the model has been downloaded once, it never needs to hit the
     # network again — but by default sentence-transformers still makes a
     # HEAD request to huggingface.co on every load just to check for updates.

@@ -31,7 +31,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" data-tab="overview">Candidates</button>
-      <button class="tab-btn" data-tab="documents">Documents</button>
+      <button class="tab-btn" data-tab="bank">Question Bank</button>
       <button class="tab-btn" data-tab="quizsets">Quiz Sets</button>
       <button class="tab-btn" data-tab="add">Add new joiners</button>
     </div>
@@ -52,6 +52,14 @@
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
+          <div style="display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid #e1e8ed;">
+            <strong style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#7f8c8d;">Date</strong>
+            <select id="dfBy" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"><option value="created_at">Added on</option><option value="submitted_at">Quiz submitted on</option></select>
+            <label style="font-size:12px;color:#7f8c8d;">From <input type="date" id="dfFrom" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"></label>
+            <label style="font-size:12px;color:#7f8c8d;">To <input type="date" id="dfTo" style="padding:6px 8px;border:1px solid #d5d9e4;border-radius:8px;"></label>
+            <button type="button" class="btn btn-ghost btn-sm" id="dfClear">Clear</button>
+            <span class="hint" id="dfInfo" style="margin:0;"></span>
+          </div>
           <table id="candidateTable">
             <thead>
               <tr>
@@ -67,46 +75,24 @@
             </thead>
             <tbody id="candidateTableBody"></tbody>
           </table>
+          <div id="pgQuiz" style="display:flex;gap:10px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;font-size:13px;color:#7f8c8d;"></div>
           <div class="empty-state" id="candidateEmpty" style="display:none;">No candidates added yet. Use "Add new joiners" to get started.</div>
         </div>
       </div>
     </div>
 
-    <!-- Documents tab -->
-    <div class="tab-panel" id="tab-documents" style="display:none;">
-      <div class="panel">
-        <div class="panel-header"><h3 style="margin:0;">Upload a document</h3></div>
-        <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Upload the onboarding material once. The whole document is read and a bank of questions is generated automatically - every candidate then receives a random 15 from that bank.</p>
-          <div class="error-box" id="uploadError"></div>
-          <div class="success-box" id="uploadSuccess" style="display:none;"></div>
-          <form id="uploadForm">
-            <div class="field">
-              <label for="docTitle">Document title</label>
-              <input type="text" id="docTitle" placeholder="e.g. Employee Handbook 2026" required />
-            </div>
-            <div class="field">
-              <label for="docCategory">Category (optional)</label>
-              <input type="text" id="docCategory" placeholder="e.g. HR, IT" list="docCategoryList" />
-              <datalist id="docCategoryList"></datalist>
-            </div>
-            <div class="field">
-              <label for="docFile">File (.pdf, .docx, .xlsx or .txt)</label>
-              <input type="file" id="docFile" accept=".pdf,.docx,.xlsx,.xlsm,.txt" required />
-            </div>
-            <button type="submit" class="btn btn-primary" id="uploadBtn">Upload and generate questions</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header"><h3 style="margin:0;">Uploaded documents</h3></div>
+    <!-- Question Bank tab: HR and IT sections, questions typed in by HR -->
+    <div class="tab-panel" id="tab-bank" style="display:none;">
+      <p class="hint" style="margin:0 0 14px;">Type your own questions here. Make a question bank in the HR or the IT section, add questions with their 4 options, and add more whenever you like. Then use these banks in <strong>Quiz Sets</strong>.</p>
+      <div id="bankSections"></div>
+      <div class="panel" id="oldDocsPanel" style="display:none;">
+        <div class="panel-header"><h3 style="margin:0;">Earlier uploaded documents</h3></div>
         <div class="panel-body" style="padding:0;">
+          <p class="hint" style="margin:12px 16px;">These were uploaded before and still feed existing quiz sets. New documents can no longer be uploaded - type questions into a bank above instead.</p>
           <table>
-            <thead><tr><th>Title</th><th>Category</th><th>File</th><th>Questions</th><th>Uploaded</th><th></th></tr></thead>
-            <tbody id="documentTableBody"></tbody>
+            <thead><tr><th>Title</th><th>Category</th><th>Questions</th><th></th></tr></thead>
+            <tbody id="oldDocBody"></tbody>
           </table>
-          <div class="empty-state" id="documentEmpty" style="display:none;">No documents uploaded yet.</div>
         </div>
       </div>
     </div>
@@ -116,7 +102,7 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;" id="quizSetFormTitle">Build a quiz set</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Tick the documents to mix into one quiz and set how many questions each contributes. The quiz set's total length is the sum of these numbers.</p>
+          <p class="hint" style="margin-bottom:18px;">Tick the question banks (HR / IT) to mix into one quiz and set how many questions each candidate gets from each bank. Every candidate gets a different random pick, in shuffled order, from everything in the bank at that moment - so questions you add later are included automatically. The quiz set's total length is the sum of these numbers.</p>
           <div class="error-box" id="quizSetError"></div>
           <div class="success-box" id="quizSetSuccess" style="display:none;"></div>
           <form id="quizSetForm">
@@ -154,13 +140,13 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;">Add new joiners</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Paste one or more emails, comma separated. Everyone you add in this batch gets the same password - share it with them directly.</p>
+          <p class="hint" style="margin-bottom:18px;">Paste one or more emails (one per line or separated by commas). Everyone you add in this batch gets the same password - share it with them directly.</p>
           <div class="error-box" id="addError"></div>
           <div class="success-box" id="addSuccess" style="display:none;"></div>
           <form id="addForm">
             <div class="field">
               <label for="emails">New joiner emails</label>
-              <textarea id="emails" placeholder="priya@company.com, rahul@company.com"></textarea>
+              <textarea id="emails" rows="4" style="min-height:96px;" placeholder="priya@company.com&#10;rahul@company.com"></textarea>
             </div>
             <div class="field">
               <label for="quizSetSelect">Assign quiz set</label>
@@ -174,13 +160,13 @@
       <div class="panel">
         <div class="panel-header"><h3 style="margin:0;">Regenerate a password</h3></div>
         <div class="panel-body">
-          <p class="hint" style="margin-bottom:18px;">Passwords can't be recovered once set, only replaced. Use this if a candidate forgot theirs - works for one email, or several at once.</p>
+          <p class="hint" style="margin-bottom:18px;">Passwords can't be recovered once set, only replaced. Use this if a candidate forgot theirs - works for one email, or several at once (one per line or separated by commas).</p>
           <div class="error-box" id="regenError"></div>
           <div class="success-box" id="regenSuccess" style="display:none;"></div>
           <form id="regenForm">
             <div class="field">
               <label for="regenEmails">Candidate email(s)</label>
-              <textarea id="regenEmails" placeholder="priya@company.com"></textarea>
+              <textarea id="regenEmails" rows="3" style="min-height:80px;" placeholder="priya@company.com&#10;rahul@company.com"></textarea>
             </div>
             <button type="submit" class="btn btn-secondary" id="regenBtn">Regenerate password</button>
           </form>

@@ -30,6 +30,7 @@ MODULES = {
     "cv":            "CV Builder",
     "buddy_referral": "Buddy Referral",
     "compliance_calendar": "Compliance Calendar",
+    "employee_form": "Employee Application Form",
     "declaration":   "Employee Declaration",
 }
 _COLLECTION_MODULES = [m for m in MODULES if m != "declaration"]
@@ -63,6 +64,10 @@ def is_referral_admin(empid: str) -> bool:
     return has_admin_module(empid, "buddy_referral")
 
 
+def is_employee_form_admin(empid: str) -> bool:
+    return has_admin_module(empid, "employee_form")
+
+
 def is_compliance_admin(empid: str) -> bool:
     """Explicit grant only (via Manage Module Access): access managers and super admins
     do NOT get the Compliance Calendar admin automatically."""
@@ -92,6 +97,12 @@ def seed_compliance_admin() -> None:
 def require_compliance_admin(current_user: str = Depends(get_current_user)) -> str:
     if not is_compliance_admin(current_user):
         raise HTTPException(403, "Compliance Calendar admin access required")
+    return current_user
+
+
+def require_employee_form_admin(current_user: str = Depends(get_current_user)) -> str:
+    if not is_employee_form_admin(current_user):
+        raise HTTPException(403, "Employee Application Form admin access required")
     return current_user
 
 

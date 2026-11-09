@@ -54,7 +54,10 @@ async function apiRequest(path, { method = "GET", body = null, role = null, isFo
   }
 
   if (!res.ok) {
-    const message = (data && data.detail) || "Something went wrong, please try again";
+    let message = (data && data.detail) || "Something went wrong, please try again";
+    if (Array.isArray(message)) {
+      message = message.map((m) => m.msg || (typeof m === "string" ? m : JSON.stringify(m))).join("; ");
+    }
     const err = new Error(typeof message === "string" ? message : JSON.stringify(message));
     err.status = res.status;
     throw err;

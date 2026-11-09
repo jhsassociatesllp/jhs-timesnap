@@ -78,10 +78,12 @@ jobs:
           case "$BRANCH" in
             main)
               ENV="production"
+              MONGO_URI="${{ secrets.MONGO_CONNECTION_STRING }}"
               APP_NAME="jhs_timesnap_production"
               PORT=8011
               SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
               HR_QUIZ_DB_NAME="hr_quiz_production"
+              RESUME_RANKER_DB_NAME="Resume_Ranker"
               # Fixed on purpose, SAME on both branches — this is where the
               # chatbot's HR/RCM/observation_bot history collections have
               # always actually lived; not environment-scoped like
@@ -90,10 +92,12 @@ jobs:
               ;;
             staging)
               ENV="staging"
+              MONGO_URI="mongodb://45.198.225.149:27017/"
               APP_NAME="jhs_timesnap_staging"
               PORT=8010
               SMTP="${{ secrets.SMTP_KEY_STAGING }}"
               HR_QUIZ_DB_NAME="hr_quiz_staging"
+              RESUME_RANKER_DB_NAME="Resume_Ranker_Staging"
               CHATBOT_DB_NAME="Chat_bot"
               ;;
             *)
@@ -182,11 +186,14 @@ jobs:
               docker run -d \
                 --name "$APP_NAME" \
                 -p "$PORT:8000" \
+                --add-host=host.docker.internal:host-gateway \
+                -v "${APP_NAME}_resume_uploads:/app/data/resume_ranker/uploads" \
                 -e APP_ENV="$ENV" \
-                -e MONGO_CONNECTION_STRING="${{ secrets.MONGO_CONNECTION_STRING }}" \
+                -e MONGO_CONNECTION_STRING="$MONGO_URI" \
                 -e SMTP_KEY="$SMTP" \
                 -e JWT_SECRET="${{ secrets.JWT_SECRET_KEY }}" \
                 -e HR_QUIZ_DB_NAME="$HR_QUIZ_DB_NAME" \
+                -e RESUME_RANKER_DB_NAME="$RESUME_RANKER_DB_NAME" \
                 -e CHATBOT_DB_NAME="$CHATBOT_DB_NAME" \
                 -e HR_QUIZ_JWT_SECRET="${{ secrets.HR_QUIZ_JWT_SECRET }}" \
                 -e HR_QUIZ_JWT_ALGORITHM="HS256" \
@@ -210,12 +217,17 @@ jobs:
                 -e OUTLOOK_EMAIL="${{ secrets.OUTLOOK_EMAIL }}" \
                 -e OUTLOOK_PASSWORD="${{ secrets.OUTLOOK_PASSWORD }}" \
                 -e OUTLOOK_APP_PASSWORD="${{ secrets.OUTLOOK_APP_PASSWORD }}" \
-                -e GRAPH_TENANT_ID="${{ secrets.GRAPH_TENANT_ID }}" \
-                -e GRAPH_CLIENT_ID="${{ secrets.GRAPH_CLIENT_ID }}" \
-                -e GRAPH_CLIENT_SECRET="${{ secrets.GRAPH_CLIENT_SECRET }}" \
-                -e GRAPH_SENDER="${{ secrets.GRAPH_SENDER }}" \
+                -e MS_MAIL_TENANT_ID="${{ secrets.MS_MAIL_TENANT_ID || secrets.GRAPH_TENANT_ID }}" \
+                -e MS_MAIL_CLIENT_ID="${{ secrets.MS_MAIL_CLIENT_ID || secrets.GRAPH_CLIENT_ID }}" \
+                -e MS_MAIL_CLIENT_SECRET="${{ secrets.MS_MAIL_CLIENT_SECRET || secrets.GRAPH_CLIENT_SECRET }}" \
+                -e MS_MAIL_SENDER="${{ secrets.MS_MAIL_SENDER || secrets.GRAPH_SENDER }}" \
                 -e HR_NOTIFY_EMAIL="${{ secrets.HR_NOTIFY_EMAIL }}" \
                 -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
+                -e NQ_DB_HOST="host.docker.internal" \
+                -e NQ_DB_LOCAL_PORT="${{ secrets.NQ_DB_LOCAL_PORT }}" \
+                -e NQ_DB_NAME="${{ secrets.NQ_DB_NAME }}" \
+                -e NQ_DB_USER="${{ secrets.NQ_DB_USER }}" \
+                -e NQ_DB_PASS="${{ secrets.NQ_DB_PASS }}" \
                 "$IMAGE"
 
               echo "🧹 Cleaning dangling images..."

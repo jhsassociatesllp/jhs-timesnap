@@ -2,9 +2,7 @@
 answers for every completed candidate) as Excel, Word or PDF bytes."""
 from io import BytesIO
 from typing import List
-
 from backend.hr_policy_quiz.db import candidates, attempts
-
 
 def format_dt(dt):
     if not dt:
@@ -12,15 +10,22 @@ def format_dt(dt):
     return dt.strftime("%d %b %Y, %I:%M %p")
 
 
-def gather_report_rows() -> List[dict]:
+def gather_report_rows(date_from: str = "", date_to: str = "", by: str = "created_at") -> List[dict]:
     """Same shape as /api/hr/candidates, plus the full answers_detail for
-    completed candidates so the report can include a per-question review."""
+    completed candidates so the report can include a per-question review.
+    Optional date range (IST days) on `by`: created_at (added on) | submitted_at (quiz submitted on)."""
+    from backend import date_range
+    lo, hi = date_range.bounds(date_from, date_to)
+    by = by if by in ("created_at", "submitted_at") else "created_at"
     rows = []
     for c in candidates.find({}):
         latest_attempt = attempts.find_one(
             {"candidate_email": c["email"], "status": "completed"}, sort=[("submitted_at", -1)]
         )
         in_progress = attempts.find_one({"candidate_email": c["email"], "status": "in_progress"})
+        when = c.get("created_at") if by == "created_at" else (latest_attempt or {}).get("submitted_at")
+        if not date_range.within(when, lo, hi):
+            continue
         rows.append(
             {
                 "email": c["email"],
@@ -37,11 +42,23 @@ def gather_report_rows() -> List[dict]:
 
 
 def result_label(item: dict) -> str:
-    if item["is_correct"]:
+    if item.get("is_correct"):
         return "Correct"
-    if item["selected_option"] is None:
+    if item.get("selected_option") is None:
         return "Unattempted"
     return "Incorrect"
+
+
+def safe_option(item: dict, key: str) -> str:
+    """Safely resolve an option index from an answers_detail item.
+    Guards against missing keys, None values, and out-of-range indices."""
+    options = item.get("options") or []
+    idx = item.get(key)
+    if idx is None:
+        return "(no answer)"
+    if not isinstance(idx, int) or idx < 0 or idx >= len(options):
+        return "(invalid)"
+    return options[idx]
 
 
 # ---------------------------------------------------------------------------
@@ -71,8 +88,8 @@ def generate_excel(rows: List[dict]) -> bytes:
         cell.font = bold
     for r in rows:
         for i, item in enumerate(r["answers_detail"], start=1):
-            selected = item["options"][item["selected_option"]] if item["selected_option"] is not None else "(no answer)"
-            correct = item["options"][item["correct_index"]]
+            selected = safe_option(item, "selected_option")
+            correct = safe_option(item, "correct_index")
             answers.append([r["email"], i, item["question"], selected, correct, result_label(item)])
 
     for sheet in (summary, answers):
@@ -90,7 +107,7 @@ def generate_excel(rows: List[dict]) -> bytes:
 # ---------------------------------------------------------------------------
 
 def generate_docx(rows: List[dict]) -> bytes:
-    from docx import Document
+    from docx import Document  # type: ignore[import-untyped]
 
     doc = Document()
     doc.add_heading("Candidate Report", level=1)
@@ -115,8 +132,8 @@ def generate_docx(rows: List[dict]) -> bytes:
         doc.add_page_break()
         doc.add_heading(f"{r['email']} - {r['score']}/{r['total_questions']}", level=2)
         for i, item in enumerate(r["answers_detail"], start=1):
-            selected = item["options"][item["selected_option"]] if item["selected_option"] is not None else "(no answer)"
-            correct = item["options"][item["correct_index"]]
+            selected = safe_option(item, "selected_option")
+            correct = safe_option(item, "correct_index")
             p = doc.add_paragraph()
             p.add_run(f"Q{i}. {item['question']}").bold = True
             doc.add_paragraph(f"Candidate answer: {selected}")
@@ -168,8 +185,8 @@ def generate_pdf(rows: List[dict]) -> bytes:
         line(pdf, f"{r['email']} - {r['score']}/{r['total_questions']}", 10)
         pdf.set_font("Helvetica", "", 10)
         for i, item in enumerate(r["answers_detail"], start=1):
-            selected = item["options"][item["selected_option"]] if item["selected_option"] is not None else "(no answer)"
-            correct = item["options"][item["correct_index"]]
+            selected = safe_option(item, "selected_option")
+            correct = safe_option(item, "correct_index")
             pdf.set_font("Helvetica", "B", 10)
             line(pdf, f"Q{i}. {item['question']}")
             pdf.set_font("Helvetica", "", 10)

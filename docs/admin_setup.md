@@ -1,0 +1,66 @@
+# Admin setup, Review team and the submitted-day lock
+
+## Admin setup (`/static/timesheet/admin.html`, admins only; menu: Admin setup)
+1. **Payrolls and cycles.** "Create payroll" asks for the month the payroll ENDS in (2026-10 = 21 Sep - 20 Oct 2026). The three sub-cycles
+   (21-end of the previous month, 1-10, 11-20) appear with a live preview and a deadline each (cycle end + N days, 23:59 IST; N is editable
+   per payroll, and each deadline can be changed afterwards). A payroll with timesheet data cannot be deleted.
+   **Only cycles that belong to a created payroll can be filled in (My day) or reviewed (Review team).**
+2. **Working rules.** Hours in a working day (8.5), week-off days (Sat and Sun ticked), holidays (date and name), default deadline days.
+   They drive the allotted hours on Review and the working days in the day strip.
+3. **Who uses My day.** All employees, or only a list of codes (staged roll-out), plus "always include" codes for free-text staff.
+4. **Allow changes to a day.** Find an employee's submitted days and press Allow (a reason is required). They can change that day once and
+   submit it again; it locks again after they submit. Not possible for classic days or for a cycle the manager has approved (unlock the cycle first).
+Every change is written to `cycle_reviews` (`admin_change`, `day_reopen`). API: `/timesheet/v2/admin/*`.
+
+## My day: a submitted day is locked
+After "Submit day" the day is read-only. It opens again only when an admin allows it, or when the manager sends the cycle back.
+
+## Review team (team leads and admins)
+- The cycle list shows only created payrolls and their three sub-cycles.
+- **Review** opens a modal: per date and task the hours that day, the total hours on the task, the hours ALLOTTED to the task
+  (working days between its Nexus Quant start and end date x hours per day, minus week-off days and holidays) and a result:
+  completed within / over the allotted hours, in progress within / over, unplanned. A summary line counts them.
+- One remarks box: optional when approving, required when sending back. Approving is allowed at any time (before the cycle ends it asks
+  for a confirmation because it locks the days not yet filled).
+
+Removed for now (to be rebuilt step by step): Team dashboard, Reconciliation, Late projects.
+
+
+## HRMS attendance and the typed-hours comparison
+- **Upload** (menu: HRMS upload, admins): the HRMS "Attendance" export (.xlsx or .csv) with one row per employee per day. The column titles may
+  sit below a title line. Read: Employee Code, Date, Muster, In Time, Out Time. One document per employee per date is stored in
+  `hrms_attendance` (status, in, out, gross hours = out - in; the "Total Hours" column is hours.minutes and is never used). Re-uploading is safe.
+  An out punch after midnight (before 06:00) counts as the next morning; a present day with out before in, or more than 18 hours, is
+  reported as a row error and skipped. Rows with no status and no punches are ignored. Muster PST = present, ABS = absent, WEO = weekly off,
+  PHY / HOL = holiday, CL / SL / PL = leave. Dates where almost everyone is on holiday are added to the holiday list automatically.
+- **Review team**, per employee: the team table shows Typed hrs, HRMS hrs and Difference; the modal shows, per date, the HRMS status, in and
+  out times, HRMS hours (gross minus lunch), typed hours, the difference and a result (matched, typed less, typed more, hours typed with no
+  punch, punched with nothing typed, off/leave). Lunch (0.5 h) and the matching tolerance (0.5 h) are set in Admin setup, Working rules.
+- The task table in the modal has **Client** and **Project** columns right after the date.
+- Nothing is precomputed: the comparison is calculated when a team lead opens the screen.
+
+
+## Team dashboard (team leads, partners, admins; menu: Team dashboard)
+Filters: Payroll (admin-created), Period (whole payroll or one 10-day cycle), Client, Project, and for admins and partners a Team picker.
+Sections: tiles (hours, typed vs HRMS, days filled, tasks done, overdue, unplanned), Needs attention, Hours per day, Projects (Late / Watch / On track),
+People (with a Review link that opens that employee in Review team), Clients. "Download this view" gives the same view as Excel.
+- A team lead sees their own reportees; admins and partners see everyone or one manager's team.
+- Hours come from the new timesheet only. Allotted hours = NQ task working days x hours per day (admin working rules) per assigned person.
+- Late: an overdue unfinished task, or hours so far over the allotted hours. Watch: 80% or more of the allotted hours used with fewer than 80% of tasks
+  done, or no hours for 14 days while tasks are open. Calculated when the page opens; needs the NQ connection for project status.
+
+## Project tracker (team leads, partners, admins)
+
+Menu: **Project tracker**. One place to see every project and client linked to a manager, straight from Nexus Quant (NQ). Nothing is written to NQ.
+
+- **Which projects**: those where the manager is the NQ project manager or partner, plus any project where the manager or one of their reportees is assigned to a stage. Admins and partners see the whole firm, or one manager (Manager box).
+- **Totals**: clients, projects, completed / ongoing / pending / on hold, not planned, not assigned, and on track / at risk / delayed.
+- **Per project**: audit type (NQ category, tidied; "Not set" if empty), State, Plan, Assigned, live Status, stage progress, final report due date, who logged hours in the last 7 days. Click a row for its stages (dates, people, state).
+  - State: Completed = every stage done (or project closed); Ongoing = a stage started or done; Pending = nothing started; On hold.
+  - Plan: Planned = every stage has start and end dates; Partly planned; Not planned (no stages or no dates).
+  - Assigned: Assigned = every stage has someone; Partly assigned; Not assigned.
+  - Final report due = end date of the stage named "Final Report", else the project end date.
+  - Delayed = that date has passed (not complete) or an open stage is past its end date. At risk = due within 3 days while earlier stages are open. Otherwise On track.
+- Closed projects are hidden until "All, including closed" is chosen (the summary says how many are hidden).
+- **Download this view** gives an Excel file: Dashboard, Projects, Master Tracker (one row per stage), Clients, Notes. Each download is recorded in the audit log.
+- The fake NQ (docs/nq_schema.sql, nq_seed.sql) now has `tbl_projects.category`; recreate the dev containers to pick it up.

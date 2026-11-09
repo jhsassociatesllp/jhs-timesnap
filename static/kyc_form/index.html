@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>KYC Details Form — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .req{color:#e74c3c}
+    .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:1.2rem 1.4rem}
+    .g2 .full{grid-column:1/-1}
+    .qn{color:var(--muted);font-weight:700;margin-right:.35rem}
+    .opts{display:flex;gap:.5rem 1.4rem;flex-wrap:wrap;align-items:center;padding:.35rem 0}
+    .opts label{display:inline-flex;align-items:center;gap:.45rem;font-size:.92rem;font-weight:500;text-transform:none;letter-spacing:0;cursor:pointer}
+    .opts.col{flex-direction:column;align-items:flex-start;gap:.55rem}
+    textarea.fi{resize:vertical;min-height:70px;font-family:inherit}
+    .fi.bad,.upl.bad{border-color:#e74c3c;box-shadow:0 0 0 3px rgba(231,76,60,.12)}
+    .opts.bad{outline:2px solid #e74c3c;outline-offset:4px;border-radius:8px}
+    .fi:disabled,.fi[readonly]{background:#f1f3f9;color:#6b7280}
+    .note{background:#fff;border:1px solid var(--border);border-radius:10px;padding:.7rem 1rem;font-size:.84rem;color:var(--muted);margin-bottom:1.2rem}
+    .upl{border:2px dashed #c3c9ea;border-radius:12px;padding:.85rem 1rem;background:#fcfcff;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;transition:var(--tr)}
+    .upl .state{flex:1;min-width:180px;font-size:.88rem;color:var(--muted);word-break:break-all}
+    .upl .state b{color:var(--text)}
+    .upl.done{border-style:solid;border-color:#9bdcc9;background:#f3fbf8}
+    .upl.busy{opacity:.7}
+    .status-bar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;background:#fff;border:1px solid var(--border);border-radius:12px;padding:.8rem 1.2rem;margin-bottom:1.6rem;font-size:.88rem}
+    .locked-note{color:var(--muted);font-size:.8rem}
+    .pill-sub{background:rgba(17,153,142,.15);color:#0d7a70;border-radius:20px;padding:.15rem .7rem;font-weight:700;font-size:.75rem}
+    .pill-draft{background:rgba(243,156,18,.15);color:#b9770e;border-radius:20px;padding:.15rem .7rem;font-weight:700;font-size:.75rem}
+    .actions{display:flex;gap:.8rem;justify-content:flex-end;flex-wrap:wrap;margin-top:.5rem}
+    #toastWrap{position:fixed;top:1.2rem;right:1.2rem;z-index:999;display:flex;flex-direction:column;gap:.5rem}
+    .toast{background:#fff;border-radius:10px;padding:.75rem 1.1rem;box-shadow:var(--sh-m);font-size:.88rem;display:flex;gap:.5rem;align-items:center;border-left:4px solid #11998e;max-width:380px}
+    .toast.error{border-left-color:#e74c3c}
+    .loader{display:flex;align-items:center;justify-content:center;gap:.8rem;min-height:100vh;color:#fff;font-weight:600}
+    .spin{width:22px;height:22px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    #menuOv{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:900}
+    #sideMenu{position:fixed;top:0;left:0;bottom:0;width:290px;max-width:85vw;background:#fff;z-index:950;transform:translateX(-102%);transition:transform .25s ease;box-shadow:4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding-bottom:1rem}
+    #sideMenu.open{transform:none}
+    #sideMenu .sm-head{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.1rem;background:#2c3e50;color:#fff;font-weight:700}
+    #sideMenu .sm-head button{background:none;border:0;color:#fff;font-size:1.1rem;cursor:pointer}
+    #sideMenu a{display:flex;align-items:center;gap:.7rem;padding:.8rem 1.1rem;color:#1f2937;text-decoration:none;font-weight:500;font-size:.92rem}
+    #sideMenu a:hover{background:#eef0fb;color:#667eea}
+    #sideMenu a.on{background:#eef0fb;color:#667eea;font-weight:700}
+    #sideMenu a i{width:1.2rem;text-align:center;color:#667eea}
+    #sideMenu .sm-sec{padding:.9rem 1.1rem .3rem;font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#6b7280;border-top:1px solid #e5e7eb;margin-top:.4rem}
+    @media(max-width:820px){.g2{grid-template-columns:1fr}.body{padding:1.2rem}.hdr h1{font-size:1.6rem}}
+  </style>
+</head>
+<body>
+<div id="ls" class="loader"><div class="spin"></div> Loading KYC Details Form…</div>
+<div id="toastWrap"></div>
+
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div style="display:flex;align-items:center;gap:.9rem">
+      <button type="button" class="nav-btn" aria-label="Menu" onclick="toggleMenu()" style="padding:.5rem .8rem"><i class="fas fa-bars"></i></button>
+      <div class="brand"><i class="fas fa-id-card"></i> JHS KYC Details Form</div>
+    </div>
+    <div class="nav-r" style="display:flex;align-items:center;gap:.9rem">
+      <span class="emp-badge" id="empBadge"></span>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+  <div id="menuOv" onclick="toggleMenu(false)"></div>
+  <aside id="sideMenu">
+    <div class="sm-head"><span><i class="fas fa-id-card"></i> Menu</span><button type="button" onclick="toggleMenu(false)" aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+    <div class="sm-sec" style="border-top:0;margin-top:0">Forms</div>
+    <a href="/employee-form"><i class="fas fa-file-signature"></i> Employee Application Form</a>
+    <a href="/employee-form"><i class="fas fa-scale-balanced"></i> Declaration &amp; Undertaking</a>
+    <a href="/employee-form"><i class="fas fa-file-contract"></i> Undertaking</a>
+    <a href="/kyc-form" class="on"><i class="fas fa-id-card"></i> KYC Details Form</a>
+    <div id="adminLinks"></div>
+  </aside>
+
+  <div class="wrap">
+    <div class="hdr">
+      <h1>KYC Details Form</h1>
+      <p>Employee details and documents</p>
+    </div>
+    <div class="body">
+      <div class="status-bar">
+        <div><i class="fas fa-info-circle" style="color:var(--accent)"></i> <span id="stText">New</span> <span class="locked-note" id="stSub"></span></div>
+        <div class="locked-note"><span class="req">*</span> Required — every question in this form</div>
+      </div>
+      <form id="kycForm" autocomplete="off" onsubmit="return false">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-user"></i> Employee Details</div>
+          <div class="g2" id="answers"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-paperclip"></i> Documents</div>
+          <div class="note" id="uploadNote"></div>
+          <div class="g2" id="uploads"></div>
+        </div>
+        <div class="actions" id="actions">
+          <button type="button" class="btn btn-ghost" id="draftBtn" onclick="save(false)"><i class="fas fa-floppy-disk"></i> Save Draft</button>
+          <button type="button" class="btn btn-pri" id="submitBtn" onclick="save(true)"><i class="fas fa-paper-plane"></i> Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const empId = localStorage.getItem('loggedInEmployeeId') || '';
+const token = localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+const IS_JOINER = localStorage.getItem('userRole') === 'joiner';   // new joiner: signed in with a personal e-mail
+document.getElementById('empBadge').textContent = IS_JOINER ? (localStorage.getItem('loggedInEmail') || 'New joiner') : empId;
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type='success'){
+  const w=document.getElementById('toastWrap'), t=document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':'fa-exclamation-circle'}"></i> ${esc(msg)}`;
+  w.appendChild(t); setTimeout(()=>t.remove(),6500);
+}
+async function raw(url, opts={}){
+  const res = await fetch(url, Object.assign({}, opts, {headers:Object.assign({}, AUTH, opts.headers||{})}));
+  if (res.status===401){ window.location.href='/login'; throw new Error('Session expired'); }
+  if (!res.ok){ let d=null; try{ d=await res.json(); }catch(e){} throw new Error((d&&d.detail)||'Request failed'); }
+  return res;
+}
+const api = async (u,o) => (await raw(u,o)).json();
+function toggleMenu(open){
+  const m = document.getElementById('sideMenu'), on = open === undefined ? !m.classList.contains('open') : open;
+  m.classList.toggle('open', on); document.getElementById('menuOv').style.display = on ? 'block' : 'none';
+}
+
+// ── Draw the form from the questions the server sends (same order as the Microsoft Form) ──
+let SPEC = null, FILES = {}, LOCKED = false;
+const star = ' <span class="req">*</span>';
+const kb = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+function answerHtml(f, n){
+  const label = `<span class="qn">${n}.</span>${esc(f.label)}${star}`;
+  const wide = f.type === 'textarea' || (f.type === 'radio' && (f.options||[]).length > 4);
+  let input;
+  if (f.type === 'radio') {
+    input = `<div class="opts ${(f.options||[]).length > 4 ? 'col' : ''}" data-radio="${f.key}">${f.options.map(o => `<label><input type="radio" name="${f.key}" data-k="${f.key}" value="${esc(o)}"> ${esc(o)}</label>`).join('')}</div>`;
+  } else if (f.type === 'textarea') {
+    input = `<textarea class="fi" rows="2" data-k="${f.key}"></textarea>`;
+  } else {
+    input = `<input class="fi" type="${f.type}" data-k="${f.key}"${f.upper ? ' style="text-transform:uppercase"' : ''}>`;
+  }
+  return `<div class="form-group${wide ? ' full' : ''}"><label>${label}</label>${input}</div>`;
+}
+function uploadHtml(u, n){
+  const upStar = u.optional ? ' <span class="opt" style="color:#888;font-size:.82em">(optional)</span>' : star;
+  return `<div class="form-group full"><label><span class="qn">${n}.</span>${esc(u.label)}${upStar}</label>
+    <div class="upl" id="up-${u.key}" data-up="${u.key}">
+      <div class="state" id="st-${u.key}">No file chosen</div>
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer"><i class="fas fa-upload"></i> <span class="ub">Upload file</span>
+        <input type="file" style="display:none" onchange="doUpload('${u.key}', this)"></label>
+      <button type="button" class="btn btn-ghost btn-sm dl" style="display:none" onclick="download('${u.key}')"><i class="fas fa-download"></i> Download</button>
+      <button type="button" class="btn btn-ghost btn-sm rm" style="display:none" onclick="removeFile('${u.key}')"><i class="fas fa-trash"></i> Remove</button>
+    </div></div>`;
+}
+function render(){
+  const n = SPEC.answers.length;
+  document.getElementById('answers').innerHTML = SPEC.answers.map((f, i) => answerHtml(f, i + 1)).join('');
+  document.getElementById('uploads').innerHTML = SPEC.uploads.map((u, i) => uploadHtml(u, n + i + 1)).join('');
+  document.getElementById('uploadNote').innerHTML = `<i class="fas fa-circle-info"></i> One file per question · up to ${SPEC.max_mb} MB each · allowed: ${esc(SPEC.allowed)}.`;
+  document.querySelectorAll('[data-k]').forEach(el => {
+    el.addEventListener('input', () => { el.classList.remove('bad'); if (el.style.textTransform === 'uppercase') el.value = el.value.toUpperCase(); });
+    el.addEventListener('change', () => { const r = el.closest('[data-radio]'); if (r) r.classList.remove('bad'); });
+  });
+}
+function paintFile(key){
+  const f = FILES[key], box = document.getElementById('up-' + key); if (!box) return;
+  box.classList.toggle('done', !!f); box.classList.remove('bad');
+  document.getElementById('st-' + key).innerHTML = f ? `<i class="fas fa-circle-check" style="color:#11998e"></i> <b>${esc(f.name)}</b> · ${kb(f.size)}` : 'No file chosen';
+  box.querySelector('.ub').textContent = f ? 'Replace' : 'Upload file';
+  box.querySelector('.dl').style.display = f ? '' : 'none';
+  box.querySelector('.rm').style.display = f && !LOCKED ? '' : 'none';
+  box.querySelector('input[type=file]').disabled = LOCKED;
+  box.querySelector('label.btn').style.display = LOCKED ? 'none' : '';
+}
+const paintAllFiles = () => SPEC.uploads.forEach(u => paintFile(u.key));
+async function doUpload(key, input){
+  const file = input.files[0]; input.value = ''; if (!file || LOCKED) return;
+  if (file.size > SPEC.max_mb * 1048576) { toast(`${file.name} is larger than ${SPEC.max_mb} MB`, 'error'); return; }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!SPEC.allowed_ext.includes(ext)) { toast('File type not allowed. Allowed: ' + SPEC.allowed, 'error'); return; }
+  const box = document.getElementById('up-' + key); box.classList.add('busy');
+  document.getElementById('st-' + key).textContent = 'Uploading ' + file.name + '…';
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await api('/kyc-form/upload/' + key, {method:'POST', body: fd});
+    FILES[key] = {name: r.name, size: r.size}; toast('Uploaded: ' + r.name);
+  } catch(e) { toast(e.message, 'error'); }
+  box.classList.remove('busy'); paintFile(key);
+}
+async function removeFile(key){
+  if (LOCKED || !confirm('Remove this file?')) return;
+  try { await api('/kyc-form/upload/' + key, {method:'DELETE'}); delete FILES[key]; paintFile(key); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function download(key){
+  try {
+    const blob = await (await raw('/kyc-form/file/' + key)).blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = FILES[key].name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+const q = k => document.querySelectorAll(`[data-k="${k}"]`);
+function collect(){
+  const out = {};
+  document.querySelectorAll('#kycForm [data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === 'radio') { if (el.checked) out[k] = el.value; else if (!(k in out)) out[k] = ''; }
+    else out[k] = el.value;
+  });
+  return out;
+}
+function fill(data){
+  document.querySelectorAll('#kycForm [data-k]').forEach(el => {
+    const v = (data || {})[el.dataset.k]; if (v === undefined) return;
+    if (el.type === 'radio') el.checked = (el.value === v); else el.value = v;
+  });
+}
+function setStatus(status, when){
+  const t = document.getElementById('stText'), sub = document.getElementById('stSub');
+  const fmt = d => d ? new Date(d).toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'}) : '';
+  if (status === 'submitted') {
+    t.innerHTML = '<span class="pill-sub">Submitted</span>'; sub.textContent = when ? 'on ' + fmt(when) + ' — contact HR if anything needs to change.' : '';
+    lock(true);
+  } else if (status === 'draft') {
+    t.innerHTML = '<span class="pill-draft">Draft</span>'; sub.textContent = when ? 'last saved ' + fmt(when) : '';
+  } else { t.textContent = 'New'; sub.textContent = ''; }
+}
+function lock(on){
+  LOCKED = on;
+  document.querySelectorAll('#kycForm [data-k]').forEach(el => el.disabled = on);
+  document.getElementById('actions').style.display = on ? 'none' : 'flex';
+  if (SPEC) paintAllFiles();
+}
+function checkRequired(){
+  document.querySelectorAll('.bad').forEach(e => e.classList.remove('bad'));
+  let first = null; const mark = el => { if (el) { el.classList.add('bad'); first = first || el; } };
+  const marital = (q('marital_status')[0] && [...q('marital_status')].find(e => e.checked) || {}).value || '';
+  SPEC.answers.forEach(f => {
+    // spouse_name only required when married / widowed
+    if (f.key === 'spouse_name' && (marital === 'Unmarried' || marital === 'Divorce')) return;
+    // alt_mobile is optional — only flag if invalid format when filled in
+    if (f.key === 'alt_mobile') return;
+    const els = q(f.key);
+    if (f.type === 'radio') { if (![...els].some(e => e.checked)) mark(document.querySelector(`[data-radio="${f.key}"]`)); }
+    else if (!els[0].value.trim()) mark(els[0]);
+  });
+  SPEC.uploads.forEach(u => { if (!u.optional && !FILES[u.key]) mark(document.getElementById('up-' + u.key)); });
+  return first;
+}
+async function save(submit){
+  if (LOCKED) return;
+  if (submit) {
+    const miss = checkRequired();
+    if (miss) { miss.scrollIntoView({behavior:'smooth', block:'center'}); toast('Please fill in all required fields and upload all required documents', 'error'); return; }
+  }
+  const btns = document.querySelectorAll('.actions .btn'); btns.forEach(b => b.disabled = true);
+  try {
+    const body = JSON.stringify(collect()), headers = {'Content-Type':'application/json'};
+    if (submit) {
+      const r = await api('/kyc-form/submit', {method:'POST', headers, body});
+      setStatus('submitted', r.submitted_at); toast('KYC form submitted'); window.scrollTo({top:0, behavior:'smooth'});
+    } else {
+      const r = await api('/kyc-form/draft', {method:'PUT', headers, body});
+      setStatus('draft', r.updated_at); toast('Draft saved');
+    }
+  } catch(e) { toast(e.message, 'error'); }
+  btns.forEach(b => b.disabled = false);
+}
+
+(async function init(){
+  try {
+    const [spec, me, mine] = await Promise.all([api('/kyc-form/spec'), api('/kyc-form/me'), api('/kyc-form/my')]);
+    SPEC = spec; render();
+    FILES = mine.files || {};
+    if (mine.status !== 'none') { fill(mine.data); setStatus(mine.status, mine.status === 'submitted' ? mine.submitted_at : mine.updated_at); }
+    else {
+      const set = (k, v) => { const el = q(k)[0]; if (el && v && !el.value) el.value = v; };
+      set('full_name', me.name); set('personal_email', me.personal_email); set('designation', me.designation);
+      set('mobile', /^\d{10}$/.test(me.mobile) ? me.mobile : '');
+    }
+    paintAllFiles();
+    api('/kyc-form/admin/access-check').then(a => {
+      if (a.is_admin) document.getElementById('adminLinks').innerHTML =
+        '<div class="sm-sec">HR</div><a href="/kyc-form-admin"><i class="fas fa-table-list"></i> KYC responses (HR)</a>';
+    }).catch(() => {});
+  } catch(e) { toast(e.message, 'error'); }
+  document.getElementById('ls').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+})();
+</script>
+</body>
+</html>
