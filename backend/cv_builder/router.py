@@ -13,11 +13,14 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import base64
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.database import employee_details_collection, cv_db
+from backend.cv_builder import storage
 from backend.cv_builder.convert import pptx_to_pdf
 from backend.cv_builder.ppt_profile import build_profile_ppt
 from backend.cv_builder.resume_parser import extract_texts, parse_resume_texts
@@ -237,7 +240,28 @@ def get_profile(current_user: str = Depends(get_current_user)):
     doc.pop("_id", None)
     for k, v in _PROFILE_DEFAULTS.items():
         doc.setdefault(k, v)
+    return _expose_photo(doc)
+
+
+_PHOTO_IN_GRIDFS = "gridfs"          # marker kept in the profile; the image itself is in GridFS
+_PHOTO_KEEP = "__keep__"             # sent by the form when the photo is unchanged
+
+
+def _expose_photo(doc: dict) -> dict:
+    """What the browser gets: a URL for a GridFS photo (legacy inline images are passed through)."""
+    if doc.get("professional_photo") == _PHOTO_IN_GRIDFS:
+        ts = doc.get("updated_at")
+        stamp = int(ts.replace(tzinfo=timezone.utc).timestamp()) if isinstance(ts, datetime) else 0
+        doc["professional_photo"] = f"/cv-builder/photo?v={stamp}"
     return doc
+
+
+@router.get("/photo")
+def get_photo(current_user: str = Depends(get_current_user)):
+    data = storage.get_photo(current_user.strip().upper())
+    if not data:
+        raise HTTPException(404, "No photo")
+    return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.post("/profile")
@@ -258,15 +282,40 @@ def save_profile(body: CVProfileModel, current_user: str = Depends(get_current_u
     secs = _canonical_list("sector", [x.sector for x in body.sector_experience or []], who)
     dur = {x.sector.strip().lower(): (x.duration or "") for x in body.sector_experience or []}
     data["sector_experience"] = [{"sector": x, "duration": dur.get(x.lower(), "")} for x in secs]
-    payload = {"empid": empid, "employee_name": emp_info["name"], **data, "updated_at": now}
     existing = cv_profiles_collection.find_one({"empid": empid})
+    data["professional_photo"] = _store_photo(empid, body.professional_photo, existing)
+    payload = {"empid": empid, "employee_name": emp_info["name"], **data, "updated_at": now}
     payload["created_at"] = existing.get("created_at", now) if existing else now
     if existing:
         cv_profiles_collection.replace_one({"empid": empid}, payload)
     else:
         cv_profiles_collection.insert_one(payload)
     payload.pop("_id", None)
-    return {"success": True, "profile": payload}
+    return {"success": True, "profile": _expose_photo(payload)}
+
+
+def _store_photo(empid: str, value: Optional[str], existing: Optional[dict]) -> str:
+    """Put a newly chosen photo in GridFS; returns the value to keep in the profile."""
+    value = (value or "").strip()
+    had = (existing or {}).get("professional_photo")
+    if value.startswith("data:image/"):
+        try:
+            storage.save_photo(empid, storage.normalize_photo(value))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return _PHOTO_IN_GRIDFS
+    if value == _PHOTO_KEEP or value.startswith("/cv-builder/photo"):
+        if had == _PHOTO_IN_GRIDFS:
+            return _PHOTO_IN_GRIDFS
+        if had and had.startswith("data:image/"):                 # profile saved before GridFS: move it over now
+            try:
+                storage.save_photo(empid, storage.normalize_photo(had))
+                return _PHOTO_IN_GRIDFS
+            except ValueError:
+                return ""
+        return ""
+    storage.delete_photo(empid)                                   # empty = photo removed
+    return ""
 
 
 @router.delete("/profile")
@@ -275,6 +324,7 @@ def clear_profile(current_user: str = Depends(get_current_user)):
     Only their own record is touched; shared dropdown suggestions are left alone."""
     empid = current_user.strip().upper()
     result = cv_profiles_collection.delete_one({"empid": empid})
+    storage.delete_all(empid)                                    # photo and stored slide
     return {"success": True, "deleted": result.deleted_count}
 
 
@@ -290,9 +340,27 @@ def _stored_profile(empid: str) -> dict:
 _PPT_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 
+def _slide_bytes(profile: dict, empid: str) -> bytes:
+    """The profile slide, from GridFS when it was built from the current profile, else built and stored."""
+    version = str(profile.get("updated_at") or "")
+    stem = "Profile_" + re.sub(r"[^\w\-]", "_", (profile.get("employee_name") or empid).strip())
+    if version:
+        stored = storage.get_cv(empid, version)
+        if stored:
+            return stored
+    build_from = dict(profile)
+    if build_from.get("professional_photo") == _PHOTO_IN_GRIDFS:
+        jpeg = storage.get_photo(empid)
+        build_from["professional_photo"] = ("data:image/jpeg;base64," + base64.b64encode(jpeg).decode()) if jpeg else ""
+    data = build_profile_ppt(build_from, profile.get("employee_name") or empid)
+    if version:
+        storage.save_cv(empid, version, data, f"{stem}.pptx")
+    return data
+
+
 def _ppt_response(profile: dict, empid: str):
     try:
-        data = build_profile_ppt(profile, profile.get("employee_name") or empid)
+        data = _slide_bytes(profile, empid)
     except Exception as e:
         raise HTTPException(500, f"Profile PPT generation failed: {e}")
     stem = "Profile_" + re.sub(r"[^\w\-]", "_", (profile.get("employee_name") or empid).strip())
@@ -303,7 +371,7 @@ def _ppt_response(profile: dict, empid: str):
 def _view_response(profile: dict, empid: str):
     """The slide as an inline PDF, for viewing in the browser."""
     try:
-        pdf = pptx_to_pdf(build_profile_ppt(profile, profile.get("employee_name") or empid))
+        pdf = pptx_to_pdf(_slide_bytes(profile, empid))
     except RuntimeError as e:
         raise HTTPException(501 if "not available" in str(e) else 500, str(e))
     except Exception as e:

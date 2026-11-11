@@ -515,10 +515,17 @@ function hideUnusedFields(){
 }
 
 // ── Photo (stored as a small JPEG data URL) ──────────────────────────────────
+let photoUrl=null;
 function setPhoto(v, silent){
   document.getElementById('f_photo').value=v||'';
   const img=document.getElementById('photoPrev');
-  img.src=v||''; img.style.display=v?'block':'none';
+  if(photoUrl){ URL.revokeObjectURL(photoUrl); photoUrl=null; }
+  if(v && v.startsWith('/cv-builder/photo')){                 // stored in GridFS: needs the login token, so fetch it
+    img.style.display='block';
+    fetch(v,{headers:{Authorization:`Bearer ${token}`}}).then(r=>r.ok?r.blob():null).then(b=>{
+      if(b && document.getElementById('f_photo').value===v){ photoUrl=URL.createObjectURL(b); img.src=photoUrl; }
+    }).catch(()=>{});
+  } else { img.src=v||''; img.style.display=v?'block':'none'; }
   document.getElementById('photoRm').style.display=v?'inline-flex':'none';
   if(!silent) scheduleAutosave();
 }
@@ -778,7 +785,7 @@ function collectPayload(){
   return {
     designation:document.getElementById('f_desig').value.trim(),
     department:document.getElementById('f_dept').value.trim(),
-    professional_photo:document.getElementById('f_photo').value.trim(),
+    professional_photo:(v=>v.startsWith('data:')?v:(v?'__keep__':''))(document.getElementById('f_photo').value.trim()),
     qualification:msState['qualification']||[],
     membership:msState['membership']||[],
     membership_id:'',
@@ -810,6 +817,7 @@ async function saveProfile(e,thenPreview=false,silent=false){
     if(!silent) toast('Profile saved!','success'); ok=true; hasSaved=true; resumeDone();
     updatePill(true);
     setSaveState('saved');
+    { const ph=d.profile&&d.profile.professional_photo; if(ph&&ph.startsWith('/cv-builder/photo')&&document.getElementById('f_photo').value.startsWith('data:')) setPhoto(ph,true); }
   }catch(err){toast('Error: '+err.message,'error');}
   btns.forEach((b,i)=>{b.disabled=false;b.innerHTML=origs[i];});
   if(ok&&thenPreview) switchTab('preview');
@@ -842,6 +850,7 @@ async function runAutosave(keepalive=false){
       headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(collectPayload())});
     if(!res.ok) throw new Error('save failed');
     hasSaved=true; setSaveState('saved');
+    try{ const j=await res.clone().json(); const ph=j.profile&&j.profile.professional_photo; if(ph&&ph.startsWith('/cv-builder/photo')&&document.getElementById('f_photo').value.startsWith('data:')) setPhoto(ph,true); }catch(x){}
   }catch(e){ setSaveState('error'); autosaveAgain=true; setTimeout(()=>{ if(autosaveAgain){autosaveAgain=false; scheduleAutosave();} },4000); }
   autosaving=false;
   if(autosaveAgain && !autosaveTimer){ autosaveAgain=false; scheduleAutosave(); }
