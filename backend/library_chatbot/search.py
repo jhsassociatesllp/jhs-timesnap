@@ -3,14 +3,14 @@ vocabulary. Ported from the standalone JHS Library project — reads
 credentials from library_settings instead of bare os.getenv() calls."""
 import difflib
 
-from openai import OpenAI
+from backend.library_chatbot.lazy_openai import LazyOpenAI
 from pinecone import Pinecone
 
 from backend.library_chatbot.config import library_settings
 
 _pc = Pinecone(api_key=library_settings.PINECONE_API_KEY)
 _index = _pc.Index(library_settings.PINECONE_INDEX_NAME)
-_openai = OpenAI(api_key=library_settings.OPENAI_API_KEY)
+_openai = LazyOpenAI(library_settings.OPENAI_API_KEY)
 
 
 def embed(text: str) -> list:

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>JHS — Resume Ranker</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/resume_ranker/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand"><i class="fas fa-ranking-star"></i> Resume Ranker</div>
+    <div class="navbar-right">
+      <span class="emp-badge" id="empBadge"></span>
+      <a class="nav-btn" href="/modules"><i class="fas fa-arrow-left"></i> Modules</a>
+    </div>
+  </nav>
+
+  <div id="gate" class="gate"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+
+  <main id="app" class="page" style="display:none">
+    <div id="aiBanner" class="banner warn" style="display:none">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>The AI key is not configured on the server (<code>RESUME_OPENAI_API_KEY</code> in <code>.env</code>). Uploading is disabled until it is set.</span>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="upload"><i class="fas fa-cloud-arrow-up"></i> Upload CVs</button>
+      <button class="tab" data-tab="candidates"><i class="fas fa-ranking-star"></i> Candidates &amp; Ranking</button>
+      <span class="queue-pill" id="queuePill" style="display:none"></span>
+    </div>
+
+    <!-- ───────────── UPLOAD ───────────── -->
+    <section id="tab-upload" class="panel">
+      <div class="panel-head">
+        <div><h2>Bulk upload</h2><p class="muted">PDF, Word (DOCX/DOC) or PowerPoint (PPTX/PPT) — up to <b>10 MB</b> each. Every CV is parsed and ranked automatically — no setup needed. Corrupt or unreadable files are skipped and reported; the rest continue.</p></div>
+      </div>
+      <div class="card">
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <i class="fas fa-file-arrow-up"></i>
+          <div class="dz-title">Drag &amp; drop resumes here</div>
+          <div class="muted">or <button class="link" id="pickBtn" type="button">choose files</button> · <button class="link" id="pickFolderBtn" type="button">choose a folder</button></div>
+          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.pptx,.ppt" hidden />
+          <input type="file" id="folderInput" webkitdirectory multiple hidden />
+        </div>
+        <div id="fileQueue" style="display:none">
+          <div class="queue-head">
+            <b id="queueCount"></b>
+            <span>
+              <button class="btn btn-ghost" id="clearBtn">Clear</button>
+              <button class="btn btn-primary" id="startBtn"><i class="fas fa-play"></i> Upload &amp; rank</button>
+            </span>
+          </div>
+          <div id="queueRejects" class="banner warn" style="display:none"></div>
+          <div class="table-wrap short"><table><thead><tr><th>File</th><th>Size</th><th>Status</th></tr></thead><tbody id="queueBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="card" id="progressCard" style="display:none">
+        <h3>Progress</h3>
+        <div class="prog-label"><span>Uploading</span><span id="upLabel"></span></div>
+        <div class="bar"><div id="upBar"></div></div>
+        <div class="prog-label"><span>Reading, parsing &amp; ranking (AI)</span><span id="parseLabel"></span></div>
+        <div class="bar"><div id="parseBar"></div></div>
+        <div id="progSummary" class="prog-summary"></div>
+        <div id="failuresBox" style="display:none">
+          <h4><i class="fas fa-circle-exclamation"></i> Files that could not be processed</h4>
+          <div class="table-wrap short"><table><thead><tr><th>File</th><th>Reason</th></tr></thead><tbody id="failBody"></tbody></table></div>
+          <button class="btn btn-ghost" id="retryBtn"><i class="fas fa-rotate"></i> Retry failed parses</button>
+        </div>
+        <div id="doneActions" style="display:none;margin-top:1rem">
+          <button class="btn btn-primary" id="viewResultsBtn"><i class="fas fa-users"></i> View ranked candidates</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────── CANDIDATES ───────────── -->
+    <section id="tab-candidates" class="panel" style="display:none">
+      <div class="panel-head">
+        <div><h2>Candidates &amp; ranking</h2><p class="muted" id="candSub">Every uploaded CV is ranked automatically — highest-ranked first.</p></div>
+        <div class="head-actions">
+          <div class="menu-wrap">
+            <button class="btn btn-primary" id="exportBtn"><i class="fas fa-file-export"></i> Export <i class="fas fa-caret-down"></i></button>
+            <div class="menu" id="exportMenu">
+              <div class="menu-h">Excel (.xlsx)</div>
+              <button data-x="xlsx|all">All ranked</button>
+              <button data-x="xlsx|top10">Top 10</button>
+              <div class="menu-h">CSV</div>
+              <button data-x="csv|all">All ranked</button>
+              <button data-x="csv|selected">Selected rows</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card filters">
+        <div class="f-row">
+          <div class="f wide"><label>Keyword search <span class="muted">(anywhere in the resume)</span></label><input id="fQ" placeholder='e.g. "statutory audit" Tally GST' /></div>
+          <div class="f"><label>Location</label><div class="inline"><div class="suggest-wrap"><input id="fLocation" autocomplete="off" placeholder="City" /><div class="suggest" id="citySuggest" hidden></div></div><div class="suggest-wrap"><input id="fState" autocomplete="off" placeholder="State" /><div class="suggest" id="stateSuggest" hidden></div></div></div></div>
+          <div class="f"><label>Education</label><div class="suggest-wrap"><input id="fEducation" autocomplete="off" placeholder="e.g. MBA, B.Com" /><div class="suggest" id="educationSuggest" hidden></div></div></div>
+        </div>
+        <div class="f-row">
+          <div class="f wide"><label>Skills</label><input id="fSkills" placeholder="python, sql" /></div>
+          <div class="f"><label>Certification</label><div class="suggest-wrap"><input id="fCertification" autocomplete="off" placeholder="e.g. CA, PMP" /><div class="suggest" id="certSuggest" hidden></div></div></div>
+          <div class="f"><label>Experience (years)</label><div class="inline"><input id="fMinExp" type="number" min="0" step="0.5" placeholder="min" /><input id="fMaxExp" type="number" min="0" step="0.5" placeholder="max" /></div></div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-primary" id="applyBtn" type="button"><i class="fas fa-magnifying-glass"></i> Search</button>
+          <button class="btn btn-ghost" id="resetBtn" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div id="bulkBar" class="bulk" style="display:none">
+        <b id="bulkCount"></b><span class="muted small">selected. You can export them from Export.</span>
+        <span class="bulk-actions">
+          <button class="btn btn-ghost" id="bulkClear">Clear selection</button>
+          <button class="btn btn-danger" id="bulkDelete"><i class="fas fa-trash"></i> Delete selected</button>
+        </span>
+      </div>
+      <div class="table-wrap"><table id="candTable"><thead id="candHead"></thead><tbody id="candBody"></tbody></table></div>
+      <div id="candEmpty" class="empty" style="display:none"></div>
+      <div class="pager"><span id="pagerInfo" class="muted"></span><span><button class="btn btn-ghost" id="prevBtn">‹ Prev</button><button class="btn btn-ghost" id="nextBtn">Next ›</button></span></div>
+    </section>
+  </main>
+
+  <!-- ───────────── DETAIL DRAWER ───────────── -->
+  <div class="drawer-mask" id="drawerMask"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head"><h3 id="dTitle"></h3><button class="x" id="dClose">&times;</button></div>
+    <div class="drawer-body" id="dBody"></div>
+  </aside>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/resume_ranker/app.js"></script>
+</body>
+</html>

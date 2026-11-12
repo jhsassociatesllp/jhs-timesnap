@@ -56,9 +56,30 @@ const DAY_OFF_LOCATIONS = ["Leave", "PHY", "Week Off"];
 const isDayOffLocation = (loc) => DAY_OFF_LOCATIONS.includes((loc || "").trim());
 const NO_TRAVEL_TIME_LOCATIONS = [...DAY_OFF_LOCATIONS, "Work From Home", "Office"];
 
+// Location dropdown: [stored value, label shown]. Stored values are unchanged ("Client Site", "Work From Home",
+// "Week Off") so existing entries, reports and the server rules keep working; only the labels differ.
+const LOCATION_CHOICES = [
+  ["Office", "Office"], ["Client Site", "Client site"], ["Work From Home", "WFH"],
+  ["Leave", "Leave"], ["Week Off", "Week off"], ["PHY", "PHY"],
+];
+const _escHtml = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function locationOptionsHtml(selected) {
+  const sel = (selected || "").trim();
+  let html = LOCATION_CHOICES.map(([v, l]) => `<option value="${v}"${sel === v ? " selected" : ""}>${l}</option>`).join("");
+  // an older entry may hold a value that is no longer offered (e.g. "Field Work"): keep showing it
+  if (sel && !LOCATION_CHOICES.some(([v]) => v === sel)) html += `<option value="${_escHtml(sel)}" selected>${_escHtml(sel)}</option>`;
+  return html;
+}
+
 function applyLocationTimeRules(row) {
   if (!row) return;
   const location = row.querySelector('.location-select')?.value || '';
+  const hoursBox = row.querySelector('.project-hours-field');
+  if (hoursBox) {                                   // Leave / PHY / Week off: no worked hours
+    const off = isDayOffLocation(location);
+    if (off) hoursBox.value = '';
+    hoursBox.disabled = off;
+  }
   const lunchTime = row.querySelector('.lunch-time-select');
   const travelTime = row.querySelector('.travel-time-select');
   const billable = row.querySelector('.billable-select');
@@ -86,6 +107,12 @@ function onLocationChange(select) {
 
 function applyModalLocationTimeRules() {
   const location = document.getElementById('modalInput2')?.value || '';
+  const modalHours = document.getElementById('modalInput10');
+  if (modalHours) {
+    const off = isDayOffLocation(location);
+    if (off) modalHours.value = '';
+    modalHours.disabled = off;
+  }
   const lunchTime = document.getElementById('modalInput13');
   const travelTime = document.getElementById('modalInput14');
   const billable = document.getElementById('modalInput11');
@@ -151,6 +178,7 @@ async function loadEmployeeProjects() {
 
     if (res.ok) {
       employeeProjects = await res.json();
+      _showNqBanner();
       window._freeTextClientProject =
         (employeeProjects.partner_emp_code || "").trim().toUpperCase() === FREE_TEXT_PARTNER_CODE ||
         FREE_TEXT_EMPLOYEE_CODES.has((loggedInEmployeeId || "").trim().toUpperCase());
@@ -420,8 +448,9 @@ function _applyLunchTravelVisibility() {
   ['13','14'].forEach(n => {
     const label = document.getElementById(`modalLabel${n}`);
     const input = document.getElementById(`modalInput${n}`);
-    if (label) label.closest('div').style.display = show ? '' : 'none';
-    else if (input) input.closest('div').style.display = show ? '' : 'none';
+    // lunch / travel are no longer entered on the timesheet: the modal fields stay hidden whatever the cycle says
+    if (label) label.closest('div').style.display = 'none';
+    else if (input) input.closest('div').style.display = 'none';
   });
 
   // Table columns — header and cells in all existing sections
@@ -531,54 +560,14 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
         onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="onLocationChange(this)">
-        <option value="Office"${entry.location==='Office'?' selected':''}>Office</option>
-        <option value="Client Site"${entry.location==='Client Site'?' selected':''}>Client Site</option>
-        <option value="Work From Home"${entry.location==='Work From Home'?' selected':''}>Work From Home</option>
-        <option value="Field Work"${entry.location==='Field Work'?' selected':''}>Field Work</option>
-        <option value="Leave"${entry.location==='Leave'?' selected':''}>Leave</option>
-        <option value="PHY"${entry.location==='PHY'?' selected':''}>PHY</option>
-        <option value="Week Off"${entry.location==='Week Off'?' selected':''}>Week Off</option>
-      </select>
+      <select class="location-select form-input" onchange="onLocationChange(this)">${locationOptionsHtml(entry.location)}</select>
     </td>
-    <td class="col-project-start"><input type="time" class="project-start form-input" value="${entry.projectStartTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-    <td class="col-project-end"><input type="time" class="project-end form-input" value="${entry.projectEndTime||''}" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
     <td class="col-client"></td>
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" value="${entry.reportingManagerEntry||''}" placeholder="Enter Reporting Manager"></td>
-    <td class="col-activity" style="min-width:200px;"><input type="text" class="activity-field form-input" value="${entry.activity||''}" placeholder="Enter Activity" oninput="updateSummary()"></td>
-    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" value="${entry.projectHours||''}" readonly></td>
-    <td class="col-billable">
-      <select class="billable-select form-input" onchange="updateSummary()">
-        <option value="Yes"${entry.billable==='Yes'?' selected':''}>Billable</option>
-        <option value="No"${entry.billable==='No'?' selected':''}>Non-Billable</option>
-      </select>
-    </td>
-    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="lunch-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min"${entry.lunchTime==='15 min'?' selected':''}>15 min</option>
-        <option value="30 min"${(entry.lunchTime || '30 min')==='30 min'?' selected':''}>30 min</option>
-        <option value="45 min"${entry.lunchTime==='45 min'?' selected':''}>45 min</option>
-        <option value="1 hr"${entry.lunchTime==='1 hr'?' selected':''}>1 hr</option>
-        <option value="1.5 hr"${entry.lunchTime==='1.5 hr'?' selected':''}>1.5 hr</option>
-        <option value="2 hr"${entry.lunchTime==='2 hr'?' selected':''}>2 hr</option>
-      </select>
-    </td>
-    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="travel-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min"${entry.travelTime==='15 min'?' selected':''}>15 min</option>
-        <option value="30 min"${entry.travelTime==='30 min'?' selected':''}>30 min</option>
-        <option value="45 min"${entry.travelTime==='45 min'?' selected':''}>45 min</option>
-        <option value="1 hr"${entry.travelTime==='1 hr'?' selected':''}>1 hr</option>
-        <option value="1.5 hr"${entry.travelTime==='1.5 hr'?' selected':''}>1.5 hr</option>
-        <option value="2 hr"${entry.travelTime==='2 hr'?' selected':''}>2 hr</option>
-        <option value="2.5 hr"${entry.travelTime==='2.5 hr'?' selected':''}>2.5 hr</option>
-        <option value="3 hr"${entry.travelTime==='3 hr'?' selected':''}>3 hr</option>
-      </select>
-    </td>
+    <td class="col-activity" style="min-width:200px;"></td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" step="0.25" min="0" max="24" value="${_escHtml(entry.projectHours||'')}" placeholder="Hours" oninput="onHoursInput(this)"></td>
     <td class="col-remarks"><input type="text" class="remarks-field form-input" value="${entry.remarks||''}" placeholder="Additional notes"></td>
     <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
   `;
@@ -633,6 +622,15 @@ function _restoreDraftRow(sectionId, entry, isSaved = false) {
     }
   }
 
+  // Activity (after client / project are restored, so its choices can be worked out). An old row without a
+  // picked task keeps its text; the server asks the employee to pick an assigned activity at submit time.
+  setupActivityCell(tr, {
+    activity: entry.activity,
+    nqTaskId: entry.nqTaskId,
+    activityOther: entry.activityOther,
+    activityReason: entry.activityReason,
+  });
+
   // Covers drafts loaded on page load and rows restored right after an Excel
   // upload alike — both funnel through this one restore function.
   showProjectPlanStatus(entry.projectCode || '', { row: tr });
@@ -671,6 +669,10 @@ function createSearchableCombo(type, options, currentValue = "") {
   let lastValid = currentValue || "";
   let highlighted = -1;
   let scrollHandler = null;
+  // options may be an array or a function returning the current array (used by the Activity column,
+  // whose choices depend on the row's client / project / date)
+  const getOpts = () => (typeof options === "function" ? options() : options);
+  input._suggestList = list;       // lets callers remove the floating list when they discard this input
 
   function positionList() {
     const r = input.getBoundingClientRect();
@@ -709,7 +711,8 @@ function createSearchableCombo(type, options, currentValue = "") {
 
   function renderList() {
     const q = input.value.trim().toLowerCase();
-    const matches = (q ? options.filter(o => o.toLowerCase().includes(q)) : options).slice(0, 200);
+    const all = getOpts();
+    const matches = (q ? all.filter(o => o.toLowerCase().includes(q)) : all).slice(0, 200);
     list.innerHTML = "";
     highlighted = -1;
     if (!matches.length) { closeList(); return; }
@@ -762,7 +765,7 @@ function createSearchableCombo(type, options, currentValue = "") {
       e.preventDefault();
       if (highlighted >= 0 && items[highlighted]) {
         commit(items[highlighted].textContent);
-      } else if (options.includes(input.value)) {
+      } else if (getOpts().includes(input.value)) {
         commit(input.value);
       }
     } else if (e.key === "Escape") {
@@ -775,7 +778,7 @@ function createSearchableCombo(type, options, currentValue = "") {
     // whether the typed text is valid.
     setTimeout(() => {
       closeList();
-      if (!options.includes(input.value)) {
+      if (!getOpts().includes(input.value)) {
         input.value = lastValid;
       } else {
         lastValid = input.value;
@@ -784,6 +787,271 @@ function createSearchableCombo(type, options, currentValue = "") {
   });
 
   return input;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   Activity = the Nexus Quant tasks ASSIGNED to this employee for the row's client + project + date
+   (task window overlaps the date, or the task is overdue and still open). Anything else is "Other"
+   with a reason, which the manager sees. Free-text employees (JHS01 partner / JHS1562) and rows whose
+   client is "Other" keep the plain text box they always had.
+   The control's root is a <div class="activity-wrap">; the value-bearing input keeps the class
+   .activity-field, so every existing reader of that class keeps working. The picked task id travels in
+   wrap.dataset.taskId and is read with getActivityState().
+   ───────────────────────────────────────────────────────────────────────────────────────────── */
+const ACTIVITY_OTHER = "Other (not in my assigned list)";
+
+function _activityTasksFor(clientValue, projectValue, dateStr) {
+  if (window._freeTextClientProject) return [];
+  const projs = (employeeProjects.projects_by_client || {})[clientValue] || [];
+  const p = projs.find(x => x.project_name === projectValue);
+  if (!p) return [];
+  const acts = (employeeProjects.activities_by_project || {})[p.project_code] || [];
+  const d = dateStr || "";
+  return acts.filter(a => {
+    const s = a.start_date, e = a.end_date;
+    if (!s && !e) return !a.is_complete;                 // undated task: offered while it is open
+    if (!d) return !a.is_complete;
+    if (s && d < s) return false;                        // starts after this date
+    if (e && d > e) return !a.is_complete;               // ended before this date: only if still open (overdue)
+    return true;                                         // the date falls inside the task window
+  });
+}
+
+function createActivityControl(ctx, preset) {
+  preset = preset || {};
+  const wrap = document.createElement("div");
+  wrap.className = "activity-wrap";
+  wrap._ctx = ctx;
+
+  const tasks = () => _activityTasksFor(ctx.getClient(), ctx.getProject(), ctx.getDate());
+  const labels = () => tasks().map(t => t.label).concat([ACTIVITY_OTHER]);
+  const taskByLabel = (lbl) => tasks().find(t => t.label === lbl);
+  const dropOldList = () => {
+    const old = wrap.querySelector(".activity-field");
+    if (old && old._suggestList) old._suggestList.remove();
+  };
+
+  function showList(value, taskId) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "list";
+    wrap.dataset.taskId = taskId ? String(taskId) : "";
+    const combo = createSearchableCombo("activity", labels, value || "");
+    combo.placeholder = "Select your assigned activity";
+    combo.title = "Only activities assigned to you in Nexus Quant for this client, project and date are listed";
+    combo.addEventListener("change", () => {
+      const v = combo.value;
+      if (v === ACTIVITY_OTHER) { showOther("", ""); return; }
+      const t = taskByLabel(v);
+      wrap.dataset.taskId = t ? String(t.task_id) : "";
+      updateSummary();
+    });
+    wrap.appendChild(combo);
+    if (value && !taskId) {                              // an old / typed value that matches a task by name
+      const t = taskByLabel(value);
+      if (t) wrap.dataset.taskId = String(t.task_id);
+    }
+    updateSummary();
+  }
+
+  function showOther(activity, reason) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "other";
+    wrap.dataset.taskId = "";
+    const what = document.createElement("input");
+    what.type = "text";
+    what.className = "activity-field form-input";
+    what.placeholder = "What did you do?";
+    what.value = activity || "";
+    what.addEventListener("input", updateSummary);
+    const why = document.createElement("input");
+    why.type = "text";
+    why.className = "activity-reason form-input";
+    why.placeholder = "Reason: why is it not in your assigned list?";
+    why.value = reason || "";
+    why.addEventListener("input", updateSummary);
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "activity-back-btn";
+    back.textContent = "↩ pick from my assigned list";
+    back.addEventListener("click", () => showList("", ""));
+    wrap.append(what, why, back);
+    updateSummary();
+  }
+
+  function showPlain(value) {
+    dropOldList();
+    wrap.innerHTML = "";
+    wrap.dataset.mode = "plain";
+    wrap.dataset.taskId = "";
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "activity-field form-input";
+    inp.placeholder = "Enter Activity";
+    inp.value = value || "";
+    inp.addEventListener("input", updateSummary);
+    wrap.appendChild(inp);
+  }
+
+  wrap._showList = showList;
+  wrap._showOther = showOther;
+  wrap._showPlain = showPlain;
+
+  if (window._freeTextClientProject || ctx.isPlain()) showPlain(preset.activity);
+  else if (preset.activityOther) showOther(preset.activity, preset.activityReason);
+  else showList(preset.activity, preset.nqTaskId);
+  return wrap;
+}
+
+// scope = a table row or the modal's #modalActivityHost
+function getActivityState(scope) {
+  const wrap = scope && scope.querySelector ? scope.querySelector(".activity-wrap") : null;
+  const field = scope && scope.querySelector ? scope.querySelector(".activity-field") : null;
+  const activity = field ? field.value : "";
+  if (!wrap) return { activity, nqTaskId: null, activityOther: false, activityReason: "" };
+  const mode = wrap.dataset.mode;
+  return {
+    activity,
+    nqTaskId: mode === "list" && wrap.dataset.taskId ? Number(wrap.dataset.taskId) : null,
+    activityOther: mode === "other",
+    activityReason: mode === "other" ? (scope.querySelector(".activity-reason")?.value || "") : "",
+  };
+}
+
+function setActivityState(scope, st) {
+  st = st || {};
+  const wrap = scope.querySelector(".activity-wrap");
+  if (!wrap) {
+    const f = scope.querySelector(".activity-field");
+    if (f) f.value = st.activity || "";
+    return;
+  }
+  if (wrap.dataset.mode === "plain") { wrap._showPlain(st.activity); return; }
+  if (st.activityOther) wrap._showOther(st.activity, st.activityReason);
+  else wrap._showList(st.activity, st.nqTaskId);
+}
+
+// Keep the Activity consistent with the client / project / date of its row (or of the modal).
+function _refreshActivityWrap(wrap, clear) {
+  if (!wrap || window._freeTextClientProject) return;
+  const mode = wrap.dataset.mode, ctx = wrap._ctx;
+  if (ctx.isPlain()) {                                   // client is "Other": plain text like before
+    if (mode !== "plain") wrap._showPlain(wrap.querySelector(".activity-field")?.value || "");
+    return;
+  }
+  if (mode === "other") return;                          // an explicit "Other" stays Other
+  if (mode === "plain" || clear) { wrap._showList("", ""); return; }
+  const id = Number(wrap.dataset.taskId || 0);           // date changed: keep only a still-valid task
+  if (id && !_activityTasksFor(ctx.getClient(), ctx.getProject(), ctx.getDate()).some(t => t.task_id === id)) {
+    wrap._showList("", "");
+  }
+}
+
+function refreshActivity(row, clear) {
+  _refreshActivityWrap(row && row.querySelector(".activity-wrap"), clear);
+}
+
+function setupActivityCell(row, preset) {
+  const cell = row.querySelector(".col-activity");
+  if (!cell) return;
+  cell.innerHTML = "";
+  const ctx = {
+    getClient: () => getFieldValue(row, ".col-client"),
+    getProject: () => getFieldValue(row, ".col-project"),
+    getDate: () => row.querySelector(".date-field")?.value || "",
+    isPlain: () => (getFieldValue(row, ".col-client") || "").trim() === "Other",
+  };
+  cell.appendChild(createActivityControl(ctx, preset));
+  const dateField = row.querySelector(".date-field");
+  if (dateField && !row._activityDateHook) {
+    row._activityDateHook = true;
+    dateField.addEventListener("change", () => refreshActivity(row, false));
+  }
+}
+
+// ── the same control inside the edit modal (replaces the old plain #modalInput9) ──
+function mountModalActivity(state) {
+  let host = document.getElementById("modalActivityHost");
+  if (!host) {
+    const old = document.getElementById("modalInput9");
+    if (!old || !old.parentNode) return;
+    host = document.createElement("div");
+    host.id = "modalActivityHost";
+    old.parentNode.replaceChild(host, old);
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay) {
+      overlay.addEventListener("change", (e) => {
+        const t = e.target;
+        if (!t || !t.closest) return;
+        const wrap = document.querySelector("#modalActivityHost .activity-wrap");
+        if (t.closest("#modalClientContainer, #modalProjectContainer")) _refreshActivityWrap(wrap, true);
+        else if (t.id === "modalInput1") _refreshActivityWrap(wrap, false);
+      });
+    }
+  }
+  const modalVal = (id) => (document.getElementById(id)?.querySelector("input")?.value || "").trim();
+  const ctx = {
+    getClient: () => modalVal("modalClientContainer"),
+    getProject: () => modalVal("modalProjectContainer"),
+    getDate: () => document.getElementById("modalInput1")?.value || "",
+    isPlain: () => modalVal("modalClientContainer") === "Other",
+  };
+  host.innerHTML = "";
+  host.appendChild(createActivityControl(ctx, state || {}));
+}
+
+// Copies the modal's activity back onto its table row (after the row's client/project/date were updated).
+function applyModalActivityToRow(row) {
+  const host = document.getElementById("modalActivityHost");
+  if (!host || !row) return;
+  const st = getActivityState(host);
+  refreshActivity(row, false);                           // e.g. client became "Other" -> plain text
+  if (!st.activityOther && st.nqTaskId) {
+    const ok = _activityTasksFor(getFieldValue(row, ".col-client"), getFieldValue(row, ".col-project"),
+                                 row.querySelector(".date-field")?.value || "").some(t => t.task_id === st.nqTaskId);
+    if (!ok) {
+      setActivityState(row, { activity: "" });
+      showPopup("The activity was cleared: it is not assigned to you for that project and date.", true);
+      return;
+    }
+  }
+  setActivityState(row, st);
+}
+
+// history edit: the saved entry (with its nqTaskId) comes from the history data already loaded
+function _historyActivityState(entryId, fallbackText) {
+  for (const p of (window._historyPayrolls || [])) {
+    const list = p.entries || (p.weeks || []).flatMap(w => w.entries || []);
+    const e = list.find(x => x.id === entryId);
+    if (e) return { activity: e.activity || fallbackText, nqTaskId: e.nqTaskId || null,
+                    activityOther: !!e.activityOther, activityReason: e.activityReason || "" };
+  }
+  return { activity: fallbackText };
+}
+
+// Banner above the cycle selector: NQ down / stale / nothing assigned yet
+function _showNqBanner() {
+  const p = employeeProjects || {};
+  let msg = "";
+  if (p.nq_unavailable) {
+    msg = "Project data from Nexus Quant is unavailable right now, so your assigned clients, projects and activities cannot be listed. Please refresh in a few minutes. Rows you already saved are not affected.";
+  } else if (p.nq_data_may_be_stale) {
+    msg = "Project data may be out of date.";
+  } else if (p.source === "nq" && !(p.clients || []).length) {
+    msg = "No clients, projects or activities are assigned to you in Nexus Quant yet. You can use Other (with a reason) for now, and ask your manager to assign your work in Nexus Quant.";
+  }
+  let el = document.getElementById("nqBanner");
+  if (!msg) { if (el) el.style.display = "none"; return; }
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "nqBanner";
+    el.style.cssText = "margin:1rem 0;padding:.8rem 1.2rem;border-radius:10px;font-weight:600;background:#fef9c3;border:2px solid #fde047;color:#854d0e;";
+    const anchor = document.getElementById("payrollCycleSelectorWrap");
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
+  }
+  el.textContent = msg;
+  el.style.display = "block";
 }
 
 function createSmartDropdown(type, container, currentValue = "", currentClient = "") {
@@ -1047,12 +1315,10 @@ function renderTimesheetTable() {
     <table class="timesheet-table">
       <thead>
         <tr>
-          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Work</th>
-          <th>Project Start</th><th>Project End</th><th>Client</th><th>Project</th>
+          <th>S.No</th><th>Add</th><th>Action</th><th>Date</th><th>Location</th>
+          <th>Client</th><th>Project</th>
           <th>Project Code</th><th>Reporting Manager</th><th>Activity</th>
-          <th>Project Hours</th><th>Billable</th>
-          <th style="display:${showLT?'':'none'}">Lunch Time</th>
-          <th style="display:${showLT?'':'none'}">Travel Time</th>
+          <th>Project Hours</th>
           <th>Remarks</th><th>Delete</th>
         </tr>
       </thead>
@@ -1195,54 +1461,14 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
       <input type="date" class="date-field form-input" value="${defaultDate}" min="${minDate}" max="${maxDate}" onchange="validateDate(this); updateSummary()">
     </td>
     <td class="col-location">
-      <select class="location-select form-input" onchange="onLocationChange(this)">
-        <option value="Office">Office</option>
-        <option value="Client Site">Client Site</option>
-        <option value="Work From Home">Work From Home</option>
-        <option value="Field Work">Field Work</option>
-        <option value="Leave">Leave</option>
-        <option value="PHY">PHY</option>
-        <option value="Week Off">Week Off</option>
-      </select>
+      <select class="location-select form-input" onchange="onLocationChange(this)">${locationOptionsHtml('')}</select>
     </td>
-    <td class="col-project-start"><input type="time" class="project-start form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
-    <td class="col-project-end"><input type="time" class="project-end form-input" onchange="validateTimes(this.closest('tr')); calculateHours(this.closest('tr'))"></td>
     <td class="col-client"></td>
     <td class="col-project"></td>
     <td class="col-project-code"></td>
     <td class="col-reporting-manager"><input type="text" class="reporting-manager-field form-input" placeholder="Enter Reporting Manager"></td>
-    <td class="col-activity" style="min-width: 200px;"><input type="text" class="activity-field form-input" placeholder="Enter Activity" oninput="updateSummary()"></td>
-    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" readonly></td>
-    <td class="col-billable">
-      <select class="billable-select form-input" onchange="updateSummary()">
-        <option value="Yes">Billable</option>
-        <option value="No">Non-Billable</option>
-      </select>
-    </td>
-    <td class="col-lunch-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="lunch-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min">15 min</option>
-        <option value="30 min" selected>30 min</option>
-        <option value="45 min">45 min</option>
-        <option value="1 hr">1 hr</option>
-        <option value="1.5 hr">1.5 hr</option>
-        <option value="2 hr">2 hr</option>
-      </select>
-    </td>
-    <td class="col-travel-time" style="display:${window._showLunchTravel!==false?'':'none'}">
-      <select class="travel-time-select form-input">
-        <option value="">None</option>
-        <option value="15 min">15 min</option>
-        <option value="30 min">30 min</option>
-        <option value="45 min">45 min</option>
-        <option value="1 hr">1 hr</option>
-        <option value="1.5 hr">1.5 hr</option>
-        <option value="2 hr">2 hr</option>
-        <option value="2.5 hr">2.5 hr</option>
-        <option value="3 hr">3 hr</option>
-      </select>
-    </td>
+    <td class="col-activity" style="min-width: 200px;"></td>
+    <td class="col-project-hours"><input type="number" class="project-hours-field form-input" step="0.25" min="0" max="24" placeholder="Hours" oninput="onHoursInput(this)"></td>
     <td class="col-remarks"><input type="text" class="remarks-field form-input" placeholder="Additional notes"></td>
     <td class="col-delete"><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
   `;
@@ -1255,6 +1481,7 @@ function addRow(sectionId, specificDate = null, insertAfterRow = null) {
 
   // ✅ Setup smart dropdowns for client, project, project code
   setupSmartDropdowns(tr);
+  setupActivityCell(tr);
   applyLocationTimeRules(tr);
 
   // Auto focus first input
@@ -1477,6 +1704,7 @@ function _applyRowClientCascade(row, clientValue) {
 
     projectCodeCell.innerHTML = "";
     projectCodeCell.appendChild(createReadonlyProjectCode("Other", "Other"));
+    refreshActivity(row, true);
     updateSummary();
     return;
   }
@@ -1491,6 +1719,7 @@ function _applyRowClientCascade(row, clientValue) {
 
   projectCodeCell.innerHTML = "";
   projectCodeCell.appendChild(createReadonlyProjectCode("", "Auto-filled"));
+  refreshActivity(row, true);
   updateSummary();
 }
 
@@ -1507,6 +1736,7 @@ function _applyRowProjectCode(row, clientValue, projectValue) {
   projectCodeCell.innerHTML = "";
   projectCodeCell.appendChild(createReadonlyProjectCode(code, "Auto-filled"));
   showProjectPlanStatus(code, { row });
+  refreshActivity(row, true);
 }
 
 function setupSmartDropdowns(row) {
@@ -1705,25 +1935,34 @@ function deleteRow(btn) {
 }
 
 /* Calculations & validations */
+// Project hours are typed by the employee now (there is no start/end time). Kept under its old name so the
+// older call sites (paste, modal save) keep working: it only re-checks the day's total and the summary.
 function calculateHours(row) {
   if (!row) return;
-  const start = row.querySelector(".project-start")?.value;
-  const end = row.querySelector(".project-end")?.value;
-  const hoursField = row.querySelector(".project-hours-field");
-  if (!start || !end) {
-    if (hoursField) hoursField.value = "";
-    updateSummary();
-    return;
-  }
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let startMin = sh * 60 + sm;
-  let endMin = eh * 60 + em;
-  if (endMin < startMin) endMin += 24 * 60; // overnight allowed
-  const hrs = ((endMin - startMin) / 60).toFixed(2);
-  if (hoursField) hoursField.value = hrs;
-
+  _flagDayTotal(row);
   updateSummary();
+}
+
+// Called as hours are typed in a row
+function onHoursInput(el) {
+  _flagDayTotal(el && el.closest("tr"));
+  updateSummary();
+}
+
+// Highlight every row of a date whose hours add up to more than 24
+function _flagDayTotal(row) {
+  const section = row && row.closest("tbody");
+  if (!section) return;
+  const date = row.querySelector(".date-field")?.value || "";
+  const rows = [...section.querySelectorAll("tr")].filter((r) => (r.querySelector(".date-field")?.value || "") === date);
+  const total = rows.reduce((t, r) => t + (parseFloat(r.querySelector(".project-hours-field")?.value) || 0), 0);
+  rows.forEach((r) => {
+    const box = r.querySelector(".project-hours-field");
+    if (box) {
+      box.classList.toggle("hours-over", total > 24);
+      box.title = total > 24 ? `Hours for ${date} add up to ${total.toFixed(2)} - more than 24` : "";
+    }
+  });
 }
 
 function validateTimes(rowOrModal, isModal = false) {
@@ -2129,7 +2368,7 @@ function openModal(button) {
 
   // Set other fields
   document.getElementById("modalInput8").value = currentRow.querySelector(".reporting-manager-field")?.value || "";
-  document.getElementById("modalInput9").value = currentRow.querySelector(".activity-field")?.value || "";
+  mountModalActivity(getActivityState(currentRow));
   document.getElementById("modalInput10").value = currentRow.querySelector(".project-hours-field")?.value || "";
   document.getElementById("modalInput11").value = currentRow.querySelector(".billable-select")?.value || "";
   // Lunch & Travel Time
@@ -2380,8 +2619,7 @@ function saveModalEntry() {
   const reportingManager = currentRow.querySelector(".reporting-manager-field");
   if (reportingManager) reportingManager.value = document.getElementById("modalInput8").value;
 
-  const activity = currentRow.querySelector(".activity-field");
-  if (activity) activity.value = document.getElementById("modalInput9").value;
+  applyModalActivityToRow(currentRow);
 
   const projectHours = currentRow.querySelector(".project-hours-field");
   if (projectHours) projectHours.value = document.getElementById("modalInput10").value;
@@ -2414,19 +2652,7 @@ function closeModal() {
 }
 
 function updateModalHours() {
-  // Project hours from modalInput4/5 -> modalInput10
-  const projectStart = document.getElementById("modalInput3")?.value;
-  const projectEnd = document.getElementById("modalInput4")?.value;
-  const projectHoursInput = document.getElementById("modalInput10");
-
-  if (projectStart && projectEnd && projectHoursInput) {
-    const [sh, sm] = projectStart.split(":").map(Number);
-    const [eh, em] = projectEnd.split(":").map(Number);
-    let s = sh * 60 + sm;
-    let e = eh * 60 + em;
-    if (e < s) e += 24 * 60;
-    projectHoursInput.value = ((e - s) / 60).toFixed(2);
-  }
+  // Project hours are typed in the modal now (no start/end time) - nothing to calculate.
 }
 
 /* Manager employee details modal (opens timeline and feedback) */
@@ -3161,7 +3387,7 @@ function editHistoryRow(button, entryId) {
       }
 
     document.getElementById("modalInput8").value = cells[9].textContent.trim(); // Reporting Manager
-    document.getElementById("modalInput9").value = cells[10].textContent.trim(); // Activity
+    mountModalActivity(_historyActivityState(entryId, cells[10].textContent.trim())); // Activity
     document.getElementById("modalInput10").value = cells[11].textContent.trim(); // Project Hours
     document.getElementById("modalInput11").value = cells[12].textContent.trim(); // Billable
     document.getElementById("modalInput12").value = cells[13].textContent.trim(); // Remarks
@@ -3214,7 +3440,10 @@ function updateHistoryEntry() {
     projectCode: projectCodeValue,
     
     reportingManagerEntry: document.getElementById("modalInput8").value,
-    activity: document.getElementById("modalInput9").value,
+    ...(() => {
+      const st = getActivityState(document.getElementById("modalActivityHost"));
+      return { activity: st.activity, nqTaskId: st.nqTaskId, activityOther: st.activityOther, activityReason: st.activityReason };
+    })(),
     projectHours: document.getElementById("modalInput10").value,
     billable: document.getElementById("modalInput11").value,
     remarks: document.getElementById("modalInput12").value,
@@ -3234,7 +3463,7 @@ function updateHistoryEntry() {
         closeModal();
         loadHistory();
       } else {
-        showPopup("Failed to update entry", true);
+        showPopup((res && res.detail) || "Failed to update entry", true);
       }
     })
     .catch((err) => {
@@ -3284,15 +3513,15 @@ function _collectEntries() {
     const project         = getFieldValue(row, '.col-project') || '';
     const projectCode     = getFieldValue(row, '.col-project-code') || '';
     const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || '';
-    const activity        = row.querySelector('.activity-field')?.value || '';
+    const actState       = getActivityState(row);
+    const activity        = actState.activity || '';
     const projectHours    = row.querySelector('.project-hours-field')?.value || '0';
-    let billable          = row.querySelector('.billable-select')?.value || 'No';
+    let billable          = row.querySelector('.billable-select')?.value || '';   // column removed: blank unless an older row carries one
     const remarks         = row.querySelector('.remarks-field')?.value || '';
     let lunchTime         = row.querySelector('.lunch-time-select')?.value || '';
     let travelTime        = row.querySelector('.travel-time-select')?.value || '';
     if (isDayOffLocation(location)) lunchTime = '';
     if (NO_TRAVEL_TIME_LOCATIONS.includes(location.trim())) travelTime = '';
-    if (isDayOffLocation(location)) billable = 'No';
     if (!date) return;
     entries.push({
       date, location,
@@ -3302,6 +3531,9 @@ function _collectEntries() {
       reportingManagerEntry: reportingMgr,
       activity, projectHours, billable, remarks,
       lunchTime, travelTime,
+      nqTaskId: actState.nqTaskId,
+      activityOther: actState.activityOther,
+      activityReason: actState.activityReason,
     });
   });
   return entries;
@@ -3651,6 +3883,8 @@ function copyRow(button) {
     projectCode: getFieldValue(row, '.col-project-code'), // ✅ Smart dropdown
     reportingManager: row.querySelector('.reporting-manager-field')?.value || '',
     activity: row.querySelector('.activity-field')?.value || '',
+    activityState: getActivityState(row),
+    projectHours: row.querySelector('.project-hours-field')?.value || '',
     billable: row.querySelector('.billable-select')?.value || '',
     remarks: row.querySelector('.remarks-field')?.value || ''
   };
@@ -3691,9 +3925,11 @@ function pasteRow(button) {
   const reportingManagerField = row.querySelector('.reporting-manager-field');
   if (reportingManagerField) reportingManagerField.value = copiedData.reportingManager;
   
-  const activityField = row.querySelector('.activity-field');
-  if (activityField) activityField.value = copiedData.activity;
+  refreshActivity(row, true);                              // client / project were just pasted
+  setActivityState(row, copiedData.activityState || { activity: copiedData.activity });
   
+  const hoursField = row.querySelector('.project-hours-field');
+  if (hoursField && !hoursField.disabled) hoursField.value = copiedData.projectHours || '';
   const billableField = row.querySelector('.billable-select');
   if (billableField) billableField.value = copiedData.billable;
   
@@ -3930,19 +4166,20 @@ function exportTimesheetToExcel() {
     const employeeInfo = getEmployeeInfoForExport();
     const wb = XLSX.utils.book_new();
 
+    // same columns as the downloadable template, so an export can be edited and uploaded again
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "date","location","projectStartTime","projectEndTime",
+        "date","location",
         "client","project","projectCode","reportingManagerEntry","activity",
-        "projectHours","billable","lunchTime","travelTime","remarks",
+        "projectHours","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others"
     ];
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Date","Work","Project Start Time","Project End Time",
+        "Date","Work",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
-        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "Project Hours","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others"
     ];
 
@@ -3952,17 +4189,12 @@ function exportTimesheetToExcel() {
     rows.forEach((row) => {
         const date            = row.querySelector('.date-field')?.value?.trim() || "";
         const location        = row.querySelector('.location-select')?.value || "";
-        const projectStart    = row.querySelector('.project-start')?.value || "";
-        const projectEnd      = row.querySelector('.project-end')?.value || "";
         const client          = getFieldValue(row, '.col-client') || "";
         const project          = getFieldValue(row, '.col-project') || "";
         const projectCode     = getFieldValue(row, '.col-project-code') || "";
         const reportingMgr    = row.querySelector('.reporting-manager-field')?.value || "";
         const activity        = row.querySelector('.activity-field')?.value || "";
         const projectHours    = row.querySelector('.project-hours-field')?.value || "";
-        const billable        = row.querySelector('.billable-select')?.value || "";
-        const lunchTime       = row.querySelector('.lunch-time-select')?.value || "";
-        const travelTime      = row.querySelector('.travel-time-select')?.value || "";
         const remarks         = row.querySelector('.remarks-field')?.value || "";
 
         if (!date && !project && !client) return;
@@ -3975,11 +4207,9 @@ function exportTimesheetToExcel() {
             partner: employeeInfo["Partner"],
             reportingManager: employeeInfo["Reporting Manager"],
             date, location,
-            projectStartTime: projectStart,
-            projectEndTime: projectEnd,
             client, project, projectCode,
             reportingManagerEntry: reportingMgr,
-            activity, projectHours, billable, lunchTime, travelTime, remarks,
+            activity, projectHours, remarks,
             hits: document.getElementById("hits")?.value || "",
             misses: document.getElementById("misses")?.value || "",
             feedback_hr: document.getElementById("feedback_hr")?.value || "",
@@ -4008,20 +4238,20 @@ function exportHistoryToExcel() {
 
     const columns = [
         "employeeId","employeeName","designation","gender","partner","reportingManager",
-        "date","location","projectStartTime","projectEndTime",
+        "date","location",
         "client","project","projectCode","reportingManagerEntry","activity",
-        "projectHours","billable","lunchTime","travelTime","remarks",
+        "projectHours","remarks",
         "hits","misses","feedback_hr","feedback_it","feedback_crm","feedback_others",
-        "totalHours","totalBillableHours","totalNonBillableHours"
+        "totalHours"
     ];
 
     const headersPretty = [
         "Employee ID","Employee Name","Designation","Gender","Partner","Reporting Manager",
-        "Date","Work","Project Start Time","Project End Time",
+        "Date","Work",
         "Client","Project","Project Code","Reporting Manager Entry","Activity",
-        "Project Hours","Billable","Lunch Time","Travel Time","Remarks",
+        "Project Hours","Remarks",
         "3 HITS","3 MISSES","Feedback for HR","Feedback for IT","Feedback for CRM","Feedback for Others",
-        "Total Hours","Total Billable Hours","Total Non Billable Hours"
+        "Total Hours"
     ];
 
     const cleanedRows = historyEntries.map((row) => ({
@@ -4033,17 +4263,12 @@ function exportHistoryToExcel() {
         reportingManager: row.reportingManager || "",
         date: row.date || "",
         location: row.location || "",
-        projectStartTime: row.projectStartTime || "",
-        projectEndTime: row.projectEndTime || "",
         client: row.client || "",
         project: row.project || "",
         projectCode: row.projectCode || "",
         reportingManagerEntry: row.reportingManagerEntry || "",
         activity: row.activity || "",
         projectHours: row.projectHours || "",
-        billable: row.billable || "",
-        lunchTime: row.lunchTime || "",
-        travelTime: row.travelTime || "",
         remarks: row.remarks || "",
         hits: row.hits || "",
         misses: row.misses || "",
@@ -4051,9 +4276,7 @@ function exportHistoryToExcel() {
         feedback_it: row.feedback_it || "",
         feedback_crm: row.feedback_crm || "",
         feedback_others: row.feedback_others || "",
-        totalHours: row.totalHours || "",
-        totalBillableHours: row.totalBillableHours || "",
-        totalNonBillableHours: row.totalNonBillableHours || ""
+        totalHours: row.totalHours || ""
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanedRows, { header: columns });
@@ -4428,7 +4651,7 @@ function _promptRejectionReason(employeeId) {
 /* Navigation helper */
 async function showSection(section) {
   await checkUserRole();
-  const sections = ["timesheet", "history", "approve", "pending", "rejected"];
+  const sections = ["timesheet", "history", "approve", "pending", "rejected", "forms"];
   sections.forEach((s) => {
     const el = document.getElementById(`${s}Section`);
     if (el) el.style.display = s === section ? "block" : "none";
@@ -4450,6 +4673,7 @@ async function showSection(section) {
   if (section === "approve") await loadApprovedList();
   if (section === "pending") await loadPendingList();
   if (section === "rejected") await loadRejectedList();
+  if (section === "forms" && window.initFormsSection) await initFormsSection();
 }
 
 /* Logout & UI helpers */
@@ -4727,11 +4951,11 @@ async function handleExcelUpload(event) {
             }
 
             // ✅ Required columns to validate (Lunch Time & Travel Time are optional)
-            const requiredColumns = [
+            const requiredColumns = [   // start/end time, billable, lunch and travel columns are no longer needed
                 'Employee ID', 'Employee Name', 'Designation', 'Gender', 'Partner',
                 'Reporting Manager', 'Date', 'Work',
-                'Project Start Time', 'Project End Time', 'Client', 'Project', 'Project Code',
-                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Billable', 'Remarks'
+                'Client', 'Project', 'Project Code',
+                'Reporting Manager Entry', 'Activity', 'Project Hours', 'Remarks'
             ];
 
             const fileColumns = Object.keys(jsonData[0]);
@@ -4800,14 +5024,15 @@ async function handleExcelUpload(event) {
             }
             
             function calculateHours(row) {
+              // hours are typed in the 'Project Hours' column; an old template without typed hours still
+              // gets them from its start/end times
+              const typed = parseFloat(String(row['Project Hours'] == null ? '' : row['Project Hours']).replace(',', '.'));
+              if (!isNaN(typed) && typed > 0) return Math.round(typed * 100) / 100;
               const start = excelTimeToMinutes(row['Project Start Time']);
               const end = excelTimeToMinutes(row['Project End Time']);
-
               if (start !== null && end !== null && end > start) {
                 return minutesToHours(end - start);
               }
-
-              // No valid time data → explicitly zero
               return 0;
             }
 
@@ -4852,6 +5077,26 @@ async function handleExcelUpload(event) {
             };
           });
 
+          // Activity -> the assigned Nexus Quant task of that project (so the row passes the submit rule), or
+          // "Other" with the Remarks as its reason. Anything else stays as typed text and is flagged below.
+          const activityProblems = [];
+          timesheetData.forEach((entry, i) => {
+            if (!entry.date || isDayOffLocation(entry.location) || window._freeTextClientProject) return;
+            if (entry.client.trim().toUpperCase() === 'OTHER') return;
+            const text = entry.activity.trim().toLowerCase();
+            if (text === 'other' || text === ACTIVITY_OTHER.toLowerCase()) {
+              entry.activityOther = true;
+              entry.activityReason = (entry.remarks || '').trim();
+              entry.activity = ACTIVITY_OTHER;
+              if (entry.activityReason.length < 3) activityProblems.push(`Row ${i + 1} (${entry.date}): Activity "Other" needs the reason in Remarks`);
+              return;
+            }
+            const tasks = (employeeProjects.activities_by_project || {})[entry.projectCode] || [];
+            const match = tasks.find(t => t.label.toLowerCase() === text) || tasks.find(t => t.name.toLowerCase() === text);
+            if (match) { entry.nqTaskId = match.task_id; entry.activity = match.label; }
+            else activityProblems.push(`Row ${i + 1} (${entry.date}): Activity "${entry.activity || '(blank)'}" is not one of your tasks for ${entry.projectCode || 'this project'} - see the "My tasks" tab`);
+          });
+
           // Rows with no Date are unused buffer rows from the template (dropdown/
           // validation formatting can materialize a cell even when nothing was
           // typed into it) — they aren't real entries, so drop them here.
@@ -4862,21 +5107,27 @@ async function handleExcelUpload(event) {
             showPopup('No filled-in rows found in this Excel file.', true);
             return;
           }
+          if (activityProblems.length) {
+            hideLoading();
+            showPopup(activityProblems.slice(0, 5).join('\n') + (activityProblems.length > 5 ? `\n...and ${activityProblems.length - 5} more` : ''), true);
+            event.target.value = "";
+            return;
+          }
 
           // Same mandatory-field rule the manual "Save Week" flow enforces:
           // working-day rows must have every project field filled in. Leave /
           // PHY / Week Off rows are exempt (but whatever is filled stays).
           {
-            const requireLunch = window._showLunchTravel !== false;
-            const mandatoryFields = ['date', 'projectStartTime', 'projectEndTime', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
+            const mandatoryFields = ['date', 'client', 'project', 'projectCode', 'reportingManagerEntry', 'activity'];
             const uploadErrors = [];
             realEntries.forEach((entry, i) => {
               if (isDayOffLocation(entry.location)) return;
               mandatoryFields.forEach(f => {
                 if (!entry[f] || !entry[f].trim()) uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): ${f} is required`);
               });
-              if (requireLunch && (!entry.lunchTime || !entry.lunchTime.trim())) {
-                uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): Lunch Time is required`);
+              const uploadedHours = parseFloat(entry.projectHours);
+              if (!(uploadedHours > 0 && uploadedHours <= 24)) {
+                uploadErrors.push(`Row ${i + 1} (${entry.date || 'no date'}): Project Hours must be more than 0 and at most 24`);
               }
             });
             if (uploadErrors.length) {
@@ -5097,11 +5348,13 @@ async function downloadSampleTemplate() {
     // LTSC — don't have and never will). Ctrl+F searches it like any text.
     const refWS = window._freeTextClientProject ? null : wb.addWorksheet('Client-Project List');
 
+    // Columns: A-F employee details, G Date, H Work, I Client, J Project, K Project Code, L Reporting Manager Entry,
+    // M Activity, N Project Hours (typed), O Remarks, P-U 3 Hits ... Feedback for Others
     const headers = [
       'Employee ID','Employee Name','Designation','Gender','Partner','Reporting Manager',
-      'Date','Work','Project Start Time','Project End Time',
+      'Date','Work',
       'Client','Project','Project Code','Reporting Manager Entry','Activity',
-      'Project Hours','Billable','Lunch Time','Travel Time','Remarks',
+      'Project Hours','Remarks',
       '3 Hits','3 Misses','Feedback for HR','Feedback for IT','Feedback for CRM','Feedback for Others'
     ];
     const headerRow = ws.addRow(headers);
@@ -5113,15 +5366,13 @@ async function downloadSampleTemplate() {
     let lastDateRow = 1;
 
     while (curr <= end) {
-      const rIdx        = ws.rowCount + 1;
       const dateStr     = curr.toISOString().split('T')[0];
-      const hFormula    = `IF(AND(I${rIdx}<>"",J${rIdx}<>""),(J${rIdx}-I${rIdx})*24,"")`;
 
       ws.addRow([
         empId, empName, designation, gender, partner, repManager,
-        dateStr, '', '', '',
+        dateStr, '',
         '', '', '', repManager, '',
-        { formula: hFormula }, 'Yes', '30 min', 'None', '',
+        '', '',
         '', '', '', '', '', ''
       ]);
       lastDateRow = ws.rowCount;
@@ -5135,11 +5386,9 @@ async function downloadSampleTemplate() {
     // validation identically throughout.
     const bufferRows = lastDateRow + 60;
 
-    // Apply hh:mm format to Project Start/End Time columns (I, J) across the
-    // full buffer range, not just the date rows, so inserted/extra rows format correctly too.
+    // Project Hours (N) is typed by the employee: a plain number, 2 decimals
     for (let r = 2; r <= bufferRows; r++) {
-      ws.getCell(`I${r}`).numFmt = 'hh:mm';
-      ws.getCell(`J${r}`).numFmt = 'hh:mm';
+      ws.getCell(`N${r}`).numFmt = '0.00';
     }
 
     // ── Build MetadataLists sheet (hidden helper sheet backing the dropdowns) ──
@@ -5147,7 +5396,7 @@ async function downloadSampleTemplate() {
     let d = new Date(start);
     while (d <= end) { dateValues.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
 
-    const locations = ['Office','Client Site','Work From Home','Field Work','Leave','PHY','Week Off'];
+    const locations = ['Office','Client Site','Work From Home','Leave','Week Off','PHY'];
     const billable  = ['Yes','No'];
     const lunch     = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr'];
     const travel    = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr','2.5 hr','3 hr'];
@@ -5232,6 +5481,43 @@ async function downloadSampleTemplate() {
     lookupNames.forEach((name, r) => { metaWS.getCell(r + 2, 24).value = name; });
     lookupCodes.forEach((code, r) => { metaWS.getCell(r + 2, 25).value = code; });
 
+    // Activities: every assigned task label (flat list for the dropdown) + "Other"; the visible "My tasks" tab shows
+    // which task belongs to which project and when it runs.
+    const activityLabels = [];
+    if (!freeTextClientProject) {
+      const seen = new Set();
+      Object.values(employeeProjects.activities_by_project || {}).forEach(list => list.forEach(a => {
+        if (a.is_complete) return;                           // finished tasks are not offered (same as the grid)
+        if (!seen.has(a.label)) { seen.add(a.label); activityLabels.push(a.label); }
+      }));
+      activityLabels.push('Other');
+    }
+    metaWS.getCell(1, 28).value = 'Activities';
+    activityLabels.forEach((label, r) => { metaWS.getCell(r + 2, 28).value = label; });
+    if (!freeTextClientProject) {
+      const tasksWS = wb.addWorksheet('My tasks');
+      tasksWS.getCell('A1').value = 'Your assigned Nexus Quant tasks. Pick the Activity in the Timesheet tab from these; ' +
+        'use "Other" (with the reason in Remarks) only for work that is not in this list.';
+      tasksWS.getCell('A1').font = { italic: true, size: 10, color: { argb: 'FF6B7280' } };
+      tasksWS.mergeCells('A1:G1');
+      tasksWS.getRow(1).height = 30;
+      tasksWS.getCell('A1').alignment = { wrapText: true, vertical: 'middle' };
+      const th = tasksWS.addRow(['Client', 'Project', 'Project Code', 'Activity', 'Starts', 'Ends', 'Status']);
+      th.font = { bold: true };
+      th.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
+      clients.forEach(c => {
+        if (c === 'Other') return;
+        (employeeProjects.projects_by_client[c] || []).forEach(p => {
+          ((employeeProjects.activities_by_project || {})[p.project_code] || []).forEach(a => {
+            if (a.is_complete) return;
+            tasksWS.addRow([c, p.project_name, p.project_code, a.label, a.start_date || '', a.end_date || '', a.is_complete ? 'Complete' : (a.status || 'Open')]);
+          });
+        });
+      });
+      tasksWS.views = [{ state: 'frozen', ySplit: 2 }];
+      [30, 40, 16, 44, 12, 12, 14].forEach((w, i) => { tasksWS.getColumn(i + 1).width = w; });
+    }
+
     // Shared-services (free-text partner) Project Code options — the fixed
     // SS-team list plus "Type Here", mirroring the app's dropdown.
     const ssProjectCodeOptions = freeTextClientProject
@@ -5283,9 +5569,15 @@ async function downloadSampleTemplate() {
     const lookupEnd  = Math.max(lookupNames.length + 1, 2);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
-    const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
-    const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
-    const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
+    // Activity: strict list of the employee's own tasks (+ Other); free-text employees type it freely
+    const dvActivity = freeTextClientProject ? null : strictList(`MetadataLists!$AB$2:$AB$${Math.max(activityLabels.length + 1, 2)}`);
+    const dvHours = {
+      type: 'decimal', operator: 'between', allowBlank: true,
+      showErrorMessage: true, errorStyle: 'error',
+      errorTitle: 'Invalid hours',
+      error: 'Type the hours you worked on this row as a number from 0.25 to 24, e.g. 4 or 2.5.',
+      formulae: [0.25, 24]
+    };
     // Plain static strict list — Excel dropdowns can't live-filter based on
     // their own in-progress typed text without a dynamic-array function
     // (FILTER), which many real-world Excel installs don't have (notably
@@ -5303,24 +5595,15 @@ async function downloadSampleTemplate() {
       showErrorMessage: false,
       formulae: [`MetadataLists!$AA$2:$AA$${ssProjectCodeOptions.length + 1}`]
     } : null;
-    // Strict time-of-day validation so Project Start/End Time can only ever
-    // hold an actual time value (rejects plain text, numbers, etc.).
-    const dvTime = {
-      type: 'time', operator: 'between', allowBlank: true,
-      showErrorMessage: true, errorStyle: 'error',
-      errorTitle: 'Invalid time',
-      error: 'Enter a valid time (hh:mm), e.g. 09:30.',
-      formulae: [0, 0.9999884259259259]
-    };
 
     // (bufferRows was computed earlier, alongside the search-helper block)
     for (let r = 2; r <= bufferRows; r++) {
       ws.getCell(`G${r}`).dataValidation  = dvDate;
       ws.getCell(`H${r}`).dataValidation  = dvLocation;
-      ws.getCell(`I${r}`).dataValidation  = dvTime;
-      ws.getCell(`J${r}`).dataValidation  = dvTime;
-      if (dvClient) ws.getCell(`K${r}`).dataValidation = dvClient;
-      if (dvSSProjectCode) ws.getCell(`M${r}`).dataValidation = dvSSProjectCode;
+      if (dvClient) ws.getCell(`I${r}`).dataValidation = dvClient;
+      if (dvSSProjectCode) ws.getCell(`K${r}`).dataValidation = dvSSProjectCode;
+      if (dvActivity) ws.getCell(`M${r}`).dataValidation = dvActivity;
+      ws.getCell(`N${r}`).dataValidation = dvHours;
       // Project's dependent-dropdown formula must reference *this* row's
       // Client cell explicitly (MATCH(K{r}, ...)) rather than a single
       // shared reference — ExcelJS splits a 500-row range into several XML
@@ -5332,11 +5615,11 @@ async function downloadSampleTemplate() {
       // errorStyle 'error') so a Client of "Other" — which has no fixed
       // project list — can still be typed into freely.
       if (!freeTextClientProject) {
-        ws.getCell(`L${r}`).dataValidation = {
+        ws.getCell(`J${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDIRECT("Client_"&MATCH(K${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
+          formulae: [`INDIRECT("Client_"&MATCH(I${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
         };
-        // Project Code (M) is normally auto-filled by the formula set below —
+        // Project Code (K) is normally auto-filled by the formula set below —
         // but a row a user inserts via Excel's own Insert Row only inherits
         // formatting/validation, never formulas/values, which would otherwise
         // leave Project Code blank on an inserted row. Backing it with this
@@ -5345,14 +5628,11 @@ async function downloadSampleTemplate() {
         // an inserted row too — one click instead of zero, but no dead end.
         // Doesn't fight the formula: a formula-derived value never triggers
         // its own cell's validation, only a value the user types/picks does.
-        ws.getCell(`M${r}`).dataValidation = {
+        ws.getCell(`K${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(L${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
+          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(J${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
         };
       }
-      ws.getCell(`Q${r}`).dataValidation  = dvBillable;
-      ws.getCell(`R${r}`).dataValidation  = dvLunch;
-      ws.getCell(`S${r}`).dataValidation  = dvTravel;
     }
 
     // ── Project Code formula (Column M) — auto-fills "Other" when Client is
@@ -5362,20 +5642,10 @@ async function downloadSampleTemplate() {
     // extra/inserted rows compute the code too, not just the original dates. ──
     if (!freeTextClientProject) {
       for (let r = 2; r <= bufferRows; r++) {
-        ws.getCell(`M${r}`).value = {
-          formula: `IF(K${r}="Other","Other",IFERROR(VLOOKUP(L${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
+        ws.getCell(`K${r}`).value = {
+          formula: `IF(I${r}="Other","Other",IFERROR(VLOOKUP(J${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
         };
       }
-    }
-
-    // ── Project Hours formula (Column P) — computed from Start/End Time.
-    // Only the cycle's date rows get it inline when created (above); extend it
-    // across the full buffer range too, so extra/inserted rows compute hours
-    // automatically as well, exactly like the real date rows do. ──
-    for (let r = lastDateRow + 1; r <= bufferRows; r++) {
-      ws.getCell(`P${r}`).value = {
-        formula: `IF(AND(I${r}<>"",J${r}<>""),(J${r}-I${r})*24,"")`
-      };
     }
 
     // ── Every column stays editable, including Project Code (M) — it's
@@ -5390,7 +5660,7 @@ async function downloadSampleTemplate() {
     // object across untouched cells, so leaving one column "untouched" let
     // it silently pick up whatever locked state a neighboring cell happened
     // to set. ──
-    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U'];
     const lockedCols = [];
     for (let r = 2; r <= bufferRows; r++) {
       allDataCols.forEach(col => {
@@ -5421,7 +5691,7 @@ async function downloadSampleTemplate() {
     });
 
     // Reasonable column widths so the template reads like the app, not a raw dump
-    const widths = [12,18,14,10,14,18,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
+    const widths = [12,18,14,10,14,18,12,16,16,22,14,20,28,12,26,16,16,20,20,20,20];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     const cycleLabel = _selectedCycle.cycle_label.replace(/[^a-zA-Z0-9]/g, '_');

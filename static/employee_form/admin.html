@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <title>Employee Application Form Admin — JHS</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
+  <style>
+    .bar{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center}
+    .bar .fi{max-width:320px}
+    .tbl-wrap{overflow-x:auto}
+    table.l{width:100%;border-collapse:collapse;min-width:760px}
+    table.l th{background:#eef0fb;font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;padding:.65rem .7rem;text-align:left}
+    table.l td{padding:.65rem .7rem;border-bottom:1px solid var(--border);font-size:.88rem}
+    .pill-draft{background:rgba(243,156,18,.15);color:#b9770e}
+    .empty{padding:2rem;text-align:center;color:var(--muted)}
+    .nj{border:1px solid var(--border);border-radius:14px;padding:1.2rem 1.3rem;margin-bottom:1.5rem;background:#fafbff}
+    .nj h3{font-size:1.05rem;margin-bottom:.3rem;color:var(--text)}
+    .nj textarea{width:100%;min-height:90px;resize:vertical;font-family:inherit}
+    .nj .row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.7rem}
+    .nj table{width:100%;border-collapse:collapse;margin-top:.8rem;font-size:.88rem}
+    .nj th{background:#eef0fb;text-align:left;padding:.5rem .7rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.4px}
+    .nj td{padding:.5rem .7rem;border-bottom:1px solid var(--border)}
+    .nj code{background:#fff3cd;padding:.15rem .45rem;border-radius:6px;font-size:.95rem;letter-spacing:.5px;user-select:all}
+    .nj .warn{margin-top:.6rem;padding:.6rem .8rem;border-radius:8px;background:#fff8e1;border:1px solid #ffe08a;color:#7a5b00;font-size:.85rem}
+    .tabs{display:flex;gap:.4rem;border-bottom:2px solid var(--border);margin-bottom:1.4rem}
+    .tabs button{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;padding:.75rem 1.3rem;font:600 .95rem inherit;font-family:inherit;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:.5rem}
+    .tabs button:hover{color:var(--accent)}
+    .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+    .njx{margin-top:1.4rem;border-top:1px solid var(--border);padding-top:1.1rem}
+    .njx h4{font-size:1rem;margin:0 0 .8rem;color:var(--text);display:flex;align-items:center;gap:.5rem}
+    .njsum{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem}
+    .njsum button{border:1px solid var(--border);background:#fff;border-radius:12px;padding:.5rem .9rem;cursor:pointer;font-family:inherit;text-align:left;min-width:110px;transition:var(--tr)}
+    .njsum button b{display:block;font-size:1.25rem;line-height:1.2;color:var(--text)}
+    .njsum button span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+    .njsum button:hover{border-color:var(--accent)}
+    .njsum button.on{border-color:var(--accent);background:#eef0fb}
+    .njbar{display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;margin-bottom:.8rem}
+    .njbar .fi{max-width:300px;padding:.55rem .8rem;font-size:.88rem}
+    .njwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+    table.njt{width:100%;border-collapse:collapse;min-width:1100px;font-size:.85rem}
+    table.njt th{background:#eef0fb;text-align:left;padding:.6rem .7rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;position:sticky;top:0;color:var(--text)}
+    table.njt th.sort{cursor:pointer;user-select:none}
+    table.njt th.sort:hover{color:var(--accent)}
+    table.njt th .ar{opacity:.4;margin-left:.25rem}
+    table.njt th.on .ar{opacity:1;color:var(--accent)}
+    table.njt td{padding:.6rem .7rem;border-bottom:1px solid var(--border);vertical-align:middle}
+    table.njt tbody tr:nth-child(even){background:#fafbff}
+    table.njt tbody tr:hover{background:#f1f3fd}
+    table.njt td.n{color:var(--muted);width:34px}
+    table.njt .em{font-weight:600;color:var(--text);word-break:break-all}
+    table.njt .dim{color:var(--muted);font-size:.8rem}
+    table.njt .pill{display:inline-block;border-radius:20px;padding:.12rem .6rem;font-size:.7rem;font-weight:700;white-space:nowrap}
+    .p-ok{background:rgba(17,153,142,.15);color:#0d7a70}
+    .p-draft{background:rgba(243,156,18,.15);color:#b9770e}
+    .p-none{background:#eceef4;color:#6b7280}
+    .p-bad{background:rgba(231,76,60,.13);color:#c0392b}
+    .prog{display:flex;align-items:center;gap:.5rem;min-width:90px}
+    .prog i{flex:1;height:6px;border-radius:4px;background:#e4e7f2;overflow:hidden;display:block}
+    .prog i b{display:block;height:100%;background:#11998e}
+    .prog span{font-size:.75rem;font-weight:700;color:var(--text);white-space:nowrap}
+    .pill-none{background:#eceef4;color:#6b7280}
+    .pager{display:flex;gap:.6rem 1.2rem;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:.8rem .3rem 0;font-size:.84rem;color:var(--muted)}
+    .pager select{padding:.3rem .5rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-left:.3rem}
+    .pager .pg-btns{display:flex;align-items:center;gap:.6rem}
+    .pager button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:.35rem .8rem;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:600;color:var(--text)}
+    .pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+    .pager button:disabled{opacity:.4;cursor:not-allowed}
+    .dbar{display:flex;gap:.5rem .7rem;flex-wrap:wrap;align-items:center}
+    .dbar label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+    .dbar .fi{padding:.5rem .7rem;font-size:.85rem;max-width:160px;width:auto}
+    .dbar select.fi{max-width:190px}
+    .loader{display:flex;align-items:center;justify-content:center;gap:.8rem;min-height:100vh;color:#fff;font-weight:600}
+    .spin{width:22px;height:22px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div id="ls" class="loader"><div class="spin"></div> Loading…</div>
+<div id="app" style="display:none">
+  <nav class="navbar">
+    <div class="brand"><i class="fas fa-file-signature"></i> Employee Application Form — Admin</div>
+    <div class="nav-r">
+      <a href="/control-panel" class="nav-btn"><i class="fas fa-arrow-left"></i> Control Panel</a>
+      <button class="nav-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+  <div class="wrap">
+    <div class="hdr"><h1>Application Forms</h1><p>View, edit and export employee application forms</p></div>
+    <div class="body">
+      <div class="tabs">
+        <button type="button" class="on" id="tbJoin" onclick="showTab('join')"><i class="fas fa-user-plus"></i> New Joiners</button>
+        <button type="button" id="tbApp" onclick="showTab('app')"><i class="fas fa-file-signature"></i> Application Forms</button>
+      </div>
+      <div id="tabJoin">
+      <div class="nj">
+        <h3><i class="fas fa-user-plus"></i> New Joiner Access</h3>
+        <p class="hint" style="margin:0 0 .6rem">New joiners see the Employee Application Form only. Enter their personal email IDs (one or many, one per line or separated by commas) and generate a login. If a joiner forgets the password, enter the same email again to get a new one.</p>
+        <textarea class="fi" id="njEmails" placeholder="name1@gmail.com&#10;name2@outlook.com"></textarea>
+        <div class="row">
+          <button class="btn btn-pri btn-sm" id="njBtn" onclick="genJoiners()"><i class="fas fa-key"></i> Generate password</button>
+          <span class="hint" id="njMsg" style="margin:0"></span>
+        </div>
+        <div id="njResult" style="display:none">
+          <div class="warn"><i class="fas fa-triangle-exclamation"></i> Passwords are shown only now. Copy or download them and share each one with the joiner.</div>
+          <div class="row"><button class="btn btn-ghost btn-sm" onclick="copyAllJoiners()"><i class="fas fa-copy"></i> Copy all</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadJoiners()"><i class="fas fa-file-csv"></i> Download CSV</button></div>
+          <table><thead><tr><th>Personal email</th><th>Password</th><th>Result</th><th></th></tr></thead><tbody id="njRows"></tbody></table>
+        </div>
+        <div class="njx" id="njList">
+          <h4><i class="fas fa-users"></i> New-joiner logins <span class="chip" id="njCount">0</span></h4>
+          <div class="njsum" id="njSum"></div>
+          <div class="njbar">
+            <input class="fi" id="njQ" placeholder="Search email or login ID…" oninput="renderJoiners()">
+            <select class="fi" id="njF" style="max-width:210px" onchange="setNjFilter(this.value)">
+              <option value="">All joiners</option>
+              <option value="never">Never logged in</option>
+              <option value="notstarted">Logged in, form not started</option>
+              <option value="progress">In progress</option>
+              <option value="done">All 4 forms submitted</option>
+              <option value="mailfail">Email not sent</option>
+            </select>
+            <span class="dbar"><label>Date</label>
+              <select class="fi" id="njBy" onchange="renderJoiners()"><option value="created_at">Created on</option><option value="last_login">Last login</option><option value="last_activity">Last form activity</option></select>
+              <label>From</label><input class="fi" type="date" id="njFrom" onchange="renderJoiners()">
+              <label>To</label><input class="fi" type="date" id="njTo" onchange="renderJoiners()">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="clearDates('nj')">Clear</button></span>
+            <span class="hint" id="njShown" style="margin:0"></span>
+            <button class="btn btn-pri btn-sm" style="margin-left:auto" onclick="exportJoiners()" title="One Excel file with three sheets: Application Forms, KYC Details, New Joiners"><i class="fas fa-file-excel"></i> Export to Excel</button>
+          </div>
+          <div class="njwrap"><table class="njt" id="njTable"><thead><tr>
+            <th>#</th>
+            <th class="sort" data-s="email" onclick="sortJoiners('email')">Personal email<span class="ar">↕</span></th>
+            <th>Login ID</th>
+            <th class="sort" data-s="created_at" onclick="sortJoiners('created_at')">Created<span class="ar">↕</span></th>
+            <th>Email sent</th>
+            <th class="sort" data-s="last_login" onclick="sortJoiners('last_login')">Last login<span class="ar">↕</span></th>
+            <th>Application</th><th>Declaration &amp; Undertaking</th><th>Undertaking</th><th>KYC</th>
+            <th class="sort" data-s="submitted_count" onclick="sortJoiners('submitted_count')">Progress<span class="ar">↕</span></th>
+            <th></th></tr></thead><tbody id="njAll"></tbody></table></div>
+          <div class="pager" id="pgNj"></div>
+        </div>
+      </div>
+      </div>
+      <div id="tabApp" style="display:none">
+      <div class="bar">
+        <input class="fi" id="q" placeholder="Search code, name, email…" oninput="render()" />
+        <select class="fi" id="st" style="max-width:180px" onchange="render()"><option value="">All statuses</option><option value="submitted">Submitted</option><option value="draft">Draft</option></select>
+        <span class="chip" id="count"></span>
+        <span class="dbar"><label>Date</label>
+          <select class="fi" id="dBy" onchange="render()"><option value="updated_at">Last updated</option><option value="submitted_at">Application submitted</option></select>
+          <label>From</label><input class="fi" type="date" id="dFrom" onchange="render()">
+          <label>To</label><input class="fi" type="date" id="dTo" onchange="render()">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="clearDates('d')">Clear</button></span>
+        <button class="btn btn-pri btn-sm" style="margin-left:auto" onclick="exportXlsx()" title="One Excel file with three sheets: Application Forms, KYC Details, New Joiners"><i class="fas fa-file-excel"></i> Export to Excel</button>
+      </div>
+      <div class="tbl-wrap"><table class="l"><thead><tr><th>Emp Code</th><th>Name</th><th>Application</th><th>Declaration &amp; Undertaking</th><th>Undertaking</th><th>KYC</th><th>E-mail</th><th>Mobile</th><th>Last Updated</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="pager" id="pgApp"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="kycModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto" onclick="if(event.target===this)closeKyc()">
+  <div style="background:#fff;border-radius:16px;max-width:780px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.4rem;background:#2c3e50;color:#fff;font-weight:700"><span id="kycTitle"></span>
+      <button onclick="closeKyc()" aria-label="Close" style="background:none;border:0;color:#fff;font-size:1.2rem;cursor:pointer"><i class="fas fa-xmark"></i></button></div>
+    <div id="kycBody" style="padding:1.2rem 1.4rem 1.6rem"></div>
+  </div>
+</div>
+<div id="delModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:1.4rem 1.5rem;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+    <h3 style="margin:0 0 .3rem"><i class="fas fa-trash" style="color:#c0392b"></i> Delete form</h3>
+    <p class="hint" style="margin:0 0 .8rem">Employee: <b id="delWho"></b><br>The entered details are removed permanently, so the employee can fill in and submit the form again.</p>
+    <label style="display:block;margin:.35rem 0"><input type="radio" name="delPart" value="application"> Employee Application Form</label>
+    <label style="display:block;margin:.35rem 0"><input type="radio" name="delPart" value="undertaking"> Declaration &amp; Undertaking</label>
+    <label style="display:block;margin:.35rem 0"><input type="radio" name="delPart" value="policy"> Undertaking</label>
+    <label style="display:block;margin:.35rem 0"><input type="radio" name="delPart" value="all" checked> All forms of this employee</label>
+    <div class="hint" id="delMsg" style="margin:.6rem 0 0;color:#c0392b"></div>
+    <div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-ghost btn-sm" onclick="closeDel()">Cancel</button>
+      <button class="btn btn-pri btn-sm" style="background:#c0392b" onclick="confirmDel()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+<script>
+const token =localStorage.getItem('access_token') || '';
+if (!token) window.location.href = '/login';
+// ── date filter (From / To are calendar days; timestamps from the server are UTC) ──
+const utc = s => /[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z";
+const inRange = (iso, from, to) => {
+  if (!from && !to) return true;
+  if (!iso) return false;
+  const t = new Date(utc(iso)).getTime();
+  if (from && t < new Date(from + "T00:00:00").getTime()) return false;
+  if (to && t > new Date(to + "T23:59:59.999").getTime()) return false;
+  return true;
+};
+const dateQs = (by, from, to) => [from && "date_from=" + from, to && "date_to=" + to, (from || to) && by && "by=" + by].filter(Boolean).join("&");
+function clearDates(p){ document.getElementById(p + 'From').value = ''; document.getElementById(p + 'To').value = ''; (p === 'nj' ? renderJoiners : render)(); }
+// ── paging: at most one page of rows on screen (10 / 25 / 50 / 100 per page) ──
+const PG = {};
+function pgSetup(id, fn){ PG[id] = {page: 1, size: 10, sig: null, fn}; }
+function pgSlice(id, rows, sig){
+  const p = PG[id];
+  if (p.sig !== sig) { p.sig = sig; p.page = 1; }                 // a new search / filter starts on page 1
+  p.page = Math.min(p.page, Math.max(1, Math.ceil(rows.length / p.size)));
+  return {rows: rows.slice((p.page - 1) * p.size, p.page * p.size), offset: (p.page - 1) * p.size};
+}
+function pgRender(id, total){
+  const p = PG[id], box = document.getElementById(id), pages = Math.max(1, Math.ceil(total / p.size));
+  if (!total) { box.innerHTML = ''; return; }
+  box.innerHTML = `<span>Rows per page <select onchange="pgSize('${id}', this.value)">${[10, 25, 50, 100].map(n => `<option${n === p.size ? ' selected' : ''}>${n}</option>`).join('')}</select></span>
+    <span>${(p.page - 1) * p.size + 1}–${Math.min(total, p.page * p.size)} of ${total}</span>
+    <span class="pg-btns"><button type="button" ${p.page <= 1 ? 'disabled' : ''} onclick="pgGo('${id}', -1)">‹ Prev</button><span>Page ${p.page} of ${pages}</span><button type="button" ${p.page >= pages ? 'disabled' : ''} onclick="pgGo('${id}', 1)">Next ›</button></span>`;
+}
+function pgGo(id, d){ PG[id].page += d; PG[id].fn(); }
+function pgSize(id, v){ PG[id].size = +v; PG[id].page = 1; PG[id].fn(); }
+function showTab(t){
+  const ids = {join: 'tabJoin', app: 'tabApp'}, btn = {join: 'tbJoin', app: 'tbApp'};
+  Object.keys(ids).forEach(k => { document.getElementById(ids[k]).style.display = k === t ? '' : 'none'; document.getElementById(btn[k]).classList.toggle('on', k === t); });
+  history.replaceState(null, '', t === 'app' ? '#forms' : location.pathname + location.search);
+}
+function logout(){ localStorage.clear(); sessionStorage.clear(); window.location.href='/login'; }
+const AUTH = {Authorization:`Bearer ${token}`};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+let all = [];
+function fmt(d){ return d ? new Date(d).toLocaleString() : ''; }
+const stPill = v => v === 'submitted' ? '<span class="pill pill-yes">Submitted</span>' : v === 'draft' ? '<span class="pill pill-draft">Draft</span>' : '<span class="pill pill-none">Not started</span>';
+function render(){
+  const q = document.getElementById('q').value.toLowerCase(), st = document.getElementById('st').value;
+  const by = document.getElementById('dBy').value, df = document.getElementById('dFrom').value, dt = document.getElementById('dTo').value;
+  const rows = all.filter(r => (!st || r.status===st) && (!q || [r.empid,r.name,r.email].join(' ').toLowerCase().includes(q)) && inRange(r[by], df, dt));
+  document.getElementById('count').textContent = rows.length + ' form' + (rows.length===1?'':'s');
+  const pg = pgSlice('pgApp', rows, [q, st, by, df, dt].join('|'));
+  pgRender('pgApp', rows.length);
+  document.getElementById('rows').innerHTML = rows.length ? pg.rows.map(r => `<tr>
+    <td><b>${esc(r.empid)}</b></td><td>${esc(r.name)}</td>
+    <td>${stPill(r.status)}</td>
+    <td>${stPill(r.undertaking_status)}</td>
+    <td>${stPill(r.policy_status)}</td>
+    <td>${stPill(r.kyc_status)}</td>
+    <td>${esc(r.email)}</td><td>${esc(r.mobile)}</td>
+    <td>${fmt(r.updated_at)}${r.edited_by?`<div class="hint" style="margin:0">edited by ${esc(r.edited_by)}</div>`:''}</td>
+    <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" ${r.kyc_status === 'none' ? 'disabled style="opacity:.4;cursor:not-allowed" title="KYC not started"' : 'title="View the KYC details and documents"'} onclick="viewKyc('${esc(r.empid)}')"><i class="fas fa-id-card"></i> KYC</button>
+      <a class="btn btn-ghost btn-sm" href="/employee-form?emp=${encodeURIComponent(r.empid)}"><i class="fas fa-eye"></i> View / Edit</a>
+      <button class="btn btn-ghost btn-sm" style="color:#c0392b" title="Delete this form so the employee can submit it again" onclick="delForm('${esc(r.empid)}','${esc(r.name).replace(/'/g,'')}')"><i class="fas fa-trash"></i> Delete</button>
+      ${[['app','Application Form',r.status],['und','Declaration & Undertaking',r.undertaking_status],['pol','Undertaking',r.policy_status]].map(([k,t,s]) => s==='submitted'
+        ? `<a class="btn btn-ghost btn-sm" title="Download ${t} PDF" href="#" onclick="return getPdf('${encodeURIComponent(r.empid)}','${k}',this)"><i class="fas fa-file-pdf"></i> ${k==='app'?'Form':k==='und'?'Decl.':'Undert.'}</a>`
+        : `<span class="btn btn-ghost btn-sm" title="${t} not submitted yet" style="opacity:.35;cursor:not-allowed"><i class="fas fa-file-pdf"></i> ${k==='app'?'Form':k==='und'?'Decl.':'Undert.'}</span>`).join(' ')}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="empty">No application forms found</td></tr>';
+}
+// PDF download runs in a hidden frame, so this page stays put and the browser's Back button is unaffected
+let pdfFrame = null;
+function getPdf(emp, k, btn){
+  if (pdfFrame) return false;
+  const html = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing…'; btn.style.pointerEvents = 'none';
+  const done = () => { if (pdfFrame) pdfFrame.remove(); pdfFrame = null; btn.innerHTML = html; btn.style.pointerEvents = ''; window.removeEventListener('message', onMsg); clearTimeout(t); };
+  const onMsg = e => { if (e.origin === location.origin && e.data && 'pdfDone' in e.data) { if (!e.data.pdfDone) alert('PDF could not be created'); done(); } };
+  const t = setTimeout(done, 60000);
+  window.addEventListener('message', onMsg);
+  pdfFrame = document.createElement('iframe'); pdfFrame.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
+  pdfFrame.src = `/employee-form?emp=${emp}&pdf=${k}`; document.body.appendChild(pdfFrame);
+  return false;
+}
+// ── New joiner logins ──
+let njLast = [];
+async function njApi(url, opts){
+  const res = await fetch(url, Object.assign({}, opts||{}, {headers:Object.assign({}, AUTH, {"Content-Type":"application/json"})}));
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.detail || "Request failed");
+  return j;
+}
+async function genJoiners(emailsText){
+  const txt = emailsText !== undefined ? emailsText : document.getElementById("njEmails").value;
+  const btn = document.getElementById("njBtn"), msg = document.getElementById("njMsg");
+  btn.disabled = true; msg.textContent = "Generating…";
+  try {
+    const r = await njApi("/employee-form/admin/joiners", {method:"POST", body:JSON.stringify({emails:txt})});
+    njLast = r.results;
+    document.getElementById("njRows").innerHTML = r.results.map(x => `<tr><td>${esc(x.email)}</td><td><code>${esc(x.password)}</code></td>
+      <td>${x.status==="created" ? "New login created" : "New password generated"}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="copyText(${JSON.stringify("Email: "+x.email+"\nPassword: "+x.password).replace(/"/g,"&quot;")})"><i class="fas fa-copy"></i> Copy</button></td></tr>`).join("");
+    document.getElementById("njResult").style.display = r.results.length ? "block" : "none";
+    const m = r.mail || {}, failed = m.failed || [];
+    document.querySelectorAll("#njRows tr").forEach((tr, i) => {            // per row: did the e-mail go?
+      const em = r.results[i].email, td = tr.children[2];
+      td.innerHTML += `<div class="hint" style="margin:.2rem 0 0;color:${failed.includes(em) ? "#b9770e" : "#0d7a70"}">${failed.includes(em) ? "Email not sent" : "Email sent"}</div>`;
+    });
+    msg.textContent = r.results.length + " login(s) ready" + (r.invalid.length ? " · not a valid email: " + r.invalid.join(", ") : "") +
+      (m.configured === false ? " · Emails NOT sent: " + (m.error || "mail service not set up") + " Share the passwords yourself."
+        : failed.length ? " · Email sent to " + (m.sent || []).length + ", could not email: " + failed.join(", ") + ". " + (m.error || "") + " Share those passwords yourself."
+        : " · Email sent to " + (m.sent || []).length + " joiner(s) with the link and their login.");
+    if (emailsText === undefined) document.getElementById("njEmails").value = "";
+    loadJoiners();
+  } catch(e) { msg.textContent = e.message; }
+  btn.disabled = false;
+}
+function copyText(t){ navigator.clipboard.writeText(t).then(() => { document.getElementById("njMsg").textContent = "Copied"; }); }
+function copyAllJoiners(){ copyText(njLast.map(x => "Email: " + x.email + "\nPassword: " + x.password).join("\n\n")); }
+function downloadJoiners(){
+  const csv = "Email,Password,Result\n" + njLast.map(x => [x.email, x.password, x.status].join(",")).join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
+  a.download = "New_Joiner_Logins.csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+let NJ = [], njSort = {k: "created_at", dir: -1}, njFilter = "";
+const njDate = d => d ? new Date(utc(d)).toLocaleDateString("en-IN", {day: "2-digit", month: "short", year: "numeric"}) : "—";
+const njDateTime = d => d ? new Date(utc(d)).toLocaleString("en-IN", {day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"}) : "";
+const njPill = v => v === "submitted" ? '<span class="pill p-ok">Submitted</span>' : v === "draft" ? '<span class="pill p-draft">Draft</span>' : '<span class="pill p-none">Not started</span>';
+function njState(r){            // one status per joiner, used by the summary tiles and the filter
+  if (r.submitted_count === 4) return "done";
+  if (r.submitted_count > 0 || r.application === "draft" || r.undertaking === "draft" || r.policy === "draft" || r.kyc === "draft") return "progress";
+  return r.last_login ? "notstarted" : "never";
+}
+function setNjFilter(v){ njFilter = v; document.getElementById("njF").value = v; renderJoiners(); }
+function sortJoiners(k){ njSort = {k, dir: njSort.k === k ? -njSort.dir : (k === "email" ? 1 : -1)}; renderJoiners(); }
+function renderJoiners(){
+  const q = document.getElementById("njQ").value.trim().toLowerCase();
+  const cnt = {never: 0, notstarted: 0, progress: 0, done: 0, mailfail: 0};
+  NJ.forEach(r => { cnt[njState(r)]++; if (r.mail === "failed") cnt.mailfail++; });
+  const tiles = [["", "Total", NJ.length], ["never", "Never logged in", cnt.never], ["notstarted", "Form not started", cnt.notstarted],
+                 ["progress", "In progress", cnt.progress], ["done", "All forms submitted", cnt.done]];
+  if (cnt.mailfail) tiles.push(["mailfail", "Email not sent", cnt.mailfail]);
+  document.getElementById("njSum").innerHTML = tiles.map(([k, l, n]) => `<button type="button" class="${njFilter === k ? "on" : ""}" onclick="setNjFilter('${k}')"><b>${n}</b><span>${l}</span></button>`).join("");
+  document.getElementById("njCount").textContent = NJ.length;
+  let rows = NJ.filter(r => (!q || r.email.toLowerCase().includes(q) || r.empid.toLowerCase().includes(q)) &&
+    (!njFilter || (njFilter === "mailfail" ? r.mail === "failed" : njState(r) === njFilter)) &&
+    inRange(r[document.getElementById("njBy").value], document.getElementById("njFrom").value, document.getElementById("njTo").value));
+  const {k, dir} = njSort;
+  rows.sort((a, b) => { const x = a[k] ?? "", y = b[k] ?? ""; return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  document.querySelectorAll("#njTable th.sort").forEach(th => { th.classList.toggle("on", th.dataset.s === k); th.querySelector(".ar").textContent = th.dataset.s === k ? (dir > 0 ? "↑" : "↓") : "↕"; });
+  document.getElementById("njShown").textContent = rows.length === NJ.length ? "" : `showing ${rows.length} of ${NJ.length}`;
+  const pg = pgSlice("pgNj", rows, [q, njFilter, document.getElementById("njBy").value, document.getElementById("njFrom").value, document.getElementById("njTo").value, njSort.k, njSort.dir].join("|"));
+  pgRender("pgNj", rows.length);
+  document.getElementById("njAll").innerHTML = rows.length ? pg.rows.map((r, i) => `<tr>
+      <td class="n">${pg.offset + i + 1}</td>
+      <td class="em">${esc(r.email)}</td>
+      <td class="dim">${esc(r.empid)}</td>
+      <td>${njDate(r.created_at)}</td>
+      <td>${r.mail === "sent" ? '<span class="pill p-ok" title="' + esc(njDateTime(r.mail_at)) + '">Sent</span>' : r.mail === "failed" ? '<span class="pill p-bad" title="' + esc(njDateTime(r.mail_at)) + '">Not sent</span>' : '<span class="pill p-none">—</span>'}</td>
+      <td>${r.last_login ? njDateTime(r.last_login) : '<span class="dim">Never</span>'}</td>
+      <td>${njPill(r.application)}</td><td>${njPill(r.undertaking)}</td><td>${njPill(r.policy)}</td><td>${njPill(r.kyc)}</td>
+      <td><div class="prog"><i><b style="width:${Math.round(r.submitted_count * 100 / 4)}%"></b></i><span>${r.submitted_count}/4</span></div></td>
+      <td style="white-space:nowrap">${r.kyc !== "none" ? `<button class="btn btn-ghost btn-sm" onclick="viewKyc(\x27${esc(r.empid)}\x27)" title="View the KYC details and documents"><i class="fas fa-id-card"></i> KYC</button> ` : ""}<button class="btn btn-ghost btn-sm" onclick="if(confirm(\x27Generate a new password for ${esc(r.email)}? The old password will stop working and they will be e-mailed the new one.\x27)) genJoiners(\x27${esc(r.email)}\x27)"><i class="fas fa-rotate"></i> New password</button></td></tr>`).join("")
+    : '<tr><td colspan="12" class="empty">' + (NJ.length ? "No joiners match this filter" : "No new-joiner logins yet") + "</td></tr>";
+}
+async function loadJoiners(){
+  try { NJ = (await njApi("/employee-form/admin/joiners")).rows; renderJoiners(); } catch(e) {}
+}
+async function downloadAll(qs){
+  const res = await fetch("/employee-form/admin/export" + (qs ? "?" + qs : ""), {headers: AUTH});
+  if (!res.ok) { alert("Export failed"); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob());
+  a.download = "Employee_Forms_KYC_and_New_Joiners.xlsx"; a.click(); URL.revokeObjectURL(a.href);
+}
+function exportJoiners(){       // from the New Joiners tab: its date filter applies to the joiners sheet
+  const g = id => document.getElementById(id).value;
+  downloadAll([g("njFrom") && "date_from=" + g("njFrom"), g("njTo") && "date_to=" + g("njTo"), "joiners_by=" + g("njBy")].filter(Boolean).join("&"));
+}
+// ── KYC details of one person (answers + uploaded documents), opened from the tables above ──
+let KYC_SPEC = null;
+const kbs = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB";
+function spLine(d){
+  if (d.status !== "submitted") return "";
+  const sp = d.sharepoint || {}, ok = sp.status === "saved" || sp.status === "partial";
+  const box = (bg, bd, col, html) => `<div style="margin-top:.8rem;padding:.6rem .9rem;border-radius:10px;background:${bg};border:1px solid ${bd};color:${col};font-size:.84rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;justify-content:space-between"><span>${html}</span><button class="btn btn-ghost btn-sm" onclick="kycSp('${esc(d.empid)}')"><i class="fas fa-cloud-arrow-up"></i> Save ${ok ? "again" : "now"}</button></div>`;
+  const where = (sp.where || []).join(" + ");
+  const places = [sp.local_path && `<div>OneDrive folder: <b>${esc(sp.local_path)}</b></div>`, sp.path && `<div>SharePoint: <b>${esc(sp.path)}</b></div>`].filter(Boolean).join("");
+  if (sp.status === "saved") return box("#f3fbf8", "#9bdcc9", "#0d7a70", `<i class="fas fa-circle-check"></i> Saved to ${esc(where)} (Excel + ${sp.files} document${sp.files === 1 ? "" : "s"})${places}`);
+  if (sp.status === "partial") return box("#fff8e1", "#ffe08a", "#7a5b00", `<i class="fas fa-circle-check"></i> Saved to ${esc(where)} (Excel + ${sp.files} document${sp.files === 1 ? "" : "s"})${places}<div style="margin-top:.3rem"><i class="fas fa-triangle-exclamation"></i> ${esc(sp.error || "")}</div>`);
+  if (sp.status === "pending") return box("#fff8e1", "#ffe08a", "#7a5b00", `<i class="fas fa-hourglass-half"></i> Being saved…`);
+  if (sp.status === "failed") return box("#fdecea", "#f5b7b1", "#c0392b", `<i class="fas fa-triangle-exclamation"></i> Not saved: ${esc(sp.error || "unknown error")}`);
+  return box("#eceef4", "#dfe2ec", "#6b7280", `<i class="fas fa-circle-info"></i> Not saved to OneDrive / SharePoint yet${sp.status === "not_configured" ? " (the server has no save folder or Microsoft Graph settings)" : ""}`);
+}
+async function kycSp(empid){
+  try { const r = await njApi("/kyc-form/admin/" + encodeURIComponent(empid) + "/sharepoint", {method: "POST"});
+        if (r.status !== "saved") alert("Not saved: " + (r.error || r.status)); } catch(e) { alert(e.message); }
+  viewKyc(empid);
+}
+async function viewKyc(empid){
+  try {
+    if (!KYC_SPEC) KYC_SPEC = await njApi("/kyc-form/spec");
+    const d = await njApi("/kyc-form/admin/" + encodeURIComponent(empid));
+    const n = KYC_SPEC.answers.length;
+    document.getElementById("kycTitle").textContent = "KYC Details — " + d.empid + (d.name ? " · " + d.name : "");
+    const dl = rows => `<dl style="display:grid;grid-template-columns:230px 1fr;gap:.35rem .9rem;font-size:.88rem;margin:0">${rows}</dl>`;
+    document.getElementById("kycBody").innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+        <span class="pill ${d.status === "submitted" ? "pill-yes" : "pill-draft"}">${d.status === "submitted" ? "Submitted " + fmt(d.submitted_at) : "Draft · last saved " + fmt(d.updated_at)}</span>
+        <span style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="kycDetails('${esc(d.empid)}','xlsx')" title="Download these details as Excel"><i class="fas fa-file-excel"></i> Details (Excel)</button>
+          <button class="btn btn-ghost btn-sm" onclick="kycDetails('${esc(d.empid)}','pdf')" title="Download these details as PDF"><i class="fas fa-file-pdf"></i> Details (PDF)</button>
+          ${d.status === "submitted" ? `<button class="btn btn-ghost btn-sm" onclick="kycReopen('${esc(d.empid)}')"><i class="fas fa-lock-open"></i> Reopen for editing</button>` : ""}</span></div>
+      ${spLine(d)}
+      <h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin:1.1rem 0 .5rem">Employee details</h4>
+      ${dl(KYC_SPEC.answers.map((f, i) => `<dt style="color:var(--muted)">${i + 1}. ${esc(f.label)}</dt><dd style="margin:0;font-weight:500;word-break:break-word">${esc(d.data[f.key] || "—")}</dd>`).join(""))}
+      <h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin:1.1rem 0 .5rem">Documents</h4>
+      ${dl(KYC_SPEC.uploads.map((u, i) => { const f = (d.files || {})[u.key];
+        return `<dt style="color:var(--muted)">${n + i + 1}. ${esc(u.label)}</dt><dd style="margin:0;font-weight:500;word-break:break-word">${f ? `<a href="#" onclick="kycFile('${esc(d.empid)}','${u.key}','${esc(f.name).replace(/'/g, "")}');return false"><i class="fas fa-download"></i> ${esc(f.name)}</a> <span style="color:var(--muted)">(${kbs(f.size)})</span>` : '<span style="color:var(--muted)">Not uploaded</span>'}</dd>`; }).join(""))}`;
+    document.getElementById("kycModal").style.display = "flex";
+  } catch(e) { alert(e.message); }
+}
+function closeKyc(){ document.getElementById("kycModal").style.display = "none"; }
+async function kycDetails(empid, ext){
+  const res = await fetch(`/kyc-form/admin/${encodeURIComponent(empid)}/details.${ext}`, {headers: AUTH});
+  if (!res.ok) { alert("Could not download the details"); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob()); a.download = `KYC Details - ${empid}.${ext}`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function kycFile(empid, field, name){
+  const res = await fetch(`/kyc-form/admin/${encodeURIComponent(empid)}/file/${field}`, {headers: AUTH});
+  if (!res.ok) { alert("Could not download the file"); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob()); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function kycReopen(empid){
+  if (!confirm("Let " + empid + " edit and submit the KYC form again?")) return;
+  try { await njApi(`/kyc-form/admin/${encodeURIComponent(empid)}/reopen`, {method: "POST"}); closeKyc(); await loadList(); render(); loadJoiners(); } catch(e) { alert(e.message); }
+}
+function exportXlsx(){          // from the Application Forms tab: its date filter applies to the whole file
+  const g = id => document.getElementById(id).value;
+  downloadAll(dateQs(g("dBy"), g("dFrom"), g("dTo")));
+}
+// ── Delete a submitted form so the employee can fill and submit it again ──
+let delTarget = null;
+function delForm(empid, name){
+  delTarget = empid;
+  document.getElementById('delWho').textContent = empid + (name ? ' — ' + name : '');
+  document.querySelector('input[name="delPart"][value="all"]').checked = true;
+  document.getElementById('delMsg').textContent = '';
+  document.getElementById('delModal').style.display = 'flex';
+}
+function closeDel(){ document.getElementById('delModal').style.display = 'none'; delTarget = null; }
+async function confirmDel(){
+  const part = document.querySelector('input[name="delPart"]:checked').value, msg = document.getElementById('delMsg');
+  msg.textContent = 'Deleting…';
+  try {
+    const res = await fetch('/employee-form/admin/' + encodeURIComponent(delTarget) + '?part=' + part, {method:'DELETE', headers:AUTH});
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.detail || 'Delete failed');
+    closeDel(); await loadList(); render(); loadJoiners();
+  } catch(e) { msg.textContent = e.message; }
+}
+async function loadList(){
+  const res = await fetch('/employee-form/admin/list', {headers:AUTH});
+  if (res.status===401) { window.location.href='/login'; return false; }
+  if (res.status===403) { window.location.href='/control-panel'; return false; }
+  all = (await res.json()).rows; return true;
+}
+pgSetup('pgNj', () => renderJoiners()); pgSetup('pgApp', () => render());
+if (location.hash === '#forms') showTab('app');
+(async function(){
+  try { if (await loadList() === false) return; } catch(e) {}
+  render(); loadJoiners();
+  document.getElementById('ls').style.display='none';
+  document.getElementById('app').style.display='block';
+})();
+</script>
+</body>
+</html>

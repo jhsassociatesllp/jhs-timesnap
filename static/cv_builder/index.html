@@ -127,6 +127,10 @@
     .actions{display:flex;align-items:center;justify-content:flex-end;gap:.8rem;margin-top:1.4rem;padding-top:1.2rem;border-top:2px solid var(--border);flex-wrap:wrap}
 
     /* ── Template selector strip ── */
+    #memDetBox{display:none!important}   /* membership level / number are not on the slide */
+    .area-card{border:2px solid var(--border);border-radius:12px;padding:.8rem;margin-bottom:.8rem;display:grid;gap:.5rem;background:#fff}
+    .area-head{display:grid;grid-template-columns:1fr 34px;gap:.5rem;align-items:center}
+    .area-head .fi{font-weight:700}
     .tpl-strip{margin-bottom:2rem;padding:1.5rem;background:linear-gradient(135deg,#f0f4ff,#e8f4ff);border-radius:15px;border-left:5px solid var(--accent)}
     .tpl-strip-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem}
     .tpl-strip-header h4{font-size:.95rem;font-weight:700;color:var(--text);margin:0}
@@ -218,15 +222,11 @@
       .doc-bar{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem}
     .doc-bar .left,.doc-bar .right{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
     .doc-host{background:#d9dde6;border-radius:14px;padding:1rem;overflow:auto;max-height:82vh;min-height:300px;position:relative}
-    .doc-host .docx-wrapper{background:transparent!important;padding:0!important}
-    .doc-host .docx-wrapper>section.docx{margin:0 auto 1rem!important;box-shadow:0 4px 18px rgba(0,0,0,.2)}
     .doc-msg{padding:3rem 1rem;text-align:center;color:var(--muted)}
     .saved-note{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:.6rem 1rem;font-size:.85rem;margin-bottom:1rem;display:none}
       .tpl-off{display:none!important}
     #memDet.no-level .det-row.mem{grid-template-columns:150px 1fr}
     #memDet.no-level .mem-level{display:none}
-    #asgRows.no-role .asg-row{grid-template-columns:1.2fr 1.5fr 1fr 34px}
-    #asgRows.no-role .asg-role{display:none}
     .tpl-note{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:.65rem 1rem;font-size:.83rem;margin-bottom:1.4rem;display:flex;gap:.6rem;align-items:flex-start}
     .tpl-note i{margin-top:.15rem}
       .sec-off{display:none!important}
@@ -306,36 +306,15 @@
         </div>
       </div>
 
-      <!-- ══ Template Selector Strip ══ -->
+      <!-- ══ Download strip ══ -->
       <div class="tpl-strip">
         <div class="tpl-strip-header">
-          <h4><i class="fas fa-palette"></i> Choose Your CV Template</h4>
-          <button class="btn btn-ghost btn-sm" onclick="openPreviewModal()">
-            <i class="fas fa-expand-alt"></i> Browse Full Preview
+          <h4><i class="fas fa-file-powerpoint"></i> Your JHS Profile Slide</h4>
+          <button class="btn btn-pri btn-sm" onclick="downloadPpt(this)">
+            <i class="fas fa-file-powerpoint"></i> Download Profile PPT
           </button>
         </div>
-        <div class="tpl-grid" id="tplGrid">
-          <!-- injected by JS -->
-        </div>
-        <div class="tpl-dl-row">
-          <span class="tpl-sel-label">Selected: <strong id="tplSelLabel">Template 1</strong></span>
-          <span style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <button class="btn btn-pri btn-sm" id="dlDocx" onclick="downloadCV('docx')">
-              <i class="fas fa-file-word"></i> Download Word
-            </button>
-            <button class="btn btn-pri btn-sm" id="dlPdf" onclick="downloadCV('pdf')">
-              <i class="fas fa-file-pdf"></i> Download PDF
-            </button>
-            <button class="btn btn-ghost btn-sm ppt-btn" onclick="downloadPpt(this)">
-              <i class="fas fa-file-powerpoint"></i> Profile PPT
-            </button>
-          </span>
-        </div>
-        <div class="layout-pick">
-          <span class="tpl-sel-label">CV length:</span>
-          <label class="rad"><input type="radio" name="pgl" value="2" checked onchange="setLayout('2')"> 2 pages</label>
-          <label class="rad"><input type="radio" name="pgl" value="1" onchange="setLayout('1')"> 1 page <small>(compact)</small></label>
-        </div>
+        <span class="tpl-sel-label">Fill in the details below &mdash; your profile is saved automatically and downloaded as a one-slide PowerPoint in the JHS format.</span>
       </div>
 
       <!-- Tabs -->
@@ -346,7 +325,6 @@
 
       <!-- ════ TAB: PROFILE ════ -->
       <div class="tc active" id="tc-profile">
-        <div class="tpl-note"><i class="fas fa-info-circle"></i><span id="tplNote"></span></div>
         <div class="card" id="resumeCard">
           <div class="card-title"><i class="fas fa-file-import"></i> Auto-fill from your old resume <span class="hint">(optional)</span></div>
           <p style="font-size:.83rem;color:var(--muted);margin-bottom:.9rem">
@@ -378,12 +356,14 @@
                 <input class="fi" type="text" id="f_dept" placeholder="Type your department / team" />
               </div>
               <div class="form-group">
-                <label><i class="fas fa-clock"></i> Total Experience (Years)</label>
-                <input class="fi" type="text" id="f_exp" placeholder="Type your total experience in years" />
-              </div>
-              <div class="form-group" data-tpl="" data-label="Photo">
-                <label><i class="fas fa-image"></i> Professional Photo URL</label>
-                <input class="fi" type="text" id="f_photo" placeholder="Paste your photo link (optional)" />
+                <label><i class="fas fa-image"></i> Professional Photo <span class="hint">(shown on the slide; portrait works best)</span></label>
+                <input type="hidden" id="f_photo" />
+                <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+                  <img id="photoPrev" alt="" style="display:none;width:60px;height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--border)" />
+                  <label class="btn btn-ghost btn-sm" style="cursor:pointer"><i class="fas fa-upload"></i> Choose photo
+                    <input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="photoChosen(this.files[0]);this.value=''" /></label>
+                  <button type="button" class="btn btn-ghost btn-sm" id="photoRm" style="display:none" onclick="setPhoto('')"><i class="fas fa-times"></i> Remove</button>
+                </div>
               </div>
               <div class="form-group">
                 <label><i class="fas fa-envelope"></i> Email</label>
@@ -393,13 +373,14 @@
                 <label><i class="fas fa-phone"></i> Phone</label>
                 <input class="fi" type="text" id="f_phone" placeholder="Type your phone number" />
               </div>
-              <div class="form-group" data-tpl="1,2,3" data-label="Location">
+              <div class="form-group">
                 <label><i class="fas fa-map-marker-alt"></i> Location</label>
                 <input class="fi" type="text" id="f_loc" placeholder="Type your city / location" />
               </div>
               <div class="form-group full" data-sec="summary">
-                <label><i class="fas fa-align-left"></i> Professional Summary</label>
-                <textarea class="fi" id="f_summary" rows="4" placeholder="Type a short summary about yourself (2-4 lines)"></textarea>
+                <label><i class="fas fa-align-left"></i> Headline / Summary</label>
+                <textarea class="fi" id="f_summary" rows="3" maxlength="190" placeholder="One or two sentences - the headline at the top of your slide" oninput="sumCount()"></textarea>
+                <small class="hint" id="sumCnt">0 / 190 &mdash; the last sentence is highlighted in red on the slide</small>
               </div>
             </div>
           </div>
@@ -408,15 +389,15 @@
             <div class="card-title"><i class="fas fa-graduation-cap"></i> Qualifications & Memberships</div>
             <div class="g2">
               <div class="form-group" data-sec="education">
-                <label><i class="fas fa-graduation-cap"></i> Qualification <span class="hint">(multi-select)</span></label>
+                <label><i class="fas fa-graduation-cap"></i> Qualification <span class="hint">(multi-select; shown as boxes on the slide)</span></label>
                 <div class="ms-box" id="ms-qual" data-field="qualification"></div>
               </div>
               <div class="form-group" data-sec="memberships">
-                <label><i class="fas fa-certificate"></i> Institute Membership <span class="hint">(multi-select)</span></label>
+                <label><i class="fas fa-certificate"></i> Institute Membership <span class="hint">(multi-select; boxes follow the qualifications - 4 fit in all)</span></label>
                 <div class="ms-box" id="ms-mem" data-field="membership"></div>
               </div>
-              <div class="form-group full" id="qualDetBox" style="display:none" data-sec="education" data-tpl="1,2,3,4" data-label="Qualification institute &amp; year">
-                <label><i class="fas fa-university"></i> Qualification details <span class="hint">(institute &amp; year - shown on the CV)</span></label>
+              <div class="form-group full" id="qualDetBox" style="display:none" data-sec="education">
+                <label><i class="fas fa-university"></i> Qualification details <span class="hint">(institute - shown beside the qualification on the slide)</span></label>
                 <div id="qualDet"></div>
               </div>
               <div class="form-group full" id="memDetBox" style="display:none" data-sec="memberships">
@@ -428,10 +409,10 @@
 
           <div class="card" data-sec="sectors">
             <div class="card-title"><i class="fas fa-industry"></i> Sector Experience</div>
-            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem;">Select each sector and enter your years/months of experience in that sector.</p>
+            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem;">Up to 8 sectors fit on the slide. Each card shows the sector and the short description you enter. <strong>Sector not in the list?</strong> Type it and press Enter or <em>Add</em> &mdash; it is saved and every other employee will see it in the list too.</p>
             <div class="sector-picker" id="sectorPicker">
               <div class="sector-add-row">
-                <input class="sector-in" id="sectorAddSelect" list="sectorOptions" placeholder="Type or select a sector (add your own if it isn't listed)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();addSector();}">
+                <input class="sector-in" id="sectorAddSelect" list="sectorOptions" placeholder="Type or select a sector, then press Enter" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();addSector();}">
                 <datalist id="sectorOptions"></datalist>
                 <button type="button" class="sector-add-btn" onclick="addSector()"><i class="fas fa-plus"></i> Add</button>
               </div>
@@ -441,67 +422,22 @@
             </div>
           </div>
 
-          <div class="card" data-sec="expertise,other_skills">
-            <div class="card-title"><i class="fas fa-tools"></i> Skills / Areas of Expertise</div>
-            <div class="form-group">
-              <label><i class="fas fa-tools"></i> Skills <span class="hint">(multi-select, type to search)</span></label>
-              <div class="ms-box" id="ms-skills" data-field="skills_expertise"></div>
+          <div class="card">
+            <div class="card-title"><i class="fas fa-bullseye"></i> Skills / Areas of Expertise</div>
+            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">First pick or type an area, then add the details under it. Up to 4 areas fit on the slide, each with up to 3 lines.</p>
+            <div class="sector-add-row">
+              <input class="sector-in" id="areaAddInput" list="areaOptions" placeholder="Type or select an area (e.g. Assurance &amp; Audit)" autocomplete="off" maxlength="26" onkeydown="if(event.key==='Enter'){event.preventDefault();addArea();}" />
+              <datalist id="areaOptions"></datalist>
+              <button type="button" class="sector-add-btn" onclick="addArea()"><i class="fas fa-plus"></i> Add area</button>
             </div>
-            <div class="form-group" style="margin-top:1.1rem" data-sec="expertise">
-              <label><i class="fas fa-bullseye"></i> Key Skills to Highlight <span class="hint">(pick from your skills above - shown as Core Expertise; first 6 skills used if empty)</span></label>
-              <div class="ms-box" id="ms-key" data-field="key_skills"></div>
-            </div>
-            <div class="form-group" style="margin-top:1.1rem;max-width:260px">
-              <label><i class="fas fa-star"></i> Skills to be Highlighted</label>
-              <select class="fi" id="f_hl">
-                <option value="">— Select —</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
-            </div>
+            <div id="areaRows" style="margin-top:1rem"></div>
           </div>
 
           <div class="card">
-            <div class="card-title"><i class="fas fa-trophy"></i> Achievements, Certifications & Social</div>
-            <div class="g2">
-              <div class="form-group full" data-sec="achievements">
-                <label><i class="fas fa-trophy"></i> Achievements / Awards</label>
-                <textarea class="fi" id="f_ach" rows="3" placeholder="Type your achievements or awards (one per line)"></textarea>
-              </div>
-              <div class="form-group full" data-sec="certifications">
-                <label><i class="fas fa-award"></i> Certifications</label>
-                <textarea class="fi" id="f_certs" rows="3" placeholder="Type your certifications (one per line)"></textarea>
-              </div>
-              <div class="form-group">
-                <label><i class="fab fa-linkedin"></i> LinkedIn</label>
-                <input class="fi" type="text" id="f_li" placeholder="Type or paste your LinkedIn link" />
-              </div>
-              <div class="form-group">
-                <label><i class="fas fa-link"></i> Portfolio Link</label>
-                <input class="fi" type="text" id="f_pf" placeholder="Type or paste your portfolio link" />
-              </div>
-            </div>
-          </div>
-
-          <div class="card" data-sec="assignments">
-            <div class="card-title"><i class="fas fa-project-diagram"></i> Key Assignments <span class="hint" style="font-weight:400">(optional)</span></div>
-            <div id="asgRows"></div>
-            <button type="button" class="sector-add-btn" onclick="addAsg()"><i class="fas fa-plus"></i> Add assignment</button>
-          </div>
-
-          <div class="card" id="sectionsCard">
-            <div class="card-title"><i class="fas fa-layer-group"></i> Sections in your CV <span class="hint" id="secTplName"></span></div>
-            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">
-              Switch a section off to remove it from the CV (its inputs are hidden too), or rename its heading.
-              The CV adjusts to match. You can also add sections of your own below.
-            </p>
-            <div class="sec-list" id="secList"></div>
-            <div class="card-title" style="margin-top:1.4rem"><i class="fas fa-plus-circle"></i> Your own sections</div>
-            <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">Add anything the template doesn't have, such as Languages or Publications. Each line becomes a bullet.</p>
-            <div id="csList"></div>
-            <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;align-items:center">
-              <button type="button" class="sector-add-btn" onclick="addCustomSection()"><i class="fas fa-plus"></i> Add section</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="resetSections()"><i class="fas fa-undo"></i> Reset to template default</button>
+            <div class="card-title"><i class="fas fa-tools"></i> Frameworks / Tools</div>
+            <div class="form-group">
+              <label><i class="fas fa-tools"></i> Frameworks, tools &amp; skills <span class="hint">(multi-select, type to search - shown as the chips along the bottom of the slide)</span></label>
+              <div class="ms-box" id="ms-skills" data-field="skills_expertise"></div>
             </div>
           </div>
 
@@ -519,46 +455,18 @@
 
       <!-- ════ TAB: PREVIEW ════ -->
       <div class="tc" id="tc-preview">
-        <div class="saved-note" id="savedNote"><i class="fas fa-check-circle"></i> This is your saved CV. Use <strong>Edit</strong> to change your details &mdash; the preview updates to match.</div>
+        <div class="saved-note" id="savedNote"><i class="fas fa-check-circle"></i> Your profile is saved. Use <strong>Edit</strong> to change your details.</div>
         <div class="doc-bar">
-          <div class="left">
-            <span class="tpl-sel-label">Template: <strong id="pvTplLabel">Template 1</strong> <span class="hint">(change it from the selector above)</span></span>
-          </div>
+          <div class="left"><span class="tpl-sel-label">How your slide looks (sections you hide are left out)</span></div>
           <div class="right">
             <button class="btn btn-ghost btn-sm" onclick="switchTab('profile')"><i class="fas fa-pen"></i> Edit</button>
             <button class="btn btn-ghost btn-sm" onclick="renderPreview()"><i class="fas fa-sync-alt"></i> Refresh</button>
-            <button class="btn btn-pri btn-sm" onclick="downloadCV('docx')"><i class="fas fa-file-word"></i> Word</button>
-            <button class="btn btn-pri btn-sm" onclick="downloadCV('pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
-            <button class="btn btn-ghost btn-sm ppt-btn" onclick="downloadPpt(this)"><i class="fas fa-file-powerpoint"></i> Profile PPT</button>
+            <button class="btn btn-pri btn-sm" onclick="downloadPpt(this)"><i class="fas fa-file-powerpoint"></i> Download PPT</button>
           </div>
         </div>
-        <div class="saved-note" id="pageNote" style="background:#fff7ed;border-color:#fed7aa;color:#9a3412"></div>
-        <div class="doc-host" id="docHost"><div class="doc-msg"><i class="fas fa-file-alt" style="font-size:2rem;display:block;margin-bottom:.6rem"></i>Fill in your details, then open this tab to see your CV.</div></div>
+        <div class="doc-host" id="docHost"><div class="doc-msg"><i class="fas fa-file-powerpoint" style="font-size:2rem;display:block;margin-bottom:.6rem"></i>Open this tab to see your slide.</div></div>
       </div>
 
-
-    </div>
-  </div>
-</div>
-
-<!-- ══ Template Full Preview Modal ══ -->
-<div class="preview-modal-bg" id="previewBg">
-  <div class="preview-modal">
-    <div class="preview-modal-head">
-      <h3><i class="fas fa-palette"></i> Select a CV Template</h3>
-      <button class="modal-x" onclick="closePreviewModal()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="preview-templates-wrap" id="previewGrid">
-      <!-- injected by JS -->
-    </div>
-    <div class="preview-foot">
-      <div class="sel-info">Selected: <strong id="previewSelLabel">Template 1</strong></div>
-      <div class="preview-foot-btns">
-        <button class="btn btn-ghost" onclick="closePreviewModal()">Cancel</button>
-        <button class="btn btn-pri" id="previewDlBtn" onclick="closePreviewModal(); downloadCV('docx')">
-          <i class="fas fa-file-word"></i> Download Selected (Word)
-        </button>
-      </div>
     </div>
   </div>
 </div>
@@ -597,83 +505,45 @@ function updatePill(filled){
   p.textContent=t; p.className='pill pill-'+t;
 }
 
-// ── Template selector ─────────────────────────────────────────────────────────
-const TPL_NAMES = ['Executive Sidebar','Classic Corporate','Modern Banner','Timeline','Proposal Profile'];
-let selectedTpl = '1';
-
-function buildTplGrid(containerId, cardClass, imgH){
-  const grid = document.getElementById(containerId);
-  grid.innerHTML = '';
-  for(let i=1;i<=5;i++){
-    const card = document.createElement('div');
-    card.className = cardClass + (i===parseInt(selectedTpl)?' selected':'');
-    card.id = containerId+'_tpl'+i;
-    card.onclick = () => selectTemplate(String(i));
-    card.innerHTML = `
-      <img src="/cv-builder/template-preview/${i}?t=${Date.now()}"
-           alt="Template ${i}" loading="lazy"
-           onerror="this.style.background='#e8ecf9';this.alt='Template ${i}'"
-           style="height:${imgH}px" />
-      <div class="${cardClass==='tpl-card'?'tpl-card-foot':'preview-tpl-label'}">
-        <span style="font-size:.74rem;font-weight:600;color:#555">T${i}: ${TPL_NAMES[i-1]}</span>
-      </div>
-      <div class="${cardClass==='tpl-card'?'tpl-check':'preview-tpl-check'}"><i class="fas fa-check"></i></div>
-    `;
-    grid.appendChild(card);
-  }
+// The slide does not use these inputs, so they are hidden (anything already saved is kept).
+function sumCount(){
+  const n=document.getElementById('f_summary').value.length;
+  document.getElementById('sumCnt').innerHTML=`${n} / 190 &mdash; the last sentence is highlighted in red on the slide`;
+}
+function hideUnusedFields(){
+  document.getElementById('memDet').classList.add('no-level');
 }
 
-// Which template shows which optional inputs. Anything not listed is used by every template.
-const TPL_RULES = {
-  memLevel: {tpls:['1','2','3','4'], label:'Membership level'},
-  asgRole:  {tpls:['5'],             label:'Assignment role'},
-};
-function applyTemplateFields(id){
-  const off=[];
-  document.querySelectorAll('[data-tpl]').forEach(el=>{
-    const on=el.dataset.tpl.split(',').filter(Boolean).includes(id);
-    el.classList.toggle('tpl-off',!on);
-    if(!on) off.push(el.dataset.label);
-  });
-  const mem=document.getElementById('memDet'), asg=document.getElementById('asgRows');
-  const noLevel=!TPL_RULES.memLevel.tpls.includes(id), noRole=!TPL_RULES.asgRole.tpls.includes(id);
-  mem.classList.toggle('no-level',noLevel); asg.classList.toggle('no-role',noRole);
-  if(noLevel) off.push(TPL_RULES.memLevel.label);
-  if(noRole)  off.push(TPL_RULES.asgRole.label);
-  const name=TPL_NAMES[parseInt(id)-1];
-  document.getElementById('tplNote').innerHTML = off.length
-    ? `<strong>Template ${id} &mdash; ${esc(name)}</strong> doesn't use: ${off.map(esc).join(', ')}. Those inputs are hidden (anything you saved is kept). Switch template above to see them.`
-    : `<strong>Template ${id} &mdash; ${esc(name)}</strong> uses every input on this page.`;
+// ── Photo (stored as a small JPEG data URL) ──────────────────────────────────
+let photoUrl=null;
+function setPhoto(v, silent){
+  document.getElementById('f_photo').value=v||'';
+  const img=document.getElementById('photoPrev');
+  if(photoUrl){ URL.revokeObjectURL(photoUrl); photoUrl=null; }
+  if(v && v.startsWith('/cv-builder/photo')){                 // stored in GridFS: needs the login token, so fetch it
+    img.style.display='block';
+    fetch(v,{headers:{Authorization:`Bearer ${token}`}}).then(r=>r.ok?r.blob():null).then(b=>{
+      if(b && document.getElementById('f_photo').value===v){ photoUrl=URL.createObjectURL(b); img.src=photoUrl; }
+    }).catch(()=>{});
+  } else { img.src=v||''; img.style.display=v?'block':'none'; }
+  document.getElementById('photoRm').style.display=v?'inline-flex':'none';
+  if(!silent) scheduleAutosave();
 }
-
-function selectTemplate(id, silent){
-  selectedTpl = id; if(!silent) scheduleAutosave();
-  applyTemplateFields(id);
-  if(typeof loadSecSpec==='function') loadSecSpec();
-  // Update strip grid
-  document.querySelectorAll('.tpl-card').forEach((c,idx)=>{
-    c.classList.toggle('selected', String(idx+1)===id);
-  });
-  // Update preview grid
-  document.querySelectorAll('.preview-tpl').forEach((c,idx)=>{
-    c.classList.toggle('selected', String(idx+1)===id);
-  });
-  const label = `Template ${id}: ${TPL_NAMES[parseInt(id)-1]}`;
-  document.getElementById('tplSelLabel').textContent = label;
-  document.getElementById('previewSelLabel').textContent = label;
-  if(document.getElementById('tc-preview').classList.contains('active')) renderPreview();
-  if(!silent) toast(`Template ${id} selected: ${TPL_NAMES[parseInt(id)-1]}`);
+function photoChosen(file){
+  if(!file) return;
+  if(!/^image\/(png|jpeg|webp)$/.test(file.type)){ toast('Please choose a PNG, JPG or WEBP image','error'); return; }
+  if(file.size>8*1024*1024){ toast('Photo must be 8 MB or smaller','error'); return; }
+  const url=URL.createObjectURL(file), im=new Image();
+  im.onload=()=>{
+    const max=900, k=Math.min(1,max/Math.max(im.width,im.height)), c=document.createElement('canvas');
+    c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    URL.revokeObjectURL(url);
+    setPhoto(c.toDataURL('image/jpeg',0.85));
+  };
+  im.onerror=()=>{ URL.revokeObjectURL(url); toast('Could not read that image','error'); };
+  im.src=url;
 }
-
-function openPreviewModal(){
-  document.getElementById('previewBg').classList.add('open');
-}
-function closePreviewModal(){
-  document.getElementById('previewBg').classList.remove('open');
-}
-document.getElementById('previewBg').addEventListener('click', e=>{
-  if(e.target===document.getElementById('previewBg')) closePreviewModal();
-});
 
 // ── Dropdowns ─────────────────────────────────────────────────────────────────
 let DD = {};
@@ -697,7 +567,7 @@ function initMS(cid, field, opts){
       td.appendChild(t);
     });
   }
-  const API_FIELD={qualification:'qualification',membership:'membership',skills_expertise:'skills',key_skills:'skills'};
+  const API_FIELD={qualification:'qualification',membership:'membership',skills_expertise:'skills'};
   const has=(arr,v)=>arr.some(x=>x.toLowerCase()===v.toLowerCase());
   async function addCustom(raw){
     const q=raw.replace(/\s+/g,' ').trim();
@@ -710,7 +580,6 @@ function initMS(cid, field, opts){
       const v=d.value;                                           // stored spelling (case-insensitive match)
       if(!has(opts,v)) opts.push(v);                             // suggest it from now on
       if(!has(msState[field],v)) msState[field].push(v);
-      if(field==='key_skills' && !has(msState.skills_expertise||[],v)){ msState.skills_expertise=(msState.skills_expertise||[]).concat(v); setMS('skills_expertise',msState.skills_expertise); }
       inp.value=''; renderTags(); renderDrop(); onMSChange(field);
     }catch(err){ toast(err.message,'error'); }
   }
@@ -746,7 +615,7 @@ function initMS(cid, field, opts){
 
 function setMS(field, vals){
   msState[field]=vals||[];
-  const cm={qualification:'ms-qual',membership:'ms-mem',skills_expertise:'ms-skills',key_skills:'ms-key'};
+  const cm={qualification:'ms-qual',membership:'ms-mem',skills_expertise:'ms-skills'};
   const cid=cm[field];if(!cid)return;
   const td=document.getElementById(cid+'-tags');if(!td)return;
   td.innerHTML='';
@@ -760,7 +629,7 @@ function setMS(field, vals){
 }
 
 // ── Qualification / membership details + assignments ────────────────────────
-let qualDet={}, memDet={}, asgItems=[];
+let qualDet={}, memDet={}, areaItems=[];
 function onMSChange(field){
   scheduleAutosave();
   if(field==='qualification') renderQualDet();
@@ -787,16 +656,25 @@ function renderMemDet(){
 }
 function md(i,k,v){const n=msState['membership'][i];memDet[n]=Object.assign(memDet[n]||{},{[k]:v});}
 
-function renderAsg(){
-  document.getElementById('asgRows').innerHTML=asgItems.map((a,i)=>`<div class="asg-row">
-    <input class="fi" type="text" placeholder="Type the assignment" value="${esc(a.assignment)}" oninput="asgItems[${i}].assignment=this.value">
-    <input class="fi" type="text" placeholder="Type the client / scope" value="${esc(a.client)}" oninput="asgItems[${i}].client=this.value">
-    <input class="fi" type="text" placeholder="Type the sector" value="${esc(a.sector)}" oninput="asgItems[${i}].sector=this.value">
-    <input class="fi asg-role" type="text" placeholder="Type your role" value="${esc(a.role)}" oninput="asgItems[${i}].role=this.value">
-    <button type="button" class="sector-row-rm" onclick="removeAsg(${i})" title="Remove"><i class="fas fa-times-circle"></i></button></div>`).join('');
+// ── Areas of expertise: an area, then its detail lines ───────────────────────
+function renderAreas(){
+  document.getElementById('areaRows').innerHTML=areaItems.map((a,i)=>`<div class="area-card">
+    <div class="area-head">
+      <input class="fi" type="text" maxlength="26" placeholder="Area" value="${esc(a.area)}" oninput="areaItems[${i}].area=this.value;scheduleAutosave()">
+      <button type="button" class="sector-row-rm" onclick="removeArea(${i})" title="Remove area"><i class="fas fa-times-circle"></i></button>
+    </div>
+    ${[0,1,2].map(j=>`<input class="fi" type="text" maxlength="38" placeholder="Detail ${j+1}${j?' (optional)':''}" value="${esc((a.details||[])[j]||'')}" oninput="setAreaDetail(${i},${j},this.value)">`).join('')}
+  </div>`).join('') || '<div class="sector-empty">No areas added yet. Type or select an area above.</div>';
 }
-function addAsg(){asgItems.push({assignment:'',client:'',sector:'',role:''});renderAsg();scheduleAutosave();}
-function removeAsg(i){asgItems.splice(i,1);renderAsg();scheduleAutosave();}
+function setAreaDetail(i,j,v){ const d=areaItems[i].details=areaItems[i].details||['','','']; d[j]=v; scheduleAutosave(); }
+function addArea(){
+  const inp=document.getElementById('areaAddInput'), name=inp.value.replace(/\s+/g,' ').trim();
+  if(!name){ toast('Type or pick an area first','error'); return; }
+  if(areaItems.length>=4){ toast('The slide fits 4 areas - remove one to add another','error'); return; }
+  if(areaItems.some(a=>a.area.toLowerCase()===name.toLowerCase())){ toast('That area is already added','error'); return; }
+  areaItems.push({area:name,details:['','','']}); inp.value=''; renderAreas(); scheduleAutosave();
+}
+function removeArea(i){ areaItems.splice(i,1); renderAreas(); scheduleAutosave(); }
 
 // ── Sector widget ─────────────────────────────────────────────────────────────
 let sectorItems=[];
@@ -806,6 +684,7 @@ function initSectorWidget(list){
 }
 
 async function addSector(){
+  if(sectorItems.length>=8){ toast('The slide fits 8 sectors - remove one to add another','error'); return; }
   const inp=document.getElementById('sectorAddSelect');
   const typed=inp.value.replace(/\s+/g,' ').trim();
   if(!typed){toast('Type or pick a sector first','error');return;}
@@ -838,7 +717,7 @@ function renderSectors(){
     row.innerHTML=`
       <span class="sector-row-name" title="${esc(item.sector)}"><i class="fas fa-industry" style="color:var(--accent);margin-right:.35rem;font-size:.75rem"></i>${esc(item.sector)}</span>
       <div class="sector-row-dur">
-        <input type="text" placeholder="Type the time spent here"
+        <input type="text" maxlength="70" placeholder="Short description shown on the slide"
           value="${esc(item.duration)}"
           oninput="sectorItems[${idx}].duration=this.value"
           onfocus="this.style.borderColor='var(--accent)'"
@@ -863,7 +742,7 @@ async function loadDropdowns(){
   initMS('ms-qual',   'qualification',    DD.qualifications);
   initMS('ms-mem',    'membership',       DD.memberships);
   initMS('ms-skills', 'skills_expertise', DD.skills_expertise);
-  initMS('ms-key',    'key_skills',       DD.skills_expertise);
+  document.getElementById('areaOptions').innerHTML=(DD.skills_expertise||[]).map(v=>`<option value="${esc(v)}">`).join('');
   initSectorWidget(DD.sector_experience);
 }
 
@@ -876,144 +755,49 @@ async function loadProfile(){
   document.getElementById('f_name').value   =p.employee_name||'';
   document.getElementById('f_desig').value  =p.designation||'';
   document.getElementById('f_dept').value   =p.department||'';
-  document.getElementById('f_exp').value    =p.total_experience||'';
-  document.getElementById('f_photo').value  =p.professional_photo||'';
-  document.getElementById('f_ach').value    =p.achievements||'';
-  document.getElementById('f_certs').value  =p.certifications||'';
-  document.getElementById('f_li').value     =p.linkedin||'';
-  document.getElementById('f_pf').value     =p.portfolio||'';
-  document.getElementById('f_hl').value     =p.skills_highlighted||'';
+  setPhoto(p.professional_photo||'', true);
   document.getElementById('f_email').value  =p.email||'';
   document.getElementById('f_phone').value  =p.phone||'';
   document.getElementById('f_loc').value    =p.location||'';
-  document.getElementById('f_summary').value=p.summary||'';
-  if(p.selected_template && ['1','2','3','4','5'].includes(p.selected_template)){ selectTemplate(p.selected_template, true); }
+  document.getElementById('f_summary').value=p.summary||''; sumCount();
   hasSaved=!!p.updated_at;
   rsUndo=null; $id('rsChip').style.display='none';
-  const sc=p.section_config||{};
-  secCfg={hidden:sc.hidden||[],titles:sc.titles||{},custom:(sc.custom||[]).map(c=>Object.assign({id:'',title:'',text:'',visible:true},c))};
-  pageLayout=p.page_layout==='1'?'1':'2';
-  document.querySelectorAll('input[name=pgl]').forEach(r=>r.checked=(r.value===pageLayout));
   qualDet=p.qualification_details||{}; memDet=p.membership_details||{};
   // older profiles kept one membership number on its own: show it against the first membership
   if(p.membership_id && (p.membership||[]).length){
     const first=p.membership[0];
     if(!(memDet[first]&&memDet[first].number)) memDet[first]=Object.assign({},memDet[first]||{},{number:p.membership_id});
   }
-  asgItems=(p.key_assignments||[]).map(a=>Object.assign({assignment:'',client:'',sector:'',role:''},a));
-  renderAsg();
-  loadSecSpec();
+  areaItems=(p.expertise_areas||[]).map(a=>({area:a.area||'',details:[0,1,2].map(j=>(a.details||[])[j]||'')}));
+  if(!areaItems.length && (p.key_skills||[]).length)                      // older profiles: start from the key skills
+    areaItems=p.key_skills.slice(0,4).map(k=>({area:k,details:['','','']}));
+  renderAreas();
   setMS('qualification',    p.qualification||[]);
   setMS('membership',       p.membership||[]);
   setMS('skills_expertise', p.skills_expertise||[]);
-  setMS('key_skills',       p.key_skills||[]);
   setSectors(p.sector_experience||[]);
   updatePill(!!p.updated_at);
   if(p.updated_at) setSaveState('saved');
 }
 
 // ── Save profile ──────────────────────────────────────────────────────────────
-// ── Sections (show / hide / rename / add) ────────────────────────────────────
-let secCfg = {hidden:[], titles:{}, custom:[]};
-let secSpec = [];                       // sections of the selected template
-const secSpecCache = {};
-
-async function loadSecSpec(){
-  const id = selectedTpl;
-  if(!secSpecCache[id]){
-    try{ secSpecCache[id] = (await (await fetch('/cv-builder/sections/'+id)).json()).sections || []; }
-    catch(e){ secSpecCache[id] = []; }
-  }
-  if(id !== selectedTpl) return;
-  secSpec = secSpecCache[id];
-  renderSections();
-}
-function secKeys(){ return secSpec.map(x=>x.key); }
-function isHidden(k){ return secCfg.hidden.includes(k) && secKeys().includes(k); }
-
-function renderSections(){
-  document.getElementById('secTplName').textContent = `Template ${selectedTpl}: ${TPL_NAMES[parseInt(selectedTpl)-1]}`;
-  document.getElementById('secList').innerHTML = secSpec.map(sp=>{
-    const off = secCfg.hidden.includes(sp.key);
-    return `<div class="sec-row ${off?'off':''}">
-      <label class="sw" title="Show / hide this section"><input type="checkbox" ${off?'':'checked'} onchange="toggleSection('${sp.key}',this.checked)"><span></span></label>
-      <div class="sec-name">${esc(sp.label)}<small>${sp.title?'Heading: '+esc(sp.title):'Part of another heading'}</small></div>
-      <div class="sec-title">${sp.editable
-        ? `<input class="fi" type="text" maxlength="60" placeholder="${esc(sp.title)}" value="${esc(secCfg.titles[sp.key]||'')}" ${off?'disabled':''} oninput="setSecTitle('${sp.key}',this.value)">`
-        : '<span class="hint">No separate heading in this template</span>'}</div>
-    </div>`;}).join('');
-  renderCustom();
-  applySectionVisibility();
-}
-function toggleSection(k,on){
-  secCfg.hidden = secCfg.hidden.filter(x=>x!==k);
-  if(!on) secCfg.hidden.push(k);
-  renderSections(); scheduleAutosave();
-}
-function setSecTitle(k,v){ if(v.trim()) secCfg.titles[k]=v; else delete secCfg.titles[k]; }
-
-function renderCustom(){
-  document.getElementById('csList').innerHTML = secCfg.custom.map((c,i)=>`<div class="cs-card ${c.visible===false?'off':''}">
-    <div class="cs-head">
-      <label class="sw" title="Show / hide"><input type="checkbox" ${c.visible===false?'':'checked'} onchange="secCfg.custom[${i}].visible=this.checked;renderCustom();scheduleAutosave()"><span></span></label>
-      <input class="fi" type="text" maxlength="60" placeholder="Type the section heading" value="${esc(c.title)}" oninput="secCfg.custom[${i}].title=this.value">
-      <button type="button" class="sector-row-rm" title="Delete section" onclick="deleteCustom(${i})"><i class="fas fa-trash"></i></button>
-    </div>
-    <textarea class="fi" rows="3" placeholder="Type one item per line" oninput="secCfg.custom[${i}].text=this.value">${esc(c.text)}</textarea>
-  </div>`).join('') || '<p class="hint" style="margin:0 0 .8rem">No custom sections yet.</p>';
-}
-function addCustomSection(){
-  secCfg.custom.push({id:'c'+Date.now().toString(36),title:'',text:'',visible:true});
-  renderCustom(); scheduleAutosave();
-  const t=document.querySelectorAll('#csList .cs-card input.fi'); if(t.length) t[t.length-1].focus();
-}
-function deleteCustom(i){
-  if(!confirm('Delete this section?')) return;
-  secCfg.custom.splice(i,1); renderCustom(); scheduleAutosave();
-}
-function resetSections(){
-  if(!confirm('Reset the template to its default? All hidden sections, renamed headings and your own sections will be cleared.')) return;
-  secCfg={hidden:[],titles:{},custom:[]}; renderSections(); scheduleAutosave(); toast('Template reset to default');
-}
-// hide the inputs of switched-off sections
-function applySectionVisibility(){
-  document.querySelectorAll('[data-sec]').forEach(el=>{
-    const keys=el.dataset.sec.split(',');
-    el.classList.toggle('sec-off', keys.every(k=>isHidden(k)));
-  });
-}
-
 function collectPayload(){
   return {
     designation:document.getElementById('f_desig').value.trim(),
     department:document.getElementById('f_dept').value.trim(),
-    professional_photo:document.getElementById('f_photo').value.trim(),
+    professional_photo:(v=>v.startsWith('data:')?v:(v?'__keep__':''))(document.getElementById('f_photo').value.trim()),
     qualification:msState['qualification']||[],
     membership:msState['membership']||[],
     membership_id:'',
-    total_experience:document.getElementById('f_exp').value.trim(),
     sector_experience:sectorItems.map(i=>({sector:i.sector,duration:i.duration})),
     skills_expertise:msState['skills_expertise']||[],
-    skills_highlighted:document.getElementById('f_hl').value,
-    achievements:document.getElementById('f_ach').value.trim(),
-    certifications:document.getElementById('f_certs').value.trim(),
-    linkedin:document.getElementById('f_li').value.trim(),
-    portfolio:document.getElementById('f_pf').value.trim(),
     email:document.getElementById('f_email').value.trim(),
     phone:document.getElementById('f_phone').value.trim(),
     location:document.getElementById('f_loc').value.trim(),
     summary:document.getElementById('f_summary').value.trim(),
-    key_skills:msState['key_skills']||[],
     qualification_details:Object.fromEntries((msState['qualification']||[]).map(n=>[n,qualDet[n]||{}])),
     membership_details:Object.fromEntries((msState['membership']||[]).map(n=>[n,memDet[n]||{}])),
-    key_assignments:asgItems.filter(a=>Object.values(a).some(v=>(v||'').trim())),
-    selected_template:selectedTpl,
-    page_layout:pageLayout,
-    section_config:{
-      hidden:secCfg.hidden,
-      titles:secCfg.titles,
-      custom:secCfg.custom.filter(c=>(c.title||'').trim()||(c.text||'').trim()),
-    },
+    expertise_areas:areaItems.filter(a=>(a.area||'').trim()).map(a=>({area:a.area.trim(),details:(a.details||[]).map(d=>(d||'').trim()).filter(Boolean)})),
   };
 }
 
@@ -1033,6 +817,7 @@ async function saveProfile(e,thenPreview=false,silent=false){
     if(!silent) toast('Profile saved!','success'); ok=true; hasSaved=true; resumeDone();
     updatePill(true);
     setSaveState('saved');
+    { const ph=d.profile&&d.profile.professional_photo; if(ph&&ph.startsWith('/cv-builder/photo')&&document.getElementById('f_photo').value.startsWith('data:')) setPhoto(ph,true); }
   }catch(err){toast('Error: '+err.message,'error');}
   btns.forEach((b,i)=>{b.disabled=false;b.innerHTML=origs[i];});
   if(ok&&thenPreview) switchTab('preview');
@@ -1065,6 +850,7 @@ async function runAutosave(keepalive=false){
       headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(collectPayload())});
     if(!res.ok) throw new Error('save failed');
     hasSaved=true; setSaveState('saved');
+    try{ const j=await res.clone().json(); const ph=j.profile&&j.profile.professional_photo; if(ph&&ph.startsWith('/cv-builder/photo')&&document.getElementById('f_photo').value.startsWith('data:')) setPhoto(ph,true); }catch(x){}
   }catch(e){ setSaveState('error'); autosaveAgain=true; setTimeout(()=>{ if(autosaveAgain){autosaveAgain=false; scheduleAutosave();} },4000); }
   autosaving=false;
   if(autosaveAgain && !autosaveTimer){ autosaveAgain=false; scheduleAutosave(); }
@@ -1073,6 +859,16 @@ async function runAutosave(keepalive=false){
   const userEdit=e=>{ if(e.target && (e.target.id==='rsFile')) return; scheduleAutosave(); };
   ['tc-profile','tc-preview'].forEach(id=>{ const el=document.getElementById(id); if(!el) return;
     el.addEventListener('input',userEdit); el.addEventListener('change',userEdit); });
+  // Enter in any text box saves straight away (no waiting for the delay, no page submit)
+  const profile=document.getElementById('tc-profile');
+  if(profile) profile.addEventListener('keydown',e=>{
+    if(e.key!=='Enter' || e.defaultPrevented || e.isComposing) return;
+    const t=e.target;
+    if(!t || t.tagName!=='INPUT' || ['file','checkbox','radio','button'].includes(t.type)) return;
+    e.preventDefault();
+    if(typeof rsUndo!=='undefined' && rsUndo){ toast('Press "Keep these details" to save the resume details','error'); return; }
+    runAutosave().then(()=>toast('Saved','success'));
+  });
   const flush=()=>{ if(autosaveTimer) runAutosave(true); };       // do not lose the last few characters when the page closes
   window.addEventListener('pagehide',flush);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flush(); });
@@ -1087,9 +883,8 @@ const $id=i=>document.getElementById(i);
 const textIO=id=>({get:()=>$id(id).value, set:v=>{$id(id).value=v;}, isEmpty:()=>!$id(id).value.trim()});
 const RS_FIELDS={
   designation:textIO('f_desig'), department:textIO('f_dept'),
-  email:textIO('f_email'), phone:textIO('f_phone'), location:textIO('f_loc'), linkedin:textIO('f_li'), portfolio:textIO('f_pf'),
-  summary:textIO('f_summary'), total_experience:textIO('f_exp'),
-  certifications:textIO('f_certs'), achievements:textIO('f_ach'),
+  email:textIO('f_email'), phone:textIO('f_phone'), location:textIO('f_loc'), 
+  summary:textIO('f_summary'),
   qualification:{get:()=>[...(msState.qualification||[])], set:v=>setMS('qualification',v)},
   membership:{get:()=>[...(msState.membership||[])], set:v=>setMS('membership',v)},
   skills_expertise:{get:()=>[...(msState.skills_expertise||[])], set:v=>setMS('skills_expertise',v)},
@@ -1097,11 +892,11 @@ const RS_FIELDS={
   membership_details:{get:()=>JSON.parse(JSON.stringify(memDet)), set:v=>{memDet=v; renderMemDet();}},
   sector_experience:{get:()=>sectorItems.map(x=>({...x})), set:v=>{sectorItems=v; renderSectors();}},
 };
-const RS_LABELS={designation:'designation',department:'department',email:'email',phone:'phone',location:'location',linkedin:'LinkedIn',portfolio:'portfolio link',summary:'summary',
-  total_experience:'total experience',membership_details:'membership number',certifications:'certifications',achievements:'achievements',
+const RS_LABELS={designation:'designation',department:'department',email:'email',phone:'phone',location:'location',summary:'summary',
+  membership_details:'membership number',
   qualification:'qualifications',membership:'memberships',skills_expertise:'skills',qualification_details:'institute & year',sector_experience:'sectors'};
 const RS_ORDER=['designation','department','qualification','qualification_details','membership','skills_expertise','sector_experience',
-  'email','phone','location','linkedin','portfolio','summary','total_experience','membership_details','certifications','achievements'];
+  'email','phone','location','summary','membership_details'];
 const unionCI=(a,b)=>{const out=[...a]; b.forEach(x=>{ if(!out.some(y=>y.toLowerCase()===x.toLowerCase())) out.push(x); }); return out;};
 
 function rsMessage(kind,html){ const m=$id('rsMsg'); m.className='rs-msg '+kind; m.innerHTML=html; if(!html) m.style.display='none'; }
@@ -1170,12 +965,26 @@ function resumeDone(){ if($id('rsChip').style.display!=='none'){ $id('rsChip').s
   ['dragleave','drop'].forEach(e=>d.addEventListener(e,ev=>{ev.preventDefault();d.classList.remove('over');}));
   d.addEventListener('drop',ev=>resumeChosen(ev.dataTransfer.files[0])); })();
 
-// ── CV length (1 or 2 pages) and the optional profile PPT ────────────────────
-let pageLayout='2';
-function setLayout(v){
-  pageLayout=v; scheduleAutosave();
-  if(document.getElementById('tc-preview').classList.contains('active')) renderPreview();
+// ── Slide view (the saved profile rendered as a PDF) ─────────────────────────
+let pvSeq=0, pvUrl=null;
+async function renderPreview(){
+  const host=document.getElementById('docHost'), my=++pvSeq;
+  host.innerHTML='<div class="doc-msg"><div class="spin spin-dark"></div> Building your slide…</div>';
+  try{
+    if(autosaveTimer||autosaving){ await runAutosave(); }                // show what is on the form, saved
+    const res=await fetch('/cv-builder/view',{headers:{Authorization:`Bearer ${token}`}});
+    if(!res.ok){let d=null;try{d=await res.json();}catch(x){} throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Preview failed');}
+    const blob=await res.blob();
+    if(my!==pvSeq) return;
+    if(pvUrl) URL.revokeObjectURL(pvUrl);
+    pvUrl=URL.createObjectURL(blob);
+    host.innerHTML=`<iframe src="${pvUrl}#toolbar=0&navpanes=0" style="width:100%;height:70vh;border:0;border-radius:12px;background:#fff"></iframe>`;
+  }catch(err){
+    if(my===pvSeq) host.innerHTML=`<div class="doc-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}<br><small>You can still download the PPT.</small></div>`;
+  }
 }
+
+// ── Profile PPT download ─────────────────────────────────────────────────────
 async function saveBlob(res, fallbackName){
   const blob=await res.blob(), u=URL.createObjectURL(blob);
   const cd=res.headers.get('Content-Disposition')||''; const m=/filename="?([^";]+)"?/.exec(cd);
@@ -1193,29 +1002,6 @@ async function downloadPpt(btn){
   btn.disabled=false; btn.innerHTML=orig;
 }
 
-// ── Live preview (renders the real Word output in the browser) ───────────────
-let pvSeq=0;
-async function renderPreview(){
-  const host=document.getElementById('docHost'), my=++pvSeq;
-  document.getElementById('pvTplLabel').textContent=`Template ${selectedTpl}: ${TPL_NAMES[parseInt(selectedTpl)-1]}`;
-  host.innerHTML='<div class="doc-msg"><div class="spin spin-dark"></div> Building your CV…</div>';
-  try{
-    const res=await fetch(`/cv-builder/preview/docx/${selectedTpl}`,{method:'POST',
-      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(collectPayload())});
-    if(!res.ok){let d=null;try{d=await res.json();}catch(x){} throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Preview failed');}
-    const buf=await res.arrayBuffer();
-    if(my!==pvSeq) return;                      // a newer render superseded this one
-    if(!window.docx||!window.docx.renderAsync) throw new Error('Preview library could not be loaded (check your internet connection). You can still download the Word file.');
-    host.innerHTML='';
-    await window.docx.renderAsync(buf,host,null,{className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,useBase64URL:true});
-    const pages=host.querySelectorAll('section.docx').length, note=document.getElementById('pageNote');
-    if(pageLayout==='1'&&pages>1){note.style.display='block';note.innerHTML=`<i class="fas fa-exclamation-triangle"></i> Your CV is longer than one page (${pages} pages). Hide a section or shorten some text in the <strong>Sections</strong> tab to fit on one page.`;}
-    else note.style.display='none';
-  }catch(err){
-    if(my===pvSeq) host.innerHTML=`<div class="doc-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}</div>`;
-  }
-}
-
 // ── Clear all: empties every input and deletes the saved profile ─────────────
 async function clearAllDetails(){
   const wasReady=autosaveReady; autosaveReady=false; clearTimeout(autosaveTimer); autosaveTimer=null;
@@ -1227,18 +1013,14 @@ async function clearAllDetails(){
     let d=null; try{d=await res.json();}catch(x){}
     if(!res.ok) throw new Error((d&&typeof d.detail==='string'&&d.detail)||'Could not clear your saved details');
     // database is clean -> empty the page too
-    ['f_desig','f_dept','f_exp','f_photo','f_email','f_phone','f_loc','f_summary','f_ach','f_certs','f_li','f_pf']
+    ['f_desig','f_dept','f_photo','f_email','f_phone','f_loc','f_summary']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    ['f_hl'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    updatePill(false);
-    ['qualification','membership','skills_expertise','key_skills'].forEach(f=>setMS(f,[]));
+    setPhoto('', true); updatePill(false);
+    ['qualification','membership','skills_expertise'].forEach(f=>setMS(f,[]));
     qualDet={}; memDet={}; renderQualDet(); renderMemDet();
-    setSectors([]); asgItems=[]; renderAsg();
-    secCfg={hidden:[],titles:{},custom:[]}; renderSections();
+    setSectors([]); areaItems=[]; renderAreas();
     rsUndo=null; document.getElementById('rsChip').style.display='none'; rsMessage('',''); 
-    pageLayout='2'; document.querySelectorAll('input[name=pgl]').forEach(r=>r.checked=(r.value==='2'));
     hasSaved=false; setSaveState(''); document.getElementById('savedNote').style.display='none';
-    document.getElementById('docHost').innerHTML='<div class="doc-msg"><i class="fas fa-file-alt" style="font-size:2rem;display:block;margin-bottom:.6rem"></i>Fill in your details, then open this tab to see your CV.</div>';
     switchTab('profile'); window.scrollTo({top:0,behavior:'smooth'});
     toast('All details cleared. You can start fresh.','success');
   }catch(err){ toast('Error: '+err.message,'error'); }
@@ -1248,30 +1030,11 @@ async function clearAllDetails(){
 
 function resetForm(){loadProfile();toast('Reset to last saved values');}
 
-// ── CV Download ───────────────────────────────────────────────────────────────
-async function downloadCV(fmt){
-  const btn=document.getElementById(fmt==='pdf'?'dlPdf':'dlDocx');
-  const orig=btn.innerHTML;
-  btn.disabled=true;btn.innerHTML='<div class="spin spin-dark"></div> '+(fmt==='pdf'?'Making PDF…':'Generating…');
-  try{
-    if(!(await saveProfile(null,false,true))) throw new Error('Could not save your profile');   // file = what you see
-    const res=await fetch(`/cv-builder/download/${fmt}/${selectedTpl}`,{headers:{Authorization:`Bearer ${token}`}});
-    if(!res.ok){let e=null;try{e=await res.json();}catch(x){} throw new Error((e&&typeof e.detail==='string'&&e.detail)||'Failed');}
-    await saveBlob(res,`CV_${(document.getElementById('f_name').value||empId).replace(/\s+/g,'_')}_T${selectedTpl}.${fmt==='pdf'?'pdf':'docx'}`);
-    toast(`CV downloaded as ${fmt==='pdf'?'PDF':'Word'} (Template ${selectedTpl})`,'success');
-  }catch(err){toast('Download failed: '+err.message,'error');}
-  btn.disabled=false;btn.innerHTML=orig;
-}
-
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init(){
-  // Build template grids
-  buildTplGrid('tplGrid',    'tpl-card',    140);
-  buildTplGrid('previewGrid','preview-tpl', 180);
-
-  applyTemplateFields(selectedTpl);
+  hideUnusedFields();
   await loadDropdowns();
   await loadProfile();
   autosaveReady=true;                                    // from now on, what the user types is saved automatically
@@ -1286,6 +1049,5 @@ async function init(){
 init();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
 </body>
 </html>

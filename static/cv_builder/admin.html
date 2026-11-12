@@ -10,19 +10,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/buddy_referral/theme.css" />
   <style>
+    .vw-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:900;display:none;align-items:flex-start;justify-content:center;padding:1.2rem}
+    .vw-bg.open{display:flex}
+    .vw{background:#fff;border-radius:16px;width:100%;max-width:1100px;height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.4)}
+    .vw-head{background:var(--pg);color:#fff;padding:.9rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .vw-head h3{font-size:.95rem;margin:0;display:flex;align-items:center;gap:.5rem}
+    .vw-body{flex:1;overflow:auto;background:#d9dde6}
+    .vw-body iframe{width:100%;height:100%;border:0;background:#fff}
+    .vw-msg{padding:3rem 1rem;text-align:center;color:#555}
+    .x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
     .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:2px solid var(--border);background:#fff;color:var(--accent);cursor:pointer;transition:var(--tr);font-size:.9rem}
     .icon-btn:hover{border-color:var(--accent);background:#f0f4ff;transform:translateY(-1px)}
     .icon-btn.w{color:#2b579a}.icon-btn.p{color:#c0392b}.icon-btn.o{color:#c8102e}
     .acts{display:flex;gap:.35rem;white-space:nowrap}
-    .vw-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:900;display:none;align-items:flex-start;justify-content:center;padding:1.2rem}
-    .vw-bg.open{display:flex}
-    .vw{background:#fff;border-radius:16px;width:100%;max-width:980px;height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.4)}
-    .vw-head{background:var(--pg);color:#fff;padding:.9rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-    .vw-head h3{font-size:.95rem;margin:0;display:flex;align-items:center;gap:.5rem}
-    .vw-body{flex:1;overflow:auto;background:#d9dde6}
-    .vw-body .docx-wrapper{background:transparent!important;padding:1rem!important}
-    .vw-msg{padding:3rem 1rem;text-align:center;color:#555}
-    .x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
   </style>
 </head>
 <body>
@@ -76,8 +76,6 @@
   </div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
 
 <script>
 const empId = localStorage.getItem('loggedInEmployeeId') || '';
@@ -118,35 +116,34 @@ function renderCV(){
   const rows=cvRows.filter(r=>(f==='all'||(f==='filled')===r.filled) &&
     (!q || [r.empid,r.name,r.manager,r.partner].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('cvBody').innerHTML = rows.length ? rows.map(r=>{
-    const e=encodeURIComponent(r.empid), t=esc(r.template||'1');
+    const e=encodeURIComponent(r.empid);
     return `<tr>
     <td><b>${esc(r.empid)}</b></td><td>${esc(r.name)}</td><td>${esc(r.manager)||'—'}</td><td>${esc(r.partner)||'—'}</td>
     <td>${r.filled?'<span class="pill pill-yes"><i class="fas fa-check"></i>&nbsp;Filled</span>':'<span class="pill pill-no">Not filled</span>'}</td>
     <td>${esc(r.profile_status)||'—'}</td><td>${fmt(r.updated_at)}</td>
     <td>${r.filled?`<div class="acts">
-      <button class="icon-btn" title="Preview CV" onclick="previewCV('${e}','${t}','${esc(r.name)}')"><i class="fas fa-eye"></i></button>
-      <button class="icon-btn w" title="Download Word" onclick="download('/cv-builder/admin/download/${e}/${t}?fmt=docx','CV_${esc(r.empid)}.docx')"><i class="fas fa-file-word"></i></button>
-      <button class="icon-btn p" title="Download PDF" onclick="download('/cv-builder/admin/download/${e}/${t}?fmt=pdf','CV_${esc(r.empid)}.pdf')"><i class="fas fa-file-pdf"></i></button>
-      ${r.ppt?`<button class="icon-btn o" title="Download profile PPT" onclick="download('/cv-builder/admin/ppt/${e}','Profile_${esc(r.empid)}.pptx')"><i class="fas fa-file-powerpoint"></i></button>`:''}
+      <button class="icon-btn" title="View CV" onclick="viewCV('${e}','${esc(r.name)}')"><i class="fas fa-eye"></i></button>
+      <button class="icon-btn o" title="Download profile PPT" onclick="download('/cv-builder/admin/ppt/${e}','Profile_${esc(r.empid)}.pptx')"><i class="fas fa-file-powerpoint"></i></button>
     </div>`:''}</td>
   </tr>`;}).join('') : '<tr><td colspan="8"><div class="empty"><i class="fas fa-user-slash"></i>No employees match.</div></td></tr>';
 }
 
-// ── CV preview (renders the employee's saved CV from its Word file) ──────────
-async function previewCV(e,t,name){
+
+// ── CV view (the employee's saved profile slide as a PDF) ────────────────────
+let vwUrl=null;
+async function viewCV(e,name){
   const bg=document.getElementById('vwBg'), body=document.getElementById('vwBody');
   document.getElementById('vwTitle').textContent='CV — '+name;
   body.innerHTML='<div class="vw-msg"><div class="spin spin-dark"></div> Loading…</div>'; bg.classList.add('open');
   try{
-    const r=await fetch(`/cv-builder/admin/download/${e}/${t}?fmt=docx`,{headers:AUTH});
+    const r=await fetch(`/cv-builder/admin/view/${e}`,{headers:AUTH});
     if(!r.ok){ let d=null; try{d=await r.json();}catch(x){} throw new Error((d&&d.detail)||'Could not load the CV'); }
-    const buf=await r.arrayBuffer();
-    if(!window.docx||!window.docx.renderAsync) throw new Error('Viewer could not load (check your internet connection). Use the download buttons instead.');
-    body.innerHTML='';
-    await window.docx.renderAsync(buf, body, null, {className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,useBase64URL:true});
-  }catch(err){ body.innerHTML=`<div class="vw-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}</div>`; }
+    if(vwUrl) URL.revokeObjectURL(vwUrl);
+    vwUrl=URL.createObjectURL(await r.blob());
+    body.innerHTML=`<iframe src="${vwUrl}"></iframe>`;
+  }catch(err){ body.innerHTML=`<div class="vw-msg"><i class="fas fa-exclamation-circle" style="font-size:2rem;color:#ef4444;display:block;margin-bottom:.6rem"></i>${esc(err.message)}<br><small>You can still download the PPT.</small></div>`; }
 }
-function closeView(){ document.getElementById('vwBg').classList.remove('open'); document.getElementById('vwBody').innerHTML=''; }
+function closeView(){ document.getElementById('vwBg').classList.remove('open'); document.getElementById('vwBody').innerHTML=''; if(vwUrl){URL.revokeObjectURL(vwUrl);vwUrl=null;} }
 document.getElementById('vwBg').addEventListener('mousedown',ev=>{ if(ev.target.id==='vwBg') closeView(); });
 document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') closeView(); });
 

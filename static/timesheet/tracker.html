@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Project tracker — JHS</title>
+    <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/timesheet/styles.css" />
+    <link rel="stylesheet" href="/static/timesheet/shell.css" />
+    <link rel="stylesheet" href="/static/timesheet/my-day.css" />
+    <link rel="stylesheet" href="/static/timesheet/daily.css" />
+    <link rel="stylesheet" href="/static/timesheet/dashboards.css" />
+    <link rel="stylesheet" href="/static/timesheet/dash-theme.css" />
+    <link rel="stylesheet" href="/static/timesheet/team.css" />
+    <link rel="stylesheet" href="/static/timesheet/tracker.css" />
+  </head>
+  <body>
+    <div id="appNav" data-active="tracker"></div>
+
+    <div class="container md">
+      <div class="header"><h1><i class="fas fa-list-check"></i> Project tracker</h1></div>
+
+      <div class="md-body">
+        <div id="msg" class="dt-banner"></div>
+
+        <section class="day-head filters" aria-label="Filters">
+          <div class="form-group" id="teamWrap" hidden><label for="fTeam">Manager</label><select id="fTeam"><option value="">Whole firm</option></select></div>
+          <div class="form-group"><label for="fShow">Projects</label><select id="fShow">
+            <option value="open">Open (not closed)</option><option value="all">All, including closed</option><option value="closed">Closed only</option></select></div>
+          <div class="form-group"><label for="fClient">Client</label><select id="fClient"><option value="">All clients</option></select></div>
+          <div class="form-group"><label for="fAudit">Audit type</label><select id="fAudit"><option value="">All types</option></select></div>
+          <div class="form-group"><label for="fStatus">Status</label><select id="fStatus"><option value="">Any status</option>
+            <option value="delayed">Delayed</option><option value="at_risk">At risk</option><option value="on_track">On track</option>
+            <option value="no_plan">Not planned</option><option value="on_hold">On hold</option><option value="completed">Completed</option></select></div>
+          <button class="dt-btn" id="reload" type="button"><i class="fas fa-rotate"></i> Show</button>
+          <button class="dt-btn go" id="download" type="button"><i class="fas fa-file-excel"></i> Download this view</button>
+        </section>
+        <p class="sub" id="asOf"></p>
+
+        <div id="content" hidden>
+          <div class="kpi-row" id="tiles"></div>
+
+          <div class="dt-card">
+            <h3><i class="fas fa-file-lines"></i> Summary</h3>
+            <div id="summary"></div>
+          </div>
+
+          <div class="dt-card">
+            <h3><i class="fas fa-diagram-project"></i> Projects</h3>
+            <p class="hint">Click a project to see its stages. <b>Plan</b>: do the stages have dates. <b>Assigned</b>: does every stage have someone. Worst first.</p>
+            <div class="table-responsive"><table class="dt-grid">
+              <thead><tr><th>Client / project</th><th>Audit type</th><th>Status</th><th>State</th><th>Progress</th><th>Plan</th><th>Assigned</th><th>Final report due</th><th>Worked this week</th></tr></thead>
+              <tbody id="projects"></tbody></table></div>
+          </div>
+
+          <div class="dt-card">
+            <h3><i class="fas fa-building"></i> Clients</h3>
+            <div class="table-responsive"><table class="dt-grid">
+              <thead><tr><th>Client</th><th>Projects</th><th>Completed</th><th>Ongoing</th><th>Pending</th><th>On hold</th><th>Not planned</th><th>Not assigned</th><th>Delayed</th></tr></thead>
+              <tbody id="clients"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/static/timesheet/shell.js"></script>
+    <script src="/static/timesheet/tracker.js"></script>
+  </body>
+</html>

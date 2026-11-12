@@ -35,6 +35,9 @@ class TimesheetEntry(BaseModel):
     idle_time_status: Optional[str] = None
     idle_time_hours: Optional[str] = None
     idle_time_reason: Optional[str] = None
+    nqTaskId: Optional[int] = None            # Nexus Quant task picked as the activity
+    activityOther: Optional[bool] = None      # "Other" activity (not in the assigned list)
+    activityReason: Optional[str] = None      # required when activityOther is true
 
 
 class UpdateTimesheetRequest(BaseModel):
@@ -52,6 +55,9 @@ class UpdateTimesheetRequest(BaseModel):
     remarks: Optional[str] = None
     lunchTime: Optional[str] = None
     travelTime: Optional[str] = None
+    nqTaskId: Optional[int] = None            # Nexus Quant task picked as the activity
+    activityOther: Optional[bool] = None      # "Other" activity (not in the assigned list)
+    activityReason: Optional[str] = None      # required when activityOther is true
 
 
 class ApproveRejectRequest(BaseModel):

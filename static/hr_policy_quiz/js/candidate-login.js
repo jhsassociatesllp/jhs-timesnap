@@ -13,7 +13,7 @@ form.addEventListener("submit", async (e) => {
       method: "POST",
       body: {
         email: document.getElementById("email").value.trim(),
-        password: document.getElementById("password").value,
+        password: document.getElementById("password").value.trim(),
       },
     });
     setToken("candidate", data.access_token);

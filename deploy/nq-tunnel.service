@@ -1,0 +1,23 @@
+# Permanent, read-only SSH tunnel from server A to the Nexus Quant MySQL on server B.
+# Install: see docs/nq_tunnel_server_setup.md. Listens ONLY on the Docker bridge address, so the web containers
+# (which reach it as host.docker.internal) can use it but the internet and other hosts cannot.
+[Unit]
+Description=Nexus Quant database tunnel (autossh)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+EnvironmentFile=/etc/nq-tunnel/nq-tunnel.env
+Environment=AUTOSSH_GATETIME=0
+ExecStart=/usr/bin/autossh -M 0 -N \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
+  -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+  -p ${NQ_SSH_PORT} -i /etc/nq-tunnel/id_nq \
+  -L ${NQ_BIND_ADDR}:${NQ_DB_LOCAL_PORT}:127.0.0.1:${NQ_DB_REMOTE_PORT} \
+  ${NQ_SSH_USER}@${NQ_SSH_HOST}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

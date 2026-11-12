@@ -50,13 +50,65 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 });
 
 // ---------------------------------------------------------------------------
+// Date filter (From / To are calendar days; timestamps from the server are UTC) - also applied to the downloads
+// ---------------------------------------------------------------------------
+const utc = (s) => (/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z");
+function inRange(iso, from, to) {
+  if (!from && !to) return true;
+  if (!iso) return false;
+  const t = new Date(utc(iso)).getTime();
+  if (from && t < new Date(from + "T00:00:00").getTime()) return false;
+  if (to && t > new Date(to + "T23:59:59.999").getTime()) return false;
+  return true;
+}
+function dateFilter() {
+  return { by: document.getElementById("dfBy").value, from: document.getElementById("dfFrom").value, to: document.getElementById("dfTo").value };
+}
+function dateQuery() {
+  const { by, from, to } = dateFilter();
+  return [from && "date_from=" + from, to && "date_to=" + to, (from || to) && "by=" + by].filter(Boolean).join("&");
+}
+["dfBy", "dfFrom", "dfTo"].forEach((id) => document.getElementById(id).addEventListener("change", () => loadCandidates()));
+document.getElementById("dfClear").addEventListener("click", () => {
+  document.getElementById("dfFrom").value = ""; document.getElementById("dfTo").value = ""; loadCandidates();
+});
+
+// ---------------------------------------------------------------------------
+// Paging: at most one page of candidates on screen (10 / 25 / 50 / 100 per page); the numbers above the table
+// (total / completed / average) still cover every candidate that matches the date filter.
+// ---------------------------------------------------------------------------
+const quizPg = { page: 1, size: 10, sig: null };
+function renderQuizPager(total) {
+  const box = document.getElementById("pgQuiz");
+  const pages = Math.max(1, Math.ceil(total / quizPg.size));
+  if (!total) { box.innerHTML = ""; return; }
+  box.innerHTML = `<span>Rows per page <select id="pgQuizSize">${[10, 25, 50, 100].map((n) => `<option${n === quizPg.size ? " selected" : ""}>${n}</option>`).join("")}</select></span>
+    <span>${(quizPg.page - 1) * quizPg.size + 1}-${Math.min(total, quizPg.page * quizPg.size)} of ${total}</span>
+    <span><button type="button" class="btn btn-ghost btn-sm" id="pgQuizPrev" ${quizPg.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button>
+      Page ${quizPg.page} of ${pages}
+      <button type="button" class="btn btn-ghost btn-sm" id="pgQuizNext" ${quizPg.page >= pages ? "disabled" : ""}>Next &rsaquo;</button></span>`;
+  document.getElementById("pgQuizSize").addEventListener("change", (e) => { quizPg.size = +e.target.value; quizPg.page = 1; loadCandidates(); });
+  document.getElementById("pgQuizPrev").addEventListener("click", () => { quizPg.page--; loadCandidates(); });
+  document.getElementById("pgQuizNext").addEventListener("click", () => { quizPg.page++; loadCandidates(); });
+}
+
+// ---------------------------------------------------------------------------
 // Candidate table + stats
 // ---------------------------------------------------------------------------
 async function loadCandidates() {
-  const rows = await apiRequest("/api/hr/candidates", { role: "hr" });
+  let rows = await apiRequest("/api/hr/candidates", { role: "hr" });
+  const total = rows.length;
+  const { by, from, to } = dateFilter();
+  if (from || to) rows = rows.filter((r) => inRange(r[by], from, to));
+  document.getElementById("dfInfo").textContent = from || to ? `showing ${rows.length} of ${total} candidates` : "";
   const tbody = document.getElementById("candidateTableBody");
   const empty = document.getElementById("candidateEmpty");
   tbody.innerHTML = "";
+  const sig = [by, from, to].join("|");                      // a new date filter starts on page 1
+  if (quizPg.sig !== sig) { quizPg.sig = sig; quizPg.page = 1; }
+  quizPg.page = Math.min(quizPg.page, Math.max(1, Math.ceil(rows.length / quizPg.size)));
+  const pageStart = (quizPg.page - 1) * quizPg.size, pageEnd = pageStart + quizPg.size;
+  renderQuizPager(rows.length);
 
   if (rows.length === 0) {
     empty.style.display = "block";
@@ -66,9 +118,10 @@ async function loadCandidates() {
 
   let completed = 0, inProgress = 0, scoreSum = 0, scoreCount = 0;
 
-  rows.forEach((r) => {
+  rows.forEach((r, idx) => {
     if (r.status === "completed") { completed++; scoreSum += r.score; scoreCount++; }
     if (r.status === "in_progress") inProgress++;
+    if (idx < pageStart || idx >= pageEnd) return;           // counted above, just not drawn on this page
 
     const tr = document.createElement("tr");
     const badgeClass = r.status === "completed" ? "badge-completed" : r.status === "in_progress" ? "badge-progress" : "badge-pending";
@@ -128,7 +181,8 @@ async function downloadReport(format) {
   downloadBtn.disabled = true;
   downloadBtn.textContent = "Preparing...";
   try {
-    const res = await fetch(`${API_BASE}/api/hr/candidates/export.${format}`, {
+    const qs = dateQuery();
+    const res = await fetch(`${API_BASE}/api/hr/candidates/export.${format}${qs ? "?" + qs : ""}`, {
       headers: { Authorization: "Bearer " + getToken("hr") },
     });
     if (!res.ok) throw new Error("Could not generate the report");
@@ -175,7 +229,7 @@ function quickRegenerate(email) {
           role: "hr",
           body: { emails: [email] },
         });
-        showPasswordModal(email, data.password);
+        showPasswordModal(email, data.password, data.mail);
       } catch (err) {
         alert(err.message);
       }
@@ -210,7 +264,7 @@ function showConfirmModal(messageHtml, confirmText, onConfirm) {
   });
 }
 
-function showPasswordModal(email, password) {
+function showPasswordModal(email, password, mail) {
   const root = document.getElementById("attemptModalRoot");
   root.innerHTML = `
     <div class="modal-overlay" id="passwordModalOverlay">
@@ -219,7 +273,7 @@ function showPasswordModal(email, password) {
           <h3>New password generated</h3>
           <button class="btn btn-ghost btn-sm" id="passwordModalClose">Close</button>
         </div>
-        <p class="hint" style="margin-bottom:14px;">For <strong>${escapeHtml(email)}</strong>. Their old password stopped working - share this with them directly.</p>
+        <p class="hint" style="margin-bottom:14px;">For <strong>${escapeHtml(email)}</strong>. Their old password stopped working.</p>${mail ? mailNote(mail) : ""}
         <div class="password-display">
           <span id="passwordText">${escapeHtml(password)}</span>
           <button class="btn btn-secondary btn-sm" id="copyPasswordBtn">Copy</button>
@@ -248,40 +302,202 @@ document.getElementById("refreshBtn").addEventListener("click", loadCandidates);
 // ---------------------------------------------------------------------------
 let allDocuments = [];
 
+function mailNote(m) {
+  m = m || {};
+  if (m.configured === false) return `<div class="hint" style="margin-top:10px;color:#b9770e;"><strong>Email not sent</strong> - ${escapeHtml(m.error || "the mail service is not set up")} Share the password yourself.</div>`;
+  if ((m.failed || []).length) return `<div class="hint" style="margin-top:10px;color:#b9770e;">Email sent to ${(m.sent || []).length}. <strong>Could not email:</strong> ${m.failed.map(escapeHtml).join(", ")}. ${escapeHtml(m.error || "")} Share the password yourself.</div>`;
+  return `<div class="hint" style="margin-top:10px;color:#0d7a70;"><strong>Email sent</strong> to ${(m.sent || []).length} candidate(s) with the new password.</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Question Bank: HR and IT sections, questions typed in by HR (and added to later)
+// ---------------------------------------------------------------------------
+function renderBanks() {
+  const root = document.getElementById("bankSections");
+  if (!root) return;
+  const open = new Set([...root.querySelectorAll(".bank-new-form.open")].map((f) => f.dataset.section));
+  root.innerHTML = ["HR", "IT"].map((sec) => {
+    const banks = allDocuments.filter((d) => d.kind === "manual" && (d.category || "").toUpperCase() === sec);
+    const total = banks.reduce((n, d) => n + d.question_pool_size, 0);
+    return `<div class="panel">
+      <div class="panel-header"><h3 style="margin:0;">${sec} questions <span style="font-weight:400;font-size:13px;color:#7f8c8d;">(${banks.length} bank${banks.length === 1 ? "" : "s"}, ${total} questions)</span></h3>
+        <button class="btn btn-primary btn-sm" data-new="${sec}">+ New ${sec} question bank</button></div>
+      <div class="panel-body" style="padding:0;">
+        <div class="bank-new-form ${open.has(sec) ? "open" : ""}" data-section="${sec}" style="display:${open.has(sec) ? "flex" : "none"};gap:10px;padding:14px 16px;border-bottom:1px solid #e1e8ed;align-items:center;flex-wrap:wrap;">
+          <input class="bank-name" placeholder="Name, e.g. ${sec === "HR" ? "Leave policy" : "Password and email security"}" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #d5d9e4;border-radius:8px;">
+          <button class="btn btn-primary btn-sm" data-create="${sec}">Create</button>
+          <button class="btn btn-ghost btn-sm" data-cancel="${sec}">Cancel</button>
+          <span class="hint bank-err" style="color:#c0392b;margin:0;"></span>
+        </div>
+        ${banks.length ? `<table><thead><tr><th>Question bank</th><th>Questions</th><th>Created</th><th></th></tr></thead><tbody>${banks.map((d) => `
+          <tr><td>${escapeHtml(d.title)}</td><td>${d.question_pool_size}</td><td>${formatDateTime(d.uploaded_at)}</td>
+          <td style="white-space:nowrap;"><button class="btn btn-primary btn-sm" data-add="${d.document_id}">Add questions</button>
+              <button class="btn btn-secondary btn-sm" data-view="${d.document_id}">View / edit</button>
+              <button class="btn btn-ghost btn-sm" data-del="${d.document_id}">Delete</button></td></tr>`).join("")}</tbody></table>`
+          : `<div class="empty-state">No ${sec} question bank yet. Click "+ New ${sec} question bank" to start.</div>`}
+      </div></div>`;
+  }).join("");
+  const byId = (id) => allDocuments.find((d) => d.document_id === id);
+  root.querySelectorAll("[data-new]").forEach((b) => b.addEventListener("click", () => {
+    const f = root.querySelector(`.bank-new-form[data-section="${b.dataset.new}"]`);
+    f.style.display = "flex"; f.classList.add("open"); f.querySelector("input").focus();
+  }));
+  root.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", () => {
+    const f = b.closest(".bank-new-form"); f.style.display = "none"; f.classList.remove("open");
+  }));
+  root.querySelectorAll("[data-create]").forEach((b) => b.addEventListener("click", async () => {
+    const f = b.closest(".bank-new-form"), name = f.querySelector(".bank-name").value;
+    try {
+      const d = await apiRequest("/api/hr/question-banks", { method: "POST", role: "hr", body: { title: name, category: b.dataset.create } });
+      f.classList.remove("open");
+      await loadDocuments();
+      viewQuestions(d.document_id, d.title, { add: true });
+    } catch (err) { f.querySelector(".bank-err").textContent = err.message; }
+  }));
+  root.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => viewQuestions(b.dataset.add, byId(b.dataset.add).title, { add: true })));
+  root.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => viewQuestions(b.dataset.view, byId(b.dataset.view).title)));
+  root.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => deleteDocument(b.dataset.del, byId(b.dataset.del).title)));
+}
+
+// ---------------------------------------------------------------------------
+// Question review: HR reads every question of a document, and edits or deletes the ones that are not good
+// ---------------------------------------------------------------------------
+let QV = { docId: null, title: "", all: [], page: 1, q: "", editing: null, adding: false, added: 0 };
+const QV_PAGE = 8;
+
+async function viewQuestions(documentId, title, opts = {}) {
+  try {
+    const d = await apiRequest(`/api/hr/documents/${encodeURIComponent(documentId)}/questions`, { role: "hr" });
+    QV = { docId: documentId, title, all: d.questions, page: 1, q: "", editing: null, adding: !!opts.add, added: 0 };
+    let root = document.getElementById("qvRoot");
+    if (!root) { root = document.createElement("div"); root.id = "qvRoot"; document.body.appendChild(root); }
+    root.innerHTML = `
+      <div class="modal-overlay" id="qvOverlay">
+        <div class="modal-box" style="max-width:900px;width:94vw;max-height:88vh;display:flex;flex-direction:column;">
+          <div class="modal-header"><h3 id="qvTitle"></h3><button class="btn btn-ghost btn-sm" id="qvClose">Close</button></div>
+          <div style="padding:10px 16px;border-bottom:1px solid #e1e8ed;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input id="qvSearch" placeholder="Search questions..." style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #d5d9e4;border-radius:8px;">
+            <button class="btn btn-primary btn-sm" id="qvAddBtn">+ Add question</button>
+            <span class="hint" style="margin:0;">Edit or delete anything unclear. Changes apply to quizzes started from now on.</span>
+          </div>
+          <div id="qvList" style="overflow:auto;padding:12px 16px;flex:1;"></div>
+          <div id="qvPager" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid #e1e8ed;font-size:13px;color:#7f8c8d;"></div>
+        </div>
+      </div>`;
+    const close = () => { root.innerHTML = ""; loadDocuments(); };
+    document.getElementById("qvClose").addEventListener("click", close);
+    document.getElementById("qvOverlay").addEventListener("click", (e) => { if (e.target.id === "qvOverlay") close(); });
+    document.getElementById("qvSearch").addEventListener("input", (e) => { QV.q = e.target.value.toLowerCase(); QV.page = 1; renderQv(); });
+    document.getElementById("qvList").addEventListener("click", qvClick);
+    document.getElementById("qvAddBtn").addEventListener("click", () => { QV.adding = true; QV.page = 1; renderQv(); });
+    renderQv();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function qvAddForm() {
+  return `<div class="qv-card qv-new" style="border:2px solid #0d7a70;border-radius:10px;padding:12px;margin-bottom:14px;background:#f4fbfa;">
+    <div style="font-weight:700;margin-bottom:6px;">New question${QV.added ? ` <span style="font-weight:400;color:#0d7a70;">- ${QV.added} added so far</span>` : ""}</div>
+    <textarea id="qvNq" rows="2" placeholder="Type the question" style="width:100%;padding:8px;border:1px solid #d5d9e4;border-radius:8px;margin-bottom:8px;font-family:inherit;"></textarea>
+    ${[0, 1, 2, 3].map((j) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;"><input type="radio" name="qvNewCorrect" value="${j}" title="Tick the correct answer"><span style="width:18px;font-weight:700;color:#7f8c8d;">${"ABCD"[j]}</span><input class="qvNo" placeholder="Option ${"ABCD"[j]}" style="flex:1;padding:7px 9px;border:1px solid #d5d9e4;border-radius:8px;"></div>`).join("")}
+    <div class="hint" style="margin:4px 0 8px;">Tick the dot next to the correct answer.</div>
+    <button class="btn btn-primary btn-sm" data-act="add-save">Save and add next</button>
+    <button class="btn btn-ghost btn-sm" data-act="add-close">Done</button>
+    <span class="hint" id="qvNewErr" style="color:#c0392b;margin-left:8px;"></span></div>`;
+}
+
+function renderQv() {
+  const rows = QV.all.filter((x) => !QV.q || (x.question + " " + x.options.join(" ")).toLowerCase().includes(QV.q));
+  const pages = Math.max(1, Math.ceil(rows.length / QV_PAGE));
+  QV.page = Math.min(QV.page, pages);
+  const start = (QV.page - 1) * QV_PAGE;
+  document.getElementById("qvTitle").innerHTML = `Questions - ${escapeHtml(QV.title)} <span style="font-weight:400;font-size:13px;color:#7f8c8d;">(${QV.all.length})</span>`;
+  document.getElementById("qvList").innerHTML = (QV.adding ? qvAddForm() : "") + (rows.length ? rows.slice(start, start + QV_PAGE).map((x, i) => {
+    if (QV.editing === x.id) {
+      return `<div class="qv-card" data-id="${x.id}" style="border:2px solid #667eea;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:600;color:#7f8c8d;">Question</label>
+        <textarea id="qvEq" rows="2" style="width:100%;padding:8px;border:1px solid #d5d9e4;border-radius:8px;margin:4px 0 8px;font-family:inherit;">${escapeHtml(x.question)}</textarea>
+        ${x.options.map((o, j) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;"><input type="radio" name="qvCorrect" value="${j}" ${j === x.correct_index ? "checked" : ""} title="Correct answer"><span style="width:18px;font-weight:700;color:#7f8c8d;">${"ABCD"[j]}</span><input class="qvEo" value="${escapeHtml(o)}" style="flex:1;padding:7px 9px;border:1px solid #d5d9e4;border-radius:8px;"></div>`).join("")}
+        <div class="hint" style="margin:4px 0 8px;">The dot marks the correct answer.</div>
+        <button class="btn btn-primary btn-sm" data-act="save">Save</button> <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
+        <span class="hint" id="qvErr" style="color:#c0392b;margin-left:8px;"></span></div>`;
+    }
+    return `<div class="qv-card" data-id="${x.id}" style="border:1px solid #e1e8ed;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:600;">${start + i + 1}. ${escapeHtml(x.question)}</div>
+        <div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" data-act="edit">Edit</button> <button class="btn btn-ghost btn-sm" data-act="delete">Delete</button></div></div>
+      <ul style="list-style:none;margin:8px 0 0;padding:0;">${x.options.map((o, j) => `<li style="padding:3px 0;${j === x.correct_index ? "color:#0d7a70;font-weight:600;" : ""}">${"ABCD"[j]}. ${escapeHtml(o)}${j === x.correct_index ? " &#10003;" : ""}</li>`).join("")}</ul>
+      ${x.source ? `<div class="hint" style="margin:8px 0 0;">From the document: &ldquo;${escapeHtml(x.source)}&rdquo;</div>` : ""}</div>`;
+  }).join("") : (QV.adding ? "" : `<div class="empty-state">${QV.all.length ? "No questions match." : "No questions yet. Click \"+ Add question\" to type the first one."}</div>`));
+  if (QV.adding) { const t = document.getElementById("qvNq"); if (t && !t.value) t.focus(); }
+  document.getElementById("qvPager").innerHTML = `<span>${rows.length ? start + 1 : 0}-${Math.min(rows.length, start + QV_PAGE)} of ${rows.length}</span>
+    <span><button class="btn btn-ghost btn-sm" id="qvPrev" ${QV.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button> Page ${QV.page} of ${pages} <button class="btn btn-ghost btn-sm" id="qvNext" ${QV.page >= pages ? "disabled" : ""}>Next &rsaquo;</button></span>`;
+  document.getElementById("qvPrev").addEventListener("click", () => { QV.page--; QV.editing = null; renderQv(); });
+  document.getElementById("qvNext").addEventListener("click", () => { QV.page++; QV.editing = null; renderQv(); });
+}
+
+async function qvClick(e) {
+  const btn = e.target.closest("[data-act]"); if (!btn) return;
+  if (btn.dataset.act === "add-close") { QV.adding = false; renderQv(); return; }
+  if (btn.dataset.act === "add-save") {
+    const box = btn.closest(".qv-new");
+    const body = {
+      question: document.getElementById("qvNq").value,
+      options: [...box.querySelectorAll(".qvNo")].map((i) => i.value),
+      correct_index: Number((box.querySelector('input[name="qvNewCorrect"]:checked') || {}).value),
+    };
+    if (!(body.correct_index >= 0)) { document.getElementById("qvNewErr").textContent = "Tick which option is correct"; return; }
+    try {
+      const saved = await apiRequest(`/api/hr/documents/${encodeURIComponent(QV.docId)}/questions`, { method: "POST", role: "hr", body });
+      QV.all.push(saved); QV.added++; QV.q = ""; document.getElementById("qvSearch").value = "";
+      renderQv();
+    } catch (err) { document.getElementById("qvNewErr").textContent = err.message; }
+    return;
+  }
+  const card = btn.closest(".qv-card"), id = card.dataset.id, item = QV.all.find((x) => x.id === id), act = btn.dataset.act;
+  if (act === "edit") { QV.editing = id; renderQv(); return; }
+  if (act === "cancel") { QV.editing = null; renderQv(); return; }
+  const base = `/api/hr/documents/${encodeURIComponent(QV.docId)}/questions/${encodeURIComponent(id)}`;
+  if (act === "delete") {
+    if (!confirm("Delete this question?\n\n" + item.question)) return;
+    try { await apiRequest(base, { method: "DELETE", role: "hr" }); QV.all = QV.all.filter((x) => x.id !== id); renderQv(); }
+    catch (err) { alert(err.message); }
+    return;
+  }
+  if (act === "save") {
+    const body = {
+      question: document.getElementById("qvEq").value,
+      options: [...card.querySelectorAll(".qvEo")].map((i) => i.value),
+      correct_index: Number((card.querySelector('input[name="qvCorrect"]:checked') || {}).value),
+    };
+    try {
+      const saved = await apiRequest(base, { method: "PUT", role: "hr", body });
+      Object.assign(item, saved); QV.editing = null; renderQv();
+    } catch (err) { document.getElementById("qvErr").textContent = err.message; }
+  }
+}
+
 async function loadDocuments() {
   const docs = await apiRequest("/api/hr/documents", { role: "hr" });
   allDocuments = docs;
-  const tbody = document.getElementById("documentTableBody");
-  const empty = document.getElementById("documentEmpty");
-  const categoryList = document.getElementById("docCategoryList");
-
+  const old = docs.filter((d) => d.kind !== "manual");
+  document.getElementById("oldDocsPanel").style.display = old.length ? "block" : "none";
+  const tbody = document.getElementById("oldDocBody");
   tbody.innerHTML = "";
-  empty.style.display = docs.length === 0 ? "block" : "none";
-
-  const categories = new Set();
-
-  docs.forEach((d) => {
-    if (d.category) categories.add(d.category);
+  old.forEach((d) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(d.title)}</td>
       <td>${d.category ? `<span class="cat-tag">${escapeHtml(d.category)}</span>` : "-"}</td>
-      <td>${escapeHtml(d.filename)}</td>
       <td>${d.question_pool_size}</td>
-      <td>${formatDateTime(d.uploaded_at)}</td>
-      <td><button class="btn btn-ghost btn-sm" data-action="delete-doc">Delete</button></td>
-    `;
+      <td><button class="btn btn-secondary btn-sm" data-action="view-questions">View / edit questions</button>
+          <button class="btn btn-ghost btn-sm" data-action="delete-doc">Delete</button></td>`;
+    tr.querySelector('[data-action="view-questions"]').addEventListener("click", () => viewQuestions(d.document_id, d.title));
     tr.querySelector('[data-action="delete-doc"]').addEventListener("click", () => deleteDocument(d.document_id, d.title));
     tbody.appendChild(tr);
   });
 
-  categoryList.innerHTML = "";
-  categories.forEach((c) => {
-    const opt = document.createElement("option");
-    opt.value = c;
-    categoryList.appendChild(opt);
-  });
-
+  renderBanks();
   renderQuizSetDocPicker();
 }
 
@@ -299,38 +515,6 @@ function deleteDocument(documentId, title) {
     }
   );
 }
-
-document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const errorBox = document.getElementById("uploadError");
-  const successBox = document.getElementById("uploadSuccess");
-  const btn = document.getElementById("uploadBtn");
-  hideError(errorBox);
-  successBox.style.display = "none";
-
-  const fileInput = document.getElementById("docFile");
-  if (!fileInput.files.length) return;
-
-  const formData = new FormData();
-  formData.append("title", document.getElementById("docTitle").value.trim());
-  formData.append("category", document.getElementById("docCategory").value.trim());
-  formData.append("file", fileInput.files[0]);
-
-  btn.disabled = true;
-  btn.textContent = "Reading document and generating questions...";
-  try {
-    const data = await apiRequest("/api/hr/documents", { method: "POST", role: "hr", body: formData, isForm: true });
-    successBox.textContent = `"${data.title}" uploaded - ${data.question_pool_size} questions generated and ready.`;
-    successBox.style.display = "block";
-    document.getElementById("uploadForm").reset();
-    loadDocuments();
-  } catch (err) {
-    showError(errorBox, err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Upload and generate questions";
-  }
-});
 
 // ---------------------------------------------------------------------------
 // Quiz sets: pick multiple documents + a per-document question count
@@ -350,23 +534,24 @@ function renderQuizSetDocPicker(checkedEntries) {
 
   list.innerHTML = "";
   if (allDocuments.length === 0) {
-    list.innerHTML = `<div class="quiz-doc-row"><span class="hint">Upload a document first.</span></div>`;
+    list.innerHTML = `<div class="quiz-doc-row"><span class="hint">Create a question bank first (Question Bank tab).</span></div>`;
     updateQuizSetTotal();
     return;
   }
 
   allDocuments.forEach((d) => {
-    const isChecked = previouslyChecked.has(d.document_id);
+    const isEmpty = !d.question_pool_size;
+    const isChecked = !isEmpty && previouslyChecked.has(d.document_id);
     const count = previouslyChecked.get(d.document_id) || Math.min(5, d.question_pool_size || 1);
     const row = document.createElement("label");
-    row.className = "quiz-doc-row" + (isChecked ? " checked" : "");
+    row.className = "quiz-doc-row" + (isChecked ? " checked" : "") + (isEmpty ? " empty" : "");
     row.innerHTML = `
-      <input type="checkbox" class="quiz-doc-check" data-doc-id="${d.document_id}" ${isChecked ? "checked" : ""} />
+      <input type="checkbox" class="quiz-doc-check" data-doc-id="${d.document_id}" ${isChecked ? "checked" : ""} ${isEmpty ? "disabled" : ""} />
       <span class="quiz-doc-title">${escapeHtml(d.title)}
         ${d.category ? `<span class="cat-tag">${escapeHtml(d.category)}</span>` : ""}
-        <span class="quiz-doc-pool">(${d.question_pool_size} available)</span>
+        <span class="quiz-doc-pool">${isEmpty ? "(no questions yet - add some in the Question Bank tab)" : `(${d.question_pool_size} in the bank)`}</span>
       </span>
-      <span class="quiz-doc-count-label">questions:</span>
+      <span class="quiz-doc-count-label">each candidate gets:</span>
       <input type="number" class="quiz-doc-count" min="1" max="${d.question_pool_size}" value="${count}" ${isChecked ? "" : "disabled"} />
     `;
     const checkbox = row.querySelector(".quiz-doc-check");
@@ -511,6 +696,18 @@ document.getElementById("quizSetForm").addEventListener("submit", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
+function parseEmailList(raw) {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(/[\r\n,;\s]+/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
 // Add candidates
 // ---------------------------------------------------------------------------
 document.getElementById("addForm").addEventListener("submit", async (e) => {
@@ -521,10 +718,7 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
   hideError(errorBox);
   successBox.style.display = "none";
 
-  const emails = document.getElementById("emails").value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const emails = parseEmailList(document.getElementById("emails").value);
   const quizSetId = document.getElementById("quizSetSelect").value;
 
   if (emails.length === 0) { showError(errorBox, "Add at least one email"); return; }
@@ -543,6 +737,16 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
         <strong>${escapeHtml(data.password)}</strong>
         <button type="button" class="btn btn-secondary btn-sm" id="addCopyBtn">Copy</button>
       </div>`;
+    const m = data.mail || {};
+    let mailMsg;
+    if (m.configured === false) {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#b9770e;"><strong>Emails were not sent</strong> - ${escapeHtml(m.error || "the mail service is not set up")} Share the password with the candidates yourself.</div>`;
+    } else if ((m.failed || []).length) {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#b9770e;">Email sent to ${(m.sent || []).length} candidate(s). <strong>Could not email:</strong> ${m.failed.map(escapeHtml).join(", ")}. ${escapeHtml(m.error || "")} Share the password with them yourself.</div>`;
+    } else {
+      mailMsg = `<div class="hint" style="margin-top:10px;color:#0d7a70;"><strong>Email sent</strong> to ${(m.sent || []).length} candidate(s) with the quiz link and their login.</div>`;
+    }
+    successBox.innerHTML += mailMsg;
     successBox.style.display = "block";
     wireCopyButton("addCopyBtn", data.password);
     document.getElementById("addForm").reset();
@@ -566,10 +770,7 @@ document.getElementById("regenForm").addEventListener("submit", async (e) => {
   hideError(errorBox);
   successBox.style.display = "none";
 
-  const emails = document.getElementById("regenEmails").value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const emails = parseEmailList(document.getElementById("regenEmails").value);
 
   if (emails.length === 0) { showError(errorBox, "Add at least one email"); return; }
 
@@ -585,7 +786,7 @@ document.getElementById("regenForm").addEventListener("submit", async (e) => {
       <div class="password-inline">
         <strong>${escapeHtml(data.password)}</strong>
         <button type="button" class="btn btn-secondary btn-sm" id="regenCopyBtn">Copy</button>
-      </div>`;
+      </div>${mailNote(data.mail)}`;
     successBox.style.display = "block";
     wireCopyButton("regenCopyBtn", data.password);
     document.getElementById("regenForm").reset();

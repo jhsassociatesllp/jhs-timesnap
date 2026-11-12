@@ -38,6 +38,14 @@ body{font-family:'Inter','Segoe UI',sans-serif;background:var(--pg);min-height:1
 .card-title{font-size:1rem;font-weight:700;color:var(--text);margin:0 0 1.2rem;display:flex;align-items:center;gap:.5rem;padding-bottom:.75rem;border-bottom:2px solid #e8ecf9}
 .card-title i{color:var(--accent)}
 
+.my-list{margin-top:1.6rem}
+.my-list h3{font-size:1rem;margin:0 0 .7rem;display:flex;align-items:center;gap:.5rem}
+.my-list .tbl-wrap{overflow-x:auto}
+.my-list table{width:100%;border-collapse:collapse;font-size:.85rem}
+.my-list th{background:#f3f4f9;text-align:left;padding:.55rem .7rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#555}
+.my-list td{padding:.55rem .7rem;border-bottom:1px solid var(--border)}
+.my-list .st-a{color:#0f766e;font-weight:700}.my-list .st-i{color:#b91c1c;font-weight:700}
+.my-list .none{padding:1.2rem;text-align:center;color:var(--muted);font-size:.85rem}
 .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:2rem;overflow-x:auto}
 .tab{padding:.85rem 1.6rem;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:.92rem;font-weight:600;cursor:pointer;transition:var(--tr);display:flex;align-items:center;gap:.45rem;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
 .tab:hover{color:var(--accent)}

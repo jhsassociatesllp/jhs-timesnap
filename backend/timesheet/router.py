@@ -46,6 +46,11 @@ from backend.database import (
     db,
 )
 from backend.auth import get_current_user
+from backend.nq import cache as nq_cache
+from backend.nq import repository as nq_repo
+from backend.nq.models import NQUnavailable
+from backend.timesheet import nq_assignments
+from backend.timesheet import rules as ts_rules
 from backend.timesheet.models import (
     TimesheetEntry,
     UpdateTimesheetRequest,
@@ -57,12 +62,16 @@ router = APIRouter(prefix="/timesheet", tags=["Timesheet"])
 # Partner whose employees have no fixed client/project list — those fields
 # are free-typed in the app instead of dropdowns, and their project codes
 # aren't required to follow the PL-prefix convention.
-FREE_TEXT_PARTNER_CODE = "JHS01"
+from backend.timesheet.scope import FREE_TEXT_EMPLOYEE_CODES, FREE_TEXT_PARTNER_CODE  # noqa: E402  (shared with the new timesheet)
 
-# Individual employees exempted the same way regardless of their actual
-# partner — e.g. because they do shared-services-style work under a partner
-# who otherwise uses the fixed client/project list.
-FREE_TEXT_EMPLOYEE_CODES = {"JHS1562"}
+
+def _activity_gate_on() -> bool:
+    """config.nq_activity_required (default True): working-day rows must name an assigned NQ activity
+    (or Other + reason) before a timesheet can be submitted."""
+    try:
+        return bool((db["config"].find_one({"_id": "timesheet"}) or {}).get("nq_activity_required", True))
+    except Exception:
+        return True
 
 
 def _is_free_text_employee(emp_code: str, partner_code: str) -> bool:
@@ -376,17 +385,24 @@ async def submit_timesheet(
         raise HTTPException(404, "No draft found for this cycle")
 
     emp_id = current_user
+    # This submit replaces the payroll's rows wholesale. Rows copied from the approved "My day" timesheet
+    # (v2_mirror) would be lost, so refuse and point the employee to the new screen.
+    _main = timesheets_collection.find_one({"employeeId": emp_id}, {"payrolls": 1}) or {}
+    for _p in _main.get("payrolls", []) or []:
+        if _p.get("cycle_id") == cycle_id and any(e.get("v2_mirror") for e in _p.get("entries", []) or []):
+            raise HTTPException(409, "This payroll cycle already holds days approved in the new timesheet "
+                                     "(My day). Please continue there instead of the classic grid.")
     meta = _trusted_metadata(current_user, temp_payroll.get("metadata") or metadata or {})
     temp_entries = _get_payroll_entries(temp_payroll)
 
-    # Keep not-applicable time fields consistently empty in both the submitted
-    # timesheet and the locked draft. This also makes older drafts conform when
-    # they are submitted after a location is changed.
+    # Keep not-applicable fields consistently empty in both the submitted timesheet and the locked
+    # draft. A day off (Leave / PHY / Week Off) carries no worked hours. Start/end time, lunch, travel and
+    # billable are no longer entered; older drafts that still carry them keep their values untouched.
     for entry in temp_entries:
         location = (entry.get("location", "") or "").strip()
         if location in DAY_OFF_LOCATIONS:
             entry["lunchTime"] = ""
-            entry["billable"] = "No"
+            entry["projectHours"] = ""
         if location in NO_TRAVEL_TIME_LOCATIONS:
             entry["travelTime"] = ""
 
@@ -414,25 +430,11 @@ async def submit_timesheet(
             if not entry.get("date") or (entry.get("date", "") or "")[:10] in required_dates
         ]
 
-    # ── Lunch-time gate ─────────────────────────────────────────────────
-    show_lunch_travel = cycle_doc.get("show_lunch_travel", True) if cycle_doc else True
-    if show_lunch_travel:
-        lunch_errors = []
-        for i, entry in enumerate(validation_entries):
-            if (entry.get("location", "") or "").strip() in DAY_OFF_LOCATIONS:
-                continue  # not a working day — lunch time isn't applicable
-            lt = entry.get("lunchTime", "") or ""
-            if not lt.strip():
-                lunch_errors.append(f"Row {i + 1}: Lunch Time is required")
-        if lunch_errors:
-            raise HTTPException(400, "Cannot submit — " + "; ".join(lunch_errors[:5]))
-
     # ── Mandatory fields gate ───────────────────────────────────────────
     # Every working-day row must be fully filled in before the timesheet can
     # be submitted (draft saves allow partial rows; this is the final check).
     mandatory_fields = [
-        "date", "projectStartTime", "projectEndTime", "client", "project",
-        "projectCode", "reportingManagerEntry", "activity",
+        "date", "client", "project", "projectCode", "reportingManagerEntry", "activity",
     ]
     field_errors = []
     for i, entry in enumerate(validation_entries):
@@ -443,6 +445,13 @@ async def submit_timesheet(
                 field_errors.append(f"Row {i + 1}: {field} is required")
     if field_errors:
         raise HTTPException(400, "Cannot submit — " + "; ".join(field_errors[:5]))
+
+    # ── Project-hours gate ────────────────────────────────────────────────
+    # Employees type their own hours (there is no start/end time any more). HRMS hours are compared
+    # later in the reconciliation, not here.
+    hour_problems = ts_rules.project_hours_errors(validation_entries, DAY_OFF_LOCATIONS)
+    if hour_problems:
+        raise HTTPException(400, "Cannot submit — " + "; ".join(hour_problems[:5]))
 
     # ── PL-prefix gate ──────────────────────────────────────────────────
     # Non-JHS01 partners must use real Nexus Quant project codes (all start
@@ -466,6 +475,18 @@ async def submit_timesheet(
                 code_errors.append(f"Row {i + 1}: project code must start with \"PL\" (Nexus Quant only)")
         if code_errors:
             raise HTTPException(400, "Cannot submit — " + "; ".join(code_errors[:5]))
+
+    # ── Activity gate ─────────────────────────────────────────────────────
+    # Dropdown-mode employees log every working-day row against an activity ASSIGNED to them in
+    # Nexus Quant (nqTaskId), or "Other" with a reason. Free-text employees are exempt, as above.
+    if not _is_free_text_employee(emp_id, submit_partner_code) and _activity_gate_on():
+        try:
+            assigned = {t.id: t for t in nq_assignments.load_assigned_tasks(emp_id)}
+        except NQUnavailable:
+            raise HTTPException(503, "Project data is unavailable right now - please try again in a few minutes")
+        activity_problems = nq_assignments.activity_errors(validation_entries, assigned, DAY_OFF_LOCATIONS)
+        if activity_problems:
+            raise HTTPException(400, "Cannot submit — " + "; ".join(activity_problems[:5]))
 
     # ── Day-completeness gate ────────────────────────────────────────────
     # Every calendar day applicable to the employee in the payroll cycle must
@@ -737,7 +758,20 @@ async def update_timesheet(
         entries = _normalize_payroll_entries(p)
         for i, entry in enumerate(entries):
             if entry.get("id") == entry_id:
-                entries[i] = {**entry, **update_data.dict(exclude_none=True), "updated_time": now_iso, "id": entry_id}
+                merged = {**entry, **update_data.dict(exclude_none=True), "updated_time": now_iso, "id": entry_id}
+                changed = update_data.dict(exclude_none=True)
+                if any(k in changed for k in ("activity", "nqTaskId", "activityOther", "activityReason")):
+                    owner = employee_details_collection.find_one({"EmpID": employee_id}) or {}
+                    partner = (owner.get("PartnerEmpCode", "") or "").strip().upper()
+                    if not _is_free_text_employee(employee_id, partner) and _activity_gate_on():
+                        try:
+                            assigned = {t.id: t for t in nq_assignments.load_assigned_tasks(employee_id)}
+                        except NQUnavailable:
+                            raise HTTPException(503, "Project data is unavailable right now - please try again in a few minutes")
+                        problems = nq_assignments.activity_errors([merged], assigned, DAY_OFF_LOCATIONS)
+                        if problems:
+                            raise HTTPException(400, problems[0].split(": ", 1)[-1])
+                entries[i] = merged
                 updated = True
                 break
         if updated:
@@ -817,47 +851,36 @@ async def get_clients(current_user: str = Depends(get_current_user)):
 
 @router.get("/projects/{employee_id}")
 async def get_employee_projects(employee_id: str, current_user: str = Depends(get_current_user)):
-    if employee_id != current_user:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    """The clients / projects / activities this employee may pick on the timesheet grid.
 
+    Source: Nexus Quant, and ONLY what is assigned to the employee in active projects (NQ is the master;
+    Timesnap never edits it). The JSON keeps the keys the grid already uses (clients, projects_by_client,
+    partner_emp_code) and adds activities_by_project. Free-text employees (partner JHS01 and
+    FREE_TEXT_EMPLOYEE_CODES) keep their plain text boxes and never touch NQ."""
+    if employee_id != current_user:
+        raise HTTPException(403, "Unauthorized")
+
+    result = {"clients": [], "projects_by_client": {}, "activities_by_project": {}, "partner_emp_code": "",
+              "source": "nq", "nq_unavailable": False, "nq_data_may_be_stale": False}
     employee = employee_details_collection.find_one({"EmpID": employee_id})
     if not employee:
-        return {"clients": [], "projects_by_client": {}, "partner_emp_code": ""}
+        return result
 
-    # partner_code only decides dropdown vs. free-text mode (shared services,
-    # matched against FREE_TEXT_PARTNER_CODE on the frontend) — it must NOT
-    # gate the company-wide list below, which every employee should see
-    # regardless of whether PartnerEmpCode happens to be populated for them.
-    partner_code = employee.get("PartnerEmpCode", "").strip().upper()
+    # partner_code decides dropdown vs free-text mode on the frontend (FREE_TEXT_PARTNER_CODE)
+    partner_code = (employee.get("PartnerEmpCode", "") or "").strip().upper()
+    result["partner_emp_code"] = partner_code
+    if _is_free_text_employee(employee_id, partner_code):
+        result["source"] = "free_text"
+        return result
 
-    # Company-wide: every client/project is available to every dropdown-mode
-    # employee, not just the ones belonging to their own partner — they pick
-    # a client first, which then narrows the project list to that client's own.
-    projects = list(db["Projects"].find({}))
-    projects_by_client: dict = {}
-    for p in projects:
-        client = p.get("client_name", "").strip()
-        proj_name = p.get("project_name", "").strip()
-        proj_code = p.get("project_code", "").strip()
-        if not (client and proj_name and proj_code):
-            continue
-        projects_by_client.setdefault(client, [])
-        if not any(x["project_name"] == proj_name for x in projects_by_client[client]):
-            projects_by_client[client].append({
-                "project_name": proj_name,
-                "project_code": proj_code,
-                "execution_start_date": p.get("execution_start_date", ""),
-                "execution_end_date": p.get("execution_end_date", ""),
-            })
-
-    for c in projects_by_client:
-        projects_by_client[c].sort(key=lambda x: x["project_name"])
-
-    return {
-        "clients": sorted(projects_by_client.keys()),
-        "projects_by_client": projects_by_client,
-        "partner_emp_code": partner_code,
-    }
+    try:
+        tasks = nq_assignments.load_assigned_tasks(employee_id)
+    except NQUnavailable:
+        result["nq_unavailable"] = True          # the grid shows a banner; nothing is invented
+        return result
+    result.update(nq_assignments.build_assignment_view(tasks))
+    result["nq_data_may_be_stale"] = nq_cache.data_may_be_stale()
+    return result
 
 
 @router.get("/check-manager/{emp_code}")
@@ -879,6 +902,14 @@ def _lookup_project_plan(project_code: str):
     code = (project_code or "").strip().upper()
     if not code:
         return False, None, None
+    # Nexus Quant is the master for projects and their plan (tasks). If NQ cannot be reached, fall back
+    # to the legacy Mongo lookup below rather than blocking people.
+    try:
+        nq_project = nq_repo.get_project(code)
+        if nq_project is not None:
+            return (len(nq_repo.get_tasks_for_project(code)) > 0, nq_project.start_date, nq_project.end_date)
+    except NQUnavailable:
+        pass
     escaped = re.escape(code)
     plan_query = {
         "$or": [

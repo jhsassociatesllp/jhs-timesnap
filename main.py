@@ -71,14 +71,36 @@ from backend.appraisal.router          import router as appraisal_router
 from backend.quality_audit.router      import router as quality_audit_router   # ← NEW
 from backend.timesheet.timesheet_admin import admin_router
 from backend.hr_policy_quiz.router     import router as hr_quiz_router         # ← NEW
+from backend.resume_ranker.router      import router as resume_ranker_router        # ← RESUME RANKER
+from backend.resume_ranker.router      import startup as resume_ranker_startup
 from backend.employee_declaration.router import router as employee_declaration_router  # ← NEW
 from backend.chatbot.router            import router as chatbot_router             # ← CHATBOT
-from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
+# JHS Library chatbot needs LIBRARY_OPENAI_API_KEY / LIBRARY_PINECONE_API_KEY / LIBRARY_MONGODB_URI at import time.
+# Without them the whole app used to crash on start-up; now only this one module is skipped.
+try:
+    from backend.library_chatbot.router    import router as library_chatbot_router      # ← CHATBOT (JHS Library)
+except Exception as _library_err:
+    import logging as _logging
+    _logging.warning(f"[Library Chatbot] disabled - not imported: {_library_err}")
+    library_chatbot_router = None
 from backend.rcm_chatbot.router        import router as rcm_chatbot_router          # ← CHATBOT (RCM)
 from backend.cv_builder.router         import router as cv_builder_router           # ← CV Builder
 from backend.buddy_referral.router     import router as buddy_referral_router       # ← Buddy Referral
 from backend.access_manager.router     import router as access_manager_router       # ← Control-panel access manager
 from backend.compliance_calendar.router import router as compliance_calendar_router  # ← Compliance Calendar
+from backend.nq.health import router as nq_health_router  # ← NQ health (/api/health/nq)
+from backend.timesheet.daily import router as timesheet_daily_router  # ← hours-only daily timesheet (pilot)
+from backend.timesheet.me import router as timesheet_me_router  # ← role info for the shared menu (/timesheet/v2/me)
+from backend.timesheet.admin import router as timesheet_admin_router  # ← admin setup (/timesheet/v2/admin)
+from backend.timesheet.team_dashboard import router as team_dashboard_router  # ← team dashboard (/timesheet/v2/team)
+from backend.timesheet.project_tracker import router as project_tracker_router  # ← project tracker (/timesheet/v2/tracker)
+from backend.hrms.router import router as hrms_router  # ← HRMS upload + reconciliation
+from backend.cycle.router import router as cycle_router  # ← 10-day cycle review
+from backend.metrics.router import router as dashboard_router  # ← manager / portfolio dashboards
+from backend.metrics.exports import router as exports_router  # ← Excel exports (partners / admins)
+from backend.metrics.admin_exports import router as admin_exports_router  # ← admin data export (/admin-exports)
+from backend.employee_form.router      import router as employee_form_router       # ← Employee Application Form
+from backend.kyc_form.router           import router as kyc_form_router             # ← KYC Details Form
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -99,7 +121,8 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/hr-quiz", "/hr-quiz/", "/hr-quiz/candidate-login",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
                          "/employee-declaration", "/employee-declaration/admin",
-                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin"}
+                         "/resume-ranker",
+                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin", "/employee-form", "/employee-form-admin", "/kyc-form", "/kyc-form-admin"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -119,14 +142,69 @@ app.include_router(appraisal_router)
 app.include_router(quality_audit_router)   # prefix: /quality-audit
 app.include_router(admin_router)
 app.include_router(hr_quiz_router)         # prefix: /hr-quiz
+app.include_router(resume_ranker_router)   # prefix: /resume-ranker
+
+
+@app.on_event("startup")
+async def start_resume_ranker():
+    # indexes + the background worker threads that parse/score uploaded CVs
+    try:
+        resume_ranker_startup()
+    except Exception as e:
+        import logging
+        logging.warning(f"[ResumeRanker] startup skipped: {e}")
+
+
+@app.on_event("startup")
+async def retry_pending_kyc_uploads():
+    """Re-try any KYC submission that was marked 'pending' (server was shut down
+    before the background task finished) or 'failed' (SharePoint was temporarily
+    unavailable). Runs once in the background after startup so it never delays
+    the server coming up."""
+    import asyncio, logging
+    async def _do():
+        await asyncio.sleep(10)          # give the server a moment to finish booting
+        try:
+            from backend.kyc_form.router import _push_to_sharepoint, kyc
+            from backend.kyc_form import sharepoint
+            if not sharepoint.is_configured():
+                return
+            pending = list(kyc.find({"status": "submitted", "sharepoint.status": {"$in": ["pending", "failed", "not_configured"]}}))
+            if not pending:
+                return
+            logging.info("[KYC] Retrying SharePoint upload for %d form(s) …", len(pending))
+            for doc in pending:
+                try:
+                    out = _push_to_sharepoint(doc["empid"])
+                    logging.info("[KYC] %s → %s", doc["empid"], out.get("status"))
+                except Exception as exc:
+                    logging.warning("[KYC] retry failed for %s: %s", doc["empid"], exc)
+        except Exception as exc:
+            logging.warning("[KYC] startup retry skipped: %s", exc)
+    asyncio.ensure_future(_do())
+
 app.include_router(employee_declaration_router)  # prefix: /employee-declaration
 app.include_router(chatbot_router)         # prefix: /chatbot
-app.include_router(library_chatbot_router) # prefix: /chatbot/library
+if library_chatbot_router is not None:
+    app.include_router(library_chatbot_router) # prefix: /chatbot/library
 app.include_router(rcm_chatbot_router)     # prefix: /chatbot/rcm
 app.include_router(cv_builder_router)      # prefix: /cv-builder
 app.include_router(buddy_referral_router)  # prefix: /buddy-referral
 app.include_router(access_manager_router)  # prefix: /access-manager
 app.include_router(compliance_calendar_router)  # prefix: /compliance-calendar
+app.include_router(nq_health_router)  # prefix: /api/health
+app.include_router(timesheet_daily_router)  # prefix: /timesheet/v2
+app.include_router(timesheet_me_router)  # prefix: /timesheet/v2
+app.include_router(timesheet_admin_router)  # prefix: /timesheet/v2/admin
+app.include_router(team_dashboard_router)  # prefix: /timesheet/v2/team
+app.include_router(project_tracker_router)  # prefix: /timesheet/v2/tracker
+app.include_router(hrms_router)  # prefix: /hrms
+app.include_router(cycle_router)  # prefix: /timesheet/v2/cycles
+app.include_router(dashboard_router)  # prefix: /dashboard
+app.include_router(exports_router)  # prefix: /exports
+app.include_router(admin_exports_router)  # prefix: /admin-exports
+app.include_router(employee_form_router)   # prefix: /employee-form
+app.include_router(kyc_form_router)        # prefix: /kyc-form
 from backend.access_manager.router import seed_compliance_admin
 seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 
@@ -166,7 +244,9 @@ async def warmup_chatbot():
             logging.info("[RCM Chatbot] Ready.")
         except Exception as e:
             logging.warning(f"[RCM Chatbot] Warm-up skipped: {e}")
-    await loop.run_in_executor(None, _warmup)
+    # Warm up in the background: the app accepts requests straight away instead of waiting ~10 s for the
+    # embedding model, and the first chat message is still fast once the warm-up has finished.
+    app.state.chatbot_warmup = loop.run_in_executor(None, _warmup)
 
 
 static_root = os.path.join(os.path.dirname(__file__), "static")
@@ -211,7 +291,8 @@ async def modules_page():
 
 @app.get("/timesheet", response_class=FileResponse)
 async def timesheet_page():
-    return FileResponse(os.path.join(static_root, "timesheet", "index.html"))
+    # "My day" shell; it sends non-pilot employees on to the classic page (static/timesheet/index.html).
+    return FileResponse(os.path.join(static_root, "timesheet", "my-day.html"))
 
 @app.get("/appraisal", response_class=FileResponse)
 async def appraisal_page():
@@ -253,6 +334,10 @@ async def employee_declaration_page():
 async def employee_declaration_admin_page():
     return FileResponse(os.path.join(static_root, "employee_declaration", "admin.html"))
 
+@app.get("/resume-ranker", response_class=FileResponse)   # ← RESUME RANKER
+async def resume_ranker_page():
+    return FileResponse(os.path.join(static_root, "resume_ranker", "index.html"))
+
 @app.get("/cv-builder", response_class=FileResponse)   # ← CV Builder
 async def cv_builder_page():
     return FileResponse(os.path.join(static_root, "cv_builder", "index.html"))
@@ -268,6 +353,22 @@ async def referral_admin_page():
 @app.get("/compliance-admin", response_class=FileResponse)   # ← Compliance Calendar admin (control panel)
 async def compliance_admin_page():
     return FileResponse(os.path.join(static_root, "compliance_calendar", "admin.html"))
+
+@app.get("/employee-form-admin", response_class=FileResponse)   # ← Employee Application Form admin (control panel)
+async def employee_form_admin_page():
+    return FileResponse(os.path.join(static_root, "employee_form", "admin.html"))
+
+@app.get("/employee-form", response_class=FileResponse)   # ← Employee Application Form
+async def employee_form_page():
+    return FileResponse(os.path.join(static_root, "employee_form", "index.html"))
+
+@app.get("/kyc-form-admin", response_class=FileResponse)   # ← KYC Details Form admin (HR)
+async def kyc_form_admin_page():
+    return FileResponse(os.path.join(static_root, "kyc_form", "admin.html"))
+
+@app.get("/kyc-form", response_class=FileResponse)   # ← KYC Details Form
+async def kyc_form_page():
+    return FileResponse(os.path.join(static_root, "kyc_form", "index.html"))
 
 @app.get("/buddy-referral", response_class=FileResponse)   # ← Buddy Referral
 async def buddy_referral_page():
@@ -556,20 +657,11 @@ async def get_par_current_status(current_user: str = Depends(get_current_user)):
 @app.get("/get-module-access")
 async def get_module_access(current_user: str = Depends(get_current_user)):
     empid = current_user.strip().upper()
-    print(f"[ModuleAccess] Looking up empid: '{empid}' (len={len(empid)})")
-    doc = module_admin_collection.find_one({"empid": empid})
-    print(f"[ModuleAccess] Found doc: {doc}")
-    if not doc:
-        # Also try case-insensitive search to help debug
-        doc_ci = module_admin_collection.find_one({"empid": {"$regex": f"^{empid}$", "$options": "i"}})
-        print(f"[ModuleAccess] Case-insensitive fallback: {doc_ci}")
-        if doc_ci:
-            modules = doc_ci.get("modules", [])
-            print(f"[ModuleAccess] Using case-insensitive match, modules: {modules}")
-            return {"modules": modules, "is_admin": len(modules) > 0}
-        return {"modules": [], "is_admin": False}
-    modules = doc.get("modules", [])
-    print(f"[ModuleAccess] Returning modules: {modules}")
+    doc = module_admin_collection.find_one({"empid": empid}) or module_admin_collection.find_one(
+        {"empid": {"$regex": f"^{re.escape(empid)}$", "$options": "i"}})
+    # Resume Ranker lives on the main modules page and is governed only by the
+    # Resume_Ranker.Holders collection, so it never counts as a control-panel module.
+    modules = [m for m in (doc.get("modules", []) if doc else []) if m != "resume_ranker"]
     return {"modules": modules, "is_admin": len(modules) > 0}
 
 
@@ -586,7 +678,7 @@ async def set_module_access(
     """
     Set module admin access for a user.
     Only callable by users who themselves have all-module access (super admin).
-    modules: list of strings from ["timesheet", "quality_audit", "kra", "chatbot"]
+    modules: list of strings from ["timesheet", "quality_audit", "kra", "chatbot", "resume_ranker"]
     """
     # Check caller is a super admin (has at least the core 3 modules) —
     # "chatbot" is additive and deliberately not required to already be a
@@ -597,7 +689,7 @@ async def set_module_access(
     if not {"timesheet", "quality_audit", "kra"}.issubset(caller_modules):
         raise HTTPException(403, "Only super admins can assign module access")
 
-    valid = {"timesheet", "quality_audit", "kra", "chatbot", "cv", "buddy_referral"}
+    valid = {"timesheet", "quality_audit", "kra", "chatbot", "resume_ranker", "cv", "buddy_referral", "employee_form"}
     modules = [m for m in request.modules if m in valid]
     empid = request.empid.strip().upper()
 
@@ -1369,6 +1461,7 @@ async def save_timesheets_from_excel(
     # Determine payroll cycle from week period (use first entry's week)
     # For now, we'll need to match the week period to an existing cycle
     # This is a simplified approach - you may need to enhance this logic
+    
     
     from backend.database import timesheets_collection
     from backend.timesheet.router import _get_or_create_payroll, _upsert_week, recalc_payroll_totals

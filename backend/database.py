@@ -23,6 +23,7 @@ appraisal_db = _client["Appraisal"]
 cv_db         = _client["CV_Builder"]         # cv_profiles, cv_custom_options, cv_experience
 referral_db   = _client["Buddy_Referral"]     # buddy_* collections + buddy_referral_resumes GridFS
 compliance_db = _client["Compliance_Table"]   # compliance_calendar_items
+employee_form_db = _client["Employee_Application_Form"]  # employee_application_forms
 
 # ── shared collections ────────────────────────────────────────────────────────
 sessions_collection           = db["sessions"]
@@ -100,3 +101,43 @@ payroll_cycles_collection     = db["payroll_cycles"]
 # Entries are flat (no week grouping) — see backend/timesheet/router.py's
 # module docstring for the full shape and the read-side backward-compat note.
 timesheet_temp_collection     = db["Timesheet_temp"]
+
+# ── project-tracking collections (daily hours-only timesheet) ─────────────────
+# timesheet_entries: ONE document per entry line (not nested). Fields: employee_id,
+#   date (YYYY-MM-DD), task_id, project_code, client, project (copied from NQ),
+#   activity, hours, task_status, is_unplanned, unplanned_reason, cycle_id,
+#   approved, locked, created_at, updated_at (+ task_name, awaiting_hrms).
+# day_submissions: employee_id, date, submitted_at, reco_reason, cycle_id.
+# hrms_attendance: filled by the HRMS upload (Phase 3); read-only here.
+# config: {_id: "timesheet", standard_hours, lunch_hours, tolerance,
+#          pilot_employees: [...], holidays: ["YYYY-MM-DD", ...]}.
+timesheet_entries_collection  = db["timesheet_entries"]
+day_submissions_collection    = db["day_submissions"]
+# day_drafts: {employee_id, date, location, saved_at} - the not-yet-submitted state of a day (its location,
+#   and a day off with no rows). day_submissions only ever holds SUBMITTED days.
+day_drafts_collection         = db["day_drafts"]
+# timesheet_payrolls: the payrolls an ADMIN created (Admin setup): {_id: "2026-10", label, start, end, created_by, created_at,
+#   cycles: [{id: "2026-09-C3", label, start, end, deadline}]} - only these cycles are open for filling and review.
+timesheet_payrolls_collection = db["timesheet_payrolls"]
+hrms_attendance_collection    = db["hrms_attendance"]
+config_collection             = db["config"]
+hrms_uploads_collection       = db["hrms_uploads"]
+daily_reco_collection         = db["daily_reco"]
+# cycle_reviews: kind "approval" {cycle_id, employee_id, status, approved_by/at, history[]} and
+#   kind "reestimate" {cycle_id, task_id, project_code, old/new end date, hours_needed, actor, ...}.
+cycle_reviews_collection      = db["cycle_reviews"]
+# email_log: one row per mail attempt (never the body): kind, key, to, subject, status, error.
+email_log_collection          = db["email_log"]
+# job_runs: one row per scheduled job per day so only one process ever runs it.
+job_runs_collection           = db["job_runs"]
+# Pre-aggregated data for the dashboards (built nightly by backend/metrics/job.py):
+#   hours_daily   : (date, employee_id, project_code, source new|legacy) -> hours
+#   project_metrics: one snapshot per active NQ project per day (hours, % done, RAG, forecast...)
+#   dashboard_daily: per (date, manager) compliance / unplanned / reco counts
+#   team_snapshot : per (date, employee) 10-day load and missing-days streak
+hours_daily_collection        = db["hours_daily"]
+project_metrics_collection    = db["project_metrics"]
+dashboard_daily_collection    = db["dashboard_daily"]
+team_snapshot_collection      = db["team_snapshot"]
+# export_audit: who exported what (kind, date range, row count) - firm-wide data leaves the app here.
+export_audit_collection       = db["export_audit"]

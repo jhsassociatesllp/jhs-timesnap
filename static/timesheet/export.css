@@ -1,0 +1,13 @@
+/* Data export page: builds on styles.css, my-day.css and dash-theme.css */
+.md .datasets{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin:0 0 1.3rem}
+.md .dcard{background:#fff;border:2px solid var(--border-color);border-radius:15px;box-shadow:var(--shadow-light);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.5rem}
+.md .dcard h3{margin:0;font-size:1rem;color:var(--text-dark)}
+.md .dcard h3 i{color:#3498db;margin-right:.4rem}
+.md .dcard p{margin:0;font-size:.85rem;color:var(--text-light);flex:1}
+.md .dcard .dt-btn{align-self:flex-start;height:40px;font-size:.88rem}
+.md .dcard .dt-btn[disabled]{opacity:.6;cursor:wait}
+.md .presets{display:flex;gap:.5rem;flex-wrap:wrap;margin-left:auto;padding-bottom:.2rem}
+.md .presets button{border:2px solid var(--border-color);background:#fff;border-radius:999px;padding:.35rem .9rem;font:inherit;font-size:.8rem;font-weight:600;color:var(--text-dark);cursor:pointer}
+.md .presets button:hover{border-color:#3498db;color:#3498db}
+.md code{background:#f1f5f9;border-radius:6px;padding:.1rem .4rem;font-size:.82rem}
+.md .filters .form-group input[type=text]{min-width:240px}
