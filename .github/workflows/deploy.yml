@@ -83,7 +83,8 @@ jobs:
               PORT=8011
               SMTP="${{ secrets.SMTP_KEY_PRODUCTION }}"
               HR_QUIZ_DB_NAME="hr_quiz_production"
-              RESUME_RANKER_DB_NAME="Resume_Ranker"
+              # Production reads the same Resume Ranker database as staging, which holds all the resumes.
+              RESUME_RANKER_DB_NAME="Resume_Ranker_Staging"
               # Fixed on purpose, SAME on both branches — this is where the
               # chatbot's HR/RCM/observation_bot history collections have
               # always actually lived; not environment-scoped like

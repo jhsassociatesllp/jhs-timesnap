@@ -24,7 +24,7 @@ if not MONGO_CONNECTION_STRING:
 
 _client = MongoClient(MONGO_CONNECTION_STRING)
 # One database per environment: the deploy workflow sets RESUME_RANKER_DB_NAME
-# (staging -> Resume_Ranker_Staging, production -> Resume_Ranker). Unset = Resume_Ranker,
+# (staging and production -> Resume_Ranker_Staging). Unset = Resume_Ranker,
 # so production and local runs keep using the existing database.
 DB_NAME = os.getenv("RESUME_RANKER_DB_NAME") or "Resume_Ranker"
 db = _client[DB_NAME]
