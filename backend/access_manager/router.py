@@ -7,6 +7,7 @@ revoke the admin modules shown in the Control Panel for other employees.
   declaration                                 -> Employee Declaration admins collection
 """
 
+import re
 from datetime import datetime, timezone
 from typing import List
 
@@ -140,9 +141,23 @@ def _current_modules(empid: str) -> List[str]:
     return mods
 
 
+def has_control_panel(empid: str) -> bool:
+    """True when the employee has at least one Control Panel module (or manages access), so the
+    Control Panel button shows on the modules page as soon as any module is granted."""
+    empid = (empid or "").strip().upper()
+    if is_access_manager(empid):
+        return True
+    doc = module_admin_collection.find_one({"empid": empid}) or module_admin_collection.find_one(
+        {"empid": {"$regex": f"^{re.escape(empid)}$", "$options": "i"}})
+    if any(m != "resume_ranker" for m in (doc.get("modules", []) if doc else [])):
+        return True
+    return declaration_admins.find_one({"empid": empid}) is not None
+
+
 @router.get("/check")
 def check(current_user: str = Depends(get_current_user)):
-    return {"is_manager": is_access_manager(current_user), "modules": MODULES}
+    return {"is_manager": is_access_manager(current_user), "modules": MODULES,
+            "has_control_panel": has_control_panel(current_user)}
 
 
 @router.get("/user/{empid}")
@@ -208,3 +223,121 @@ def set_access(body: SetAccessBody, manager: str = Depends(require_manager)):
         "before": before, "after": wanted, "at": datetime.now(timezone.utc),
     })
     return {"success": True, "empid": empid, "name": _name(emp, empid), "modules": wanted}
+
+
+# ── Main-page module visibility ───────────────────────────────────────────────
+# Which module cards show on the main (modules) page. Only the owners below can change it.
+#   mode "all"        the card shows for everyone (subject to the module's own access rules)
+#   mode "restricted" the card is hidden for everyone (the owners included) except the employees granted here
+# Visibility only, except HR Policy Quiz where a grant also makes the employee an HR quiz admin.
+# Other modules (Quality Audit, Resume Ranker...) keep their own access rules.
+VISIBILITY_ADMINS = ["JHS1191", "JHS1485"]
+
+PAGE_MODULES = {
+    "timesheet":      "Timesheet",
+    "chatbot":        "JHS Chatbot",
+    "kra":            "KRA",
+    "quality_audit":  "Quality Audit",
+    "hr_quiz":        "HR Policy Quiz",
+    "declaration":    "Employee Declaration",
+    "resume_ranker":  "Resume Ranker",
+    "cv":             "CV Builder",
+    "buddy_referral": "Buddy Referral",
+}
+
+visibility_collection = db["module_visibility"]
+
+
+def is_visibility_admin(empid: str) -> bool:
+    return (empid or "").strip().upper() in VISIBILITY_ADMINS
+
+
+def require_visibility_admin(current_user: str = Depends(get_current_user)) -> str:
+    if not is_visibility_admin(current_user):
+        raise HTTPException(403, "Only JHS1191 and JHS1485 can manage module access")
+    return current_user.strip().upper()
+
+
+def _visibility_docs() -> dict:
+    return {d["_id"]: d for d in visibility_collection.find({}) if d.get("_id") in PAGE_MODULES}
+
+
+def _hidden_for(empid: str) -> List[str]:
+    empid = (empid or "").strip().upper()
+    out = []
+    for key, d in _visibility_docs().items():
+        if d.get("mode") == "restricted" and empid not in [e.upper() for e in d.get("empids", [])]:
+            out.append(key)
+    return out
+
+
+@router.get("/visibility/me")
+def my_visibility(current_user: str = Depends(get_current_user)):
+    """Modules hidden for the signed-in employee, and whether they may manage visibility."""
+    return {"hidden": _hidden_for(current_user), "can_manage": is_visibility_admin(current_user)}
+
+
+@router.get("/visibility")
+def get_visibility(_: str = Depends(require_visibility_admin)):
+    docs = _visibility_docs()
+    rows = []
+    for key, label in PAGE_MODULES.items():
+        d = docs.get(key) or {}
+        empids = sorted({e.strip().upper() for e in d.get("empids", []) if e})
+        rows.append({"key": key, "label": label,
+                     "mode": "restricted" if d.get("mode") == "restricted" else "all",
+                     "employees": [{"empid": e, "name": _name(_emp(e), e)} for e in empids]})
+    return {"rows": rows}
+
+
+class VisibilityModeBody(BaseModel):
+    module: str
+    mode: str                    # "all" | "restricted"
+
+
+@router.post("/visibility/mode")
+def set_visibility_mode(body: VisibilityModeBody, who: str = Depends(require_visibility_admin)):
+    if body.module not in PAGE_MODULES:
+        raise HTTPException(400, "Unknown module")
+    if body.mode not in ("all", "restricted"):
+        raise HTTPException(400, "Mode must be 'all' or 'restricted'")
+    visibility_collection.update_one({"_id": body.module}, {"$set": {"mode": body.mode}}, upsert=True)
+    audit_collection.insert_one({"changed_by": who, "target": body.module, "kind": "visibility_mode",
+                                 "after": body.mode, "at": datetime.now(timezone.utc)})
+    return {"success": True}
+
+
+class VisibilityGrantBody(BaseModel):
+    module: str
+    empid: str
+    grant: bool                  # True = give access, False = revoke
+
+
+@router.post("/visibility/grant")
+def set_visibility_grant(body: VisibilityGrantBody, who: str = Depends(require_visibility_admin)):
+    if body.module not in PAGE_MODULES:
+        raise HTTPException(400, "Unknown module")
+    empid = body.empid.strip().upper()
+    emp = _emp(empid)
+    if not emp:
+        raise HTTPException(404, "Employee not found")
+    op = {"$addToSet": {"empids": empid}} if body.grant else {"$pull": {"empids": empid}}
+    visibility_collection.update_one({"_id": body.module}, op, upsert=True)
+    if body.module == "hr_quiz":
+        _sync_hr_quiz_admin(empid, body.grant)
+    audit_collection.insert_one({"changed_by": who, "target": empid, "kind": "visibility_grant",
+                                 "module": body.module, "after": "granted" if body.grant else "revoked",
+                                 "at": datetime.now(timezone.utc)})
+    return {"success": True, "empid": empid, "name": _name(emp, empid)}
+
+
+def _sync_hr_quiz_admin(empid: str, grant: bool) -> None:
+    """The HR Policy Quiz card also needs the employee to be an HR quiz admin, so a grant here adds them
+    to that list and a revoke removes them again - but only if this panel added them (people who were
+    admins before are never removed)."""
+    from backend.hr_policy_quiz.db import hr_quiz_admins     # lazy: needs the HR_QUIZ_* settings
+    if grant:
+        if not hr_quiz_admins.find_one({"empid": empid}):
+            hr_quiz_admins.insert_one({"empid": empid, "granted_via": "module_access"})
+    else:
+        hr_quiz_admins.delete_one({"empid": empid, "granted_via": "module_access"})

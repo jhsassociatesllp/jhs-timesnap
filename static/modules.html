@@ -56,6 +56,33 @@
     .card-cv{border-left-color:#16a085}
     .card-br{border-left-color:#e84393}
 
+
+    .ma-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);z-index:950;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto}
+    .ma-bg.open{display:flex}
+    .ma-box{background:#fff;border-radius:16px;width:100%;max-width:780px;box-shadow:0 30px 70px rgba(0,0,0,.35);overflow:hidden}
+    .ma-head{background:var(--pg);color:#fff;padding:1rem 1.4rem;display:flex;align-items:center;justify-content:space-between}
+    .ma-head h3{margin:0;font-size:1.05rem;display:flex;align-items:center;gap:.5rem}
+    .ma-x{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
+    .ma-note{padding:.8rem 1.4rem;font-size:.82rem;color:#555;background:#f6f7fb;border-bottom:1px solid #e5e7ef}
+    .ma-row{padding:.9rem 1.4rem;border-bottom:1px solid #eceef5}
+    .ma-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .ma-name{font-weight:700;font-size:.95rem}
+    .ma-seg{display:inline-flex;border:2px solid #d8dcec;border-radius:10px;overflow:hidden}
+    .ma-seg button{border:none;background:#fff;padding:.38rem .8rem;font:600 .78rem inherit;font-family:inherit;cursor:pointer;color:#555}
+    .ma-seg button.on-all{background:#10b981;color:#fff}
+    .ma-seg button.on-res{background:#ef4444;color:#fff}
+    .ma-emps{margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+    .ma-chip{display:inline-flex;align-items:center;gap:.4rem;background:#eef2ff;color:#3730a3;border-radius:99px;padding:.2rem .3rem .2rem .7rem;font-size:.76rem;font-weight:600}
+    .ma-chip button{border:none;background:#c7d2fe;color:#3730a3;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:.65rem;line-height:1}
+    .ma-add{position:relative;display:inline-block}
+    .ma-add input{border:2px solid #d8dcec;border-radius:9px;padding:.3rem .6rem;font:inherit;font-size:.8rem;width:230px}
+    .ma-sugg{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d8dcec;border-radius:9px;box-shadow:0 10px 24px rgba(0,0,0,.15);z-index:5;display:none;max-height:210px;overflow:auto}
+    .ma-sugg.open{display:block}
+    .ma-sugg div{padding:.4rem .7rem;font-size:.8rem;cursor:pointer}
+    .ma-sugg div:hover{background:#f0f4ff}
+    .ma-hint{font-size:.74rem;color:#888;margin-top:.35rem}
+    .ma-msg{margin:.7rem 1.4rem;padding:.5rem .8rem;border-radius:9px;font-size:.82rem;display:none}
+    .ma-msg.err{display:block;background:#fef2f2;color:#991b1b}
     .card-top{display:flex;align-items:center;justify-content:space-between}
     .card-icon{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;font-size:1.35rem}
     .card-br .card-icon{background:rgba(232,67,147,.12);color:#e84393}
@@ -143,6 +170,7 @@
       <div class="navbar-brand"><i class="fas fa-th-large"></i> JHS Timesnap</div>
       <div class="navbar-right">
         <span class="emp-badge" id="empBadge"></span>
+        <button class="cp-btn" id="maBtn" style="display:none" onclick="openModuleAccess()"><i class="fas fa-user-lock"></i> Module Access</button>
         <button class="cp-btn" id="cpBtn" style="display:none" onclick="openCpModal()"><i class="fas fa-cogs"></i> Switch to Control Panel</button>
         <button class="logout-btn" id="calendarBtn" onclick="openLdCalendar()"><i class="fas fa-calendar-days"></i> Calendar</button>
         <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -170,6 +198,16 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Module Access (JHS1191 / JHS1485 only) -->
+  <div class="ma-bg" id="maBg">
+    <div class="ma-box">
+      <div class="ma-head"><h3><i class="fas fa-user-lock"></i> Module Access</h3><button class="ma-x" onclick="closeModuleAccess()"><i class="fas fa-times"></i></button></div>
+      <div class="ma-note">For each module choose <b>Show to everyone</b>, or <b>Hide for everyone</b> and give access to chosen employees only. This controls the cards on this page. Giving someone HR Policy Quiz also makes them an HR quiz admin; other modules (Quality Audit, Resume Ranker...) still apply their own access rules.</div>
+      <div class="ma-msg" id="maMsg"></div>
+      <div id="maRows"></div>
     </div>
   </div>
 
@@ -539,49 +577,72 @@
         if (res.ok) rrAccess = (await res.json()).allowed === true;
       } catch(e) {}
 
-      // Show Control Panel button if user has any admin module access
-      // (timesheet/QA/KRA) or Employee Declaration admin access
-      if (moduleAccess?.is_admin || declIsAdmin) {
+      // Show Control Panel button if the user has ANY control-panel module (including ones granted
+      // from Manage Module Access: CV, Buddy Referral, Compliance, Employee Form...) or manages access
+      let cpAccess = false;
+      try {
+        const res = await fetch('/access-manager/check', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) cpAccess = (await res.json()).has_control_panel === true;
+      } catch(e) {}
+      if (moduleAccess?.is_admin || declIsAdmin || cpAccess) {
         document.getElementById('cpBtn').style.display = 'flex';
       }
+
+      // Which cards the owners (JHS1191 / JHS1485) have hidden for this employee
+      let hiddenMods = new Set();
+      try {
+        const res = await fetch('/access-manager/visibility/me', {headers:{'Authorization':`Bearer ${token}`}});
+        if (res.ok) {
+          const v = await res.json();
+          hiddenMods = new Set(v.hidden || []);
+          if (v.can_manage) document.getElementById('maBtn').style.display = 'flex';
+        }
+      } catch(e) {}
+      const shown = key => !hiddenMods.has(key);
 
       // Build cards
       const grid = document.getElementById('cards-grid');
       grid.innerHTML = '';
 
       // Timesheet — always shown
-      grid.innerHTML += CARD_TS;
+      if (shown('timesheet')) grid.innerHTML += CARD_TS;
 
       // JHS Chatbot — always shown
-      grid.innerHTML += CARD_CB;
+      if (shown('chatbot')) {
+        grid.innerHTML += CARD_CB;
+        // the floating assistant bubble belongs to the JHS Chatbot module, so it only loads when the module is visible
+        ['/static/chatbot/chat-core.js', '/static/chatbot/chatbot-widget.js'].reduce((p, src) => p.then(() => new Promise(res => {
+          const sc = document.createElement('script'); sc.src = src; sc.onload = sc.onerror = res; document.body.appendChild(sc);
+        })), Promise.resolve());
+      }
 
       // KRA
       const apprOpen = !!(apprAccess?.eligible || apprAccess?.approver);
-      grid.innerHTML += buildAppraisalCard(apprOpen, apprAccess?.eligible ? '' : (apprAccess?.approver ? 'Team KRA approvals' : (apprAccess?.reason || '')));
+      if (shown('kra')) grid.innerHTML += buildAppraisalCard(apprOpen, apprAccess?.eligible ? '' : (apprAccess?.approver ? 'Team KRA approvals' : (apprAccess?.reason || '')));
 
       // Quality Audit — only if user has access
-      if (qaAccess?.has_access) {
+      if (qaAccess?.has_access && shown('quality_audit')) {
         grid.innerHTML += buildQACard(qaAccess.is_admin, qaAccess.is_qa_only);
       }
 
       // HR Policy Quiz — only for admin-listed employee codes
-      if (hrQuizAccess) {
+      if (hrQuizAccess && shown('hr_quiz')) {
         grid.innerHTML += CARD_HR;
       }
 
       // Employee Declaration Form — always shown, like Timesheet
-      grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
+      if (shown('declaration')) grid.innerHTML += buildDeclarationCard(declStatus?.submitted || false);
 
       // Resume Ranker — holders only, outside the Control Panel
-      if (rrAccess) {
+      if (rrAccess && shown('resume_ranker')) {
         grid.innerHTML += buildResumeRankerCard();
       }
 
       // CV Builder — always shown
-      grid.innerHTML += CARD_CV;
+      if (shown('cv')) grid.innerHTML += CARD_CV;
 
       // Buddy Referral — always shown
-      grid.innerHTML += CARD_BR;
+      if (shown('buddy_referral')) grid.innerHTML += CARD_BR;
 
       // Employee Application Form — not shown to present employees (it is for new joiners, who log in with
       // their personal email and go straight to /employee-form; HR manages it from the Control Panel)
@@ -599,10 +660,76 @@
       if (window.showWeeklyComplianceOnLogin) showWeeklyComplianceOnLogin();
     }
 
+
+    // ── Module Access (visibility of the cards on this page) ──────────────────
+    let maRows = [], maTimer = null, maSeq = 0;
+    const maEsc = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const maHdr = () => ({'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'});
+    function maErr(text) { const m = document.getElementById('maMsg'); m.className = 'ma-msg ' + (text ? 'err' : ''); m.textContent = text || ''; }
+    async function maApi(url, body) {
+      const res = await fetch(url, body ? {method:'POST', headers:maHdr(), body:JSON.stringify(body)} : {headers:maHdr()});
+      let d = null; try { d = await res.json(); } catch(e) {}
+      if (!res.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || 'Request failed');
+      return d;
+    }
+    async function openModuleAccess() {
+      document.getElementById('maBg').classList.add('open'); maErr('');
+      await maLoad();
+    }
+    function closeModuleAccess() { document.getElementById('maBg').classList.remove('open'); }
+    document.getElementById('maBg').addEventListener('mousedown', e => { if (e.target.id === 'maBg') closeModuleAccess(); });
+    async function maLoad() {
+      try { maRows = (await maApi('/access-manager/visibility')).rows; maRender(); }
+      catch(e) { maErr(e.message); }
+    }
+    function maRender() {
+      document.getElementById('maRows').innerHTML = maRows.map(r => {
+        const res = r.mode === 'restricted';
+        return `<div class="ma-row">
+          <div class="ma-top">
+            <span class="ma-name">${maEsc(r.label)}</span>
+            <span class="ma-seg">
+              <button class="${res ? '' : 'on-all'}" onclick="maMode('${r.key}','all')">Show to everyone</button>
+              <button class="${res ? 'on-res' : ''}" onclick="maMode('${r.key}','restricted')">Hide for everyone</button>
+            </span>
+          </div>
+          <div class="ma-emps">
+            ${r.employees.map(e => `<span class="ma-chip" title="${maEsc(e.name)}">${maEsc(e.empid)} ${maEsc(e.name)}<button title="Revoke" onclick="maGrant('${r.key}','${maEsc(e.empid)}',false)"><i class="fas fa-times"></i></button></span>`).join('')}
+            <span class="ma-add"><input id="maIn_${r.key}" placeholder="Give access: employee code or name" autocomplete="off" oninput="maSearch('${r.key}')" onblur="setTimeout(()=>maClose('${r.key}'),150)"><div class="ma-sugg" id="maSg_${r.key}"></div></span>
+          </div>
+          <div class="ma-hint">${res ? 'Hidden for everyone except the employees above (owners included - add yourself to keep seeing it).' : 'Shown to everyone. Employees added above keep access if you later hide it.'}</div>
+        </div>`; }).join('');
+    }
+    async function maMode(key, mode) {
+      maErr('');
+      try { await maApi('/access-manager/visibility/mode', {module:key, mode}); await maLoad(); }
+      catch(e) { maErr(e.message); }
+    }
+    async function maGrant(key, empid, grant) {
+      maErr('');
+      try { await maApi('/access-manager/visibility/grant', {module:key, empid, grant}); await maLoad(); }
+      catch(e) { maErr(e.message); }
+    }
+    function maClose(key) { const sg = document.getElementById('maSg_' + key); if (sg) sg.classList.remove('open'); }
+    function maSearch(key) {
+      clearTimeout(maTimer);
+      const inp = document.getElementById('maIn_' + key), sg = document.getElementById('maSg_' + key), q = inp.value.trim();
+      if (!q) { sg.classList.remove('open'); return; }
+      maTimer = setTimeout(async () => {
+        const my = ++maSeq;
+        try {
+          const d = await maApi('/buddy-referral/employees/search?q=' + encodeURIComponent(q));
+          if (my !== maSeq) return;
+          sg.innerHTML = (d.results || []).length
+            ? d.results.map(e => `<div onmousedown="event.preventDefault();maGrant('${key}','${maEsc(e.empid)}',true)">${maEsc(e.empid)} — ${maEsc(e.name)}</div>`).join('')
+            : '<div style="cursor:default;color:#888">No matching employee</div>';
+          sg.classList.add('open');
+        } catch(e) {}
+      }, 180);
+    }
+
     initModules();
   </script>
     <script src="/static/timesheet/calendar-modal.js"></script>
-    <script src="/static/chatbot/chat-core.js"></script>
-    <script src="/static/chatbot/chatbot-widget.js"></script>
 </body>
 </html>
