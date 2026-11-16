@@ -291,8 +291,7 @@ async def modules_page():
 
 @app.get("/timesheet", response_class=FileResponse)
 async def timesheet_page():
-    # "My day" shell; it sends non-pilot employees on to the classic page (static/timesheet/index.html).
-    return FileResponse(os.path.join(static_root, "timesheet", "my-day.html"))
+    return FileResponse(os.path.join(static_root, "timesheet", "index.html"))
 
 @app.get("/appraisal", response_class=FileResponse)
 async def appraisal_page():
