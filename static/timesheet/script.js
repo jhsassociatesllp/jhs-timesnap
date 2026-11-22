@@ -5083,12 +5083,6 @@ async function downloadSampleTemplate() {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Timesheet');
     const metaWS = wb.addWorksheet('MetadataLists', { state: 'hidden' });
-    // Plain, visible reference tab — a flat, alphabetical Client/Project/Code
-    // list with no formulas at all, so it can never break regardless of
-    // Excel version (unlike a live-filtered dropdown, which needs the
-    // FILTER() function that many real installs — e.g. Microsoft Office
-    // LTSC — don't have and never will). Ctrl+F searches it like any text.
-    const refWS = window._freeTextClientProject ? null : wb.addWorksheet('Client-Project List');
 
     // Columns: A-F employee details, G Date, H Work, I Client, J Project, K Project Code, L Reporting Manager Entry,
     // M Activity, N Project Hours (typed), O Remarks, P-U 3 Hits ... Feedback for Others
@@ -5166,36 +5160,6 @@ async function downloadSampleTemplate() {
     const lookupNames = projectCodeLookup.map(p => p[0]);
     const lookupCodes = projectCodeLookup.map(p => p[1]);
 
-    // ── Populate the plain Client-Project List reference tab ──
-    if (refWS) {
-      refWS.getCell('A1').value =
-        'Use Ctrl+F to search for a Client or Project name below, then go back to the Timesheet tab ' +
-        'and pick the matching entry from the dropdown in your row.';
-      refWS.getCell('A1').font = { italic: true, size: 10, color: { argb: 'FF6B7280' } };
-      refWS.mergeCells('A1:C1');
-      refWS.getRow(1).height = 30;
-      refWS.getCell('A1').alignment = { wrapText: true, vertical: 'middle' };
-
-      const refHeaderRow = refWS.addRow(['Client', 'Project', 'Project Code']);
-      refHeaderRow.font = { bold: true };
-      refHeaderRow.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
-
-      clients.forEach(c => {
-        if (c === 'Other') return; // "Other" has no fixed project list to reference
-        const projs = employeeProjects.projects_by_client[c] || [];
-        if (!projs.length) {
-          refWS.addRow([c, '', '']);
-        } else {
-          projs.forEach(p => refWS.addRow([c, p.project_name, p.project_code]));
-        }
-      });
-
-      refWS.views = [{ state: 'frozen', ySplit: 2 }];
-      refWS.getColumn(1).width = 40;
-      refWS.getColumn(2).width = 50;
-      refWS.getColumn(3).width = 16;
-    }
-
     // Column 1 (was "Week Periods") is intentionally left unused now that
     // week-wise grouping has been removed. Fixed columns B-H, per-client
     // project columns I+, lookup pair at X(24) & Y(25).
@@ -5223,43 +5187,6 @@ async function downloadSampleTemplate() {
     lookupNames.forEach((name, r) => { metaWS.getCell(r + 2, 24).value = name; });
     lookupCodes.forEach((code, r) => { metaWS.getCell(r + 2, 25).value = code; });
 
-    // Activities: every assigned task label (flat list for the dropdown) + "Other"; the visible "My tasks" tab shows
-    // which task belongs to which project and when it runs.
-    const activityLabels = [];
-    if (!freeTextClientProject) {
-      const seen = new Set();
-      Object.values(employeeProjects.activities_by_project || {}).forEach(list => list.forEach(a => {
-        if (a.is_complete) return;                           // finished tasks are not offered (same as the grid)
-        if (!seen.has(a.label)) { seen.add(a.label); activityLabels.push(a.label); }
-      }));
-      activityLabels.push('Other');
-    }
-    metaWS.getCell(1, 28).value = 'Activities';
-    activityLabels.forEach((label, r) => { metaWS.getCell(r + 2, 28).value = label; });
-    if (!freeTextClientProject) {
-      const tasksWS = wb.addWorksheet('My tasks');
-      tasksWS.getCell('A1').value = 'Your assigned Nexus Quant tasks. Pick the Activity in the Timesheet tab from these; ' +
-        'use "Other" (with the reason in Remarks) only for work that is not in this list.';
-      tasksWS.getCell('A1').font = { italic: true, size: 10, color: { argb: 'FF6B7280' } };
-      tasksWS.mergeCells('A1:G1');
-      tasksWS.getRow(1).height = 30;
-      tasksWS.getCell('A1').alignment = { wrapText: true, vertical: 'middle' };
-      const th = tasksWS.addRow(['Client', 'Project', 'Project Code', 'Activity', 'Starts', 'Ends', 'Status']);
-      th.font = { bold: true };
-      th.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8ECFB' } }; });
-      clients.forEach(c => {
-        if (c === 'Other') return;
-        (employeeProjects.projects_by_client[c] || []).forEach(p => {
-          ((employeeProjects.activities_by_project || {})[p.project_code] || []).forEach(a => {
-            if (a.is_complete) return;
-            tasksWS.addRow([c, p.project_name, p.project_code, a.label, a.start_date || '', a.end_date || '', a.is_complete ? 'Complete' : (a.status || 'Open')]);
-          });
-        });
-      });
-      tasksWS.views = [{ state: 'frozen', ySplit: 2 }];
-      [30, 40, 16, 44, 12, 12, 14].forEach((w, i) => { tasksWS.getColumn(i + 1).width = w; });
-    }
-
     // Shared-services (free-text partner) Project Code options — the fixed
     // SS-team list plus "Type Here", mirroring the app's dropdown.
     const ssProjectCodeOptions = freeTextClientProject
@@ -5284,12 +5211,10 @@ async function downloadSampleTemplate() {
       });
     }
 
-    // Plain informational text below the table — no formula, no input cell,
-    // just a pointer to the searchable reference tab. Can never break.
+    // Plain informational text below the table — no formula, no input cell. Can never break.
     if (!freeTextClientProject) {
       const noteCell = ws.getCell(`A${bufferRows + 2}`);
-      noteCell.value = 'Looking for a specific Client or Project? See the "Client-Project List" tab — press Ctrl+F there to search. ' +
-        'Need an extra row? Right-click a row number and choose Insert — the new row keeps working dropdowns for Client/Project/Project Code ' +
+      noteCell.value = 'Need an extra row? Right-click a row number and choose Insert — the new row keeps working dropdowns for Client/Project/Project Code ' +
         '(pick Project Code from its dropdown too — it\'ll show the one matching code). ' +
         'For Project Code and Hours to auto-fill with no clicks at all, copy an existing row and use "Insert Copied Cells" instead.';
       noteCell.font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
@@ -5311,8 +5236,6 @@ async function downloadSampleTemplate() {
     const lookupEnd  = Math.max(lookupNames.length + 1, 2);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
-    // Activity: strict list of the employee's own tasks (+ Other); free-text employees type it freely
-    const dvActivity = freeTextClientProject ? null : strictList(`MetadataLists!$AB$2:$AB$${Math.max(activityLabels.length + 1, 2)}`);
     const dvHours = {
       type: 'decimal', operator: 'between', allowBlank: true,
       showErrorMessage: true, errorStyle: 'error',
@@ -5344,7 +5267,6 @@ async function downloadSampleTemplate() {
       ws.getCell(`H${r}`).dataValidation  = dvLocation;
       if (dvClient) ws.getCell(`I${r}`).dataValidation = dvClient;
       if (dvSSProjectCode) ws.getCell(`K${r}`).dataValidation = dvSSProjectCode;
-      if (dvActivity) ws.getCell(`M${r}`).dataValidation = dvActivity;
       ws.getCell(`N${r}`).dataValidation = dvHours;
       // Project's dependent-dropdown formula must reference *this* row's
       // Client cell explicitly (MATCH(K{r}, ...)) rather than a single
@@ -5396,8 +5318,7 @@ async function downloadSampleTemplate() {
     // inherits formatting/validation (dropdowns), never formulas/values, so
     // a locked-but-formula-less Project Code cell on an inserted row would
     // be a permanent dead end. Leaving it unlocked means an inserted row
-    // falls back to the same manual entry the "Client-Project List" tab
-    // already exists to support. Every cell's protection is set explicitly
+    // falls back to plain manual entry instead. Every cell's protection is set explicitly
     // (never left at the default): ExcelJS appears to share a default style
     // object across untouched cells, so leaving one column "untouched" let
     // it silently pick up whatever locked state a neighboring cell happened
