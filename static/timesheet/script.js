@@ -5084,13 +5084,15 @@ async function downloadSampleTemplate() {
     const ws = wb.addWorksheet('Timesheet');
     const metaWS = wb.addWorksheet('MetadataLists', { state: 'hidden' });
 
-    // Columns: A-F employee details, G Date, H Work, I Client, J Project, K Project Code, L Reporting Manager Entry,
-    // M Activity, N Project Hours (typed), O Remarks, P-U 3 Hits ... Feedback for Others
+    // Columns: A-F employee details, G Date, H Work, I Project Start Time, J Project End Time,
+    // K Client, L Project, M Project Code, N Reporting Manager Entry, O Activity, P Project Hours
+    // (computed from I/J), Q Billable, R Lunch Time, S Travel Time, T Remarks,
+    // U-Z 3 Hits ... Feedback for Others
     const headers = [
       'Employee ID','Employee Name','Designation','Gender','Partner','Reporting Manager',
-      'Date','Work',
+      'Date','Work','Project Start Time','Project End Time',
       'Client','Project','Project Code','Reporting Manager Entry','Activity',
-      'Project Hours','Remarks',
+      'Project Hours','Billable','Lunch Time','Travel Time','Remarks',
       '3 Hits','3 Misses','Feedback for HR','Feedback for IT','Feedback for CRM','Feedback for Others'
     ];
     const headerRow = ws.addRow(headers);
@@ -5102,13 +5104,18 @@ async function downloadSampleTemplate() {
     let lastDateRow = 1;
 
     while (curr <= end) {
-      const dateStr     = curr.toISOString().split('T')[0];
+      const rIdx     = ws.rowCount + 1;
+      const dateStr  = curr.toISOString().split('T')[0];
+      // Project Hours (P) is computed from Project Start/End Time (I/J), never typed —
+      // matches the live grid and the upload side (handleExcelUpload recomputes it from
+      // the time columns too, ignoring whatever this formula evaluates to on upload).
+      const hFormula = `IF(AND(I${rIdx}<>"",J${rIdx}<>""),(J${rIdx}-I${rIdx})*24,"")`;
 
       ws.addRow([
         empId, empName, designation, gender, partner, repManager,
-        dateStr, '',
+        dateStr, '', '', '',
         '', '', '', repManager, '',
-        '', '',
+        { formula: hFormula }, 'Yes', '30 min', 'None', '',
         '', '', '', '', '', ''
       ]);
       lastDateRow = ws.rowCount;
@@ -5122,9 +5129,11 @@ async function downloadSampleTemplate() {
     // validation identically throughout.
     const bufferRows = lastDateRow + 60;
 
-    // Project Hours (N) is typed by the employee: a plain number, 2 decimals
+    // Apply hh:mm format to Project Start/End Time columns (I, J) across the
+    // full buffer range, not just the date rows, so inserted/extra rows format correctly too.
     for (let r = 2; r <= bufferRows; r++) {
-      ws.getCell(`N${r}`).numFmt = '0.00';
+      ws.getCell(`I${r}`).numFmt = 'hh:mm';
+      ws.getCell(`J${r}`).numFmt = 'hh:mm';
     }
 
     // ── Build MetadataLists sheet (hidden helper sheet backing the dropdowns) ──
@@ -5132,7 +5141,7 @@ async function downloadSampleTemplate() {
     let d = new Date(start);
     while (d <= end) { dateValues.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
 
-    const locations = ['Office','Client Site','Work From Home','Leave','Week Off','PHY'];
+    const locations = ['Office','Client Site','Work From Home','Field Work','Leave','PHY','Week Off'];
     const billable  = ['Yes','No'];
     const lunch     = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr'];
     const travel    = ['None','15 min','30 min','45 min','1 hr','1.5 hr','2 hr','2.5 hr','3 hr'];
@@ -5236,13 +5245,9 @@ async function downloadSampleTemplate() {
     const lookupEnd  = Math.max(lookupNames.length + 1, 2);
     const dvDate     = strictList(`MetadataLists!$B$2:$B$${dateValues.length + 1}`);
     const dvLocation = strictList(`MetadataLists!$C$2:$C$${locations.length + 1}`);
-    const dvHours = {
-      type: 'decimal', operator: 'between', allowBlank: true,
-      showErrorMessage: true, errorStyle: 'error',
-      errorTitle: 'Invalid hours',
-      error: 'Type the hours you worked on this row as a number from 0.25 to 24, e.g. 4 or 2.5.',
-      formulae: [0.25, 24]
-    };
+    const dvBillable = strictList(`MetadataLists!$D$2:$D$${billable.length + 1}`);
+    const dvLunch    = strictList(`MetadataLists!$E$2:$E$${lunch.length + 1}`);
+    const dvTravel   = strictList(`MetadataLists!$F$2:$F$${travel.length + 1}`);
     // Plain static strict list — Excel dropdowns can't live-filter based on
     // their own in-progress typed text without a dynamic-array function
     // (FILTER), which many real-world Excel installs don't have (notably
@@ -5260,14 +5265,24 @@ async function downloadSampleTemplate() {
       showErrorMessage: false,
       formulae: [`MetadataLists!$AA$2:$AA$${ssProjectCodeOptions.length + 1}`]
     } : null;
+    // Strict time-of-day validation so Project Start/End Time can only ever
+    // hold an actual time value (rejects plain text, numbers, etc.).
+    const dvTime = {
+      type: 'time', operator: 'between', allowBlank: true,
+      showErrorMessage: true, errorStyle: 'error',
+      errorTitle: 'Invalid time',
+      error: 'Enter a valid time (hh:mm), e.g. 09:30.',
+      formulae: [0, 0.9999884259259259]
+    };
 
     // (bufferRows was computed earlier, alongside the search-helper block)
     for (let r = 2; r <= bufferRows; r++) {
       ws.getCell(`G${r}`).dataValidation  = dvDate;
       ws.getCell(`H${r}`).dataValidation  = dvLocation;
-      if (dvClient) ws.getCell(`I${r}`).dataValidation = dvClient;
-      if (dvSSProjectCode) ws.getCell(`K${r}`).dataValidation = dvSSProjectCode;
-      ws.getCell(`N${r}`).dataValidation = dvHours;
+      ws.getCell(`I${r}`).dataValidation  = dvTime;
+      ws.getCell(`J${r}`).dataValidation  = dvTime;
+      if (dvClient) ws.getCell(`K${r}`).dataValidation = dvClient;
+      if (dvSSProjectCode) ws.getCell(`M${r}`).dataValidation = dvSSProjectCode;
       // Project's dependent-dropdown formula must reference *this* row's
       // Client cell explicitly (MATCH(K{r}, ...)) rather than a single
       // shared reference — ExcelJS splits a 500-row range into several XML
@@ -5279,11 +5294,11 @@ async function downloadSampleTemplate() {
       // errorStyle 'error') so a Client of "Other" — which has no fixed
       // project list — can still be typed into freely.
       if (!freeTextClientProject) {
-        ws.getCell(`J${r}`).dataValidation = {
+        ws.getCell(`L${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDIRECT("Client_"&MATCH(I${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
+          formulae: [`INDIRECT("Client_"&MATCH(K${r},MetadataLists!$G$2:$G$${clientsEnd},0))`]
         };
-        // Project Code (K) is normally auto-filled by the formula set below —
+        // Project Code (M) is normally auto-filled by the formula set below —
         // but a row a user inserts via Excel's own Insert Row only inherits
         // formatting/validation, never formulas/values, which would otherwise
         // leave Project Code blank on an inserted row. Backing it with this
@@ -5292,11 +5307,14 @@ async function downloadSampleTemplate() {
         // an inserted row too — one click instead of zero, but no dead end.
         // Doesn't fight the formula: a formula-derived value never triggers
         // its own cell's validation, only a value the user types/picks does.
-        ws.getCell(`K${r}`).dataValidation = {
+        ws.getCell(`M${r}`).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: false,
-          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(J${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
+          formulae: [`INDEX(MetadataLists!$Y$2:$Y$${lookupEnd},MATCH(L${r},MetadataLists!$X$2:$X$${lookupEnd},0))`]
         };
       }
+      ws.getCell(`Q${r}`).dataValidation  = dvBillable;
+      ws.getCell(`R${r}`).dataValidation  = dvLunch;
+      ws.getCell(`S${r}`).dataValidation  = dvTravel;
     }
 
     // ── Project Code formula (Column M) — auto-fills "Other" when Client is
@@ -5306,10 +5324,20 @@ async function downloadSampleTemplate() {
     // extra/inserted rows compute the code too, not just the original dates. ──
     if (!freeTextClientProject) {
       for (let r = 2; r <= bufferRows; r++) {
-        ws.getCell(`K${r}`).value = {
-          formula: `IF(I${r}="Other","Other",IFERROR(VLOOKUP(J${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
+        ws.getCell(`M${r}`).value = {
+          formula: `IF(K${r}="Other","Other",IFERROR(VLOOKUP(L${r},MetadataLists!$X$2:$Y$${lookupEnd},2,FALSE),""))`
         };
       }
+    }
+
+    // ── Project Hours formula (Column P) — computed from Start/End Time.
+    // Only the cycle's date rows get it inline when created (above); extend it
+    // across the full buffer range too, so extra/inserted rows compute hours
+    // automatically as well, exactly like the real date rows do. ──
+    for (let r = lastDateRow + 1; r <= bufferRows; r++) {
+      ws.getCell(`P${r}`).value = {
+        formula: `IF(AND(I${r}<>"",J${r}<>""),(J${r}-I${r})*24,"")`
+      };
     }
 
     // ── Every column stays editable, including Project Code (M) — it's
@@ -5323,7 +5351,7 @@ async function downloadSampleTemplate() {
     // object across untouched cells, so leaving one column "untouched" let
     // it silently pick up whatever locked state a neighboring cell happened
     // to set. ──
-    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U'];
+    const allDataCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
     const lockedCols = [];
     for (let r = 2; r <= bufferRows; r++) {
       allDataCols.forEach(col => {
@@ -5354,7 +5382,7 @@ async function downloadSampleTemplate() {
     });
 
     // Reasonable column widths so the template reads like the app, not a raw dump
-    const widths = [12,18,14,10,14,18,12,16,16,22,14,20,28,12,26,16,16,20,20,20,20];
+    const widths = [12,18,14,10,14,18,12,16,12,12,16,20,14,20,16,12,10,10,10,22,16,16,20,20,20,20];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     const cycleLabel = _selectedCycle.cycle_label.replace(/[^a-zA-Z0-9]/g, '_');
