@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR Clearance — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/exit-management"><i class="fas fa-file-lines"></i> My Exit Form</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container ex-wide">
+    <div class="ex-tabs" role="tablist">
+      <a class="ex-tab" href="/exit-management"><i class="fas fa-door-open"></i> Employee Exit Form</a>
+      <a class="ex-tab" id="exTabTeam" href="/exit-management/manager" hidden><i class="fas fa-users"></i> My Team Member Details</a>
+      <button type="button" class="ex-tab active" role="tab"><i class="fas fa-user-shield"></i> HR Clearance</button>
+    </div>
+
+    <div class="ex-loading" id="hrLoading"><i class="fas fa-spinner fa-spin"></i> Loading exit applications…</div>
+    <div class="ex-alert error" id="hrError" role="alert"></div>
+
+    <div id="hrMain" style="display:none">
+
+      <section class="ex-card pink">
+        <h2><i class="fas fa-file-circle-check"></i> Exit Applications for HR Clearance <span class="ex-count" id="hrAppCount"></span></h2>
+        <p class="ex-empty" id="hrNoApps" style="display:none">No employee has submitted an Employee Exit Form yet.</p>
+        <div class="ex-table-wrap" id="hrAppsWrap">
+          <table class="ex-table" id="hrAppTable">
+            <thead><tr><th class="c">S.No</th><th class="c">View</th><th>Employee ID</th><th>Employee Name</th><th>Designation</th><th>Resignation Date</th><th>Last Working Date</th><th>Reporting Manager Approval</th><th>IT Clearance</th><th>HR Clearance</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<!-- eye icon: every column of one application, stacked vertically -->
+<div class="ex-popup ex-light" id="hrDetail" hidden>
+  <div class="ex-popup-box ex-detail-box" role="dialog" aria-modal="true" aria-labelledby="hrDetailTitle">
+    <div class="ex-popup-top"><h2 id="hrDetailTitle"></h2><button type="button" class="ex-close-btn" id="hrDetailClose">Close</button></div>
+    <div class="ex-detail-body" id="hrDetailBody"></div>
+  </div>
+</div>
+<!-- popup: the HR Clearance form, shown on this page -->
+<div class="ex-popup ex-light" id="hrPopup" hidden>
+  <div class="ex-popup-box" role="dialog" aria-modal="true" aria-labelledby="hrPopupTitle">
+    <div class="ex-popup-top"><h2 id="hrPopupTitle"></h2><button type="button" class="ex-close-btn" id="hrPopupClose">Close</button></div>
+    <iframe id="hrFrame" title="HR Clearance form"></iframe>
+  </div>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/tabs.js?v=20261123a"></script>
+<script src="/static/exit_management/js/hr.js?v=20261123a"></script>
+</body>
+</html>

@@ -55,6 +55,9 @@
     .card-cb{border-left-color:#4a6fa5}
     .card-cv{border-left-color:#16a085}
     .card-br{border-left-color:#e84393}
+    .card-ex{border-left-color:#d4920b}
+    .card-ex .card-icon{background:rgba(212,146,11,.15);color:#d4920b}
+    .card-ex .card-btn{background:linear-gradient(135deg,#d4920b,#9a6606);color:white}
 
 
     .ma-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);z-index:950;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto}
@@ -371,6 +374,24 @@
         </div>
       </a>`;
 
+    const CARD_EX = `
+      <a href="/exit-management" class="module-card card-ex clickable">
+        <div class="card-top">
+          <div class="card-icon"><i class="fas fa-door-open"></i></div>
+          <span class="card-tag">Active</span>
+        </div>
+        <h2 class="card-title">Employee Exit Management</h2>
+        <p class="card-desc">Manage employee clearance, project handover, IT clearance, HR verification, employee feedback, and exit interviews.</p>
+        <div class="card-features">
+          <span class="chip"><i class="fas fa-clipboard-check"></i> Clearance Form</span>
+          <span class="chip"><i class="fas fa-comments"></i> Exit Interview</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-label">Clearance &amp; exit feedback</span>
+          <span class="card-btn">Open &nbsp;<i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`;
+
     const CARD_EF = `
       <a href="/employee-form" class="module-card card-br clickable">
         <div class="card-top">
@@ -643,6 +664,9 @@
 
       // Buddy Referral — always shown
       if (shown('buddy_referral')) grid.innerHTML += CARD_BR;
+
+      // Employee Exit Management — shown to everyone (owners can hide it from Module Access)
+      if (shown('exit_management')) grid.innerHTML += CARD_EX;
 
       // Employee Application Form — not shown to present employees (it is for new joiners, who log in with
       // their personal email and go straight to /employee-form; HR manages it from the Control Panel)

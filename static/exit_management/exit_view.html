@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employee Exit Form (view) — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/exit-management/manager"><i class="fas fa-users"></i> My Team Member Details</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container ex-wide">
+    <div class="ex-loading" id="evLoading"><i class="fas fa-spinner fa-spin"></i> Loading the exit form…</div>
+    <div class="ex-alert error" id="evFatal" role="alert"></div>
+
+    <div id="evMain" style="display:none">
+      <h1 class="ex-title"><i class="fas fa-door-open" style="color:var(--ex-gold)"></i> Employee Exit Form</h1>
+      <p class="ex-sub" id="evSub">What the employee filled in (read-only).</p>
+
+      <div class="ex-card gold">
+        <h2><i class="fas fa-id-card"></i> Employee Details</h2>
+        <div class="ex-dash-grid" id="evDetails"></div>
+      </div>
+
+      <div class="ex-card">
+        <h2><i class="fas fa-star-half-stroke"></i> About Reporting Manager</h2>
+        <div class="ex-table-wrap"><table class="ex-table" id="evMgr"><thead><tr><th>Particulars</th><th>Rating</th></tr></thead><tbody></tbody></table></div>
+      </div>
+
+      <div class="ex-card">
+        <h2><i class="fas fa-building"></i> About JHS</h2>
+        <div class="ex-table-wrap"><table class="ex-table" id="evCmp"><thead><tr><th>Particulars</th><th>Rating</th></tr></thead><tbody></tbody></table></div>
+      </div>
+
+      <div class="ex-card pink">
+        <h2><i class="fas fa-comments"></i> Exit Interview</h2>
+        <div id="evQa"></div>
+      </div>
+
+      <div class="ex-card">
+        <h2><i class="fas fa-file-signature"></i> Employee Signature</h2>
+        <div id="evSig" class="ex-muted">—</div>
+      </div>
+
+      <div class="ex-actions">
+        <a class="ex-btn" href="/exit-management/manager"><i class="fas fa-arrow-left"></i> Back</a>
+        <span></span>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/validation.js?v=20261123a"></script>
+<script src="/static/exit_management/js/exit_view.js?v=20261123a"></script>
+</body>
+</html>

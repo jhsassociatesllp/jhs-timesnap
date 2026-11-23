@@ -101,6 +101,7 @@ from backend.metrics.exports import router as exports_router  # ← Excel export
 from backend.metrics.admin_exports import router as admin_exports_router  # ← admin data export (/admin-exports)
 from backend.employee_form.router      import router as employee_form_router       # ← Employee Application Form
 from backend.kyc_form.router           import router as kyc_form_router             # ← KYC Details Form
+from backend.exit_management.routes    import router as exit_management_router     # ← Employee Exit Management
 
 # ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="JHS Platform API", version="3.0.0")
@@ -122,7 +123,12 @@ _NO_STORE_PATHS      = {"/", "/login", "/modules", "/timesheet", "/appraisal",
                          "/hr-quiz/hr-dashboard", "/hr-quiz/quiz",
                          "/employee-declaration", "/employee-declaration/admin",
                          "/resume-ranker",
-                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin", "/employee-form", "/employee-form-admin", "/kyc-form", "/kyc-form-admin"}
+                         "/cv-builder", "/cv-admin", "/buddy-referral", "/referral-admin", "/compliance-admin", "/employee-form", "/employee-form-admin", "/kyc-form", "/kyc-form-admin",
+                         "/exit-management", "/exit-management/tracker", "/exit-management/approvals",
+                         "/exit-management/manager", "/exit-management/handover",
+                         "/exit-management/it-clearance", "/exit-management/it-form",
+                         "/exit-management/hr-clearance", "/exit-management/hr-form",
+                         "/exit-management/exit-form-view"}
 
 @app.middleware("http")
 async def cache_control_middleware(request: Request, call_next):
@@ -205,6 +211,7 @@ app.include_router(exports_router)  # prefix: /exports
 app.include_router(admin_exports_router)  # prefix: /admin-exports
 app.include_router(employee_form_router)   # prefix: /employee-form
 app.include_router(kyc_form_router)        # prefix: /kyc-form
+app.include_router(exit_management_router) # prefix: /api/exit-management
 from backend.access_manager.router import seed_compliance_admin
 seed_compliance_admin()   # one-time: JHS1485 gets the Compliance Calendar admin module
 
@@ -364,6 +371,46 @@ async def employee_form_page():
 @app.get("/kyc-form-admin", response_class=FileResponse)   # ← KYC Details Form admin (HR)
 async def kyc_form_admin_page():
     return FileResponse(os.path.join(static_root, "kyc_form", "admin.html"))
+
+@app.get("/exit-management", response_class=FileResponse)   # ← Employee Exit Form (opens directly from the module card)
+def exit_management_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "employee_exit.html"))
+
+@app.get("/exit-management/tracker", response_class=FileResponse)   # ← Exit Status Tracker (after the form is submitted)
+def exit_management_tracker_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "tracker.html"))
+
+@app.get("/exit-management/manager", response_class=FileResponse)   # ← Reporting Manager dashboard
+def exit_management_manager_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "manager.html"))
+
+@app.get("/exit-management/handover", response_class=FileResponse)   # ← Project Related Details (handover) form
+def exit_management_handover_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "handover.html"))
+
+@app.get("/exit-management/it-clearance", response_class=FileResponse)   # ← IT Clearance dashboard (IT manager)
+def exit_management_it_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "it.html"))
+
+@app.get("/exit-management/it-form", response_class=FileResponse)   # ← IT Clearance form
+def exit_management_it_form_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "it_form.html"))
+
+@app.get("/exit-management/hr-clearance", response_class=FileResponse)   # ← HR Clearance dashboard (HR manager)
+def exit_management_hr_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "hr.html"))
+
+@app.get("/exit-management/hr-form", response_class=FileResponse)   # ← HR Clearance form
+def exit_management_hr_form_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "hr_form.html"))
+
+@app.get("/exit-management/exit-form-view", response_class=FileResponse)   # ← an employee's filled exit form (read-only, for their Reporting Manager)
+def exit_management_exit_form_view_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "exit_view.html"))
+
+@app.get("/exit-management/approvals", response_class=FileResponse)   # ← Approvals (reporting manager / IT / HR)
+def exit_management_approvals_page():
+    return FileResponse(os.path.join(static_root, "exit_management", "approvals.html"))
 
 @app.get("/kyc-form", response_class=FileResponse)   # ← KYC Details Form
 async def kyc_form_page():

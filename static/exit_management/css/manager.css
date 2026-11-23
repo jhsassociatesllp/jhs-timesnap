@@ -1,0 +1,104 @@
+/* Reporting Manager dashboard + Project Related Details form - styles for this module only */
+.ex-container.ex-wide{max-width:1280px}
+.ex-muted{color:var(--ex-muted)}
+.ex-inline{margin-left:.5rem;font-size:.62rem}
+.ex-toolbar{margin-bottom:.8rem}
+.ex-search{width:100%;max-width:360px;border:2px solid var(--ex-border);border-radius:11px;padding:.55rem .9rem;font:inherit;background:#fff}
+.ex-search:focus{outline:none;border-color:var(--ex-blue);box-shadow:0 0 0 3px rgba(102,126,234,.18)}
+.ex-scroll{max-height:420px;overflow:auto}
+.ex-scroll .ex-table th{position:sticky;top:0;z-index:1}
+.ex-actcell{white-space:nowrap}
+.ex-actcell .ex-btn{margin-right:.4rem}
+.ex-container .ex-table td{vertical-align:top}
+.ex-table-wrap .ex-table{min-width:720px}
+#mgDetails .ex-info span{font-weight:600;font-size:1.02rem}
+#mgDetails .ex-info span.ex-muted{font-weight:400;font-size:.9rem}
+#mgAppTable{min-width:1000px}
+
+/* handover form */
+.ex-ho-table{min-width:860px}
+.ex-ho-table td{vertical-align:middle}
+.ex-ho-part{font-weight:600;width:26%}
+.ex-ho-opt{width:130px;white-space:nowrap}
+.ex-ho-opt label{display:inline-flex;align-items:center;gap:.3rem;margin-right:.7rem;font-weight:600;cursor:pointer}
+.ex-ho-input{width:100%;border:2px solid var(--ex-border);border-radius:10px;padding:.55rem .7rem;font:inherit;background:#fff;min-width:160px}
+.ex-ho-input:focus{outline:none;border-color:var(--ex-blue);box-shadow:0 0 0 3px rgba(102,126,234,.18)}
+.ex-ho-input[readonly]{background:#eef0f6}
+.ex-ho-sig{min-width:250px;width:30%}
+.ex-ho-sigbox{border:2px dashed #c3cadb;border-radius:12px;padding:.6rem;background:#fff;transition:.2s}
+.ex-ho-sigbox.over{border-color:var(--ex-blue);background:#f4f6ff}
+.ex-ho-hint{font-size:.72rem;color:var(--ex-muted);margin-top:.35rem}
+.ex-ho-file{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+.ex-ho-file[hidden]{display:none}
+.ex-ho-file .ex-file-thumb{width:64px;height:48px;font-size:1.4rem}
+.ex-ho-file .ex-file-body{min-width:120px}
+.ex-ho-file .ex-file-name{font-size:.85rem}
+.ex-ho-err{display:none;margin-top:.4rem;font-size:.8rem;color:var(--ex-red)}
+.ex-ho-err.show{display:block}
+.ex-ho-table tr.row-error td{background:#fdecea}
+.ex-ho-table button[hidden]{display:none}
+
+@media(max-width:768px){
+  .ex-actcell{white-space:normal}
+  .ex-actcell .ex-btn{margin-bottom:.4rem}
+}
+
+#mgAppTable td:nth-child(7){min-width:230px;max-width:300px}
+#mgAppTable td:nth-child(8){min-width:190px}
+#mgAppTable td:nth-child(2){min-width:140px}
+
+.ex-ho-tick{display:flex;align-items:center;gap:.4rem;font-weight:600;font-size:.85rem;cursor:pointer;margin-bottom:.3rem}
+.ex-ho-tick input{width:18px;height:18px;accent-color:var(--ex-blue)}
+#hoTable .ex-ho-file,#itTable .ex-ho-file{display:none!important}   /* rows show only the checkbox, never a preview */
+.ex-actgrp{display:flex;gap:.4rem;flex-wrap:wrap}
+#itTable .ex-ho-opt{width:200px}
+#itTable .ex-ho-part{width:34%}
+
+/* popup on the manager page that shows the Employee Exit Form / Project Details form in a frame */
+.ex-popup{position:fixed;inset:0;background:rgba(20,28,45,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+.ex-popup[hidden]{display:none}
+.ex-popup-box{background:#fff;border-radius:16px;box-shadow:var(--ex-sh-lg);width:min(1100px,100%);height:min(90vh,100%);display:flex;flex-direction:column;overflow:hidden}
+.ex-popup-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 1.2rem;background:var(--ex-navy);color:#fff}
+.ex-popup-head h3{margin:0;font-size:1.05rem;font-weight:700}
+.ex-popup-close{background:transparent;border:0;color:#fff;font-size:1.4rem;line-height:1;cursor:pointer;padding:.2rem .5rem;border-radius:8px}
+.ex-popup-close:hover{background:rgba(255,255,255,.15)}
+.ex-popup-box iframe{flex:1;width:100%;border:0;background:#fff}
+/* the same pages when shown inside that popup */
+body.ex-embed{background:#fff}
+.ex-embed .ex-nav{display:none}
+.ex-embed .ex-wrap{padding:0;min-height:0}
+.ex-embed .ex-container{box-shadow:none;border-radius:0;padding:1rem 1.2rem 1.4rem;animation:none;max-width:none}
+.ex-embed .ex-actions>a.ex-btn{display:none}
+
+/* eye column + the vertical details popup */
+.ex-eye{background:transparent;border:0;color:#3498db;font-size:1.15rem;cursor:pointer;padding:.3rem .5rem;border-radius:8px}
+.ex-eye:hover{background:#eaf4fc}
+.ex-detail-box{width:min(520px,100%);height:auto;max-height:90vh}
+.ex-detail-body{padding:1rem 1.2rem 1.3rem;overflow-y:auto}
+.ex-vfield{margin-bottom:.9rem}
+.ex-vfield>label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ex-navy-2);margin-bottom:.3rem}
+.ex-vval{border:2px solid var(--ex-border);border-radius:10px;padding:.55rem .8rem;background:var(--ex-light);font-weight:500;word-break:break-word}
+.ex-actbox{display:flex;gap:.5rem;flex-wrap:wrap}
+#mgTeamTable td.c,#mgTeamTable th.c{text-align:center}
+.ex-embed .ex-tabs{display:none}
+
+/* light popup (white box, big title, coral Close button) used by the Reporting Manager dashboard for the Employee Exit Form and Project Details */
+.ex-light .ex-popup-box{background:#fff;border-radius:16px;padding:1.6rem 1.8rem 0;width:min(1000px,100%)}
+.ex-popup-top{display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap;margin-bottom:.8rem}
+.ex-popup-top h2{margin:0;font-size:1.7rem;font-weight:700;color:var(--ex-navy)}
+.ex-close-btn{border:0;cursor:pointer;color:#fff;font:inherit;font-weight:700;padding:.65rem 1.5rem;border-radius:12px;background:linear-gradient(135deg,#ff6b6b,#ee5a5a);box-shadow:0 4px 10px rgba(238,90,90,.35);transition:.15s}
+.ex-close-btn:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(238,90,90,.45)}
+.ex-light .ex-popup-box iframe{margin:0 -1.8rem;width:calc(100% + 3.6rem)}
+.ex-embed .ex-title{display:none}   /* the popup's own title replaces the page title */
+
+/* the light popup covers about 70% of the screen */
+.ex-light .ex-popup-box{width:clamp(min(100%,600px),70vw,1100px);height:min(86vh,100%)}
+
+/* Close button: smaller, at the top right of the popup */
+.ex-popup-top{justify-content:space-between;flex-wrap:nowrap;gap:1rem}
+.ex-popup-top h2{font-size:1.5rem;min-width:0}
+.ex-close-btn{font-size:.82rem;padding:.4rem 1.05rem;border-radius:9px;flex:none;box-shadow:0 3px 8px rgba(238,90,90,.3)}
+/* the small eye popup in the same light style */
+.ex-light .ex-detail-box{width:min(520px,100%);height:auto;max-height:90vh;padding-bottom:.4rem}
+.ex-light .ex-detail-body{padding:.2rem 0 1.2rem}
+

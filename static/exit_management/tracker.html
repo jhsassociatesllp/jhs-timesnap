@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exit Status Tracker — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" id="exNavManager" href="/exit-management/manager" hidden><i class="fas fa-users"></i> Manager Dashboard</a>
+    <a class="ex-navbtn" id="exNavApprovals" href="/exit-management/approvals" hidden><i class="fas fa-user-check"></i> Approvals</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container">
+    <!-- tabs for people with extra access (IT / HR / Reporting Manager); everyone else just sees the tracker -->
+    <div class="ex-tabs" id="trTabs" role="tablist" hidden>
+      <button type="button" class="ex-tab active" role="tab"><i class="fas fa-door-open"></i> Employee Exit Form</button>
+      <a class="ex-tab" id="exTabTeam" href="/exit-management/manager" hidden><i class="fas fa-users"></i> My Team Member Details</a>
+      <a class="ex-tab" id="exTabIt" href="/exit-management/it-clearance" hidden><i class="fas fa-laptop-code"></i> IT Clearance</a>
+      <a class="ex-tab" id="exTabHr" href="/exit-management/hr-clearance" hidden><i class="fas fa-user-shield"></i> HR Clearance</a>
+    </div>
+
+    <h1 class="ex-title"><i class="fas fa-route" style="color:var(--ex-gold)"></i> Exit Status Tracker</h1>
+    <p class="ex-sub" id="trSub">Follow your exit form through each approval.</p>
+
+    <div class="ex-loading" id="trLoading"><i class="fas fa-spinner fa-spin"></i> Loading your status…</div>
+    <div class="ex-alert error" id="trError" role="alert"></div>
+
+    <!-- the employee has not submitted the form yet -->
+    <div id="trNone" style="display:none">
+      <div class="ex-alert info show">You have not submitted your exit form yet. The tracker appears once you submit it.</div>
+      <div class="ex-actions"><span></span><a class="ex-btn gold" href="/exit-management"><i class="fas fa-pen"></i> Open Employee Exit Form</a></div>
+    </div>
+
+    <div id="trMain" style="display:none">
+      <div class="ex-alert" id="trSummary" role="status"></div>
+      <ol class="ex-track" id="trSteps" aria-label="Approval progress"></ol>
+      <div class="ex-actions">
+        <a class="ex-btn" id="trBack" href="/modules"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        <div class="grp">
+          <span class="ex-track-note" id="trUpdated"></span>
+          <button type="button" class="ex-btn" id="trRefresh"><i class="fas fa-rotate"></i> Refresh</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/tabs.js?v=20261123a"></script>
+<script src="/static/exit_management/js/tracker.js?v=20261123a"></script>
+</body>
+</html>

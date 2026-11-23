@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employee Exit Form — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container" id="exRoot">
+    <div class="ex-loading" id="exLoading"><i class="fas fa-spinner fa-spin"></i> Loading your details…</div>
+
+    <div id="exForm" style="display:none">
+      <div class="ex-tabs" role="tablist">
+        <a class="ex-tab active" href="/exit-management"><i class="fas fa-door-open"></i> Employee Exit Form</a>
+        <a class="ex-tab" id="exTabTeam" href="/exit-management/manager" hidden><i class="fas fa-users"></i> My Team Member Details</a>
+        <a class="ex-tab" id="exTabIt" href="/exit-management/it-clearance" hidden><i class="fas fa-laptop-code"></i> IT Clearance</a>
+        <a class="ex-tab" id="exTabHr" href="/exit-management/hr-clearance" hidden><i class="fas fa-user-shield"></i> HR Clearance</a>
+      </div>
+      <h1 class="ex-title"><i class="fas fa-door-open" style="color:var(--ex-gold)"></i> Employee Exit Form</h1>
+      <p class="ex-sub">Complete all sections below, then submit. You can save a draft and continue later.</p>
+
+      <div class="ex-alert" id="exBanner" role="status"></div>
+
+      <form id="exitForm" novalidate autocomplete="off">
+
+      <!-- ═══════════ 1. Employee/Article Details ═══════════ -->
+      <section>
+        <div class="ex-card gold">
+          <div class="ex-paper-top">
+            <h2 style="border:0;margin:0;padding:0"><i class="fas fa-id-card"></i> 1. Employee/Article Details</h2>
+            <div class="ex-datebox"><span>Date</span><input type="date" id="f_date" readonly /></div>
+          </div>
+          <div class="ex-grid" style="margin-top:1.1rem">
+            <div class="ex-field full"><label for="f_name">Full Name</label><input id="f_name" readonly placeholder="Not available" /></div>
+            <div class="ex-field"><label for="f_code">Code</label><input id="f_code" readonly placeholder="Not available" /></div>
+            <div class="ex-field"><label for="f_joining">Joining Date</label><input type="date" id="f_joining" readonly /></div>
+            <div class="ex-field"><label for="f_designation">Designation</label><input id="f_designation" readonly placeholder="Not available" /></div>
+            <div class="ex-field"><label for="f_reporting">Reporting to</label><input id="f_reporting" readonly placeholder="Not available" /></div>
+            <div class="ex-field"><label for="f_resignation">Resignation Date <span class="req">*</span></label><input type="date" id="f_resignation" /></div>
+            <div class="ex-field"><label for="f_lastday">Last Working Date <span class="req">*</span></label><input type="date" id="f_lastday" /></div>
+          </div>
+          <div class="ex-note" id="exMissingNote" style="display:none"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 2-5. Ratings, Exit Interview, Signature upload, Actions ═══════════ -->
+      <section>
+        <div class="ex-card">
+          <h2><i class="fas fa-user-tie"></i> 2. About Reporting Manager</h2>
+          <div class="ex-table-wrap"><table class="ex-table" id="tblManager"></table></div>
+        </div>
+
+        <div class="ex-card green">
+          <h2><i class="fas fa-building"></i> 3. About JHS</h2>
+          <div class="ex-table-wrap"><table class="ex-table" id="tblCompany"></table></div>
+        </div>
+
+        <div class="ex-card pink">
+          <h2><i class="fas fa-comments"></i> 4. Employee Feedback / Exit Interview</h2>
+
+          <div class="ex-q" data-q="would_rejoin">
+            <span class="lbl">17. Would you rejoin JHS any time in future? <span class="req">*</span></span>
+            <div class="opts"><label><input type="radio" name="ei_would_rejoin" value="Yes"> Yes</label><label><input type="radio" name="ei_would_rejoin" value="No"> No</label></div>
+          </div>
+
+          <div class="ex-q" data-q="systems_and_processes">
+            <label for="ei_systems_and_processes">18. Were you comfortable with all systems and processes used by your team? Suggest any changes that would have improved your efficiency. <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_systems_and_processes" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="team_experience">
+            <label for="ei_team_experience">19. Did you feel comfortable working in your team? What would you miss the most about your department? <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_team_experience" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="resignation_reason">
+            <label for="ei_resignation_reason">20. What is the reason for your resignation? <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_resignation_reason" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="better_prospect">
+            <span class="lbl">21. Are you leaving because of a better prospect? If yes, would you like to mention the name of your new employer? <span class="req">*</span></span>
+            <div class="opts"><label><input type="radio" name="ei_better_prospect" value="Yes"> Yes</label><label><input type="radio" name="ei_better_prospect" value="No"> No</label></div>
+            <div class="ex-sub-q" id="employerWrap" style="display:none" data-q="new_employer">
+              <input class="ex-textarea" style="min-height:0" id="ei_new_employer" maxlength="300" placeholder="Name of your new employer" />
+            </div>
+          </div>
+
+          <div class="ex-q" data-q="pull_factors" id="pullWrap">
+            <label for="ei_pull_factors">22. What are the pull factors of your new employer? <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_pull_factors" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="recommend_company">
+            <span class="lbl">23. Would you recommend the company to a friend as a good organisation to work for? <span class="req">*</span></span>
+            <div class="opts"><label><input type="radio" name="ei_recommend_company" value="Yes"> Yes</label><label><input type="radio" name="ei_recommend_company" value="No"> No</label></div>
+            <div class="ex-sub-q" id="recommendWrap" style="display:none" data-q="recommend_reason">
+              <label for="ei_recommend_reason">Please tell us why <span class="req">*</span></label>
+              <textarea class="ex-textarea" id="ei_recommend_reason" maxlength="5000" placeholder="Reason for not recommending the company"></textarea>
+            </div>
+          </div>
+
+          <div class="ex-q" data-q="jhs_memories">
+            <label for="ei_jhs_memories">24. List three things you would remember most about being a part of the JHS family. <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_jhs_memories" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="improvements">
+            <label for="ei_improvements">25. List three things that would have made your life better at JHS. <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_improvements" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="employee_benefits">
+            <label for="ei_employee_benefits">26. Do you think the employee benefits provided by the company were sufficient? (If not, do you have any suggestions?) <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_employee_benefits" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          <div class="ex-q" data-q="departure_prevention">
+            <label for="ei_departure_prevention">27. What circumstances would have prevented your departure? <span class="req">*</span></label>
+            <textarea class="ex-textarea" id="ei_departure_prevention" maxlength="5000" placeholder="Type your answer"></textarea>
+          </div>
+
+          </div>
+
+        <div class="ex-card" id="sigCard">
+          <h2><i class="fas fa-file-signature"></i> 5. Upload Employee Signature <span style="color:var(--ex-red)">*</span></h2>
+          <h3 class="ex-up-title">Upload Your Signature</h3>
+          <p class="ex-up-desc">Please upload your signed signature document. Accepted formats: PDF, JPG, JPEG and PNG. Maximum file size: 5 MB.</p>
+
+          <div class="ex-drop" id="sigDrop" tabindex="0" role="button" aria-label="Drag and drop your signature here, or press Enter to browse files">
+            <i class="fas fa-cloud-arrow-up"></i>
+            <strong>Drag and drop your signature here</strong>
+            <span>or</span>
+            <button type="button" class="ex-btn sm primary" id="sigBrowse"><i class="fas fa-folder-open"></i> Browse Files</button>
+            <small>Accepted formats: PDF, JPG, JPEG, PNG &nbsp;&middot;&nbsp; Maximum size: 5 MB</small>
+            <input type="file" id="sigFile" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden />
+          </div>
+
+          <div class="ex-file" id="sigInfo" hidden>
+            <div class="ex-file-thumb" id="sigThumb"></div>
+            <div class="ex-file-body">
+              <div class="ex-file-name" id="sigName"></div>
+              <div class="ex-file-meta" id="sigMeta"></div>
+              <div class="ex-progress" id="sigProgress" hidden><div class="bar" id="sigBar"></div></div>
+              <div class="ex-file-status" id="sigStatus"></div>
+            </div>
+            <div class="ex-file-actions">
+              <button type="button" class="ex-btn sm" id="sigView"><i class="fas fa-eye"></i> View</button>
+              <button type="button" class="ex-btn sm" id="sigReplace"><i class="fas fa-rotate"></i> Replace</button>
+              <button type="button" class="ex-btn sm danger" id="sigRemove"><i class="fas fa-trash"></i> Remove</button>
+            </div>
+          </div>
+          <div class="ex-alert error" id="sigError" role="alert"></div>
+        </div>
+
+        <div class="ex-alert error" id="exErrors" role="alert"></div>
+        <div class="ex-actions">
+          <span></span>
+          <div class="grp">
+            <button type="button" class="ex-btn" id="btnSaveDraft"><i class="fas fa-save"></i> Save Draft</button>
+            <button type="submit" class="ex-btn success" id="btnSubmit"><i class="fas fa-paper-plane"></i> Submit Form</button>
+          </div>
+        </div>
+      </section>
+      </form>
+    </div>
+
+    <!-- behind the success popup: the submitted form is never shown again, closing the popup opens the tracker -->
+    <div id="exDone" style="display:none">
+      <h1 class="ex-title"><i class="fas fa-circle-check" style="color:var(--ex-green)"></i> Exit form submitted</h1>
+      <p class="ex-sub"><i class="fas fa-spinner fa-spin"></i> Opening your Exit Status Tracker…</p>
+    </div>
+  </main>
+</div>
+<div class="ex-modal" id="exConfirm" hidden>
+  <div class="ex-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="exConfirmTitle" aria-describedby="exConfirmText">
+    <div class="ex-modal-check" style="background:#e8a317"><i class="fas fa-question"></i></div>
+    <h2 id="exConfirmTitle">Submit Exit Form?</h2>
+    <p id="exConfirmText">Submit your exit form? You will not be able to change it afterwards.</p>
+    <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+      <button type="button" class="ex-btn success" id="exConfirmOk"><i class="fas fa-paper-plane"></i> Yes, Submit</button>
+      <button type="button" class="ex-btn" id="exConfirmCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="ex-modal" id="exModal" hidden>
+  <div class="ex-modal-box" role="dialog" aria-modal="true" aria-labelledby="exModalTitle">
+    <div class="ex-modal-check"><i class="fas fa-check"></i></div>
+    <h2 id="exModalTitle">Employee Exit Form Submitted Successfully!</h2>
+    <p>Your Employee Exit Form has been submitted successfully. After you close this message you can follow its approval status.</p>
+    <button type="button" class="ex-btn" id="btnModalClose">Close</button>
+  </div>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<!-- load order matters: each file only uses the ones above it -->
+<script src="/static/exit_management/js/validation.js?v=20261123a"></script>
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/tabs.js?v=20261123a"></script>
+<script src="/static/exit_management/js/signature.js?v=20261123a"></script>
+<script src="/static/exit_management/js/draft.js?v=20261123a"></script>
+<script src="/static/exit_management/js/employee_exit.js?v=20261123a"></script>
+</body>
+</html>

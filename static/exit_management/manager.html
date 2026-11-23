@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reporting Manager Dashboard — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/exit-management"><i class="fas fa-file-lines"></i> My Exit Form</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container ex-wide">
+        <div class="ex-tabs" role="tablist">
+      <a class="ex-tab" href="/exit-management"><i class="fas fa-door-open"></i> Employee Exit Form</a>
+      <button type="button" class="ex-tab active" id="mgTabTeam" role="tab"><i class="fas fa-users"></i> My Team Member Details</button>
+      <a class="ex-tab" id="exTabIt" href="/exit-management/it-clearance" hidden><i class="fas fa-laptop-code"></i> IT Clearance</a>
+      <a class="ex-tab" id="exTabHr" href="/exit-management/hr-clearance" hidden><i class="fas fa-user-shield"></i> HR Clearance</a>
+    </div>
+
+    <div class="ex-loading" id="mgLoading"><i class="fas fa-spinner fa-spin"></i> Loading your team…</div>
+    <div class="ex-alert error" id="mgError" role="alert"></div>
+
+    <div id="mgMain" style="display:none">
+
+      
+      <section class="ex-card" data-tab="team">
+        <h2><i class="fas fa-people-group"></i> Team Members Who Filled the Exit Form <span class="ex-count" id="mgTeamCount"></span></h2>
+        <div class="ex-toolbar">
+          <input type="search" id="mgSearch" class="ex-search" placeholder="Search by name, ID or designation" aria-label="Search team members" />
+        </div>
+        <div class="ex-table-wrap ex-scroll">
+          <table class="ex-table" id="mgTeamTable">
+            <thead><tr><th class="c">S.No</th><th class="c">View</th><th>Employee ID</th><th>Employee Name</th><th>Designation</th><th>Branch</th><th>Joining Date</th><th>Resignation Date</th><th>Last Working Date</th><th>Submitted On</th><th>Application Status</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<!-- eye icon: every column of one employee, stacked vertically -->
+<div class="ex-popup ex-light" id="mgDetail" hidden>
+  <div class="ex-popup-box ex-detail-box" role="dialog" aria-modal="true" aria-labelledby="mgDetailTitle">
+    <div class="ex-popup-top"><h2 id="mgDetailTitle"></h2><button type="button" class="ex-close-btn" id="mgDetailClose">Close</button></div>
+    <div class="ex-detail-body" id="mgDetailBody"></div>
+  </div>
+</div>
+<!-- popup: the Employee Exit Form (read-only) or the Project Details form, shown on this page -->
+<div class="ex-popup ex-light" id="mgPopup" hidden>
+  <div class="ex-popup-box" role="dialog" aria-modal="true" aria-labelledby="mgPopupTitle">
+    <div class="ex-popup-top"><h2 id="mgPopupTitle"></h2><button type="button" class="ex-close-btn" id="mgPopupClose">Close</button></div>
+    <iframe id="mgFrame" title="Form"></iframe>
+  </div>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/tabs.js?v=20261123a"></script>
+<script src="/static/exit_management/js/manager.js?v=20261123a"></script>
+</body>
+</html>

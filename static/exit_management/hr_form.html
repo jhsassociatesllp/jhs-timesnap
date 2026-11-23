@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR Clearance — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+  <link rel="stylesheet" href="/static/exit_management/css/manager.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/exit-management/hr-clearance"><i class="fas fa-user-shield"></i> HR Clearance</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container ex-wide">
+    <div class="ex-loading" id="hrLoading"><i class="fas fa-spinner fa-spin"></i> Loading the HR Clearance form…</div>
+    <div class="ex-alert error" id="hrFatal" role="alert"></div>
+
+    <form id="hrForm" style="display:none" novalidate autocomplete="off">
+      <h1 class="ex-title"><i class="fas fa-user-shield" style="color:var(--ex-gold)"></i> HR Clearance</h1>
+      <p class="ex-sub">Human Resource clearance for the employee's exit. Answer every row (Yes / No and remarks), add your comments, upload your signature and tick it for the rows (and the HR Signature) that need it, then submit.</p>
+      <div class="ex-alert" id="hrBanner" role="status"></div>
+
+
+      <div class="ex-card">
+        <h2><i class="fas fa-user-shield"></i> Human Resource</h2>
+        <div class="ex-table-wrap">
+          <table class="ex-table ex-ho-table" id="hrTable">
+            <thead><tr><th>Particulars</th><th class="c">Option</th><th>Remarks</th><th>Signature</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <h2><i class="fas fa-file-signature"></i> Declaration</h2>
+        <p id="hrDeclaration" style="font-weight:600;margin:.2rem 0 1rem"></p>
+        <div class="ex-grid">
+          <div class="ex-field"><label>Employee Signature</label>
+            <div id="hrEmpSig" class="ex-muted">—</div></div>
+          <div class="ex-field"><label>HR Signature</label>
+            <div class="ex-ho-sigbox" id="row_hr_sign" style="min-height:48px"></div></div>
+        </div>
+        <div class="ex-field" style="margin-top:1rem"><label for="hrComments">HR Comments</label>
+          <textarea id="hrComments" class="ex-textarea" maxlength="2000" placeholder="HR comments (required if you reject)"></textarea></div>
+      </div>
+
+      <div class="ex-card" id="hrSigView" style="display:none">
+        <h2><i class="fas fa-file-signature"></i> HR Representative Signature</h2>
+        <div id="hrSigPreview" class="ex-muted">&mdash;</div>
+      </div>
+
+      <div class="ex-card" id="hrSigCard">
+        <h2><i class="fas fa-signature"></i> Upload a Signature</h2>
+        <p class="ex-sub" style="margin:0 0 .8rem">Upload your signature once, then tick &ldquo;Add signature&rdquo; on every row (and the HR Signature) it applies to. Anything left unticked stays empty.</p>
+        <div class="ex-ho-sigbox" id="hrSigDrop" style="text-align:center;padding:1.2rem">
+          <input type="file" id="hrSigFile" hidden accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+          <button type="button" class="ex-btn sm primary" id="hrSigPick"><i class="fas fa-upload"></i> Upload signature</button>
+          <button type="button" class="ex-btn sm danger" id="hrSigRemove" hidden><i class="fas fa-trash"></i> Remove</button>
+          <div class="ex-ho-hint">PDF, JPG, JPEG or PNG &middot; max 5 MB &middot; you can also drop a file here</div>
+          <div id="hrSigStatus" style="margin-top:.4rem;font-weight:600"></div>
+          <div class="ex-ho-err" id="hrSigErr"></div>
+        </div>
+      </div>
+
+      <div class="ex-alert error" id="hrErrors" role="alert"></div>
+      <div class="ex-actions" id="hrActions">
+        <a class="ex-btn" href="/exit-management/hr-clearance"><i class="fas fa-arrow-left"></i> Back to dashboard</a>
+        <div class="grp">
+          <button type="button" class="ex-btn" id="hrSaveDraft"><i class="fas fa-save"></i> Save Draft</button>
+          <button type="submit" class="ex-btn success" id="hrSubmit"><i class="fas fa-paper-plane"></i> Approve &amp; Submit HR Clearance</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+
+<div class="ex-modal" id="hrAlert" hidden>
+  <div class="ex-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="hrAlertTitle">
+    <div class="ex-modal-check" style="background:#c0392b"><i class="fas fa-signature"></i></div>
+    <h2 id="hrAlertTitle">Signature required</h2>
+    <p>A signature is required for every row answered <b>Yes</b>. Upload your signature and tick &ldquo;Add signature&rdquo; for:</p>
+    <ul id="hrAlertList" style="text-align:left;margin:.2rem 0 1rem 1.2rem"></ul>
+    <button type="button" class="ex-btn" id="hrAlertOk">OK</button>
+  </div>
+</div>
+<div class="ex-modal" id="hrConfirm" hidden>
+  <div class="ex-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="hrConfirmTitle" aria-describedby="hrConfirmText">
+    <div class="ex-modal-check" style="background:#e8a317"><i class="fas fa-question"></i></div>
+    <h2 id="hrConfirmTitle">Ready to submit?</h2>
+    <p id="hrConfirmText">Approving completes the exit process. You won&rsquo;t be able to make changes after this.</p>
+    <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+      <button type="button" class="ex-btn success" id="hrConfirmOk"><i class="fas fa-paper-plane"></i> Approve &amp; Submit</button>
+      <button type="button" class="ex-btn" id="hrConfirmCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="ex-modal" id="hrModal" hidden>
+  <div class="ex-modal-box" role="dialog" aria-modal="true" aria-labelledby="hrModalTitle">
+    <div class="ex-modal-check"><i class="fas fa-check"></i></div>
+    <h2 id="hrModalTitle">HR Clearance Submitted Successfully!</h2>
+    <p>The HR stage is now approved. The exit process is complete.</p>
+    <button type="button" class="ex-btn" id="hrModalClose">Close</button>
+  </div>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/hr_form.js?v=20261123a"></script>
+</body>
+</html>

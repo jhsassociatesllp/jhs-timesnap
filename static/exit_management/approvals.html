@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exit Approvals — JHS Timesnap</title>
+  <link rel="icon" type="image/png" href="/static/jhs_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/static/exit_management/css/employee_exit.css?v=20261123a" />
+</head>
+<body class="ex-body">
+
+<nav class="ex-nav">
+  <div class="ex-brand"><i class="fas fa-door-open"></i> JHS Exit Management</div>
+  <div class="ex-nav-right">
+    <span class="ex-badge" id="exEmpBadge"></span>
+    <a class="ex-navbtn" href="/exit-management"><i class="fas fa-file-lines"></i> My Exit Form</a>
+    <a class="ex-navbtn" href="/modules"><i class="fas fa-th-large"></i> Modules</a>
+    <button class="ex-navbtn" id="exLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<div class="ex-wrap">
+  <main class="ex-container">
+    <h1 class="ex-title"><i class="fas fa-user-check" style="color:var(--ex-gold)"></i> Exit Approvals</h1>
+    <p class="ex-sub">Exit forms waiting for your approval. A form moves Reporting Manager &rarr; IT &rarr; HR &rarr; Form Complete.</p>
+
+    <div class="ex-loading" id="apLoading"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+    <div class="ex-alert error" id="apError" role="alert"></div>
+
+    <div id="apMain" style="display:none">
+      <div class="ex-card gold" id="apListCard">
+        <h2><i class="fas fa-inbox"></i> Waiting for your approval <span class="ex-count" id="apCount"></span></h2>
+        <div id="apList"></div>
+        <div class="ex-actions"><span></span><button type="button" class="ex-btn sm" id="apRefresh"><i class="fas fa-rotate"></i> Refresh</button></div>
+      </div>
+
+      <div id="apReview" style="display:none">
+        <div class="ex-card" id="apReviewCard"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="ex-toast" id="exToast"></div>
+
+<script src="/static/exit_management/js/validation.js?v=20261123a"></script>
+<script src="/static/exit_management/js/employee_details.js?v=20261123a"></script>
+<script src="/static/exit_management/js/approvals.js?v=20261123a"></script>
+</body>
+</html>

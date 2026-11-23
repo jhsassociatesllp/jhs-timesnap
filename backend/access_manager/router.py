@@ -243,6 +243,7 @@ PAGE_MODULES = {
     "resume_ranker":  "Resume Ranker",
     "cv":             "CV Builder",
     "buddy_referral": "Buddy Referral",
+    "exit_management": "Employee Exit Management",
 }
 
 visibility_collection = db["module_visibility"]
