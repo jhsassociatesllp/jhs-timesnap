@@ -95,11 +95,21 @@ def _name(emp: dict, fallback: str = "") -> str:
     return (emp or {}).get("Emp Name") or (emp or {}).get("EmployeeName") or (emp or {}).get("Name") or fallback
 
 
+_ADDR_TOKEN = re.compile(r"[A-Za-z0-9._%+'\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
+
+
+def clean_address(value) -> str:
+    """The first plain e-mail address inside a stored value, or "". Stored values are often pasted from Outlook / a web page:
+    `mailto:a@b.in`, `Name <a@b.in>`, `a@b.in;c@d.in`, trailing spaces - Graph rejects those as recipients, so reduce them to `a@b.in`."""
+    match = _ADDR_TOKEN.search(str(value or "").replace(" ", " "))
+    return match.group(0) if match else ""
+
+
 def _address(code: str):
-    """(name, OFFICIAL e-mail address) of an employee: the `EMail` field of Employee_details. The personal address
-    (`Personal EMail`) is never used; without a valid official address the person is simply skipped."""
+    """(name, OFFICIAL e-mail address) of an employee: the `EMail` field of Employee_details, cleaned (see clean_address).
+    The personal address (`Personal EMail`) is never used; without a valid official address the person is simply skipped."""
     emp = repo.find_employee(code) or {}
-    value = str(emp.get("EMail") or "").strip()
+    value = clean_address(emp.get("EMail"))
     return _name(emp, code), (value if _EMAIL.match(value) else None)
 
 

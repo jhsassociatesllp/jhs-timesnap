@@ -122,3 +122,19 @@ def test_the_login_link_can_be_overridden_by_a_setting(mail, monkeypatch):
     submit_as(mail, "T001")
     m = take(mail)
     assert "https://other.example/" in m[0][2] and "https://jhstimesnap.in/" not in m[0][2]
+
+
+def test_addresses_pasted_with_mailto_names_or_several_values_are_cleaned():
+    assert notify.clean_address("mailto:ramakrishnan.sundar@jhsassociates.in") == "ramakrishnan.sundar@jhsassociates.in"
+    assert notify.clean_address("  Pankaj Gupta <pankaj.gupta@jhsassociates.in> ") == "pankaj.gupta@jhsassociates.in"
+    assert notify.clean_address("a.b@jhsassociates.in; c.d@jhsassociatesllp.in") == "a.b@jhsassociates.in"
+    assert notify.clean_address("O'Neil@jhsassociates.in\u00a0") == "O'Neil@jhsassociates.in"
+    assert notify.clean_address("not an address") == "" and notify.clean_address(None) == "" and notify.clean_address("") == ""
+
+
+def test_a_mailto_address_on_record_still_receives_the_mail(mail):
+    EMPLOYEES["JHS1551"]["EMail"] = "mailto:it1551@jhs.test"
+    fid = submit_as(mail, "T001")
+    take(mail)
+    manager_pass(mail, fid)
+    assert sorted(x[0] for x in take(mail)) == ["it1474@jhs.test", "it1551@jhs.test", "it722@jhs.test"]   # the cleaned address, not "mailto:..."
