@@ -54,6 +54,7 @@ def classify_message(message: str) -> str:
         label = call_llm(
             [{"role": "user", "content": CLASSIFY_PROMPT + message}],
             temperature=0,
+            provider=rag.HR_PROVIDER,
         )
         label = re.sub(r"[^A-Z]", "", label.upper())
         if label in ("HR", "LIBRARY", "RCM", "GENERAL"):
@@ -142,7 +143,7 @@ def dispatch_stream(message: str, history: List[Dict[str, str]]) -> Generator[Di
     messages.append({"role": "user", "content": message})
     try:
         full = []
-        for token in stream_llm(messages):
+        for token in stream_llm(messages, provider=rag.HR_PROVIDER):
             full.append(token)
             yield {"type": "chunk", "text": token}
         yield {"type": "done", "sources": [], "from_cache": False, "bot": "hr"}
