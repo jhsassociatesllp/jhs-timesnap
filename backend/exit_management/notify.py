@@ -33,6 +33,7 @@ log = logging.getLogger("exit_management.notify")
 LOGIN_URL = "https://jhstimesnap.in/"
 _EMAIL = re.compile(r"^[^@\s;,]+@[^@\s;,]+\.[A-Za-z]{2,}$")
 _token = {"value": None, "expires": 0.0}
+_warned = {"missing": False}
 
 
 # ── settings / sending ───────────────────────────────────────────────────────
@@ -73,6 +74,11 @@ def _send_graph(to: str, subject: str, body_html: str) -> None:
 def _deliver(to: str, subject: str, body_html: str) -> bool:
     """Send one message; never raises."""
     if not enabled():
+        missing = [k for k in ("TENANT_AP", "CLIENT_AP", "CLIENT_SECRET_AP", "SENDER_AP") if not _setting(k)]
+        if missing and not _warned["missing"]:                     # say it loudly ONCE in the server log (names only, never values)
+            _warned["missing"] = True
+            log.warning("exit mail is NOT being sent: these settings are empty in this environment: %s "
+                        "(they must be passed to the container, e.g. -e NAME=... in the deploy workflow)", ", ".join(missing))
         log.info("exit mail not sent to %s (%s): mail is disabled or not configured", to, subject)
         return False
     try:

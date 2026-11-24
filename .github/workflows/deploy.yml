@@ -223,6 +223,10 @@ jobs:
                 -e MS_MAIL_CLIENT_SECRET="${{ secrets.MS_MAIL_CLIENT_SECRET || secrets.GRAPH_CLIENT_SECRET }}" \
                 -e MS_MAIL_SENDER="${{ secrets.MS_MAIL_SENDER || secrets.GRAPH_SENDER }}" \
                 -e HR_NOTIFY_EMAIL="${{ secrets.HR_NOTIFY_EMAIL }}" \
+                -e TENANT_AP="${{ secrets.TENANT_AP }}" \
+                -e CLIENT_AP="${{ secrets.CLIENT_AP }}" \
+                -e CLIENT_SECRET_AP="${{ secrets.CLIENT_SECRET_AP }}" \
+                -e SENDER_AP="${{ secrets.SENDER_AP }}" \
                 -e APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
                 -e NQ_DB_HOST="host.docker.internal" \
                 -e NQ_DB_LOCAL_PORT="${{ secrets.NQ_DB_LOCAL_PORT }}" \
