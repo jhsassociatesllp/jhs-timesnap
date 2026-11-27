@@ -100,7 +100,7 @@
           <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/existing/export','Referred_by_JHS_Employee.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
-          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Position (Referred Emp)</th><th>Manager</th><th>Partner</th><th>Referred Emp Code</th><th>Referred Emp Name</th><th>Joining Date (Referred Emp)</th><th>Duration (Referred Emp)</th><th>Referred Emp Status</th><th>Contacted</th><th>Paid</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Position (Referred Emp)</th><th>Manager</th><th>Partner</th><th>Referred Emp Code</th><th>Referred Emp Name</th><th>Joining Date (Referred Emp)</th><th>Duration (Referred Emp)</th><th>Referred Emp Status</th><th>Resume</th><th>Date Employee Joined</th><th>Contacted</th><th>Paid</th></tr></thead>
           <tbody id="exBody"></tbody>
         </table></div>
       </div>
@@ -112,7 +112,7 @@
           <button class="btn btn-pri btn-sm" onclick="download('/buddy-referral/admin/referrals/export','Referred_Someone.xlsx')"><i class="fas fa-file-excel"></i> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="t">
-          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th><th>Contacted</th><th>Shortlisted</th></tr></thead>
+          <thead><tr><th>Emp Code</th><th>Emp Name</th><th>Manager</th><th>Partner</th><th>Role</th><th>Resume</th><th>Date Employee Joined</th><th>Contacted</th><th>Status</th></tr></thead>
           <tbody id="rrBody"></tbody>
         </table></div>
       </div>
@@ -133,7 +133,7 @@
 <div class="vw-bg" id="rmBg">
   <div class="rm-box">
     <h3 id="rmTitle">Remark</h3>
-    <p>A remark is required when the answer is No.</p>
+    <p id="rmHint"></p>
     <textarea id="rmText" rows="3" maxlength="300" placeholder="Type the remark"></textarea>
     <div class="rm-act"><button class="btn btn-sm" onclick="cancelRemark()">Cancel</button><button class="btn btn-pri btn-sm" onclick="submitRemark()">Save</button></div>
   </div>
@@ -213,37 +213,47 @@ let exRows=[], rrRows=[];
 const match=(obj,q)=>!q||Object.values(obj).some(v=>String(v==null?'':v).toLowerCase().includes(q));
 const dash=v=>v?esc(v):'—';
 
+function resumeButtons(r){
+  return `<button class="icon-btn" title="View resume" onclick="viewResume('${esc(r.id)}','${esc(r.resume_filename)}')"><i class="fas fa-eye"></i></button>
+    <button class="icon-btn dl" title="Download resume" onclick="download('/buddy-referral/admin/referrals/${esc(r.id)}/resume','${esc(r.resume_filename)}')"><i class="fas fa-download"></i></button>`;
+}
+
 function renderExisting(){
   const q=document.getElementById('exSearch').value.trim().toLowerCase();
   const rows=exRows.filter(r=>match(r,q));
   document.getElementById('exBody').innerHTML = rows.length ? rows.map(r=>`<tr>
     <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.referred_to_position||r.position)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td>
-    <td><b>${esc(r.referred_emp)}</b></td><td>${dash(r.referred_to_name)}</td><td>${dash(r.referred_doj)}</td>
+    <td><b>${dash(r.referred_emp)}</b></td><td>${r.joined_candidate?'<span class="tag">Joined candidate</span>':dash(r.referred_to_name)}</td><td>${dash(r.referred_doj)}</td>
     <td>${dash(r.duration)} ${r.buddy?'<span class="tag">Buddy Referral</span>':''}</td>
-    <td><span class="${r.status==='Active'?'st-a':'st-i'}">${esc(r.status)}</span></td>
+    <td>${r.status?`<span class="${r.status==='Active'?'st-a':'st-i'}">${esc(r.status)}</span>`:'—'}</td>
+    <td style="white-space:nowrap">${r.joined_candidate?resumeButtons(r):'—'}</td>
+    <td>${dash(r.date_of_joining)}</td>
     <td>${ctSelect('existing',r)}</td>
     <td>${decSelect('existing','paid',r)}</td>
-  </tr>`).join('') : '<tr><td colspan="12"><div class="empty"><i class="fas fa-inbox"></i>No existing-employee referrals yet.</div></td></tr>';
+  </tr>`).join('') : '<tr><td colspan="14"><div class="empty"><i class="fas fa-inbox"></i>No existing-employee referrals yet.</div></td></tr>';
 }
-// ── Paid (Referred by a JHS Employee) / Shortlisted (Referred Someone): Yes / No, with a remark when No ──
-const DEC = {existing:{field:'paid', remark:'paid_remark', label:'Paid'}, referrals:{field:'shortlisted', remark:'shortlisted_remark', label:'Shortlisted'}};
+// ── Paid (Referred by a JHS Employee): Yes / No. Status (Referred Someone). "No" / "Rejected" need a remark. ──
+const DEC = {existing:{field:'paid', remark:'paid_remark', label:'Paid', options:['Yes','No'], needsRemark:'No'},
+             referrals:{field:'shortlisted', remark:'shortlisted_remark', label:'Status', options:['Contact','Shortlist','Joined','Rejected'], needsRemark:'Rejected'}};
 function decSelect(kind,field,r){
-  const v=r[field]||'', rm=r[DEC[kind].remark]||'';
+  const d=DEC[kind], v=r[field]||'', rm=r[d.remark]||'';
   return `<div class="dec">
     <select class="ct" onchange="onDecision('${kind}','${esc(r.id)}',this)">
-      <option value=""${v?'':' selected'}>— Select —</option><option value="Yes"${v==='Yes'?' selected':''}>Yes</option><option value="No"${v==='No'?' selected':''}>No</option></select>
-    ${v==='No'?`<div class="rm" title="${esc(rm)}"><span>${esc(rm)}</span> <a href="#" onclick="event.preventDefault();askRemark('${kind}','${esc(r.id)}',null)">edit</a></div>`:''}
+      <option value=""${v?'':' selected'}>— Select —</option>${d.options.map(o=>`<option value="${o}"${v===o?' selected':''}>${o}</option>`).join('')}</select>
+    ${v===d.needsRemark?`<div class="rm" title="${esc(rm)}"><span>${esc(rm)}</span> <a href="#" onclick="event.preventDefault();askRemark('${kind}','${esc(r.id)}',null)">edit</a></div>`:''}
   </div>`;
 }
 function decRow(kind,id){ return (kind==='existing'?exRows:rrRows).find(x=>x.id===id); }
 function onDecision(kind,id,sel){
   if(!sel.value){ sel.value=decRow(kind,id)[DEC[kind].field]||''; return; }
-  if(sel.value==='No') askRemark(kind,id,sel); else saveDecision(kind,id,'Yes','');
+  if(sel.value===DEC[kind].needsRemark) askRemark(kind,id,sel); else saveDecision(kind,id,sel.value,'');
 }
 let rmCtx=null;
 function askRemark(kind,id,sel){
   const row=decRow(kind,id); rmCtx={kind,id,sel};
-  document.getElementById('rmTitle').textContent=DEC[kind].label+' = No — remark';
+  const no=DEC[kind].needsRemark;
+  document.getElementById('rmTitle').textContent=`${DEC[kind].label} = ${no} — remark`;
+  document.getElementById('rmHint').textContent=`A remark is required when the answer is ${no}.`;
   const t=document.getElementById('rmText'); t.value=row[DEC[kind].remark]||''; t.classList.remove('bad');
   document.getElementById('rmBg').classList.add('open'); setTimeout(()=>t.focus(),50);
 }
@@ -255,14 +265,20 @@ async function submitRemark(){
   const t=document.getElementById('rmText'), remark=t.value.trim();
   if(!remark){ t.classList.add('bad'); t.focus(); return; }
   const c=rmCtx; document.getElementById('rmBg').classList.remove('open'); rmCtx=null;
-  await saveDecision(c.kind,c.id,'No',remark);
+  await saveDecision(c.kind,c.id,DEC[c.kind].needsRemark,remark);
 }
 async function saveDecision(kind,id,value,remark){
   const row=decRow(kind,id), d=DEC[kind];
   try{
     const r=await fetch(`/buddy-referral/admin/${kind}/${id}/decision`,{method:'PUT',headers:{...AUTH,'Content-Type':'application/json'},body:JSON.stringify({value,remark})});
     if(!r.ok){ let e=null; try{e=await r.json();}catch(x){} throw new Error((e&&typeof e.detail==='string'&&e.detail)||'Could not save'); }
-    row[d.field]=value; row[d.remark]=value==='No'?remark:'';
+    row[d.field]=value; row[d.remark]=value===d.needsRemark?remark:'';
+    if(value==='Joined'){
+      rrRows=rrRows.filter(x=>x.id!==id); showCounts(); renderReferrals(); loadDashboard();
+      toast('Joined — moved to Referred by a JHS Employee');
+      try{ await loadRows(); }catch(e){ toast('Saved, but the lists could not refresh. Reload the page.','error'); }
+      return;
+    }
     toast(`${d.label}: ${value}`); kind==='existing'?renderExisting():renderReferrals(); loadDashboard();
   }catch(e){ toast(e.message,'error'); kind==='existing'?renderExisting():renderReferrals(); }
 }
@@ -300,7 +316,8 @@ async function loadDashboard(){
                      k(d.referred_to_count,'Referred by a JHS Employee'),k(d.referred_someone_count,'Referred Someone')])+
       g('Contact',[k(d.contacted,'Contacted','ok'),k(d.pending,'Pending','warn')])+
       g('Buddy referral (Referred by a JHS Employee)',[k(d.buddy_given,'Given','ok'),k(d.buddy_not_given,'Not given','bad'),k(d.buddy_awaiting,'Awaiting','warn')])+
-      g('Shortlisting (Referred Someone)',[k(d.shortlisted,'Shortlisted','ok'),k(d.rejected,'Rejected','bad'),k(d.shortlist_awaiting,'Awaiting','warn')]);
+      g('Status (Referred Someone)',[k(d.status_counts.Contact,'Contact'),k(d.status_counts.Shortlist,'Shortlist','ok'),k(d.status_counts.Joined,'Joined','ok'),
+                                     k(d.status_counts.Rejected,'Rejected','bad'),k(d.status_awaiting,'Awaiting','warn')]);
     document.getElementById('topBody').innerHTML = d.top.length ? d.top.map((p,i)=>`<tr class="click" onclick="showPerson(${i})">
       <td>${i+1}</td><td><b>${esc(p.empid)}</b></td><td>${dash(p.name)}</td><td><b>${p.count}</b></td><td>${p.referred_to.length}</td><td>${p.referred_someone.length}</td>
     </tr>`).join('') : '<tr><td colspan="6"><div class="empty"><i class="fas fa-inbox"></i>No referrals in this period.</div></td></tr>';
@@ -320,22 +337,22 @@ function renderReferrals(){
   const rows=rrRows.filter(r=>match(r,q));
   document.getElementById('rrBody').innerHTML = rows.length ? rows.map(r=>`<tr>
     <td><b>${esc(r.empid)}</b></td><td>${dash(r.name)}</td><td>${dash(r.manager)}</td><td>${dash(r.partner)}</td><td>${dash(r.role)}</td>
-    <td style="white-space:nowrap">
-      <button class="icon-btn" title="View resume" onclick="viewResume('${esc(r.id)}','${esc(r.resume_filename)}')"><i class="fas fa-eye"></i></button>
-      <button class="icon-btn dl" title="Download resume" onclick="download('/buddy-referral/admin/referrals/${esc(r.id)}/resume','${esc(r.resume_filename)}')"><i class="fas fa-download"></i></button>
-    </td>
+    <td style="white-space:nowrap">${resumeButtons(r)}</td>
     <td>${dash(r.date_of_joining)}</td>
     <td>${ctSelect('referrals',r)}</td>
     <td>${decSelect('referrals','shortlisted',r)}</td>
   </tr>`).join('') : '<tr><td colspan="9"><div class="empty"><i class="fas fa-inbox"></i>No referrals yet.</div></td></tr>';
 }
 
+function showCounts(){ document.getElementById('c_ex').textContent=exRows.length; document.getElementById('c_rr').textContent=rrRows.length; }
+async function loadRows(){
+  const [ex, rr] = await Promise.all([getJSON('/buddy-referral/admin/existing'), getJSON('/buddy-referral/admin/referrals')]);
+  exRows=ex.rows; rrRows=rr.rows;
+  showCounts(); renderExisting(); renderReferrals();
+}
 async function init(){
   try{
-    const [ex, rr] = await Promise.all([getJSON('/buddy-referral/admin/existing'), getJSON('/buddy-referral/admin/referrals')]);
-    exRows=ex.rows; rrRows=rr.rows;
-    document.getElementById('c_ex').textContent=exRows.length; document.getElementById('c_rr').textContent=rrRows.length;
-    renderExisting(); renderReferrals(); loadDashboard();
+    await loadRows(); loadDashboard();
     document.getElementById('ls').style.display='none';
     document.getElementById('app').style.display='block';
   }catch(e){ document.getElementById('ls').innerHTML='Could not load: '+esc(e.message); }

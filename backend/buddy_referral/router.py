@@ -261,6 +261,19 @@ def _yes_no(d: dict, field: str) -> str:
     return d.get(field) if d.get(field) in ("Yes", "No") else ""
 
 
+# Status of a "Referred Someone" candidate (stored as "shortlisted"). A "Joined" candidate is
+# listed under "Referred by a JHS Employee" (same record, nothing is copied).
+_STATUSES = ("Contact", "Shortlist", "Joined", "Rejected")
+_OLD_STATUSES = {"Yes": "Shortlist", "No": "Rejected"}      # saved before the four statuses
+
+
+def _status(d: dict) -> str:
+    """The saved status, '' while it is still open."""
+    value = d.get("shortlisted")
+    value = _OLD_STATUSES.get(value, value)
+    return value if value in _STATUSES else ""
+
+
 def _existing_rows():
     docs = list(existing_referrals.find({}).sort("submitted_at", -1))
     prof = _profiles_for(d.get("submitted_by") for d in docs)
@@ -275,6 +288,7 @@ def _existing_rows():
         rows.append({
             "id": str(d["_id"]),
             "empid": d.get("submitted_by"), "name": p["name"] or d.get("submitted_by_name"),
+            "date_of_joining": p["date_of_joining"] or d.get("date_of_joining") or "",
             "manager": p["manager"], "partner": p["partner"],
             "referred_to_name": t["name"] or d.get("referral_from_name"),
             "referred_to_position": t["designation"],
@@ -301,16 +315,36 @@ def _referral_rows():
             "date_of_joining": p["date_of_joining"] or d.get("date_of_joining") or "",
             "manager": p["manager"], "partner": p["partner"],
             "contacted": _contacted(d),
-            "shortlisted": _yes_no(d, "shortlisted"), "shortlisted_remark": d.get("shortlisted_remark") or "",
+            "shortlisted": _status(d), "shortlisted_remark": d.get("shortlisted_remark") or "",
+            "paid": _yes_no(d, "paid"), "paid_remark": d.get("paid_remark") or "",
             "role": d.get("role"), "resume_filename": d.get("resume_filename"),
             "resume_size": d.get("resume_size"), "submitted_at": d.get("submitted_at"),
         })
     return rows
 
 
+def _joined_row(r: dict) -> dict:
+    """A Joined candidate shaped like a "Referred by a JHS Employee" row. The
+    candidate has no recorded JHS code / name / joining date, so those stay blank."""
+    return {
+        **r, "joined_candidate": True, "position": r["role"],
+        "referred_emp": "", "referred_to_name": "", "referred_to_position": "", "referred_doj": "",
+        "duration": "", "buddy": False, "status": "",
+    }
+
+
+def _existing_tab_rows():
+    rows = _existing_rows() + [_joined_row(r) for r in _referral_rows() if r["shortlisted"] == "Joined"]
+    return sorted(rows, key=lambda r: r["submitted_at"] or datetime.min, reverse=True)
+
+
+def _referral_tab_rows():
+    return [r for r in _referral_rows() if r["shortlisted"] != "Joined"]
+
+
 @router.get("/admin/existing")
 def admin_existing(_: str = Depends(require_referral_admin)):
-    rows = _existing_rows()
+    rows = _existing_tab_rows()
     for r in rows:
         r["submitted_at"] = _iso(r["submitted_at"])
     return {"rows": rows}
@@ -318,7 +352,7 @@ def admin_existing(_: str = Depends(require_referral_admin)):
 
 @router.get("/admin/referrals")
 def admin_referrals(_: str = Depends(require_referral_admin)):
-    rows = _referral_rows()
+    rows = _referral_tab_rows()
     for r in rows:
         r["submitted_at"] = _iso(r["submitted_at"])
     return {"rows": rows}
@@ -375,7 +409,7 @@ _EX_HEAD = ["Emp Code", "Emp Name", "Position (Referred Emp)", "Manager", "Partn
             "Joining Date (Referred Emp)", "Duration (Referred Emp)", "Buddy Referral", "Referred Emp Status",
             "Contacted", "Paid", "Paid Remark", "Submitted On"]
 _RR_HEAD = ["Emp Code", "Emp Name", "Date of Joining", "Manager", "Partner", "Role", "Resume File",
-            "Contacted", "Shortlisted", "Shortlisted Remark", "Submitted On"]
+            "Contacted", "Status", "Status Remark", "Submitted On"]
 
 
 def _ex_line(r):
@@ -391,7 +425,7 @@ def _rr_line(r):
 
 @router.get("/admin/existing/export")
 def export_existing(_: str = Depends(require_referral_admin)):
-    rows = _existing_rows()
+    rows = _existing_tab_rows()
     data = _xlsx("Referred by a JHS Employee", _EX_HEAD, [_ex_line(r) for r in rows])
     return Response(content=data, media_type=_XLSX,
                     headers={"Content-Disposition": "attachment; filename=Referred_by_JHS_Employee.xlsx"})
@@ -399,7 +433,7 @@ def export_existing(_: str = Depends(require_referral_admin)):
 
 @router.get("/admin/referrals/export")
 def export_referrals(_: str = Depends(require_referral_admin)):
-    rows = _referral_rows()
+    rows = _referral_tab_rows()
     data = _xlsx("Referred Someone",
                  _RR_HEAD, [_rr_line(r) for r in rows])
     return Response(content=data, media_type=_XLSX,
@@ -411,26 +445,43 @@ class ContactedBody(BaseModel):
     contacted: str
 
 
+_COLLECTIONS = {"existing": existing_referrals, "referrals": resume_referrals}
+
+
+def _object_id(referral_id: str) -> ObjectId:
+    try:
+        return ObjectId(referral_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(404, "Referral not found")
+
+
+def _update_referral(kind: str, referral_id: str, changes: dict):
+    """$set on one referral. Rows of the "existing" tab can also be Joined
+    candidates, whose record lives in the resume referrals."""
+    oid = _object_id(referral_id)
+    res = _COLLECTIONS[kind].update_one({"_id": oid}, {"$set": changes})
+    if not res.matched_count and kind == "existing":
+        res = resume_referrals.update_one({"_id": oid, "shortlisted": "Joined"}, {"$set": changes})
+    if not res.matched_count:
+        raise HTTPException(404, "Referral not found")
+
+
 @router.put("/admin/{kind}/{referral_id}/contacted")
 def set_contacted(kind: str, referral_id: str, body: ContactedBody, _: str = Depends(require_referral_admin)):
-    coll = {"existing": existing_referrals, "referrals": resume_referrals}.get(kind)
-    if coll is None:
+    if kind not in _COLLECTIONS:
         raise HTTPException(404, "Unknown referral type")
     value = (body.contacted or "").strip().capitalize()
     if value not in ("Yes", "No"):
         raise HTTPException(400, "Contacted must be Yes or No")
-    try:
-        res = coll.update_one({"_id": ObjectId(referral_id)}, {"$set": {"contacted": value}})
-    except (InvalidId, TypeError):
-        raise HTTPException(404, "Referral not found")
-    if not res.matched_count:
-        raise HTTPException(404, "Referral not found")
+    _update_referral(kind, referral_id, {"contacted": value})
     return {"success": True, "contacted": value}
 
 
-# ── Paid (Referred by a JHS Employee) / Shortlisted (Referred Someone): Yes / No + remark ──
-_DECISIONS = {"existing": ("paid", existing_referrals, "paid_remark"),
-              "referrals": ("shortlisted", resume_referrals, "shortlisted_remark")}
+# ── Paid (Referred by a JHS Employee): Yes / No. Status (Referred Someone):
+#    Contact / Shortlist / Joined / Rejected. "No" and "Rejected" need a remark. ──
+# kind -> (field, allowed values, value that needs a remark, remark field)
+_DECISIONS = {"existing": ("paid", ("Yes", "No"), "No", "paid_remark"),
+              "referrals": ("shortlisted", _STATUSES, "Rejected", "shortlisted_remark")}
 
 
 class DecisionBody(BaseModel):
@@ -442,21 +493,25 @@ class DecisionBody(BaseModel):
 def set_decision(kind: str, referral_id: str, body: DecisionBody, _: str = Depends(require_referral_admin)):
     if kind not in _DECISIONS:
         raise HTTPException(404, "Unknown referral type")
-    field, coll, remark_field = _DECISIONS[kind]
+    field, allowed, needs_remark, remark_field = _DECISIONS[kind]
     value = (body.value or "").strip().capitalize()
-    if value not in ("Yes", "No"):
-        raise HTTPException(400, "Value must be Yes or No")
-    remark = (body.remark or "").strip()[:300]
-    if value == "No" and not remark:
-        raise HTTPException(400, "A remark is required when the answer is No")
-    try:
-        res = coll.update_one({"_id": ObjectId(referral_id)},
-                              {"$set": {field: value, remark_field: remark if value == "No" else ""}})
-    except (InvalidId, TypeError):
-        raise HTTPException(404, "Referral not found")
-    if not res.matched_count:
-        raise HTTPException(404, "Referral not found")
-    return {"success": True, "value": value, "remark": remark if value == "No" else ""}
+    if value not in allowed:
+        raise HTTPException(400, f"Value must be one of: {', '.join(allowed)}")
+    remark = (body.remark or "").strip()[:300] if value == needs_remark else ""
+    if value == needs_remark and not remark:
+        raise HTTPException(400, f"A remark is required when the answer is {needs_remark}")
+    changes = {field: value, remark_field: remark}
+    if kind == "existing":
+        _update_referral(kind, referral_id, changes)
+    else:
+        oid = _object_id(referral_id)
+        # Joined is final: a stale screen must not move the candidate back.
+        query = {"_id": oid} if value == "Joined" else {"_id": oid, "shortlisted": {"$ne": "Joined"}}
+        if not resume_referrals.update_one(query, {"$set": changes}).matched_count:
+            if resume_referrals.find_one({"_id": oid}):
+                raise HTTPException(409, "This candidate is already marked Joined. Refresh the page.")
+            raise HTTPException(404, "Referral not found")
+    return {"success": True, "value": value, "remark": remark}
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
@@ -504,8 +559,7 @@ def _dashboard_data(date_from: str, date_to: str) -> dict:
     contacted = sum(1 for r in ex + rr if r["contacted"] == "Yes")
     paid_yes = sum(1 for r in ex if r["paid"] == "Yes")
     paid_no = sum(1 for r in ex if r["paid"] == "No")
-    short_yes = sum(1 for r in rr if r["shortlisted"] == "Yes")
-    short_no = sum(1 for r in rr if r["shortlisted"] == "No")
+    status_counts = {s: sum(1 for r in rr if r["shortlisted"] == s) for s in _STATUSES}
     return {
         "employees_referred": len(people),
         "total_referrals": len(ex) + len(rr),
@@ -513,7 +567,7 @@ def _dashboard_data(date_from: str, date_to: str) -> dict:
         "referred_someone_count": len(rr),
         "contacted": contacted, "pending": len(ex) + len(rr) - contacted,
         "buddy_given": paid_yes, "buddy_not_given": paid_no, "buddy_awaiting": len(ex) - paid_yes - paid_no,
-        "shortlisted": short_yes, "rejected": short_no, "shortlist_awaiting": len(rr) - short_yes - short_no,
+        "status_counts": status_counts, "status_awaiting": len(rr) - sum(status_counts.values()),
         "top": top, "_ex": ex, "_rr": rr,
     }
 
@@ -540,7 +594,7 @@ def export_dashboard(date_from: str = "", date_to: str = "", _: str = Depends(re
         ["Contacted", d["contacted"]], ["Pending", d["pending"]],
         ["Buddy referral given", d["buddy_given"]], ["Buddy referral not given", d["buddy_not_given"]],
         ["Buddy referral awaiting", d["buddy_awaiting"]],
-        ["Shortlisted", d["shortlisted"]], ["Rejected", d["rejected"]], ["Shortlisting awaiting", d["shortlist_awaiting"]],
+        *[[f"Status: {s}", n] for s, n in d["status_counts"].items()], ["Status awaiting", d["status_awaiting"]],
     ]
     top = [[i + 1, p["empid"], p["name"], p["count"], len(p["referred_to"]), len(p["referred_someone"])]
            for i, p in enumerate(d["top"])]
